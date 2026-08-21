@@ -1,0 +1,2114 @@
+/**
+ * NAP-IQ GeoMap
+ * ---------------
+ * Fetches all NAP records from GET /api/naps once on page load, then
+ * does everything else (marker rendering, search, filtering) entirely
+ * client-side against that in-memory dataset. No NAP markers are ever
+ * hard-coded here — every marker traces back to a row returned by
+ * the Flask API, which itself reads straight from MySQL.
+ */
+
+(function () {
+    // Default view: Sta. Cruz, Laguna town center.
+    const DEFAULT_CENTER = [14.2810, 121.4150];
+    const DEFAULT_ZOOM = 14;
+
+    const STATUS_COLORS = {
+        active: "#198754",
+        inactive: "#6c757d",
+        maintenance: "#dc3545",
+        full: "#fd7e14",
+        pending: "#0d6efd",
+    };
+
+    const PRIORITY_COLORS = {
+        low: "#6c757d",
+        medium: "#0d6efd",
+        high: "#fd7e14",
+        critical: "#dc3545",
+    };
+
+    // Responsive icon sizing: Leaflet divIcons are plain HTML/CSS, so
+    // by default they stay a fixed *pixel* size on screen no matter
+    // the zoom level. That's fine at/above the zoom the icons were
+    // designed for, but zooming out packs more ground into the same
+    // pixel area, so those same fixed-pixel icons end up sitting on
+    // top of each other (see the province-level view where nearby
+    // NAP/issue markers visually merge into one blob).
+    //
+    // ICON_FULL_SIZE_ZOOM is the zoom level at and above which every
+    // icon renders at its normal/exact design size (zooming in
+    // further never makes them any bigger). Below that, icon size
+    // shrinks smoothly down to ICON_MIN_SCALE once zoom reaches
+    // ICON_MIN_SCALE_ZOOM, so far-apart markers stay legible while
+    // nearby ones overlap far less than they would at full size.
+    const ICON_FULL_SIZE_ZOOM = 15;
+    const ICON_MIN_SCALE_ZOOM = 8;
+    const ICON_MIN_SCALE = 0.35;
+
+    /** Current icon scale factor (0 < scale <= 1) for the live map zoom. */
+    function getIconScale() {
+        if (!map) return 1;
+        const zoom = map.getZoom();
+        if (zoom >= ICON_FULL_SIZE_ZOOM) return 1;
+        if (zoom <= ICON_MIN_SCALE_ZOOM) return ICON_MIN_SCALE;
+        const t = (zoom - ICON_MIN_SCALE_ZOOM) / (ICON_FULL_SIZE_ZOOM - ICON_MIN_SCALE_ZOOM);
+        return ICON_MIN_SCALE + t * (1 - ICON_MIN_SCALE);
+    }
+
+    // Issue statuses that count as "still active" for connection-line
+    // coloring purposes -- a resolved/closed issue shouldn't keep a
+    // subscriber's line flagged red/orange forever.
+    const OPEN_ISSUE_STATUSES = ["pending", "assigned", "in_progress"];
+    const PRIORITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 };
+    // Color used for a subscriber↔NAP connection line when that
+    // subscriber has no currently-open reported issue -- reads as
+    // "healthy" at a glance, same green as an Active NAP.
+    const NO_ISSUE_LINE_COLOR = "#198754";
+
+    const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
+        ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
+        : "";
+
+    let map;
+    let markerLayer;
+    let issueMarkerLayer;
+    let recommendationLayer;   // Phase 22: the customer pin from a NAP recommendation
+    let subscriberMarkerLayer; // Phase 23 (15%): subscriber markers, for destination selection
+    // Bug-fix notice ("Need to add"): visible connection lines, drawn
+    // alongside the subscriber/issue marker layers above and toggled
+    // by the exact same "Show Subscribers" / "Show Issues" controls
+    // (no new UI). subscriberConnectionLayer draws a line from every
+    // plotted subscriber to its assigned NAP; issueConnectionLayer
+    // draws a red line from every plotted issue to its NAP, mirroring
+    // the subscriber connection so both read the same way at a glance.
+    let subscriberConnectionLayer;
+    let issueConnectionLayer;
+    let allNaps = [];              // full NAP dataset from the API
+    let allIssues = [];            // full technical issue dataset from the API
+    let allSubscribers = [];       // active subscribers, for the Report Issue form
+    const markersById = {};        // rebuilt on every renderNapMarkers() call
+    const issueMarkersById = {};   // rebuilt on every renderIssueMarkers() call
+    const subscriberMarkersById = {}; // rebuilt on every renderSubscriberMarkers() call
+
+    /** Looks up a NAP's in-memory record (with lat/lng) by id from the
+     * full allNaps dataset -- deliberately NOT markersById, since a
+     * NAP can be filtered off the map (status/port filters) while its
+     * subscribers/issues are still shown; the connection line should
+     * still be able to find where that NAP actually is. */
+    function findNapById(napId) {
+        if (napId == null) return null;
+        return allNaps.find((nap) => nap.id === napId) || null;
+    }
+
+    /**
+     * "Change the color of connection line base on the reported
+     * issues" -- looks at every OPEN (pending/assigned/in_progress)
+     * technical issue tied to this subscriber and returns the color
+     * for the worst (highest-priority) one found, so a subscriber's
+     * connection line reads red/orange the moment they have a
+     * critical/high open complaint, and green when they don't have
+     * any active complaint at all. Resolved/closed issues are
+     * ignored -- once a problem is fixed the line should go back to
+     * "healthy" green rather than staying colored forever.
+     */
+    function getSubscriberConnectionColor(subscriberId) {
+        let worstPriority = null;
+        allIssues.forEach((issue) => {
+            if (issue.subscriber_id !== subscriberId) return;
+            if (OPEN_ISSUE_STATUSES.indexOf(issue.status) === -1) return;
+            if (!worstPriority || PRIORITY_RANK[issue.priority] > PRIORITY_RANK[worstPriority]) {
+                worstPriority = issue.priority;
+            }
+        });
+        return worstPriority ? (PRIORITY_COLORS[worstPriority] || NO_ISSUE_LINE_COLOR) : NO_ISSUE_LINE_COLOR;
+    }
+
+    // Dark-mode basemap: swaps in a CARTO dark tile layer when the app's
+    // display theme (js/theme.js, Settings > Display Settings) is dark,
+    // matching the light OpenStreetMap tiles used otherwise. `tileLayer`
+    // is the currently-active Leaflet layer so it can be removed/replaced
+    // if the theme changes while this page is already open.
+    let tileLayer;
+
+    const LIGHT_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const LIGHT_TILE_ATTRIBUTION = "&copy; OpenStreetMap contributors";
+    const DARK_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    const DARK_TILE_ATTRIBUTION = "&copy; OpenStreetMap contributors &copy; CARTO";
+
+    function isDarkTheme() {
+        return !!(window.NapIQTheme && window.NapIQTheme.get() === "dark");
+    }
+
+    function applyBasemapForCurrentTheme() {
+        if (!map) return;
+        if (tileLayer) {
+            map.removeLayer(tileLayer);
+        }
+        tileLayer = isDarkTheme()
+            ? L.tileLayer(DARK_TILE_URL, { maxZoom: 19, attribution: DARK_TILE_ATTRIBUTION })
+            : L.tileLayer(LIGHT_TILE_URL, { maxZoom: 19, attribution: LIGHT_TILE_ATTRIBUTION });
+        // Add below every other layer so markers/panels stay on top.
+        tileLayer.addTo(map);
+        tileLayer.bringToBack();
+    }
+
+    // Live-swap the basemap if Dark Mode is toggled while this page is
+    // already open, instead of requiring a reload.
+    window.addEventListener("napiq:theme-changed", applyBasemapForCurrentTheme);
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    async function init() {
+        map = L.map("napMap").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+        // Phase 8 (adapted): the manual origin picker (nav-origin-picker.js)
+        // needs the live Leaflet map instance to draw its marker and listen
+        // for clicks, but everything above this line is a closure-private
+        // variable. Expose it read-only-by-convention on window, plus a
+        // one-shot ready event so listeners registered before this file
+        // finishes loading don't have to guess when it's safe to use it.
+        window.NapIQMap = map;
+        window.dispatchEvent(new CustomEvent("napiq:map-ready"));
+
+        applyBasemapForCurrentTheme();
+
+        markerLayer = L.layerGroup().addTo(map);
+        issueMarkerLayer = L.layerGroup().addTo(map);
+        recommendationLayer = L.layerGroup().addTo(map);
+        // Phase 23 (15%): subscriber markers start OFF the map (not
+        // added to `map` yet) since they're a brand-new layer no prior
+        // phase had — the "Show Subscribers" toggle below decides
+        // whether they're ever added. Existing NAP/issue layers are
+        // untouched and keep their previous always-on behavior.
+        subscriberMarkerLayer = L.layerGroup();
+        // Connection-line layers start OFF the map too, same as
+        // subscriberMarkerLayer -- renderSubscriberMarkers()/
+        // renderIssueMarkers() add or remove them together with their
+        // matching marker layer so a line is never shown without its
+        // markers (or vice versa).
+        subscriberConnectionLayer = L.layerGroup();
+        issueConnectionLayer = L.layerGroup();
+
+        await loadNaps();
+        await loadIssues();
+        await loadSubscribers();
+
+        populateNapSelectForIssue();
+        populateSubscriberSelect();
+
+        renderAll();
+        // Delegated click handling for every "Set as destination"
+        // button, in any popup (NAP/issue/subscriber). One listener
+        // covers all of them since Leaflet re-injects popup HTML into
+        // the DOM fresh each time a marker opens.
+        map.on("popupopen", handleDestinationButtonInPopup);
+        // Rebuild every marker layer whenever the zoom level settles,
+        // so icon sizes (see getIconScale()) track the new zoom
+        // instead of staying pinned at whatever size they were built
+        // at on the last render.
+        map.on("zoomend", renderAll);
+        focusIssueFromQueryParam();
+        await focusNapRecommendationFromQueryParam();
+        // Phase 13 (65%): runs after the other two focus helpers so a
+        // page linking with both ?issue_id= (legacy) and the newer
+        // ?navigate_type=/?navigate_id= pair has this one win — it's
+        // the one that also arms NapIQNavigation, not just pans the
+        // map. allNaps/allIssues/allSubscribers are already loaded by
+        // this point, same precondition the two calls above rely on.
+        focusNavigationFromQueryParam();
+
+        // Re-render whenever a NAP filter control changes.
+        document.querySelectorAll(".status-filter").forEach((el) => {
+            el.addEventListener("change", renderAll);
+        });
+        document.getElementById("portsFilter").addEventListener("change", renderAll);
+
+        // Re-render whenever an issue filter control changes.
+        document.querySelectorAll(".issue-status-filter").forEach((el) => {
+            el.addEventListener("change", renderAll);
+        });
+        document.querySelectorAll(".issue-priority-filter").forEach((el) => {
+            el.addEventListener("change", renderAll);
+        });
+
+        // Show/Hide NAPs and Show/Hide Issues layer toggles.
+        document.querySelectorAll(".layer-toggle").forEach((el) => {
+            el.addEventListener("change", renderAll);
+        });
+
+        // Search interactions.
+        const searchInput = document.getElementById("napSearchInput");
+        searchInput.addEventListener("input", handleSearchInput);
+        searchInput.addEventListener("focus", handleSearchInput);
+        document.addEventListener("click", (event) => {
+            const dropdown = document.getElementById("napSearchResults");
+            if (!dropdown.contains(event.target) && event.target !== searchInput) {
+                dropdown.classList.add("d-none");
+            }
+        });
+
+        setupQuickAdd();
+        setupReportIssue();
+        setupNapDetailPanel();
+    }
+
+    /** Rebuilds the NAP, issue, and subscriber marker layers. */
+    function renderAll() {
+        renderNapMarkers();
+        renderIssueMarkers();
+        renderSubscriberMarkers();
+    }
+
+    /**
+     * Step 2/3 of the flow described in the chat explanation:
+     * fetch JSON from the Flask API and store it in memory.
+     */
+    async function loadNaps() {
+        try {
+            const response = await fetch("/api/naps");
+            if (!response.ok) throw new Error("Request failed: " + response.status);
+            allNaps = await response.json();
+        } catch (err) {
+            console.error("Failed to load NAP data:", err);
+            allNaps = [];
+            const mapEl = document.getElementById("napMap");
+            mapEl.insertAdjacentHTML(
+                "afterend",
+                '<div class="alert alert-danger mt-2">Could not load NAP data from the server. ' +
+                    "Check that Flask and MySQL are running, then refresh this page.</div>"
+            );
+        }
+    }
+
+    async function loadIssues() {
+        try {
+            const response = await fetch("/api/issues");
+            if (!response.ok) throw new Error("Request failed: " + response.status);
+            allIssues = await response.json();
+        } catch (err) {
+            console.error("Failed to load technical issue data:", err);
+            allIssues = [];
+            showAlert("danger", "Could not load technical issues from the server.");
+        }
+    }
+
+    async function loadSubscribers() {
+        try {
+            const response = await fetch("/api/subscribers");
+            if (!response.ok) throw new Error("Request failed: " + response.status);
+            allSubscribers = await response.json();
+        } catch (err) {
+            console.error("Failed to load subscriber data:", err);
+            allSubscribers = [];
+        }
+    }
+
+    /** Reads the current filter UI state. */
+    function getActiveFilters() {
+        const statuses = Array.from(document.querySelectorAll(".status-filter"))
+            .filter((el) => el.checked)
+            .map((el) => el.value);
+        const portsMode = document.getElementById("portsFilter").value; // all | available | full
+        return { statuses, portsMode };
+    }
+
+    /** Returns true if a NAP passes the current status + port filters. */
+    function passesFilters(nap, filters) {
+        if (!filters.statuses.includes(nap.status)) return false;
+
+        if (filters.portsMode === "available" && nap.available_ports <= 0) return false;
+        if (filters.portsMode === "full" && nap.available_ports > 0) return false;
+
+        return true;
+    }
+
+    /** Rebuilds the NAP marker layer from allNaps based on current filters. */
+    function renderNapMarkers() {
+        markerLayer.clearLayers();
+        Object.keys(markersById).forEach((key) => delete markersById[key]);
+
+        const showNaps = document.getElementById("showNapsToggle").checked;
+        if (!showNaps) {
+            updateResultCount();
+            return;
+        }
+
+        const filters = getActiveFilters();
+        let shown = 0;
+        allNaps.forEach((nap) => {
+            if (!passesFilters(nap, filters)) return;
+
+            const marker = L.marker([nap.latitude, nap.longitude], {
+                icon: buildIcon(nap),
+                title: nap.nap_code + " - " + nap.name,
+            });
+            // NAP markers no longer use a Leaflet popup (see
+            // openNapDetailPanel() below) -- clicking one opens/
+            // re-populates the right-side slide-in detail panel
+            // instead.
+            marker.on("click", () => openNapDetailPanel(nap));
+            markerLayer.addLayer(marker);
+            markersById[nap.id] = marker;
+            shown += 1;
+        });
+
+        updateResultCount();
+    }
+
+    /** Updates the "X of Y shown" counter for whichever layers are visible. */
+    function updateResultCount() {
+        const counter = document.getElementById("mapResultCount");
+        if (!counter) return;
+        const napCount = Object.keys(markersById).length;
+        const issueCount = Object.keys(issueMarkersById).length;
+        const subscriberCount = Object.keys(subscriberMarkersById).length;
+        let text =
+            napCount + " of " + allNaps.length + " NAP(s), " +
+            issueCount + " of " + allIssues.length + " issue(s) shown";
+        if (subscriberCount > 0 || document.getElementById("showSubscribersToggle").checked) {
+            text += ", " + subscriberCount + " of " + allSubscribers.length + " subscriber(s) shown";
+        }
+        counter.textContent = text;
+    }
+
+    /**
+     * Builds the NAP marker icon for a given NAP: the provided
+     * radio-tower/signal artwork (window.NAP_ICON_URL, set by
+     * naps/map.html from the real static URL), with a small
+     * status-colored badge dot layered over its bottom-right corner
+     * so the existing status-at-a-glance behavior (active/inactive/
+     * full/maintenance/pending, same colors as the legend) is still
+     * preserved even though the artwork itself is a single fixed
+     * color.
+     *
+     * A small floating label sits just above the icon showing the
+     * NAP's name and, beside it, its port-usage percentage (used_ports
+     * / total_ports, same figure shown in the detail panel and colored
+     * with the same red/yellow/green thresholds). The label is
+     * pointer-events:none and positioned outside the icon's own
+     * iconSize box, so it never affects the marker's click hit area
+     * or its geo-anchor point.
+     *
+     * Every pixel dimension below is multiplied by getIconScale(), so
+     * the whole marker (artwork, status dot, and label) shrinks
+     * smoothly as the map zooms out instead of staying full-size and
+     * piling on top of neighboring markers -- and is never any bigger
+     * than its normal design size when zoomed in. The name/percentage
+     * label is dropped entirely below a legibility threshold so a
+     * zoomed-out cluster of NAPs doesn't turn into a wall of tiny
+     * unreadable text on top of the overlap.
+     */
+    function buildIcon(nap) {
+        const status = nap.status;
+        const color = STATUS_COLORS[status] || "#0d6efd";
+        const usagePct = nap.total_ports > 0
+            ? Math.round((nap.used_ports / nap.total_ports) * 100)
+            : 0;
+        const usageColor =
+            usagePct >= NAP_USAGE_DANGER_PCT
+                ? "#dc3545"
+                : usagePct >= NAP_USAGE_WARNING_PCT
+                    ? "#b8860b"
+                    : "#198754";
+
+        const scale = getIconScale();
+        const w = Math.round(34 * scale);
+        const h = Math.round(31 * scale);
+        const dot = Math.max(4, Math.round(10 * scale));
+        const dotOffset = Math.round(2 * scale);
+        const dotBorder = Math.max(1, Math.round(2 * scale));
+
+        // Below this scale the label would be too small to read and
+        // just adds visual clutter to an already-dense cluster, so
+        // it's skipped entirely rather than shrunk further.
+        const showLabel = scale >= 0.7;
+        let labelHtml = "";
+        if (showLabel) {
+            const fontSize = Math.max(9, Math.round(11 * scale));
+            labelHtml =
+                '<div class="nap-marker-label" style="position:absolute;bottom:100%;left:50%;' +
+                'transform:translateX(-50%);margin-bottom:3px;white-space:nowrap;display:flex;' +
+                'align-items:center;gap:4px;background:rgba(255,255,255,.95);' +
+                'border:1px solid rgba(0,0,0,.15);border-radius:4px;padding:1px 5px;' +
+                'font-size:' + fontSize + 'px;line-height:1.4;color:#212529;' +
+                'box-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;">' +
+                '<span class="fw-semibold">' + escapeHtml(nap.name || "") + "</span>" +
+                '<span style="color:' + usageColor + ';font-weight:700;">' + usagePct + "%</span>" +
+                "</div>";
+        }
+
+        const html =
+            '<div class="nap-marker-wrap" style="position:relative;width:' + w + 'px;height:' + h + 'px;">' +
+            labelHtml +
+            '<img src="' + (window.NAP_ICON_URL || "") + '" width="' + w + '" height="' + h + '" ' +
+            'alt="" style="display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));">' +
+            // status badge dot, bottom-right corner of the artwork
+            '<span style="position:absolute;right:-' + dotOffset + 'px;bottom:-' + dotOffset + 'px;' +
+            'width:' + dot + 'px;height:' + dot + 'px;border-radius:50%;background:' + color + ';' +
+            'border:' + dotBorder + 'px solid #ffffff;box-shadow:0 1px 2px rgba(0,0,0,.4);"></span>' +
+            "</div>";
+
+        return L.divIcon({
+            html: html,
+            className: "nap-marker-icon" + (status === "pending" ? " nap-marker-pending" : ""),
+            iconSize: [w, h],
+            iconAnchor: [Math.round(w / 2), Math.round(h * (27 / 31))],
+            popupAnchor: [0, -Math.round(h * (24 / 31))],
+        });
+    }
+
+    // Usage-badge / progress-bar color thresholds for the NAP detail
+    // panel, matching the exact convention already used elsewhere in
+    // the dashboard (reports/index.html's pct >= near_capacity_threshold
+    // / >= 70 ladder, where near_capacity_threshold is
+    // NEAR_CAPACITY_THRESHOLD_PCT = 90 in app/routes/reports.py):
+    // red >=90%, yellow >=70%, green below that.
+    const NAP_USAGE_DANGER_PCT = 90;
+    const NAP_USAGE_WARNING_PCT = 70;
+
+    // id of the NAP currently shown in the detail panel, or null when
+    // closed. Only used so re-clicking is harmless; open/close state
+    // itself lives on the panel element's class (see below).
+    let openNapDetailNapId = null;
+
+    /**
+     * Opens the right-side NAP detail slide-in panel (#napDetailPanel
+     * in naps/map.html) populated with `nap`'s data -- replaces the
+     * old marker popup (see renderNapMarkers() above). If the panel
+     * is already open (for this NAP or a different one), this just
+     * re-populates the fields in place rather than closing/reopening,
+     * so switching between NAP markers while the panel is open has no
+     * close/reopen flicker.
+     */
+    function openNapDetailPanel(nap) {
+        const panel = document.getElementById("napDetailPanel");
+        if (!panel) return;
+
+        openNapDetailNapId = nap.id;
+
+        const usagePct = nap.total_ports > 0
+            ? Math.round((nap.used_ports / nap.total_ports) * 100)
+            : 0;
+
+        document.getElementById("napDetailCode").textContent = nap.nap_code;
+        document.getElementById("napDetailName").textContent = nap.name;
+        document.getElementById("napDetailLocation").textContent = nap.address || "\u2014";
+
+        const usageBadge = document.getElementById("napDetailUsageBadge");
+        usageBadge.textContent = usagePct + "%";
+        usageBadge.classList.remove("text-bg-success", "text-bg-warning", "text-bg-danger");
+        usageBadge.classList.add(
+            usagePct >= NAP_USAGE_DANGER_PCT
+                ? "text-bg-danger"
+                : usagePct >= NAP_USAGE_WARNING_PCT
+                    ? "text-bg-warning"
+                    : "text-bg-success"
+        );
+
+        document.getElementById("napDetailSlotSummary").textContent =
+            nap.used_ports + " used \u00b7 " + nap.available_ports + " open";
+
+        const progressBar = document.getElementById("napDetailProgressBar");
+        progressBar.style.width = usagePct + "%";
+        progressBar.setAttribute("aria-valuenow", String(usagePct));
+        progressBar.classList.remove("bg-success", "bg-warning", "bg-danger");
+        progressBar.classList.add(
+            usagePct >= NAP_USAGE_DANGER_PCT
+                ? "bg-danger"
+                : usagePct >= NAP_USAGE_WARNING_PCT
+                    ? "bg-warning"
+                    : "bg-success"
+        );
+
+        document.getElementById("napDetailTotalSlots").textContent = nap.total_ports + " total slots";
+
+        const lines = nap.connected_lines || [];
+        document.getElementById("napDetailLinesHeading").textContent =
+            "Connected lines (" + lines.length + ")";
+
+        const linesList = document.getElementById("napDetailLinesList");
+        linesList.innerHTML = "";
+        if (lines.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "napmap-detail-empty-lines";
+            empty.textContent = "No subscribers connected to this NAP yet.";
+            linesList.appendChild(empty);
+        } else {
+            lines.forEach((line) => {
+                const row = document.createElement("a");
+                row.className = "napmap-detail-line-row";
+                row.href = "/subscribers/" + line.subscriber_id;
+                row.innerHTML =
+                    '<span class="badge napmap-detail-line-code">' +
+                    escapeHtml(line.subscriber_code) + "</span>" +
+                    '<span class="napmap-detail-line-name">' + escapeHtml(line.full_name) + "</span>" +
+                    '<span class="badge ' + paymentStatusBadgeClass(line.payment_status) + '">' +
+                    escapeHtml(line.payment_status) + "</span>" +
+                    '<i class="bi bi-chevron-right napmap-detail-line-chevron"></i>';
+                linesList.appendChild(row);
+            });
+        }
+
+        panel.classList.add("napmap-detail-panel-open");
+        panel.setAttribute("aria-hidden", "false");
+    }
+
+    /** Closes the NAP detail slide-in panel (slides it back off-screen). */
+    function closeNapDetailPanel() {
+        const panel = document.getElementById("napDetailPanel");
+        if (!panel) return;
+        panel.classList.remove("napmap-detail-panel-open");
+        panel.setAttribute("aria-hidden", "true");
+        openNapDetailNapId = null;
+    }
+
+    /**
+     * Bootstrap badge class for a connected line's payment status,
+     * matching the same status->color language payments/list.html
+     * already uses (confirmed/"Paid" -> success, pending/"Pending" ->
+     * secondary, overdue/"Overdue" -> danger, voided/"Voided" ->
+     * dark), keyed here off the human-readable label
+     * naps_json()/_connected_lines() sends instead of the raw status.
+     */
+    function paymentStatusBadgeClass(paymentStatus) {
+        switch (paymentStatus) {
+            case "Paid": return "text-bg-success";
+            case "Pending": return "text-bg-secondary";
+            case "Overdue": return "text-bg-danger";
+            case "Voided": return "text-bg-dark";
+            default: return "text-bg-secondary"; // "No payment"
+        }
+    }
+
+    /**
+     * Wires up the NAP detail panel's close (X) button and makes
+     * clicking anywhere else on the map close it too -- the same
+     * "click elsewhere dismisses it" behavior a Leaflet popup gets for
+     * free. Marker clicks don't bubble up to this map "click"
+     * listener, so clicking a different NAP marker re-populates the
+     * panel (via its own marker "click" handler in renderNapMarkers())
+     * rather than triggering this close handler first.
+     */
+    function setupNapDetailPanel() {
+        const closeBtn = document.getElementById("napDetailCloseBtn");
+        if (closeBtn) closeBtn.addEventListener("click", closeNapDetailPanel);
+        map.on("click", closeNapDetailPanel);
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str == null ? "" : String(str);
+        return div.innerHTML;
+    }
+
+    // ---------------- Issue markers ----------------
+
+    /** Reads the current issue filter UI state. */
+    function getActiveIssueFilters() {
+        const statuses = Array.from(document.querySelectorAll(".issue-status-filter"))
+            .filter((el) => el.checked)
+            .map((el) => el.value);
+        const priorities = Array.from(document.querySelectorAll(".issue-priority-filter"))
+            .filter((el) => el.checked)
+            .map((el) => el.value);
+        return { statuses, priorities };
+    }
+
+    /** Returns true if an issue passes the current status + priority filters. */
+    function passesIssueFilters(issue, filters) {
+        if (!filters.statuses.includes(issue.status)) return false;
+        if (!filters.priorities.includes(issue.priority)) return false;
+        return true;
+    }
+
+    /** Rebuilds the issue marker layer from allIssues based on current filters. */
+    function renderIssueMarkers() {
+        issueMarkerLayer.clearLayers();
+        issueConnectionLayer.clearLayers();
+        Object.keys(issueMarkersById).forEach((key) => delete issueMarkersById[key]);
+
+        const showIssues = document.getElementById("showIssuesToggle").checked;
+        if (showIssues) {
+            if (!map.hasLayer(issueConnectionLayer)) issueConnectionLayer.addTo(map);
+        } else {
+            if (map.hasLayer(issueConnectionLayer)) map.removeLayer(issueConnectionLayer);
+            updateResultCount();
+            return;
+        }
+
+        const filters = getActiveIssueFilters();
+        allIssues.forEach((issue) => {
+            if (!passesIssueFilters(issue, filters)) return;
+
+            const marker = L.marker([issue.latitude, issue.longitude], {
+                icon: buildIssueIcon(issue.priority),
+                title: (issue.issue_code || "Issue") + " - " + issue.issue_type,
+            });
+            marker.bindPopup(buildIssuePopupHtml(issue));
+            issueMarkerLayer.addLayer(marker);
+            issueMarkersById[issue.id] = marker;
+
+            // "Reported issues must have a visible line connection to
+            // their nap" -- same treatment as the subscriber↔NAP line
+            // above, colored by this issue's own priority (same
+            // PRIORITY_COLORS palette as the issue marker/legend) so
+            // a critical issue's line reads red while a low-priority
+            // one reads gray, instead of every issue line looking
+            // identically severe.
+            const nap = findNapById(issue.nap_id);
+            if (nap) {
+                const line = L.polyline(
+                    [
+                        [issue.latitude, issue.longitude],
+                        [nap.latitude, nap.longitude],
+                    ],
+                    {
+                        color: PRIORITY_COLORS[issue.priority] || "#dc3545",
+                        weight: 2.5,
+                        opacity: 0.8,
+                        dashArray: "4,4",
+                        interactive: false,
+                    }
+                );
+                issueConnectionLayer.addLayer(line);
+            }
+        });
+
+        updateResultCount();
+    }
+
+    /**
+     * Builds a marker icon for a technical issue. Deliberately a
+     * circular warning badge (not the teardrop pin used for NAPs) so
+     * issue markers are visually distinguishable from NAP markers at
+     * a glance, colored by priority rather than status.
+     */
+    function buildIssueIcon(priority) {
+        const color = PRIORITY_COLORS[priority] || "#0d6efd";
+        const s = Math.round(28 * getIconScale());
+        const svg =
+            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="14" cy="14" r="12" fill="' + color + '" stroke="#ffffff" stroke-width="2"/>' +
+            '<text x="14" y="19" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+            'font-family="Arial, sans-serif">!</text>' +
+            "</svg>";
+
+        return L.divIcon({
+            html: svg,
+            className: "issue-marker-icon",
+            iconSize: [s, s],
+            iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
+            popupAnchor: [0, -Math.round(s / 2)],
+        });
+    }
+
+    /** Builds a "pending" (not-yet-saved) issue marker icon — same
+     * shape, distinct pulsing blue color. */
+    function buildPendingIssueIcon() {
+        const s = Math.round(28 * getIconScale());
+        const svg =
+            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="14" cy="14" r="12" fill="#0d6efd" stroke="#ffffff" stroke-width="2"/>' +
+            '<text x="14" y="19" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+            'font-family="Arial, sans-serif">!</text>' +
+            "</svg>";
+
+        return L.divIcon({
+            html: svg,
+            className: "issue-marker-icon issue-marker-pending",
+            iconSize: [s, s],
+            iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
+            popupAnchor: [0, -Math.round(s / 2)],
+        });
+    }
+
+    /** Turns "in_progress" into "In Progress", etc. */
+    function formatStatusLabel(value) {
+        return String(value)
+            .split("_")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+    }
+
+    /** Builds the popup HTML shown when an issue marker is clicked. */
+    function buildIssuePopupHtml(issue) {
+        const priorityColor = PRIORITY_COLORS[issue.priority] || "#6c757d";
+        return (
+            '<div class="issue-popup">' +
+            '<div class="issue-popup-code">' + escapeHtml(issue.issue_code || ("Issue #" + issue.id)) + "</div>" +
+            "<h6>" + escapeHtml(issue.issue_type) + "</h6>" +
+            '<dl class="row mb-1">' +
+            '<dt class="col-5">Priority</dt><dd class="col-7">' +
+                '<span class="legend-dot legend-dot-square" style="background:' + priorityColor + '"></span> ' +
+                formatStatusLabel(issue.priority) + "</dd>" +
+            '<dt class="col-5">Status</dt><dd class="col-7">' + formatStatusLabel(issue.status) + "</dd>" +
+            '<dt class="col-5">Subscriber</dt><dd class="col-7">' +
+                escapeHtml(issue.subscriber_code ? issue.subscriber_code + " — " + issue.subscriber_name : (issue.subscriber_name || "\u2014")) +
+                "</dd>" +
+            '<dt class="col-5">NAP</dt><dd class="col-7">' + escapeHtml(issue.nap_code || "\u2014") + "</dd>" +
+            '<dt class="col-5">Description</dt><dd class="col-7">' + escapeHtml(issue.description || "\u2014") + "</dd>" +
+            '<dt class="col-5">Reported</dt><dd class="col-7">' + formatDateTime(issue.created_at) + "</dd>" +
+            "</dl>" +
+            '<div class="d-flex gap-1">' +
+            '<a class="btn btn-sm btn-outline-warning flex-fill" href="/issues/' + issue.id + '">View Issue</a>' +
+            '<button type="button" class="btn btn-sm btn-outline-success flex-fill" ' +
+            'data-dest-type="issue" data-dest-id="' + issue.id + '">' +
+            '<i class="bi bi-signpost-split me-1"></i>Set as destination</button>' +
+            "</div>" +
+            "</div>"
+        );
+    }
+
+    // ---------------- Subscriber markers (Phase 23, 15%) ----------------
+    // Subscribers had no marker layer before this phase — they only
+    // fed the Report Issue form's dropdown (loadSubscribers(), still
+    // used exactly as before). This section is purely additive: a new
+    // optional layer, off by default, that plots the same
+    // already-loaded `allSubscribers` dataset (no new API call) so a
+    // real subscriber can be selected as a navigation destination the
+    // same way a NAP or issue can. Existing NAP/issue marker code
+    // above is completely untouched.
+
+    /** Rebuilds the subscriber marker layer from allSubscribers. Only
+     * subscribers with known coordinates can be plotted — same
+     * skip-if-unplottable rule /api/naps and /api/issues already use
+     * (subscriber latitude/longitude is nullable in the schema). */
+    function renderSubscriberMarkers() {
+        subscriberMarkerLayer.clearLayers();
+        subscriberConnectionLayer.clearLayers();
+        Object.keys(subscriberMarkersById).forEach((key) => delete subscriberMarkersById[key]);
+
+        const toggle = document.getElementById("showSubscribersToggle");
+        const showSubscribers = toggle ? toggle.checked : false;
+
+        if (showSubscribers) {
+            if (!map.hasLayer(subscriberMarkerLayer)) subscriberMarkerLayer.addTo(map);
+            if (!map.hasLayer(subscriberConnectionLayer)) subscriberConnectionLayer.addTo(map);
+        } else {
+            if (map.hasLayer(subscriberMarkerLayer)) map.removeLayer(subscriberMarkerLayer);
+            if (map.hasLayer(subscriberConnectionLayer)) map.removeLayer(subscriberConnectionLayer);
+            updateResultCount();
+            return;
+        }
+
+        allSubscribers.forEach((subscriber) => {
+            if (subscriber.latitude == null || subscriber.longitude == null) return;
+
+            const marker = L.marker([subscriber.latitude, subscriber.longitude], {
+                icon: buildSubscriberIcon(),
+                title: subscriber.subscriber_code + " - " + subscriber.full_name,
+            });
+            marker.bindPopup(buildSubscriberPopupHtml(subscriber));
+            subscriberMarkerLayer.addLayer(marker);
+            subscriberMarkersById[subscriber.id] = marker;
+
+            // "Subscribers connection to nap must be visible when I
+            // enable the subscribers checkbox" -- a line from the
+            // subscriber to its assigned NAP, when that NAP's location
+            // is known. Colored by getSubscriberConnectionColor() --
+            // green when the subscriber has no open reported issue,
+            // otherwise the color of their worst open issue's priority
+            // (same palette the issue markers/legend already use), so
+            // a glance at the map shows which links are unhealthy.
+            const nap = findNapById(subscriber.nap_id);
+            if (nap) {
+                const line = L.polyline(
+                    [
+                        [subscriber.latitude, subscriber.longitude],
+                        [nap.latitude, nap.longitude],
+                    ],
+                    {
+                        color: getSubscriberConnectionColor(subscriber.id),
+                        weight: 2.5,
+                        opacity: 0.8,
+                        dashArray: "4,4",
+                        interactive: false,
+                    }
+                );
+                subscriberConnectionLayer.addLayer(line);
+            }
+        });
+
+        updateResultCount();
+    }
+
+    /** Small circular marker for subscribers — visually distinct from
+     * both the NAP teardrop pin and the issue warning badge. */
+    function buildSubscriberIcon() {
+        const s = Math.round(22 * getIconScale());
+        const svg =
+            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="11" cy="11" r="9" fill="#6f42c1" stroke="#ffffff" stroke-width="2"/>' +
+            '<circle cx="11" cy="8.5" r="2.6" fill="#ffffff"/>' +
+            '<path d="M5.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" fill="#ffffff"/>' +
+            "</svg>";
+
+        return L.divIcon({
+            html: svg,
+            className: "subscriber-marker-icon",
+            iconSize: [s, s],
+            iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
+            popupAnchor: [0, -Math.round(s / 2)],
+        });
+    }
+
+    /** Builds the popup HTML shown when a subscriber marker is clicked. */
+    function buildSubscriberPopupHtml(subscriber) {
+        return (
+            '<div class="subscriber-popup">' +
+            '<div class="nap-popup-code">' + escapeHtml(subscriber.subscriber_code) + "</div>" +
+            "<h6>" + escapeHtml(subscriber.full_name) + "</h6>" +
+            '<dl class="row mb-1">' +
+            '<dt class="col-5">Address</dt><dd class="col-7">' + escapeHtml(subscriber.address || "\u2014") + "</dd>" +
+            "</dl>" +
+            '<div class="d-flex gap-1">' +
+            '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + subscriber.id + '">View Subscriber</a>' +
+            '<button type="button" class="btn btn-sm btn-outline-success flex-fill" ' +
+            'data-dest-type="subscriber" data-dest-id="' + subscriber.id + '">' +
+            '<i class="bi bi-signpost-split me-1"></i>Set as destination</button>' +
+            "</div>" +
+            "</div>"
+        );
+    }
+
+    // ---------------- Navigation destination selection (Phase 23, 15%) ----------------
+    // Translates the prototype's NavigationDestination concept (see
+    // src/types/index.ts + src/store/NavigationStore.tsx) into plain
+    // JSON built from data already loaded above (allNaps, allIssues,
+    // allSubscribers — every value here traces back to a real
+    // database row, nothing hard-coded). The shape matches the
+    // backend contract already documented in
+    // PHASE23_10_PERCENT_NOTES.md (app/navigation_contract.py's
+    // destination_json()), so a future phase that adds a
+    // server-rendered destination (e.g. from a technician's own
+    // assignment list) produces an identical-looking object.
+    //
+    // This phase stops at *selecting* a destination and exposing it
+    // (via NapIQNavigation, see nav-destination.js) — no routing, no
+    // GPS, no demo travel is wired up here.
+
+    function buildDestinationFromNap(nap) {
+        return {
+            id: "nap-" + nap.id,
+            type: "nap",
+            label: nap.name,
+            subtitle: nap.nap_code,
+            position: { lat: nap.latitude, lng: nap.longitude },
+        };
+    }
+
+    function buildDestinationFromIssue(issue) {
+        return {
+            id: "issue-" + issue.id,
+            type: "issue",
+            label: issue.issue_code || ("Issue #" + issue.id),
+            subtitle: issue.subscriber_name || issue.address || "",
+            position: { lat: issue.latitude, lng: issue.longitude },
+            issueId: issue.id,
+        };
+    }
+
+    function buildDestinationFromSubscriber(subscriber) {
+        return {
+            id: "subscriber-" + subscriber.id,
+            type: "subscriber",
+            label: subscriber.full_name,
+            subtitle: subscriber.subscriber_code,
+            position: { lat: subscriber.latitude, lng: subscriber.longitude },
+        };
+    }
+
+    /**
+     * Phase 13 (65%, navigation destination panels): reads the
+     * `?navigate_type=`/`?navigate_id=` pair naps.geomap() rendered
+     * onto #napMap's data attributes (see map.html) — set by the
+     * "Navigate" button on naps/view.html, subscribers/view.html, and
+     * issues/view.html — and, if present, looks the real entity up in
+     * whichever in-memory dataset already holds it (allNaps/
+     * allIssues/allSubscribers), pans/opens its popup the same way a
+     * search result or a legacy `?issue_id=` link does, and — the
+     * part those two don't do — immediately arms it as the active
+     * navigation destination via NapIQNavigation, using the exact
+     * same buildDestinationFrom*() helper a "Set as destination"
+     * popup click uses. So a NAP/subscriber/issue reached this way is
+     * indistinguishable, from here on, from one picked by hand on the
+     * map.
+     *
+     * Same "runs once after the initial render, empty attribute means
+     * no focus" shape as focusIssueFromQueryParam() above. An unknown
+     * navigate_type (already filtered server-side, but defensive
+     * here too) or unknown/foreign id simply selects nothing.
+     */
+    function focusNavigationFromQueryParam() {
+        const mapEl = document.getElementById("napMap");
+        const navigateType = mapEl ? mapEl.getAttribute("data-navigate-type") : "";
+        const rawId = mapEl ? mapEl.getAttribute("data-navigate-id") : "";
+        if (!navigateType || !rawId) return;
+
+        const entityId = Number(rawId);
+        if (!Number.isInteger(entityId)) return;
+
+        let destination = null;
+
+        if (navigateType === "nap") {
+            const nap = allNaps.find((n) => n.id === entityId);
+            if (nap) {
+                selectNap(nap);
+                destination = buildDestinationFromNap(nap);
+            }
+        } else if (navigateType === "issue") {
+            const issue = allIssues.find((i) => i.id === entityId);
+            if (issue) {
+                focusIssue(issue);
+                destination = buildDestinationFromIssue(issue);
+            }
+        } else if (navigateType === "subscriber") {
+            const subscriber = allSubscribers.find((s) => s.id === entityId);
+            if (subscriber && subscriber.latitude != null && subscriber.longitude != null) {
+                focusSubscriber(subscriber);
+                destination = buildDestinationFromSubscriber(subscriber);
+            }
+        }
+
+        if (!destination || !window.NapIQNavigation) return;
+        window.NapIQNavigation.setDestination(destination);
+    }
+
+    /**
+     * Delegated handler, attached once to `map`'s "popupopen" event
+     * (see init()). Every popup this file builds (NAP/issue/subscriber)
+     * may contain one `[data-dest-type][data-dest-id]` button; this
+     * finds it inside whichever popup just opened and wires its click
+     * to look the real entity up (by id, in the same in-memory arrays
+     * the map already uses) and hand it to NapIQNavigation.
+     */
+    function handleDestinationButtonInPopup(event) {
+        const container = event.popup.getElement();
+        if (!container) return;
+        const btn = container.querySelector("[data-dest-type][data-dest-id]");
+        if (!btn) return;
+
+        btn.addEventListener("click", () => {
+            const destType = btn.getAttribute("data-dest-type");
+            const entityId = Number(btn.getAttribute("data-dest-id"));
+            let destination = null;
+
+            if (destType === "nap") {
+                const nap = allNaps.find((n) => n.id === entityId);
+                if (nap) destination = buildDestinationFromNap(nap);
+            } else if (destType === "issue") {
+                const issue = allIssues.find((i) => i.id === entityId);
+                if (issue) destination = buildDestinationFromIssue(issue);
+            } else if (destType === "subscriber") {
+                const subscriber = allSubscribers.find((s) => s.id === entityId);
+                if (subscriber) destination = buildDestinationFromSubscriber(subscriber);
+            }
+
+            if (!destination || !window.NapIQNavigation) return;
+
+            window.NapIQNavigation.setDestination(destination);
+
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Destination set';
+            btn.disabled = true;
+            window.setTimeout(() => {
+                btn.innerHTML = '<i class="bi bi-signpost-split me-1"></i>Set as destination';
+                btn.disabled = false;
+            }, 1500);
+        });
+    }
+
+    /** Formats an ISO timestamp string for display; falls back gracefully. */
+    function formatDateTime(isoString) {
+        if (!isoString) return "\u2014";
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return escapeHtml(isoString);
+        return escapeHtml(
+            date.toLocaleString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+            })
+        );
+    }
+
+    // ---------------- Search (Phase 23, 85%: NAP + Subscriber + Complaint) ----------------
+    //
+    // Through Phase 16 this box only ever searched allNaps. Phase 17 of
+    // the integration plan ("Search -> destination -> route") asks that
+    // the existing map search be *extended*, not replaced, to also
+    // match subscribers and complaints (technical issues), and that a
+    // search result can optionally become a navigation destination and
+    // open navigation "explicit user action" — never automatically just
+    // because a query was typed or a result was highlighted.
+    //
+    // Design used here to satisfy that "explicit action" requirement
+    // without touching the plain-NAP behavior every earlier phase
+    // already relies on: each result row now has two independent click
+    // targets.
+    //   - Clicking the row body (unchanged from before, extended to
+    //     subscribers/complaints): forces the right filter/layer toggle
+    //     on, re-renders, pans/zooms the map to the entity, and opens
+    //     its existing popup. This is the exact same behavior
+    //     selectNap()/focusIssue()/focusSubscriber() already provide
+    //     for a marker click, a "Navigate" link, or a legacy
+    //     ?issue_id= — nothing new is invented here.
+    //   - Clicking the small destination button on the right of a row
+    //     performs that same focus+open *and* arms the entity as the
+    //     navigation destination via NapIQNavigation.setDestination(),
+    //     using the identical buildDestinationFrom*() helpers the
+    //     in-popup "Set as destination" button already uses (see
+    //     handleDestinationButtonInPopup() above). This is the only
+    //     path in this file that sets a destination from search, and
+    //     it only runs on that explicit click.
+    //   - No route is requested by either path. Route calculation is
+    //     driven entirely by nav-routing.js once both an origin and a
+    //     destination exist, unchanged from Phases 5-15 — search never
+    //     touches that.
+
+    const SEARCH_TYPE_META = {
+        nap: { label: "NAP", icon: "bi-hdd-network-fill", badge: "text-bg-primary" },
+        subscriber: { label: "Subscriber", icon: "bi-person-fill", badge: "napiq-badge-subscriber" },
+        issue: { label: "Complaint", icon: "bi-exclamation-triangle-fill", badge: "text-bg-danger" },
+    };
+
+    const SEARCH_RESULTS_PER_TYPE = 4;
+
+    /** Builds the combined, capped result list across all three entity
+     * types for a given lowercased query. Entities without usable
+     * coordinates are skipped since a search result must be focusable
+     * on the map (matches the existing NAP-only behavior, which only
+     * ever offered NAPs, which always have coordinates). */
+    function findSearchMatches(query) {
+        const naps = allNaps
+            .filter(
+                (nap) =>
+                    nap.nap_code.toLowerCase().includes(query) ||
+                    nap.name.toLowerCase().includes(query)
+            )
+            .slice(0, SEARCH_RESULTS_PER_TYPE)
+            .map((nap) => ({
+                type: "nap",
+                entity: nap,
+                primary: nap.nap_code,
+                secondary: nap.name,
+            }));
+
+        const subscribers = allSubscribers
+            .filter(
+                (s) =>
+                    s.latitude != null &&
+                    s.longitude != null &&
+                    ((s.full_name && s.full_name.toLowerCase().includes(query)) ||
+                        (s.subscriber_code && s.subscriber_code.toLowerCase().includes(query)) ||
+                        (s.address && s.address.toLowerCase().includes(query)))
+            )
+            .slice(0, SEARCH_RESULTS_PER_TYPE)
+            .map((s) => ({
+                type: "subscriber",
+                entity: s,
+                primary: s.full_name,
+                secondary: s.subscriber_code,
+            }));
+
+        const issues = allIssues
+            .filter(
+                (issue) =>
+                    (issue.issue_code && issue.issue_code.toLowerCase().includes(query)) ||
+                    (issue.subscriber_name && issue.subscriber_name.toLowerCase().includes(query)) ||
+                    (issue.address && issue.address.toLowerCase().includes(query))
+            )
+            .slice(0, SEARCH_RESULTS_PER_TYPE)
+            .map((issue) => ({
+                type: "issue",
+                entity: issue,
+                primary: issue.issue_code || "Complaint #" + issue.id,
+                secondary: issue.subscriber_name || issue.address || "",
+            }));
+
+        return naps.concat(subscribers, issues);
+    }
+
+    function focusSearchResult(match) {
+        if (match.type === "nap") selectNap(match.entity);
+        else if (match.type === "subscriber") focusSubscriber(match.entity);
+        else if (match.type === "issue") focusIssue(match.entity);
+    }
+
+    function buildDestinationForSearchResult(match) {
+        if (match.type === "nap") return buildDestinationFromNap(match.entity);
+        if (match.type === "subscriber") return buildDestinationFromSubscriber(match.entity);
+        if (match.type === "issue") return buildDestinationFromIssue(match.entity);
+        return null;
+    }
+
+    function handleSearchInput() {
+        const query = document.getElementById("napSearchInput").value.trim().toLowerCase();
+        const dropdown = document.getElementById("napSearchResults");
+
+        if (!query) {
+            dropdown.classList.add("d-none");
+            dropdown.innerHTML = "";
+            return;
+        }
+
+        const matches = findSearchMatches(query);
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = '<div class="list-group-item text-muted small">No matches found.</div>';
+            dropdown.classList.remove("d-none");
+            return;
+        }
+
+        dropdown.innerHTML = matches
+            .map((match, index) => {
+                const meta = SEARCH_TYPE_META[match.type];
+                return (
+                    '<div class="list-group-item nap-search-result-item d-flex align-items-center gap-2" data-result-index="' +
+                    index + '">' +
+                    '<button type="button" class="btn btn-link p-0 text-start text-decoration-none flex-grow-1 min-w-0" ' +
+                    'data-search-focus-index="' + index + '">' +
+                    '<span class="badge ' + meta.badge + ' me-1"><i class="bi ' + meta.icon + '"></i> ' + meta.label + "</span>" +
+                    '<span class="fw-semibold">' + escapeHtml(match.primary || "") + "</span>" +
+                    (match.secondary
+                        ? ' <span class="text-muted small">&middot; ' + escapeHtml(match.secondary) + "</span>"
+                        : "") +
+                    "</button>" +
+                    '<button type="button" class="btn btn-sm btn-outline-success flex-shrink-0" ' +
+                    'data-search-dest-index="' + index + '" title="Set as navigation destination">' +
+                    '<i class="bi bi-signpost-split"></i>' +
+                    "</button>" +
+                    "</div>"
+                );
+            })
+            .join("");
+
+        dropdown.classList.remove("d-none");
+
+        dropdown.querySelectorAll("[data-search-focus-index]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const match = matches[Number(btn.getAttribute("data-search-focus-index"))];
+                if (match) focusSearchResult(match);
+                dropdown.classList.add("d-none");
+            });
+        });
+
+        dropdown.querySelectorAll("[data-search-dest-index]").forEach((btn) => {
+            btn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                const match = matches[Number(btn.getAttribute("data-search-dest-index"))];
+                if (!match) return;
+
+                // Explicit action: focus/open the entity exactly like a
+                // plain row click would, then arm it as the navigation
+                // destination. Nothing here requests a route — that
+                // still requires the user to separately pick/confirm an
+                // origin in the navigation card, same as every other
+                // "Set as destination" entry point in this file.
+                focusSearchResult(match);
+                const destination = buildDestinationForSearchResult(match);
+                if (destination && window.NapIQNavigation) {
+                    window.NapIQNavigation.setDestination(destination);
+                }
+                dropdown.classList.add("d-none");
+            });
+        });
+    }
+
+    /**
+     * Called when a search result is chosen. Makes sure the matching
+     * NAP's status/port filters are enabled (so its marker is
+     * guaranteed to be visible), re-renders, then zooms to it and
+     * opens its detail panel.
+     */
+    function selectNap(nap) {
+        const statusCheckbox = document.querySelector(
+            '.status-filter[value="' + nap.status + '"]'
+        );
+        if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
+        document.getElementById("portsFilter").value = "all";
+
+        renderNapMarkers();
+
+        map.flyTo([nap.latitude, nap.longitude], 18);
+        openNapDetailPanel(nap);
+    }
+
+    /**
+     * Phase 20 (phase_8.pdf technician item #6, "Issue location on
+     * GeoMap"): reads the focus issue id naps.geomap() rendered onto
+     * #napMap's data attribute (see map.html) and, if present, hands
+     * off to focusIssue() below. Runs once, after the initial
+     * renderAll() on page load, so allIssues is already populated.
+     */
+    function focusIssueFromQueryParam() {
+        const mapEl = document.getElementById("napMap");
+        const raw = mapEl ? mapEl.getAttribute("data-focus-issue-id") : "";
+        if (!raw) return;
+
+        const issueId = Number(raw);
+        if (!Number.isInteger(issueId)) return;
+
+        const issue = allIssues.find((i) => i.id === issueId);
+        if (!issue) return; // unknown/foreign id — map just loads normally
+
+        focusIssue(issue);
+    }
+
+    /**
+     * Makes sure `issue` will actually render (forcing its status and
+     * priority filter checkboxes on if needed, same idea as
+     * selectNap() above for a NAP), re-renders, then pans/zooms to it
+     * and opens its popup.
+     */
+    function focusIssue(issue) {
+        const statusCheckbox = document.querySelector(
+            '.issue-status-filter[value="' + issue.status + '"]'
+        );
+        if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
+
+        const priorityCheckbox = document.querySelector(
+            '.issue-priority-filter[value="' + issue.priority + '"]'
+        );
+        if (priorityCheckbox && !priorityCheckbox.checked) priorityCheckbox.checked = true;
+
+        const showIssuesToggle = document.getElementById("showIssuesToggle");
+        if (showIssuesToggle && !showIssuesToggle.checked) showIssuesToggle.checked = true;
+
+        renderIssueMarkers();
+
+        const marker = issueMarkersById[issue.id];
+        map.flyTo([issue.latitude, issue.longitude], 18);
+        if (marker) {
+            marker.openPopup();
+        }
+    }
+
+    /**
+     * Phase 13 (65%) equivalent of selectNap()/focusIssue() above,
+     * for a subscriber. Forces the "Show Subscribers" layer toggle on
+     * (subscriber markers are off by default — see the subscriber
+     * marker section below) rather than a status/priority filter,
+     * since subscribers have no such filters, then pans/zooms and
+     * opens the popup exactly the same way.
+     */
+    function focusSubscriber(subscriber) {
+        const showSubscribersToggle = document.getElementById("showSubscribersToggle");
+        if (showSubscribersToggle && !showSubscribersToggle.checked) {
+            showSubscribersToggle.checked = true;
+        }
+
+        renderSubscriberMarkers();
+
+        const marker = subscriberMarkersById[subscriber.id];
+        map.flyTo([subscriber.latitude, subscriber.longitude], 18);
+        if (marker) {
+            marker.openPopup();
+        }
+    }
+
+    /**
+     * Phase 22 (phase_11.pdf requirement 8, "display the result on
+     * the GeoMap"): reads the recommend-request id naps.geomap()
+     * rendered onto #napMap's data attribute (see map.html) and, if
+     * present, fetches the ranked NAP recommendation for that service
+     * request from GET /api/service-requests/<id>/recommend-nap and
+     * plots it. Same "runs once after the initial render, empty
+     * attribute means no focus" shape as focusIssueFromQueryParam()
+     * above, extended with its own fetch since — unlike an issue,
+     * which is already in allIssues from loadIssues() — a single
+     * service request's recommendation isn't part of any dataset this
+     * page loads by default.
+     */
+    async function focusNapRecommendationFromQueryParam() {
+        const mapEl = document.getElementById("napMap");
+        const raw = mapEl ? mapEl.getAttribute("data-recommend-request-id") : "";
+        if (!raw) return;
+
+        const requestId = Number(raw);
+        if (!Number.isInteger(requestId)) return;
+
+        // This fetch runs automatically on page load, not from a button
+        // click, so there's no button to attach a spinner/disabled state
+        // to the way handleReportIssueSubmit() does. Use the page's
+        // existing mapAlertArea/showAlert() pattern instead: a dismissible
+        // "loading" alert inserted right before the fetch, removed in
+        // `finally` once the fetch settles (success or error) rather than
+        // waiting for showAlert()'s normal 6-second auto-dismiss.
+        const loadingAlertId = "napRecommendLoadingAlert";
+        const area = document.getElementById("mapAlertArea");
+        if (area) {
+            area.insertAdjacentHTML(
+                "beforeend",
+                '<div id="' + loadingAlertId + '" class="alert alert-info alert-dismissible fade show shadow-sm" role="alert">' +
+                    '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
+                    "Loading NAP recommendation…" +
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                    "</div>"
+            );
+        }
+
+        try {
+            const response = await fetch("/api/service-requests/" + requestId + "/recommend-nap");
+            if (!response.ok) throw new Error("Request failed: " + response.status);
+            const data = await response.json();
+            plotNapRecommendation(data);
+        } catch (err) {
+            console.error("Failed to load NAP recommendation:", err);
+            showAlert("danger", "Could not load the NAP recommendation for this service request.");
+        } finally {
+            const loadingEl = document.getElementById(loadingAlertId);
+            if (loadingEl) bootstrap.Alert.getOrCreateInstance(loadingEl).close();
+        }
+    }
+
+    /**
+     * Plots the customer location from a NAP recommendation feed into
+     * its own layer (recommendationLayer, cleared and rebuilt each
+     * call rather than accumulated), makes sure the recommended NAP's
+     * marker will actually render (forcing the 'active' status filter
+     * on and the ports filter to 'all', same idea as selectNap()/
+     * focusIssue() above), fits the map to show both the customer pin
+     * and the recommended NAP, and opens the recommended NAP's detail
+     * panel — the customer pin's own popup is still available on
+     * click but isn't force-opened, so nothing competes with the
+     * detail panel for attention.
+     */
+    function plotNapRecommendation(data) {
+        recommendationLayer.clearLayers();
+
+        const customerMarker = L.marker([data.customer_latitude, data.customer_longitude], {
+            icon: buildCustomerIcon(),
+            title: "Customer location (Service Request #" + data.service_request_id + ")",
+        });
+        customerMarker.bindPopup(
+            '<div class="nap-popup"><div class="nap-popup-code">Service Request #' +
+                data.service_request_id + "</div>" +
+                "<h6>Customer Location</h6>" +
+                '<a class="btn btn-sm btn-outline-primary w-100" href="/service-requests/' +
+                data.service_request_id + '/recommend-nap">View Recommendations</a></div>'
+        );
+        recommendationLayer.addLayer(customerMarker);
+
+        const bounds = [[data.customer_latitude, data.customer_longitude]];
+
+        if (data.recommended_nap_id) {
+            const statusCheckbox = document.querySelector('.status-filter[value="active"]');
+            if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
+            document.getElementById("portsFilter").value = "all";
+
+            renderNapMarkers();
+
+            const recommendedMarker = markersById[data.recommended_nap_id];
+            if (recommendedMarker) {
+                bounds.push(recommendedMarker.getLatLng());
+            }
+        }
+
+        if (bounds.length > 1) {
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+        } else {
+            map.flyTo(bounds[0], 17);
+        }
+
+        if (data.recommended_nap_id) {
+            const recommendedNap = allNaps.find((n) => n.id === data.recommended_nap_id);
+            if (recommendedNap) {
+                openNapDetailPanel(recommendedNap);
+            }
+        }
+    }
+
+    /** Builds the marker icon for a NAP recommendation's customer
+     * location pin — same teardrop shape as buildIcon() above, but a
+     * distinct color (purple) so it's never mistaken for a NAP
+     * marker at a glance. */
+    function buildCustomerIcon() {
+        const svg =
+            '<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">' +
+            '<path d="M15 0C6.7 0 0 6.7 0 15c0 11.25 15 27 15 27s15-15.75 15-27C30 6.7 23.3 0 15 0z" ' +
+            'fill="#6f42c1" stroke="#ffffff" stroke-width="1.5"/>' +
+            '<circle cx="15" cy="15" r="6" fill="#ffffff"/>' +
+            "</svg>";
+
+        return L.divIcon({
+            html: svg,
+            className: "nap-marker-icon customer-marker-icon",
+            iconSize: [30, 42],
+            iconAnchor: [15, 40],
+            popupAnchor: [0, -36],
+        });
+    }
+    // ---------------- Add NAP from map click ----------------
+
+    let addModeActive = false;
+    let pendingMarker = null;
+    let pendingLatLng = null;
+    let quickAddModalInstance = null;
+
+    function setupQuickAdd() {
+        quickAddModalInstance = new bootstrap.Modal(document.getElementById("quickAddModal"));
+
+        const addBtn = document.getElementById("addNapModeBtn");
+        const bannerCancelBtn = document.getElementById("addModeCancelBtn");
+        const modalCancelBtn = document.getElementById("quickAddCancelBtn");
+        const quickAddForm = document.getElementById("quickAddForm");
+        const quickAddModalEl = document.getElementById("quickAddModal");
+
+        addBtn.addEventListener("click", () => {
+            if (addModeActive) {
+                exitAddMode();
+            } else {
+                enterAddMode();
+            }
+        });
+
+        bannerCancelBtn.addEventListener("click", exitAddMode);
+        modalCancelBtn.addEventListener("click", exitAddMode);
+
+        // Covers the modal's own [x] close button too.
+        quickAddModalEl.addEventListener("hidden.bs.modal", () => {
+            if (addModeActive) exitAddMode();
+        });
+
+        map.on("click", (e) => {
+            if (!addModeActive) return;
+            placePendingMarker(e.latlng);
+            openQuickAddModal(e.latlng);
+        });
+
+        quickAddForm.addEventListener("submit", handleQuickAddSubmit);
+    }
+
+    function enterAddMode() {
+        // Only one "placement mode" is active at a time.
+        if (issueModeActive) exitIssueMode();
+        // Phase 8 (adapted): the manual origin picker is also a
+        // map-click placement mode, so it yields the same way.
+        if (window.NapIQNavOriginPicker) window.NapIQNavOriginPicker.stopPicking();
+        // Installation Planning Phase 3 (40%): so is Plan Installation
+        // mode. Guarded the same way — this module only exists for
+        // administrators, so the guard also covers "script never loaded".
+        if (window.NapIQInstallPlanner) window.NapIQInstallPlanner.exitPlanningMode();
+
+        addModeActive = true;
+
+        const btn = document.getElementById("addNapModeBtn");
+        btn.classList.remove("btn-primary");
+        btn.classList.add("btn-outline-danger");
+        btn.innerHTML = '<i class="bi bi-x-lg me-1"></i>Cancel Add NAP';
+
+        document.getElementById("addModeBanner").classList.remove("d-none");
+        document.getElementById("napMap").classList.add("add-mode-cursor");
+    }
+
+    /** Cleans up add-mode UI/state. Safe to call more than once. */
+    function exitAddMode() {
+        addModeActive = false;
+
+        const btn = document.getElementById("addNapModeBtn");
+        btn.classList.remove("btn-outline-danger");
+        btn.classList.add("btn-primary");
+        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add NAP';
+
+        document.getElementById("addModeBanner").classList.add("d-none");
+        document.getElementById("napMap").classList.remove("add-mode-cursor");
+
+        if (pendingMarker) {
+            map.removeLayer(pendingMarker);
+            pendingMarker = null;
+        }
+        pendingLatLng = null;
+
+        clearQuickAddErrors();
+        document.getElementById("quickAddForm").reset();
+
+        if (quickAddModalInstance) {
+            quickAddModalInstance.hide();
+        }
+    }
+
+    /** Places (or moves) the temporary pending marker at the clicked location. */
+    function placePendingMarker(latlng) {
+        pendingLatLng = latlng;
+
+        if (pendingMarker) {
+            pendingMarker.setLatLng(latlng);
+        } else {
+            pendingMarker = L.marker(latlng, {
+                icon: buildIcon("pending"),
+                draggable: true,
+                zIndexOffset: 1000,
+            }).addTo(map);
+
+            pendingMarker.on("dragend", () => {
+                pendingLatLng = pendingMarker.getLatLng();
+                updateLatLngFields(pendingLatLng);
+            });
+        }
+
+        updateLatLngFields(latlng);
+    }
+
+    function updateLatLngFields(latlng) {
+        document.getElementById("quickAddLatitude").value = latlng.lat.toFixed(7);
+        document.getElementById("quickAddLongitude").value = latlng.lng.toFixed(7);
+    }
+
+    function openQuickAddModal(latlng) {
+        updateLatLngFields(latlng);
+        clearQuickAddErrors();
+        quickAddModalInstance.show();
+    }
+
+    function clearQuickAddErrors() {
+        document.getElementById("quickAddGeneralError").classList.add("d-none");
+        document.getElementById("quickAddGeneralError").textContent = "";
+        document.querySelectorAll("#quickAddForm [data-error-for]").forEach((el) => {
+            el.textContent = "";
+        });
+        document.querySelectorAll("#quickAddForm .is-invalid").forEach((el) => {
+            el.classList.remove("is-invalid");
+        });
+    }
+
+    /**
+     * Submits the quick-add form via fetch(). This is the frontend
+     * validation pass (required attributes, min="1" on ports, etc.);
+     * the response is only ever trusted once Flask has re-validated
+     * everything and MySQL has actually stored the row.
+     */
+    async function handleQuickAddSubmit(event) {
+        event.preventDefault();
+        clearQuickAddErrors();
+
+        if (!pendingLatLng) {
+            showAlert("danger", "Click a location on the map first.");
+            return;
+        }
+
+        const form = document.getElementById("quickAddForm");
+        const submitBtn = document.getElementById("quickAddSubmitBtn");
+        const formData = new FormData(form);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+        try {
+            const response = await fetch("/naps/quick-add", {
+                method: "POST",
+                headers: { "X-CSRFToken": CSRF_TOKEN },
+                body: formData,
+            });
+            const payload = await response.json();
+
+            if (response.ok && payload.status === "success") {
+                allNaps.push(payload.nap);
+                populateNapSelectForIssue();
+                renderAll();
+                showAlert("success", payload.message);
+                exitAddMode();
+            } else if (response.status === 400 && payload.errors) {
+                showQuickAddErrors(payload.errors);
+            } else {
+                document.getElementById("quickAddGeneralError").textContent =
+                    "Something went wrong while saving. Please try again.";
+                document.getElementById("quickAddGeneralError").classList.remove("d-none");
+            }
+        } catch (err) {
+            console.error("Quick-add request failed:", err);
+            document.getElementById("quickAddGeneralError").textContent =
+                "Could not reach the server. Check your connection and try again.";
+            document.getElementById("quickAddGeneralError").classList.remove("d-none");
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save NAP';
+        }
+    }
+
+    /** Maps Flask-WTF's {field_name: [messages]} error dict onto the form. */
+    function showQuickAddErrors(errors) {
+        Object.keys(errors).forEach((fieldName) => {
+            const messages = errors[fieldName];
+            const errorEl = document.querySelector(
+                '#quickAddForm [data-error-for="' + fieldName + '"]'
+            );
+            const inputEl = document.querySelector('#quickAddForm [name="' + fieldName + '"]');
+
+            if (errorEl) errorEl.textContent = messages.join(" ");
+            if (inputEl) inputEl.classList.add("is-invalid");
+        });
+    }
+
+    /** Shows a dismissible Bootstrap alert above the map. */
+    function showAlert(type, message) {
+        const area = document.getElementById("mapAlertArea");
+        const alertId = "alert-" + Date.now();
+        area.insertAdjacentHTML(
+            "beforeend",
+            '<div id="' + alertId + '" class="alert alert-' + type +
+                ' alert-dismissible fade show shadow-sm" role="alert">' +
+                escapeHtml(message) +
+                '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                "</div>"
+        );
+        setTimeout(() => {
+            const el = document.getElementById(alertId);
+            if (el) bootstrap.Alert.getOrCreateInstance(el).close();
+        }, 6000);
+    }
+
+    // ---------------- Report an Issue from map click ----------------
+
+    let issueModeActive = false;
+    let pendingIssueMarker = null;
+    let pendingIssueLatLng = null;
+    let reportIssueModalInstance = null;
+
+    /** Fills the Subscriber <select> from allSubscribers (loaded on page init).
+     *  If there are no subscribers at all, the dropdown is disabled and its
+     *  only option says so plainly, instead of silently showing just the
+     *  generic placeholder with nothing to actually pick. */
+    function populateSubscriberSelect() {
+        const select = document.getElementById("reportIssueSubscriber");
+        if (allSubscribers.length === 0) {
+            select.innerHTML = '<option value="0" selected>-- No subscribers found --</option>';
+            select.disabled = true;
+            return;
+        }
+        select.disabled = false;
+        const options = ['<option value="0" selected>-- Select Subscriber --</option>'];
+        allSubscribers.forEach((sub) => {
+            options.push(
+                '<option value="' + sub.id + '">' +
+                    escapeHtml(sub.subscriber_code + " — " + sub.full_name) +
+                    "</option>"
+            );
+        });
+        select.innerHTML = options.join("");
+    }
+
+    /** Fills the NAP <select> from allNaps (loaded on page init). */
+    function populateNapSelectForIssue() {
+        const select = document.getElementById("reportIssueNap");
+        const previousValue = select.value || "0";
+        const options = ['<option value="0">None</option>'];
+        allNaps.forEach((nap) => {
+            options.push(
+                '<option value="' + nap.id + '">' +
+                    escapeHtml(nap.nap_code + " — " + nap.name) +
+                    "</option>"
+            );
+        });
+        select.innerHTML = options.join("");
+        select.value = previousValue;
+    }
+
+    function setupReportIssue() {
+        reportIssueModalInstance = new bootstrap.Modal(document.getElementById("reportIssueModal"));
+
+        const reportBtn = document.getElementById("reportIssueModeBtn");
+        const bannerCancelBtn = document.getElementById("issueModeCancelBtn");
+        const modalCancelBtn = document.getElementById("reportIssueCancelBtn");
+        const reportForm = document.getElementById("reportIssueForm");
+        const reportModalEl = document.getElementById("reportIssueModal");
+        const subscriberSelect = document.getElementById("reportIssueSubscriber");
+
+        reportBtn.addEventListener("click", () => {
+            if (issueModeActive) {
+                exitIssueMode();
+            } else {
+                enterIssueMode();
+            }
+        });
+
+        bannerCancelBtn.addEventListener("click", exitIssueMode);
+        modalCancelBtn.addEventListener("click", exitIssueMode);
+
+        reportModalEl.addEventListener("hidden.bs.modal", () => {
+            if (issueModeActive) exitIssueMode();
+        });
+
+        map.on("click", (e) => {
+            if (!issueModeActive) return;
+            placePendingIssueMarker(e.latlng);
+            openReportIssueModal(e.latlng);
+        });
+
+        // Auto-fill NAP + Address when a subscriber is chosen, AND
+        // snap the pending pin onto that subscriber's exact registered
+        // coordinates. "Point it in a subscriber's exact location, if
+        // not it will not proceed or show pin error": the pin the
+        // admin places on the map is what gets saved as the issue's
+        // location, so it has to be the subscriber's own location, not
+        // an approximate nearby spot -- snapping removes the guesswork
+        // and validatePinAgainstSubscriber() below still catches it if
+        // the pin is dragged off afterward.
+        subscriberSelect.addEventListener("change", () => {
+            const subscriberId = Number(subscriberSelect.value);
+            const subscriber = allSubscribers.find((s) => s.id === subscriberId);
+            if (!subscriber) {
+                clearPinValidation();
+                return;
+            }
+
+            if (subscriber.nap_id) {
+                document.getElementById("reportIssueNap").value = String(subscriber.nap_id);
+            }
+            if (subscriber.address) {
+                document.getElementById("reportIssueAddress").value = subscriber.address;
+            }
+
+            if (subscriber.latitude == null || subscriber.longitude == null) {
+                showPinError(
+                    "This subscriber has no registered map location on file, so an issue pin can't be " +
+                    "placed for them. Update their subscriber record with a location first."
+                );
+                return;
+            }
+
+            placePendingIssueMarker(L.latLng(subscriber.latitude, subscriber.longitude));
+            if (!reportIssueModalInstance || !document.getElementById("reportIssueModal").classList.contains("show")) {
+                reportIssueModalInstance.show();
+            }
+            showPinOk(subscriber);
+        });
+
+        reportForm.addEventListener("submit", handleReportIssueSubmit);
+    }
+
+    /**
+     * True if `latlng` is (within float/decimal rounding tolerance)
+     * the same point as `subscriber`'s registered latitude/longitude.
+     * The tolerance (~5 meters) exists only to absorb
+     * JS-float-vs-MySQL-DECIMAL(10,7) rounding, not to allow a
+     * meaningfully different location through.
+     */
+    function isAtSubscriberLocation(latlng, subscriber) {
+        if (!latlng || !subscriber || subscriber.latitude == null || subscriber.longitude == null) return false;
+        const EPSILON = 0.00005;
+        return (
+            Math.abs(latlng.lat - subscriber.latitude) < EPSILON &&
+            Math.abs(latlng.lng - subscriber.longitude) < EPSILON
+        );
+    }
+
+    /** Re-checks the current pending pin against whichever subscriber
+     * is currently selected in the Report Issue form, and updates the
+     * pin-status message / disables-or-enables the submit button
+     * accordingly. Returns true only when it's safe to submit. */
+    function validatePinAgainstSubscriber() {
+        const subscriberId = Number(document.getElementById("reportIssueSubscriber").value);
+        const subscriber = allSubscribers.find((s) => s.id === subscriberId);
+
+        if (!subscriber) {
+            clearPinValidation();
+            return false; // subscriber_id is required regardless
+        }
+        if (subscriber.latitude == null || subscriber.longitude == null) {
+            showPinError(
+                "This subscriber has no registered map location on file, so an issue pin can't be " +
+                "placed for them. Update their subscriber record with a location first."
+            );
+            return false;
+        }
+        if (!isAtSubscriberLocation(pendingIssueLatLng, subscriber)) {
+            showPinError(
+                "Pin error: the reported location must be the subscriber's exact registered address. " +
+                "Re-select the subscriber to snap the pin back automatically."
+            );
+            return false;
+        }
+        showPinOk(subscriber);
+        return true;
+    }
+
+    /** Shows a red pin-status message under the lat/lng fields and
+     * disables the submit button until the pin is fixed. */
+    function showPinError(message) {
+        const el = document.getElementById("reportIssuePinStatus");
+        if (!el) return;
+        el.className = "small mt-1 text-danger";
+        el.innerHTML = '<i class="bi bi-exclamation-octagon-fill me-1"></i>' + message;
+        const submitBtn = document.getElementById("reportIssueSubmitBtn");
+        if (submitBtn) submitBtn.disabled = true;
+    }
+
+    /** Shows a green pin-status confirmation and re-enables submit. */
+    function showPinOk(subscriber) {
+        const el = document.getElementById("reportIssuePinStatus");
+        if (!el) return;
+        el.className = "small mt-1 text-success";
+        el.innerHTML =
+            '<i class="bi bi-geo-alt-fill me-1"></i>Pin matches ' +
+            escapeHtml(subscriber.subscriber_code) + "'s exact registered location.";
+        const submitBtn = document.getElementById("reportIssueSubmitBtn");
+        if (submitBtn) submitBtn.disabled = false;
+    }
+
+    /** Resets the pin-status area to its neutral "not yet chosen"
+     * state and keeps submit disabled -- a subscriber must be
+     * selected (and matched) before an issue can be reported at all. */
+    function clearPinValidation() {
+        const el = document.getElementById("reportIssuePinStatus");
+        if (el) {
+            if (allSubscribers.length === 0) {
+                el.className = "small mt-1 text-danger";
+                el.innerHTML =
+                    '<i class="bi bi-exclamation-octagon-fill me-1"></i>No subscribers found. ' +
+                    "Add a subscriber first before an issue can be reported.";
+            } else {
+                el.className = "small mt-1 text-muted";
+                el.textContent = "Select the affected subscriber to snap the pin to their exact registered location.";
+            }
+        }
+        const submitBtn = document.getElementById("reportIssueSubmitBtn");
+        if (submitBtn) submitBtn.disabled = true;
+    }
+
+    function enterIssueMode() {
+        // Only one "placement mode" is active at a time.
+        if (addModeActive) exitAddMode();
+        // Phase 8 (adapted): the manual origin picker is also a
+        // map-click placement mode, so it yields the same way.
+        if (window.NapIQNavOriginPicker) window.NapIQNavOriginPicker.stopPicking();
+        // Installation Planning Phase 3 (40%): so is Plan Installation mode.
+        if (window.NapIQInstallPlanner) window.NapIQInstallPlanner.exitPlanningMode();
+
+        issueModeActive = true;
+
+        const btn = document.getElementById("reportIssueModeBtn");
+        btn.classList.remove("btn-warning");
+        btn.classList.add("btn-outline-danger");
+        btn.innerHTML = '<i class="bi bi-x-lg me-1"></i>Cancel Report';
+
+        document.getElementById("issueModeBanner").classList.remove("d-none");
+        document.getElementById("napMap").classList.add("add-mode-cursor");
+    }
+
+    /** Cleans up issue-report-mode UI/state. Safe to call more than once. */
+    function exitIssueMode() {
+        issueModeActive = false;
+
+        const btn = document.getElementById("reportIssueModeBtn");
+        btn.classList.remove("btn-outline-danger");
+        btn.classList.add("btn-warning");
+        btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Report an Issue';
+
+        document.getElementById("issueModeBanner").classList.add("d-none");
+        document.getElementById("napMap").classList.remove("add-mode-cursor");
+
+        if (pendingIssueMarker) {
+            map.removeLayer(pendingIssueMarker);
+            pendingIssueMarker = null;
+        }
+        pendingIssueLatLng = null;
+
+        clearReportIssueErrors();
+        document.getElementById("reportIssueForm").reset();
+        clearPinValidation();
+
+        if (reportIssueModalInstance) {
+            reportIssueModalInstance.hide();
+        }
+    }
+
+    function placePendingIssueMarker(latlng) {
+        pendingIssueLatLng = latlng;
+
+        if (pendingIssueMarker) {
+            pendingIssueMarker.setLatLng(latlng);
+        } else {
+            pendingIssueMarker = L.marker(latlng, {
+                icon: buildPendingIssueIcon(),
+                draggable: true,
+                zIndexOffset: 1000,
+            }).addTo(map);
+
+            pendingIssueMarker.on("dragend", () => {
+                pendingIssueLatLng = pendingIssueMarker.getLatLng();
+                updateIssueLatLngFields(pendingIssueLatLng);
+                // Dragging the pin away from the selected subscriber's
+                // exact location is exactly the "not pointed at the
+                // subscriber" case the pin-error rule exists for.
+                validatePinAgainstSubscriber();
+            });
+        }
+
+        updateIssueLatLngFields(latlng);
+    }
+
+    function updateIssueLatLngFields(latlng) {
+        document.getElementById("reportIssueLatitude").value = latlng.lat.toFixed(7);
+        document.getElementById("reportIssueLongitude").value = latlng.lng.toFixed(7);
+    }
+
+    function openReportIssueModal(latlng) {
+        updateIssueLatLngFields(latlng);
+        clearReportIssueErrors();
+        // A fresh map click starts a new pin with no subscriber chosen
+        // yet for it -- reset the Subscriber dropdown and pin-status
+        // area so a stale "Pin matches ..." message from a previous
+        // report doesn't linger against this new, unrelated pin.
+        document.getElementById("reportIssueSubscriber").value = "0";
+        clearPinValidation();
+        reportIssueModalInstance.show();
+    }
+
+    function clearReportIssueErrors() {
+        document.getElementById("reportIssueGeneralError").classList.add("d-none");
+        document.getElementById("reportIssueGeneralError").textContent = "";
+        document.querySelectorAll("#reportIssueForm [data-error-for]").forEach((el) => {
+            el.textContent = "";
+        });
+        document.querySelectorAll("#reportIssueForm .is-invalid").forEach((el) => {
+            el.classList.remove("is-invalid");
+        });
+    }
+
+    /**
+     * Submits the Report Issue form via fetch(). As with the NAP
+     * quick-add flow, this is only the frontend's first pass — Flask
+     * re-validates every field (including latitude/longitude) before
+     * anything is written to MySQL.
+     */
+    async function handleReportIssueSubmit(event) {
+        event.preventDefault();
+        clearReportIssueErrors();
+
+        if (!pendingIssueLatLng) {
+            showAlert("danger", "Click the problem location on the map first.");
+            return;
+        }
+
+        // Final client-side gate, in addition to the submit button
+        // already being disabled while the pin doesn't match: "it
+        // will not proceed" if the pin isn't the subscriber's exact
+        // location. Flask re-checks the same thing server-side below
+        // regardless -- this just avoids a round trip for the common
+        // case and gives an immediate pin-error message.
+        if (!validatePinAgainstSubscriber()) {
+            return;
+        }
+
+        const form = document.getElementById("reportIssueForm");
+        const submitBtn = document.getElementById("reportIssueSubmitBtn");
+        const formData = new FormData(form);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
+
+        try {
+            const response = await fetch("/issues/report", {
+                method: "POST",
+                headers: { "X-CSRFToken": CSRF_TOKEN },
+                body: formData,
+            });
+            const payload = await response.json();
+
+            if (response.ok && payload.status === "success") {
+                allIssues.push(payload.issue);
+                renderAll();
+                showAlert("success", payload.message);
+                exitIssueMode();
+            } else if (response.status === 400 && payload.errors) {
+                showReportIssueErrors(payload.errors);
+            } else {
+                document.getElementById("reportIssueGeneralError").textContent =
+                    "Something went wrong while submitting. Please try again.";
+                document.getElementById("reportIssueGeneralError").classList.remove("d-none");
+            }
+        } catch (err) {
+            console.error("Report-issue request failed:", err);
+            document.getElementById("reportIssueGeneralError").textContent =
+                "Could not reach the server. Check your connection and try again.";
+            document.getElementById("reportIssueGeneralError").classList.remove("d-none");
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Submit Report';
+        }
+    }
+
+    /** Maps Flask-WTF's {field_name: [messages]} error dict onto the form. */
+    function showReportIssueErrors(errors) {
+        Object.keys(errors).forEach((fieldName) => {
+            const messages = errors[fieldName];
+            const errorEl = document.querySelector(
+                '#reportIssueForm [data-error-for="' + fieldName + '"]'
+            );
+            const inputEl = document.querySelector('#reportIssueForm [name="' + fieldName + '"]');
+
+            if (errorEl) errorEl.textContent = messages.join(" ");
+            if (inputEl) inputEl.classList.add("is-invalid");
+        });
+    }
+
+    // Phase 8 (adapted): lets nav-origin-picker.js cancel Add-NAP /
+    // Report-Issue mode when the user starts picking a manual origin,
+    // so exactly one map-click mode is ever active — the same rule
+    // enterAddMode()/enterIssueMode() already enforce between
+    // themselves. Safe to call anytime; both underlying functions are
+    // no-ops if their mode isn't active.
+    // Installation Planning Phase 3 (40%): nap-install-planner.js's own
+    // enterPlanningMode() calls this same function (mirroring how
+    // nav-origin-picker.js's startPicking() already does) before
+    // activating, so Plan Installation mode also yields Add-NAP/
+    // Report-Issue. The reverse direction (this function itself exiting
+    // planning mode, so the origin picker's startPicking() also yields
+    // it) is handled here too, guarded the same way as the two calls
+    // above -- window.NapIQInstallPlanner only exists for administrators.
+    //
+    // Installation Planning Phase 6 (85%): also exposes
+    // addSubscriberMarker(), so nap-install-planner.js can push a
+    // just-created subscriber (the real row POST /subscribers/quick-
+    // add just returned) into this closure's own `allSubscribers`
+    // dataset and rebuild the existing subscriber marker layer -- the
+    // exact same data path loadSubscribers()/renderSubscriberMarkers()
+    // already use for every other subscriber marker on this map, so
+    // the new pin is a real marker sourced from the same in-memory
+    // dataset, not a one-off DOM element bolted on from outside.
+    window.NapIQMapModes = {
+        exitPlacementModes: function () {
+            if (addModeActive) exitAddMode();
+            if (issueModeActive) exitIssueMode();
+            if (window.NapIQInstallPlanner) window.NapIQInstallPlanner.exitPlanningMode();
+        },
+        /** Adds (or, if already present, replaces) one subscriber in
+         * the in-memory `allSubscribers` dataset and re-renders the
+         * subscriber marker layer from it -- the same rebuild
+         * renderSubscriberMarkers() already does after loadSubscribers()
+         * or a "Show Subscribers" toggle. Forces that layer toggle on
+         * first (same as focusSubscriber() above) so the new marker is
+         * actually visible immediately rather than silently added to a
+         * layer the admin currently has hidden. No network request is
+         * made here -- `subscriber` is the real row the caller already
+         * got back from its own create POST. */
+        addSubscriberMarker: function (subscriber) {
+            if (!subscriber || subscriber.id == null) return;
+
+            const entry = {
+                id: subscriber.id,
+                subscriber_code: subscriber.subscriber_code,
+                full_name: subscriber.full_name,
+                address: subscriber.address,
+                latitude: subscriber.latitude,
+                longitude: subscriber.longitude,
+                nap_id: subscriber.nap_id,
+            };
+
+            const existingIndex = allSubscribers.findIndex((s) => s.id === entry.id);
+            if (existingIndex >= 0) {
+                allSubscribers[existingIndex] = entry;
+            } else {
+                allSubscribers.push(entry);
+            }
+
+            const toggle = document.getElementById("showSubscribersToggle");
+            if (toggle && !toggle.checked) toggle.checked = true;
+
+            renderSubscriberMarkers();
+        },
+    };
+})();

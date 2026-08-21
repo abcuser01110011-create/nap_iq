@@ -1,0 +1,367 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}
+<div class="text-muted small">Live operations overview for NAP-IQ</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+
+{% block content %}
+
+{# ------------------------------------------------------------------ #}
+{# SUMMARY CARDS                                                       #}
+{# ------------------------------------------------------------------ #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="summary-card">
+            <span class="summary-card-icon bg-icon-primary"><i class="bi bi-hdd-network"></i></span>
+            <div>
+                <div class="summary-card-value">{{ summary_cards.total_naps }}</div>
+                <div class="summary-card-label">Total NAPs</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="summary-card">
+            <span class="summary-card-icon bg-icon-info"><i class="bi bi-ethernet"></i></span>
+            <div>
+                <div class="summary-card-value">{{ summary_cards.available_ports }}</div>
+                <div class="summary-card-label">Available Ports</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="summary-card">
+            <span class="summary-card-icon bg-icon-success"><i class="bi bi-people"></i></span>
+            <div>
+                <div class="summary-card-value">{{ summary_cards.active_subscribers }}</div>
+                <div class="summary-card-label">Active Subscribers</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="summary-card">
+            <span class="summary-card-icon bg-icon-danger"><i class="bi bi-exclamation-triangle"></i></span>
+            <div>
+                <div class="summary-card-value">{{ summary_cards.open_technical_issues }}</div>
+                <div class="summary-card-label">Open Technical Issues</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="summary-card">
+            <span class="summary-card-icon bg-icon-purple"><i class="bi bi-person-badge"></i></span>
+            <div>
+                <div class="summary-card-value">{{ summary_cards.available_technicians }}</div>
+                <div class="summary-card-label">Available Technicians</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="summary-card">
+            <span class="summary-card-icon bg-icon-warning"><i class="bi bi-clipboard-check"></i></span>
+            <div>
+                <div class="summary-card-value">{{ summary_cards.pending_service_requests }}</div>
+                <div class="summary-card-label">Pending Service Requests</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ------------------------------------------------------------------ #}
+{# ROW: NAP STATUS SUMMARY  /  TECHNICAL ISSUE STATUS SUMMARY           #}
+{# ------------------------------------------------------------------ #}
+<div class="row g-3 mb-3 align-items-stretch">
+
+    <div class="col-lg-6">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h5><i class="bi bi-hdd-network me-1 text-muted"></i>NAP Status Summary</h5>
+                <span class="text-muted">{{ total_naps }} total</span>
+            </div>
+            <div class="dash-panel-body">
+                {% if total_naps == 0 %}
+                    <div class="dash-empty">
+                        <i class="bi bi-hdd-network"></i>
+                        <p>No NAPs in the database yet.</p>
+                    </div>
+                {% else %}
+                    {% set status_colors = {'active': 'var(--napiq-success)', 'full': 'var(--napiq-warning)', 'maintenance': 'var(--napiq-danger)', 'inactive': '#9aa2ad'} %}
+                    {% for row in nap_status_summary %}
+                        <div class="status-bar-row">
+                            <span class="status-bar-label">
+                                <span class="legend-dot" style="background:{{ status_colors[row.status] }}"></span>
+                                {{ row.status }}
+                            </span>
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill" style="width:{{ (row.count / total_naps * 100) if total_naps else 0 }}%; background:{{ status_colors[row.status] }}"></div>
+                            </div>
+                            <span class="status-bar-count">{{ row.count }}</span>
+                        </div>
+                    {% endfor %}
+                    <hr class="my-3">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span>Port utilization</span>
+                        <span class="fw-semibold text-dark">{{ used_ports }} / {{ total_ports }} used ({{ port_utilization_pct }}%)</span>
+                    </div>
+                    <div class="status-bar-track">
+                        <div class="status-bar-fill" style="width:{{ port_utilization_pct }}%; background:var(--napiq-primary)"></div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h5><i class="bi bi-exclamation-triangle me-1 text-muted"></i>Technical Issue Status Summary</h5>
+                <span class="text-muted">{{ total_issues }} total</span>
+            </div>
+            <div class="dash-panel-body">
+                {% if total_issues == 0 %}
+                    <div class="dash-empty">
+                        <i class="bi bi-check2-circle"></i>
+                        <p>No technical issues have been reported yet.</p>
+                    </div>
+                {% else %}
+                    {% set issue_status_colors = {'pending': '#9aa2ad', 'assigned': '#0aa5c2', 'in_progress': 'var(--napiq-primary)', 'resolved': 'var(--napiq-success)', 'closed': '#495057'} %}
+                    {% for row in issue_status_summary %}
+                        <div class="status-bar-row">
+                            <span class="status-bar-label">
+                                <span class="legend-dot" style="background:{{ issue_status_colors[row.status] }}"></span>
+                                {{ row.status.replace('_', ' ') }}
+                            </span>
+                            <div class="status-bar-track">
+                                <div class="status-bar-fill" style="width:{{ row.pct }}%; background:{{ issue_status_colors[row.status] }}"></div>
+                            </div>
+                            <span class="status-bar-count">{{ row.count }}</span>
+                        </div>
+                    {% endfor %}
+                    <hr class="my-3">
+                    <div class="small text-muted mb-2">Open issues by priority</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% set priority_colors = {'critical': 'danger', 'high': 'warning', 'medium': 'primary', 'low': 'secondary'} %}
+                        {% for row in issue_priority_summary %}
+                            <span class="badge text-bg-{{ priority_colors[row.priority] }} text-capitalize">
+                                {{ row.priority }}: {{ row.count }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ------------------------------------------------------------------ #}
+{# ROW: RECENT REPORTED ISSUES  /  RECENT NAP ACTIVITY                  #}
+{# ------------------------------------------------------------------ #}
+<div class="row g-3 mb-3 align-items-stretch">
+
+    <div class="col-lg-6">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h5><i class="bi bi-clock-history me-1 text-muted"></i>Recent Reported Issues</h5>
+                <span class="text-muted">Last {{ recent_issues|length }}</span>
+            </div>
+            <div class="dash-panel-body">
+                {% if not recent_issues %}
+                    <div class="dash-empty">
+                        <i class="bi bi-inbox"></i>
+                        <p>No issues have been reported yet.</p>
+                    </div>
+                {% else %}
+                    {% set priority_bg = {'critical': 'bg-icon-danger', 'high': 'bg-icon-warning', 'medium': 'bg-icon-primary', 'low': 'bg-icon-info'} %}
+                    {% for issue in recent_issues %}
+                        <div class="recent-row">
+                            <span class="recent-row-icon {{ priority_bg[issue.priority] }}"><i class="bi bi-exclamation-triangle"></i></span>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between">
+                                    <span class="recent-row-title">{{ issue.issue_code or ('Issue #' ~ issue.id) }} &middot; {{ issue.issue_type }}</span>
+                                    <span class="badge text-bg-light text-capitalize">{{ issue.status.replace('_',' ') }}</span>
+                                </div>
+                                <div class="recent-row-meta">
+                                    {{ issue.subscriber.full_name if issue.subscriber else 'Unknown subscriber' }}
+                                    {% if issue.nap %} &middot; {{ issue.nap.nap_code }}{% endif %}
+                                    &middot; {{ issue.created_at.strftime('%b %d, %Y %I:%M %p') }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h5><i class="bi bi-activity me-1 text-muted"></i>Recent NAP Activity</h5>
+                <span class="text-muted">Last {{ recent_naps|length }}</span>
+            </div>
+            <div class="dash-panel-body">
+                {% if not recent_naps %}
+                    <div class="dash-empty">
+                        <i class="bi bi-hdd-network"></i>
+                        <p>No NAP activity yet.</p>
+                    </div>
+                {% else %}
+                    {% set nap_status_bg = {'active': 'bg-icon-success', 'full': 'bg-icon-warning', 'maintenance': 'bg-icon-danger', 'inactive': 'bg-icon-primary'} %}
+                    {% for nap in recent_naps %}
+                        <div class="recent-row">
+                            <span class="recent-row-icon {{ nap_status_bg.get(nap.status, 'bg-icon-primary') }}"><i class="bi bi-hdd-network"></i></span>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between">
+                                    <span class="recent-row-title">{{ nap.nap_code }} &middot; {{ nap.name }}</span>
+                                    <span class="badge text-bg-light text-capitalize">{{ nap.status }}</span>
+                                </div>
+                                <div class="recent-row-meta">
+                                    {{ nap.used_ports }}/{{ nap.total_ports }} ports used
+                                    &middot; updated {{ nap.updated_at.strftime('%b %d, %Y %I:%M %p') }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ------------------------------------------------------------------ #}
+{# ROW: TECHNICIAN WORKLOAD SUMMARY  /  GEOMAP PREVIEW                  #}
+{# ------------------------------------------------------------------ #}
+<div class="row g-3 align-items-stretch">
+
+    <div class="col-lg-6">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h5><i class="bi bi-person-badge me-1 text-muted"></i>Technician Workload Summary</h5>
+                <span class="text-muted">{{ technician_workload|length }} technicians</span>
+            </div>
+            <div class="dash-panel-body">
+                {% if not technician_workload %}
+                    <div class="dash-empty">
+                        <i class="bi bi-person-badge"></i>
+                        <p>No technicians in the database yet.</p>
+                    </div>
+                {% else %}
+                    {% set tech_status_badge = {'available': 'success', 'busy': 'warning', 'offline': 'secondary'} %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr class="text-muted small">
+                                    <th>Technician</th>
+                                    <th>Status</th>
+                                    <th>Active Assignments</th>
+                                    <th class="text-end">Resolved</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tech in technician_workload %}
+                                <tr>
+                                    <td class="fw-semibold">{{ tech.full_name }}</td>
+                                    <td>
+                                        <span class="badge text-bg-{{ tech_status_badge.get(tech.status, 'secondary') }} text-capitalize">
+                                            {{ tech.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="workload-progress">
+                                                <div class="workload-progress-fill" style="width:{{ [tech.active_assignments * 25, 100] | min }}%"></div>
+                                            </div>
+                                            <span class="small">{{ tech.active_assignments }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end small text-muted">{{ tech.resolved_issues_count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <h5><i class="bi bi-geo-alt me-1 text-muted"></i>GeoMap Preview</h5>
+                <a href="{{ url_for('naps.geomap') }}" class="small text-decoration-none">Open full map <i class="bi bi-arrow-up-right"></i></a>
+            </div>
+            <div class="dash-map-preview-wrap">
+                <div id="dashMapPreviewSkeleton" class="dash-skeleton" style="height:260px;"></div>
+                <div id="dashMapPreview" class="d-none"></div>
+                <span class="dash-map-preview-overlay">{{ total_naps }} NAP{{ '' if total_naps == 1 else 's' }} plotted</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script>
+    // Lightweight, read-only preview map: reuses the same /api/naps
+    // endpoint the full GeoMap page uses, but with no interactivity
+    // (add/report modes) since this is just a dashboard glance.
+    (function () {
+        const DEFAULT_CENTER = [14.2810, 121.4150];
+        const STATUS_COLORS = { active: '#198754', inactive: '#6c757d', full: '#fd7e14', maintenance: '#dc3545' };
+
+        const skeleton = document.getElementById('dashMapPreviewSkeleton');
+        const mapEl = document.getElementById('dashMapPreview');
+
+        function showMap() {
+            skeleton.classList.add('d-none');
+            mapEl.classList.remove('d-none');
+        }
+
+        const map = L.map('dashMapPreview', { zoomControl: false, attributionControl: false, scrollWheelZoom: false })
+            .setView(DEFAULT_CENTER, 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        fetch('/api/naps')
+            .then(function (res) { return res.json(); })
+            .then(function (naps) {
+                if (naps.length) {
+                    const bounds = [];
+                    naps.forEach(function (nap) {
+                        const color = STATUS_COLORS[nap.status] || '#0f5fa6';
+                        L.circleMarker([nap.latitude, nap.longitude], {
+                            radius: 7,
+                            color: '#fff',
+                            weight: 2,
+                            fillColor: color,
+                            fillOpacity: 0.95,
+                        })
+                            .bindPopup('<strong>' + nap.nap_code + '</strong><br>' + nap.name)
+                            .addTo(map);
+                        bounds.push([nap.latitude, nap.longitude]);
+                    });
+                    if (bounds.length > 1) {
+                        map.fitBounds(bounds, { padding: [24, 24] });
+                    } else {
+                        map.setView(bounds[0], 15);
+                    }
+                }
+                showMap();
+                setTimeout(function () { map.invalidateSize(); }, 50);
+            })
+            .catch(function () {
+                // If the API call fails, still reveal the (empty) base map
+                // rather than leaving the skeleton spinning forever.
+                showMap();
+                setTimeout(function () { map.invalidateSize(); }, 50);
+            });
+    })();
+</script>
+{% endblock %}

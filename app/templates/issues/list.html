@@ -1,0 +1,129 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Issues{% endblock %}
+{% block page_title %}Issues{% endblock %}
+{% block page_subtitle %}
+<p class="text-muted small mb-0">
+    {{ issues|length }} issue{{ '' if issues|length == 1 else 's' }} shown &middot;
+    full history — see the <a href="{{ url_for('dispatch.index') }}">Dispatch Board</a> for open work only
+</p>
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('issues.list_issues') }}" class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-5">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input
+                        type="text" class="form-control" name="q"
+                        placeholder="Issue code, type, or subscriber..."
+                        value="{{ search_term }}"
+                    >
+                </div>
+            </div>
+            <div class="col-sm-3 col-md-3">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+                    {% for s in ['pending', 'assigned', 'in_progress', 'resolved', 'closed'] %}
+                    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|replace('_',' ')|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="form-label small text-muted mb-1">Priority</label>
+                <select name="priority" class="form-select">
+                    <option value="" {% if not priority_filter %}selected{% endif %}>All Priorities</option>
+                    {% for p in ['low', 'medium', 'high', 'critical'] %}
+                    <option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+                {% if search_term or status_filter or priority_filter %}
+                    <a href="{{ url_for('issues.list_issues') }}" class="btn btn-link text-decoration-none">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Issue</th>
+                    <th>Priority</th>
+                    <th>Subscriber</th>
+                    <th>NAP</th>
+                    <th>Status</th>
+                    <th>Assigned To</th>
+                    <th>Reported</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+                {% set status_classes = {'pending': 'text-bg-secondary', 'assigned': 'text-bg-info', 'in_progress': 'text-bg-primary', 'resolved': 'text-bg-success', 'closed': 'text-bg-dark'} %}
+                {% for issue in issues %}
+                {% set assignment = assignment_by_issue.get(issue.id) %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}">
+                            {{ issue.issue_code or ('#' ~ issue.id) }}
+                        </a>
+                        <div class="text-muted small">{{ issue.issue_type }}</div>
+                    </td>
+                    <td>
+                        <span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
+                            {{ issue.priority|capitalize }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if issue.subscriber %}
+                            {{ issue.subscriber.subscriber_code }} — {{ issue.subscriber.full_name }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>{{ issue.nap.nap_code if issue.nap else "—" }}</td>
+                    <td>
+                        <span class="badge {{ status_classes.get(issue.status, 'text-bg-secondary') }}">
+                            {{ issue.status|replace('_', ' ')|capitalize }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if assignment %}
+                            {{ assignment.technician.full_name if assignment.technician else "—" }}
+                        {% else %}
+                            <span class="text-muted small">Unassigned</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td class="text-end">
+                        <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}"
+                           class="btn btn-sm btn-outline-secondary" title="View">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-5">
+                        <i class="bi bi-exclamation-triangle display-6 d-block mb-2"></i>
+                        No issues found{% if search_term or status_filter or priority_filter %} matching your filters{% endif %}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

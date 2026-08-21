@@ -1,0 +1,106 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Payments{% endblock %}
+{% block page_title %}Payments{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ payments|length }} payment{{ '' if payments|length == 1 else 's' }} shown &middot; all collectors</p>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Payment
+    </a>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('payments.list_payments') }}" class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-5">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" name="q" placeholder="Subscriber or reference #..." value="{{ search_term }}">
+                </div>
+            </div>
+            <div class="col-sm-3 col-md-3">
+                <label class="form-label small text-muted mb-1">Method</label>
+                <select name="method" class="form-select">
+                    <option value="" {% if not method_filter %}selected{% endif %}>All Methods</option>
+                    {% for m in ['cash', 'gcash', 'bank_transfer', 'other'] %}
+                    <option value="{{ m }}" {% if method_filter == m %}selected{% endif %}>{{ m|replace('_',' ')|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+                    {% for s in ['confirmed', 'pending', 'overdue', 'voided'] %}
+                    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                {% if search_term or method_filter or status_filter %}
+                    <a href="{{ url_for('payments.list_payments') }}" class="btn btn-link text-decoration-none">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Subscriber</th>
+                    <th>Amount</th>
+                    <th>Method</th>
+                    <th>Reference #</th>
+                    <th>Collector</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
+                {% for payment in payments %}
+                <tr>
+                    <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ payment.subscriber.subscriber_code }} — {{ payment.subscriber.full_name }}</td>
+                    <td>{{ "%.2f"|format(payment.amount) }}</td>
+                    <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
+                    <td>{{ payment.reference_number or "—" }}</td>
+                    <td>{{ payment.collector.full_name if payment.collector else "—" }}</td>
+                    <td><span class="badge {{ status_classes.get(payment.status, 'text-bg-secondary') }}">{{ payment.status|capitalize }}</span></td>
+                    <td class="text-end">
+                        <div class="d-flex gap-2 justify-content-end">
+                            {% if payment.status in ('pending', 'overdue') %}
+                            <form method="post" action="{{ url_for('payments.void_payment', payment_id=payment.id) }}"
+                                  onsubmit="return confirm('Void this payment?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-dark" title="Void">
+                                    <i class="bi bi-slash-circle"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <a href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-5">
+                        <i class="bi bi-cash display-6 d-block mb-2"></i>
+                        No payments found{% if search_term or method_filter or status_filter %} matching your filters{% endif %}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Service Requests{% endblock %}
+{% block page_title %}Service Requests{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ requests|length }} request{{ '' if requests|length == 1 else 's' }} shown</p>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('service_requests.add_request') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add Service Request
+    </a>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('service_requests.list_requests') }}" class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-5">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" name="q" placeholder="Subscriber or notes..." value="{{ search_term }}">
+                </div>
+            </div>
+            <div class="col-sm-3 col-md-3">
+                <label class="form-label small text-muted mb-1">Type</label>
+                <select name="type" class="form-select">
+                    <option value="" {% if not type_filter %}selected{% endif %}>All Types</option>
+                    {% for t in ['new_installation', 'relocation', 'upgrade', 'disconnection'] %}
+                    <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t|replace('_',' ')|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+                    {% for s in ['pending', 'approved', 'scheduled', 'completed', 'rejected'] %}
+                    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                {% if search_term or type_filter or status_filter %}
+                    <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-link text-decoration-none">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Type</th>
+                    <th>Subscriber</th>
+                    <th>Requested NAP</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Submitted</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set status_classes = {'pending': 'text-bg-secondary', 'approved': 'text-bg-info', 'scheduled': 'text-bg-primary', 'completed': 'text-bg-success', 'rejected': 'text-bg-danger'} %}
+                {% for r in requests %}
+                <tr>
+                    <td class="text-capitalize">{{ r.request_type|replace('_', ' ') }}</td>
+                    <td>{% if r.subscriber %}{{ r.subscriber.subscriber_code }} — {{ r.subscriber.full_name }}{% else %}<span class="text-muted small">No subscriber record</span>{% endif %}</td>
+                    <td>{{ r.requested_nap.nap_code if r.requested_nap else "—" }}</td>
+                    <td><span class="badge {{ status_classes.get(r.status, 'text-bg-secondary') }}">{{ r.status|capitalize }}</span></td>
+                    <td class="text-muted small">{{ (r.notes or "—")|truncate(60) }}</td>
+                    <td>{{ r.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td class="text-end">
+                        <div class="d-flex gap-2 justify-content-end">
+                            {% if r.status == 'pending' %}
+                            <form method="post" action="{{ url_for('service_requests.approve_request', request_id=r.id) }}"
+                                  onsubmit="return confirm('Approve this service request?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Approve">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            </form>
+                            <form method="post" action="{{ url_for('service_requests.reject_request', request_id=r.id) }}"
+                                  onsubmit="return confirm('Reject this service request?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <a href="{{ url_for('service_requests.recommend_nap', request_id=r.id) }}" class="btn btn-sm btn-outline-primary" title="Find Nearest NAP">
+                                <i class="bi bi-signpost-split"></i>
+                            </a>
+                            <a href="{{ url_for('service_requests.edit_request', request_id=r.id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-clipboard-x display-6 d-block mb-2"></i>
+                        No service requests found{% if search_term or type_filter or status_filter %} matching your filters{% endif %}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

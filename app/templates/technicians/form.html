@@ -1,0 +1,68 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ 'Edit Technician' if mode == 'edit' else 'Add Technician' }}{% endblock %}
+{% block page_title %}{{ 'Edit Technician' if mode == 'edit' else 'Add New Technician' }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Technicians
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.full_name.label }}</label>
+                            {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else ""), placeholder="e.g. Roberto Cruz") }}
+                            {% for error in form.full_name.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.contact_number.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else "")) }}
+                            {% for error in form.contact_number.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status(class="form-select" ~ (" is-invalid" if form.status.errors else "")) }}
+                            {% for error in form.status.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.user_id.label }}</label>
+                            {{ form.user_id(class="form-select" ~ (" is-invalid" if form.user_id.errors else "")) }}
+                            {% for error in form.user_id.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">
+                                Only technician-role accounts not already linked to another profile are listed.
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {{ 'Save Changes' if mode == 'edit' else 'Add Technician' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

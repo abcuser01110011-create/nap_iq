@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "NAP-IQ",
+    "slug": "nap-iq",
+    "scheme": "napiq",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1F3A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.napiq.app"
+    },
+    "android": {
+      "package": "com.napiq.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0B1F3A"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "REPLACE_WITH_YOUR_ANDROID_GOOGLE_MAPS_API_KEY"
+        }
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2E7DFF"
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "https://your-nap-iq-backend.example.com",
+      "eas": {
+        "projectId": "b62aa4b3-fdc4-4bc3-959c-cd58d86c9b62"
+      }
+    },
+    "owner": "usernameis-team"
+  }
+}

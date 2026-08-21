@@ -1,0 +1,225 @@
+{% extends "dashboard_base.html" %}
+{% block title %}My Work{% endblock %}
+{% block page_title %}My Work{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Accept, start, and complete your assignments</p>{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h5 mb-3">Welcome, {{ current_user.full_name }}</h2>
+
+        {% if profile is none %}
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                Your login account isn't linked to a technician profile yet.
+                Please contact an administrator so assignments can be routed to you.
+            </div>
+        {% else %}
+            <dl class="row mb-0 small">
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9 text-capitalize">{{ profile.status }}</dd>
+                <dt class="col-sm-3">Resolved Issues</dt>
+                <dd class="col-sm-9">{{ profile.resolved_issues_count }}</dd>
+            </dl>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-1"></i>Current Assignments</span>
+        <a href="{{ url_for('technician.history') }}" class="small text-decoration-none">
+            <i class="bi bi-clock-history me-1"></i>View Assignment History
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if assignments %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Subscriber</th>
+                        <th>NAP</th>
+                        <th>Status</th>
+                        <th>Assigned</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in assignments %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('issues.view_issue', issue_id=a.technical_issue_id) }}">
+                                {{ a.technical_issue.issue_code or ('#' ~ a.technical_issue_id) }}
+                            </a>
+                            <div class="small text-muted">{{ a.technical_issue.issue_type }}</div>
+                        </td>
+                        <td class="small">
+                            {% if a.technical_issue.subscriber %}
+                                {{ a.technical_issue.subscriber.subscriber_code }} —
+                                {{ a.technical_issue.subscriber.full_name }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {% if a.technical_issue.nap %}
+                                {{ a.technical_issue.nap.nap_code }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set assignment_status_classes = {
+                                'assigned': 'text-bg-secondary',
+                                'accepted': 'text-bg-info',
+                                'in_progress': 'text-bg-primary'
+                            } %}
+                            <span class="badge {{ assignment_status_classes.get(a.status, 'text-bg-secondary') }}">
+                                {{ a.status|replace('_', ' ')|capitalize }}
+                            </span>
+                            {% if a.resolution_notes %}
+                                <div class="small text-muted mt-1">
+                                    <i class="bi bi-journal-text me-1"></i>Notes saved
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>{{ a.assigned_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                                <a href="{{ url_for('naps.geomap', issue_id=a.technical_issue_id) }}"
+                                   class="btn btn-sm btn-outline-secondary" title="View issue location on GeoMap"
+                                   aria-label="View issue location on GeoMap">
+                                    <i class="bi bi-geo-alt"></i>
+                                </a>
+
+                                {% if a.technical_issue.latitude is not none and a.technical_issue.longitude is not none %}
+                                <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=a.technical_issue_id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="Navigate to this job"
+                                   aria-label="Navigate to this job">
+                                    <i class="bi bi-signpost-split me-1"></i>Navigate
+                                </a>
+                                {% endif %}
+
+                                {% if a.status == 'assigned' %}
+                                    <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=a.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-check2 me-1"></i>Accept
+                                        </button>
+                                    </form>
+                                {% elif a.status == 'accepted' %}
+                                    <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=a.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-info">
+                                            <i class="bi bi-play-fill me-1"></i>Start Work
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            data-bs-toggle="modal" data-bs-target="#notesModal"
+                                            data-notes-action="{{ url_for('technician.save_notes', assignment_id=a.id) }}"
+                                            data-notes-value="{{ a.resolution_notes or '' }}"
+                                            data-notes-mode="save">
+                                        <i class="bi bi-journal-plus me-1"></i>Notes
+                                    </button>
+                                {% elif a.status == 'in_progress' %}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            data-bs-toggle="modal" data-bs-target="#notesModal"
+                                            data-notes-action="{{ url_for('technician.save_notes', assignment_id=a.id) }}"
+                                            data-notes-value="{{ a.resolution_notes or '' }}"
+                                            data-notes-mode="save">
+                                        <i class="bi bi-journal-plus me-1"></i>Notes
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-success"
+                                            data-bs-toggle="modal" data-bs-target="#notesModal"
+                                            data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=a.id) }}"
+                                            data-notes-value="{{ a.resolution_notes or '' }}"
+                                            data-notes-mode="complete">
+                                        <i class="bi bi-check2-circle me-1"></i>Mark Complete
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-inbox display-6 d-block mb-2"></i>
+            No open assignments right now.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Shared modal for both "Save Notes" and "Mark Complete" — the form's
+     action/button label/wording swap based on which button opened it,
+     since both submit the same resolution_notes field to different
+     routes (save_notes keeps the assignment open; complete_assignment
+     also resolves the issue). -->
+<div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" id="notesModalForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notesModalTitle">Resolution Notes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted" id="notesModalHelp">
+                        Describe what was found and what was done. This is saved on the assignment record.
+                    </p>
+                    <textarea class="form-control" id="notesModalTextarea" name="resolution_notes"
+                              rows="5" maxlength="4000" required
+                              placeholder="e.g. Replaced damaged drop cable, verified signal levels back to normal..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="notesModalSubmit">Save Notes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var modalEl = document.getElementById("notesModal");
+    if (!modalEl) return;
+
+    modalEl.addEventListener("show.bs.modal", function (event) {
+        var button = event.relatedTarget;
+        if (!button) return;
+
+        var action = button.getAttribute("data-notes-action");
+        var value = button.getAttribute("data-notes-value") || "";
+        var mode = button.getAttribute("data-notes-mode");
+
+        document.getElementById("notesModalForm").setAttribute("action", action);
+        document.getElementById("notesModalTextarea").value = value;
+
+        var title = document.getElementById("notesModalTitle");
+        var help = document.getElementById("notesModalHelp");
+        var submitBtn = document.getElementById("notesModalSubmit");
+
+        if (mode === "complete") {
+            title.textContent = "Complete Assignment";
+            help.textContent = "Resolution notes are required to mark this issue resolved.";
+            submitBtn.textContent = "Mark Complete";
+            submitBtn.className = "btn btn-success";
+        } else {
+            title.textContent = "Resolution Notes";
+            help.textContent = "Describe what was found and what was done. This is saved on the assignment record.";
+            submitBtn.textContent = "Save Notes";
+            submitBtn.className = "btn btn-primary";
+        }
+    });
+});
+</script>
+{% endblock %}

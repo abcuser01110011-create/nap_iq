@@ -1,0 +1,248 @@
+/* =====================================================================
+   NAP-IQ Dark Mode
+   ---------------------------------------------------------------------
+   Activated by setting data-bs-theme="dark" on <html> (see
+   js/theme.js + the anti-flash inline script in base.html /
+   dashboard_base.html).
+
+   Bootstrap 5.3's own [data-bs-theme=dark] rules, already shipped in
+   vendor/bootstrap/css/bootstrap.min.css, re-theme every stock
+   Bootstrap component (forms, buttons, tables, modals, dropdowns,
+   alerts, badges, text-muted, borders, etc.) automatically.
+
+   This file only needs to:
+     1. Re-point the app's own --napiq-* design tokens (already used
+        throughout style.css / dashboard.css / napmap.css) at dark
+        values, so anything already built on those tokens re-themes
+        for free.
+     2. Patch the small number of app classes that hardcode a color
+        instead of using one of those tokens.
+
+   Palette matches the reference GeoMap screenshot: near-black navy
+   page background, dark slate-navy panels, violet/purple accent for
+   primary actions, CARTO dark map tiles (swapped in napmap.js).
+   ===================================================================== */
+
+[data-bs-theme="dark"] {
+    /* style.css tokens */
+    --napiq-primary: #8b5cf6;
+    --napiq-primary-dark: #7c3aed;
+
+    /* dashboard.css tokens */
+    --napiq-surface: #141b2d;
+    --napiq-bg: #0a0e1a;
+    --napiq-border: rgba(255, 255, 255, 0.08);
+    --napiq-text-muted: #93a0b8;
+
+    --napiq-success: #22c55e;
+    --napiq-warning: #f59e0b;
+    --napiq-danger: #f87171;
+    --napiq-info: #38bdf8;
+
+    color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- */
+/* BASE PAGE / LOGIN (base.html)                                     */
+/* ---------------------------------------------------------------- */
+
+[data-bs-theme="dark"] body {
+    background-color: var(--napiq-bg);
+    color: #e6e9f2;
+}
+
+[data-bs-theme="dark"] .app-navbar {
+    background-color: #0d1220 !important;
+    border-bottom: 1px solid var(--napiq-border);
+}
+
+/* ---------------------------------------------------------------- */
+/* DASHBOARD SHELL (dashboard_base.html)                             */
+/* ---------------------------------------------------------------- */
+
+[data-bs-theme="dark"] .dash-sidebar {
+    background: linear-gradient(180deg, #12182b 0%, #090d18 100%);
+}
+
+[data-bs-theme="dark"] .dash-sidebar-brand {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .dash-brand-sub {
+    color: #8b93ab;
+}
+
+[data-bs-theme="dark"] .dash-nav-link {
+    color: #a7afc4;
+}
+
+[data-bs-theme="dark"] .dash-nav-link:hover {
+    background: rgba(139, 92, 246, 0.14);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .dash-nav-link.active {
+    background: rgba(139, 92, 246, 0.22);
+    color: #fff;
+    box-shadow: inset 3px 0 0 var(--napiq-primary);
+}
+
+[data-bs-theme="dark"] .dash-nav-link-disabled,
+[data-bs-theme="dark"] .dash-nav-link-disabled:hover {
+    color: #5b647a;
+}
+
+[data-bs-theme="dark"] .dash-soon-badge {
+    background: rgba(255, 255, 255, 0.08);
+    color: #9aa4b8;
+}
+
+[data-bs-theme="dark"] .dash-nav-divider {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .dash-topbar-title h1 {
+    color: #f1f4f9;
+}
+
+[data-bs-theme="dark"] .dash-sidebar-toggle {
+    color: #dfe3ee;
+}
+
+[data-bs-theme="dark"] .dash-sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .dash-icon-btn {
+    color: #c9d1e0;
+}
+
+[data-bs-theme="dark"] .dash-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .dash-user-name {
+    color: #f1f4f9;
+}
+
+/* ---------------------------------------------------------------- */
+/* SUMMARY CARDS / PANELS (dashboard/index.html)                     */
+/* ---------------------------------------------------------------- */
+
+[data-bs-theme="dark"] .summary-card-value,
+[data-bs-theme="dark"] .dash-panel-header h5,
+[data-bs-theme="dark"] .recent-row-title,
+[data-bs-theme="dark"] .status-bar-count {
+    color: #f1f4f9;
+}
+
+[data-bs-theme="dark"] .status-bar-label {
+    color: #c3cadb;
+}
+
+[data-bs-theme="dark"] .dash-skeleton {
+    background: linear-gradient(90deg, #1b2338 25%, #232c47 37%, #1b2338 63%);
+    background-size: 400% 100%;
+}
+
+[data-bs-theme="dark"] .dash-empty i {
+    color: #3c445c;
+}
+
+[data-bs-theme="dark"] .table thead th {
+    color: var(--napiq-text-muted);
+}
+
+/* ---------------------------------------------------------------- */
+/* GEOMAP (naps/map.html, napmap.css)                                */
+/* ---------------------------------------------------------------- */
+
+[data-bs-theme="dark"] .napmap-legend-panel {
+    color: #dfe3ee;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.85);
+}
+
+[data-bs-theme="dark"] .napmap-legend-sep {
+    background: rgba(223, 227, 238, 0.35);
+}
+
+[data-bs-theme="dark"] .napmap-detail-panel {
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.45);
+}
+
+[data-bs-theme="dark"] .napmap-detail-name {
+    color: #f1f4f9;
+}
+
+[data-bs-theme="dark"] .nap-search-dropdown .list-group-item:hover {
+    background-color: #1c2438;
+}
+
+[data-bs-theme="dark"] .issue-popup .issue-popup-code,
+[data-bs-theme="dark"] .nap-popup .nap-popup-code,
+[data-bs-theme="dark"] .issue-popup dt,
+[data-bs-theme="dark"] .nap-popup dt {
+    color: #93a0b8;
+}
+
+[data-bs-theme="dark"] .nav-card > .card > .card-header {
+    background: linear-gradient(180deg, #171f33 0%, #121a2b 100%) !important;
+    border-bottom-color: rgba(139, 92, 246, 0.25);
+}
+
+/* Bootstrap's .bg-white / .bg-light utility classes are !important, so
+   they silently override the card-header rule above and the plain
+   .rounded.border.bg-light detail boxes nav-card.js /
+   nap-install-planner.js render inside these floating cards (route
+   status, "Use this NAP" suggestion box, etc.) -- without this, their
+   light-gray-on-white styling stays put even in dark mode while the
+   text inside picks up the page's light-on-dark color, making it
+   unreadable. Matching !important here is required to actually win. */
+[data-bs-theme="dark"] .nav-card .bg-white {
+    background-color: var(--napiq-surface) !important;
+}
+
+[data-bs-theme="dark"] .nav-card .bg-light {
+    background-color: #1c2438 !important;
+    border-color: var(--napiq-border) !important;
+}
+
+[data-bs-theme="dark"] .nav-card-route-status {
+    background-color: #171f33 !important;
+}
+
+[data-bs-theme="dark"] .nav-card .progress {
+    background-color: #1c2438;
+}
+
+/* Leaflet's own default popup/controls ship hardcoded white/black,
+   so they need explicit dark overrides on top of the CARTO dark
+   basemap swapped in by napmap.js. */
+[data-bs-theme="dark"] .leaflet-popup-content-wrapper,
+[data-bs-theme="dark"] .leaflet-popup-tip {
+    background: var(--napiq-surface);
+    color: #e6e9f2;
+}
+
+[data-bs-theme="dark"] .leaflet-popup-content-wrapper a {
+    color: var(--napiq-primary);
+}
+
+[data-bs-theme="dark"] .leaflet-bar a {
+    background: var(--napiq-surface);
+    color: #dfe3ee;
+    border-color: var(--napiq-border);
+}
+
+[data-bs-theme="dark"] .leaflet-bar a:hover {
+    background: #1c2438;
+}
+
+[data-bs-theme="dark"] .leaflet-control-attribution {
+    background: rgba(10, 15, 28, 0.75);
+    color: #93a0b8;
+}
+
+[data-bs-theme="dark"] .leaflet-control-attribution a {
+    color: #c3b8fb;
+}

@@ -1,0 +1,90 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ 'Edit Payment' if mode == 'edit' else 'Add Payment' }}{% endblock %}
+{% block page_title %}{{ 'Edit Payment' if mode == 'edit' else 'Add New Payment' }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('payments.list_payments') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Payments
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.subscriber_id.label }}</label>
+                        {{ form.subscriber_id(class="form-select" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
+                        {% for error in form.subscriber_id.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.amount.label }}</label>
+                            {{ form.amount(class="form-control" ~ (" is-invalid" if form.amount.errors else ""), placeholder="e.g. 1299.00") }}
+                            {% for error in form.amount.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.payment_method.label }}</label>
+                            {{ form.payment_method(class="form-select" ~ (" is-invalid" if form.payment_method.errors else "")) }}
+                            {% for error in form.payment_method.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.payment_date.label }}</label>
+                            {{ form.payment_date(class="form-control" ~ (" is-invalid" if form.payment_date.errors else ""), placeholder="YYYY-MM-DD") }}
+                            {% for error in form.payment_date.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status(class="form-select" ~ (" is-invalid" if form.status.errors else "")) }}
+                            {% for error in form.status.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.reference_number.label }} <span class="text-muted small">(optional)</span></label>
+                        {{ form.reference_number(class="form-control" ~ (" is-invalid" if form.reference_number.errors else ""), placeholder="e.g. RCPT-0001") }}
+                        {% for error in form.reference_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    {% if mode == 'edit' and payment.collector %}
+                    <div class="alert alert-light border small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Originally recorded by <strong>{{ payment.collector.full_name }}</strong>. Editing here won't change that.
+                    </div>
+                    {% endif %}
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('payments.list_payments') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {{ 'Save Changes' if mode == 'edit' else 'Record Payment' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

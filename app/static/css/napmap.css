@@ -1,0 +1,939 @@
+#napMap {
+    height: 65vh;
+    min-height: 420px;
+    width: 100%;
+    border-radius: 0.6rem;
+    z-index: 0;
+}
+
+@media (max-width: 576px) {
+    #napMap {
+        height: 55vh;
+        min-height: 320px;
+    }
+}
+
+/* ============================================================
+   GeoMap positioning redesign: full-bleed map with floating
+   panels docked to the shell's corners, replacing the old
+   stacked-cards-above-the-map layout. Bleeds out of the
+   sidebar shell's own .dash-content padding so the map reaches
+   the edges of the content area, same footprint a reference
+   map-first layout uses. Purely layout/positioning -- colors
+   below reuse the app's existing card/btn/legend styling. */
+.napmap-fullbleed {
+    margin: -1.5rem;
+    height: calc(100vh - var(--napiq-topbar-height, 68px));
+    min-height: 480px;
+}
+
+.napmap-fullbleed #napMap {
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+}
+
+@media (max-width: 575.98px) {
+    .napmap-fullbleed {
+        margin: -1rem;
+        height: calc(100vh - var(--napiq-topbar-height, 68px));
+    }
+}
+
+.napmap-float {
+    position: absolute;
+    z-index: 1001;
+    max-width: calc(100% - 24px);
+}
+
+.napmap-float-top-left {
+    top: 16px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.napmap-float-top-right {
+    top: 16px;
+    right: 16px;
+}
+
+.napmap-float-bottom-left {
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+    max-width: calc(100% - 24px);
+}
+
+/* Bug fix: general map alerts (#mapAlertArea) + the three placement-
+   mode banners (#addModeBanner / #issueModeBanner /
+   #planInstallModeBanner) now live INSIDE .napmap-shell as a floating
+   overlay instead of as normal block elements above it. Un-hiding one
+   of them used to insert extra height above the fixed-height map
+   viewport and push #napMap down the page ("geomap placement moves"
+   when entering Add NAP / Report Issue / Plan Installation mode) --
+   floating them here means showing/hiding a banner never changes the
+   map container's size or position, only what's drawn on top of it. */
+.napmap-float-top-banner {
+    /* Sits below the compact top-left/top-right button rows (both
+       ~34-36px tall) so a banner never overlaps the toolbar/mode
+       buttons on top of it, even though all three share the same
+       top edge of the map. */
+    top: 62px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 640px;
+    z-index: 1002;
+    pointer-events: none;
+}
+
+.napmap-float-top-banner > * {
+    pointer-events: auto;
+}
+
+@media (max-width: 767.98px) {
+    .napmap-float-top-banner {
+        max-width: calc(100% - 24px);
+        top: 108px;
+    }
+}
+
+/* ------------------------------------------------------------------
+   "Make the layer, filters, and navigation in dropdown mode and in a
+   horizontal [row], make it small a little bit" -- Layers / Filters /
+   Navigation are now three small dropdown-toggle buttons in a row
+   instead of a tall stacked-cards column. Same control ids as
+   before, only the wrapping chrome changed. ------------------------ */
+.napmap-toolbar {
+    /* row, not column -- overrides nothing on napmap-float-top-left
+       itself (that's still a column so it can wrap to a second row
+       on very narrow screens without the individual buttons
+       stretching). */
+}
+
+.napmap-toolbar-btn {
+    font-size: 0.78rem;
+    padding: 0.32rem 0.6rem;
+}
+
+.napmap-dropdown-menu {
+    width: 240px;
+    max-width: calc(100vw - 32px);
+    font-size: 0.85rem;
+    border: none;
+    box-shadow: 0 10px 28px -6px rgba(15, 23, 42, 0.28), 0 2px 8px -2px rgba(15, 23, 42, 0.12);
+}
+
+.napmap-dropdown-menu-wide {
+    width: 300px;
+}
+
+.napmap-dropdown-menu .form-check {
+    margin-bottom: 0.35rem;
+}
+
+.napmap-dropdown-menu .form-check-label {
+    font-size: 0.83rem;
+}
+
+/* Legend redesign: "make the legend small or make it horizontal with
+   no background and small" -- dropped the card/shadow wrapper
+   entirely so the legend has no background at all, just small text
+   sitting directly over the map, laid out as one horizontal wrapping
+   row instead of three stacked rows. */
+.napmap-legend-panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    font-size: 0.72rem;
+    color: #495057;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85), 0 0 6px rgba(255, 255, 255, 0.85);
+}
+
+.napmap-legend-panel .legend-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 3px;
+}
+
+.napmap-legend-panel .legend-line {
+    display: inline-block;
+    width: 14px;
+    height: 2px;
+    margin-right: 3px;
+    vertical-align: middle;
+}
+
+.napmap-legend-sep {
+    width: 1px;
+    height: 11px;
+    background: rgba(73, 80, 87, 0.35);
+    display: inline-block;
+}
+
+.napmap-legend-count {
+    margin-top: 2px;
+    font-size: 0.72rem;
+    opacity: 0.85;
+}
+
+@media (max-width: 575.98px) {
+    .napmap-legend-panel {
+        font-size: 0.68rem;
+    }
+}
+
+/* Topbar search override (rich NAP/Subscriber/Complaint search
+   moved from its own card into the shared shell's topbar search
+   slot -- wider than the default topbar search since it now
+   carries a dropdown of typed results). */
+.napmap-topbar-search {
+    width: 420px;
+    max-width: 42vw;
+}
+
+.napmap-topbar-search input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 0.85rem;
+    width: 100%;
+}
+
+.napmap-topbar-search .nap-search-dropdown {
+    left: 0;
+    right: auto;
+    width: 100%;
+    top: calc(100% + 8px);
+}
+
+.nap-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 260px;
+    overflow-y: auto;
+    z-index: 1000;
+    border-radius: 0.4rem;
+}
+
+.nap-search-dropdown .list-group-item {
+    cursor: pointer;
+}
+
+.nap-search-dropdown .list-group-item:hover {
+    background-color: #f1f6fb;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* Quick-add / Report-issue modals are docked to the side, not
+   centered, and have no backdrop, so the map stays visible and
+   clickable behind them while the admin fine-tunes the location. */
+.side-modal-dialog {
+    position: fixed;
+    top: 110px;
+    right: 24px;
+    margin: 0;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+}
+
+@media (max-width: 576px) {
+    .side-modal-dialog {
+        top: auto;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* Add NAP mode: crosshair cursor over the map (shared by issue-report mode too) */
+#napMap.add-mode-cursor {
+    cursor: crosshair;
+}
+
+/* Pending (not-yet-saved) marker pulse, to make it obvious it's temporary */
+.nap-marker-pending,
+.issue-marker-pending {
+    animation: nap-pending-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes nap-pending-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+
+#mapAlertArea .alert {
+    border: none;
+}
+
+.legend-dot-square {
+    border-radius: 3px;
+}
+
+.issue-popup h6 {
+    margin-bottom: 0.25rem;
+}
+
+.issue-popup .issue-popup-code {
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.issue-popup dl {
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.issue-popup dt {
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.nap-popup h6 {
+    margin-bottom: 0.25rem;
+}
+
+.nap-popup .nap-popup-code {
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.nap-popup dl {
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.nap-popup dt {
+    font-weight: 500;
+    color: #6c757d;
+}
+
+/* Phase 8 (adapted): manual map-click origin picker
+   (nav-origin.js / nav-origin-picker.js). Additive only — nothing
+   above this block was changed. */
+
+/* Crosshair over the map while the picker is waiting for a click,
+   same convention as #napMap.add-mode-cursor above. */
+#napMap.origin-pick-mode-cursor {
+    cursor: crosshair;
+}
+
+/* The pending (unconfirmed) map-picked origin marker pulses, reusing
+   the same nap-pending-pulse animation already defined above for
+   pending NAP/issue markers, so "not yet confirmed" reads
+   consistently across the whole app. */
+.nav-origin-marker-pending {
+    animation: nap-pending-pulse 1.4s ease-in-out infinite;
+}
+
+.nav-origin-marker-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Phase 8, second half: coordinate tooltip on the origin marker
+   (pending and confirmed). Deep-emerald border/text for the confirmed
+   point, amber for the still-pending one, matching the marker pin
+   colors above so the tooltip reads as "belonging to" that marker at
+   a glance. Additive only. */
+.nav-origin-tooltip {
+    font-size: 0.75rem;
+    font-family: var(--bs-font-monospace, monospace);
+    padding: 2px 6px;
+    background: #ffffff;
+    color: #065f46;
+    border: 1px solid #065f46;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Installation Planning, Phase 3 (40%): "Plan Installation" map mode
+   (nap-install-planner.js). Additive only — nothing above this block
+   was changed. Same crosshair-cursor convention as add-mode-cursor /
+   origin-pick-mode-cursor above. */
+#napMap.plan-install-mode-cursor {
+    cursor: crosshair;
+}
+
+.plan-install-marker-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Magenta tooltip to match the magenta diamond pin, same
+   "tooltip border/text color matches its marker" convention as
+   .nav-origin-tooltip above. */
+.plan-install-tooltip {
+    font-size: 0.75rem;
+    font-family: var(--bs-font-monospace, monospace);
+    padding: 2px 6px;
+    background: #ffffff;
+    color: #a61e6a;
+    border: 1px solid #d63384;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.nav-origin-tooltip.nav-origin-tooltip-pending {
+    color: #92400e;
+    border-color: #f59e0b;
+}
+
+.nav-origin-tooltip::before {
+    border-top-color: inherit;
+}
+
+/* Phase 4 (20%, translation project): floating Navigation Card overlay
+   on the GeoMap, translated from the prototype's NavigationCard.tsx.
+   Positioned like the prototype (bottom-right over the map), but
+   using the site's existing light Bootstrap `card` look instead of
+   the prototype's dark Tailwind treatment. Purely additive: napMap
+   itself is unchanged, this just adds a positioned sibling on top of it. */
+.napmap-shell {
+    position: relative;
+}
+
+.nav-card {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 1000;
+    width: 340px;
+    max-width: calc(100% - 24px);
+}
+
+.nav-card-body {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.nav-card-type-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    background: rgba(13, 110, 253, 0.12);
+    color: #0d6efd;
+}
+
+.nav-card-dot {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: #6c757d;
+    flex-shrink: 0;
+}
+
+.nav-card-dot-active {
+    background: #0d6efd;
+}
+
+.nav-card-route-status {
+    background-color: #f8f9fa;
+}
+
+@media (max-width: 576px) {
+    .nav-card {
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+}
+
+/* Phase 5 (25%, translation project): manual origin lat/lng form
+   rendered inside the Navigation Card by nav-routing.js. */
+.nav-card-origin-form .form-control {
+    font-size: 0.8rem;
+}
+
+.nav-card-origin-form input[type="number"]::-webkit-outer-spin-button,
+.nav-card-origin-form input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.nav-card-origin-form input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+#navCardOriginError:empty {
+    display: none;
+}
+
+/* Phase 9 (45%, translation project): demo-travel controls block,
+   appended into the Navigation Card's #navCardControls by
+   nav-demo-travel.js, alongside (below) the Phase 5 origin form
+   above. Additive only -- nothing existing was changed. */
+.nav-demo-travel .btn {
+    font-size: 0.78rem;
+}
+
+/* Phase 10 (50%, translation project): the dedicated navigation/
+   technician marker (nav-technician-marker.js). Additive only --
+   nothing above this block was changed. */
+.nav-tech-marker-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Gentle pulse while a demo run is actively "running", so the marker
+   visibly reads as in-motion rather than static, without reusing the
+   sharper nap-pending-pulse animation already used for unconfirmed
+   NAP/issue/origin markers (that one means "unconfirmed"; this one
+   means "moving"). */
+.nav-tech-marker-pulse svg {
+    animation: nav-tech-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes nav-tech-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+.nav-tech-popup {
+    min-width: 180px;
+}
+
+/* Phase 11 (55%, translation project): device GPS origin
+   (nav-gps-origin.js). Additive only -- nothing above this block was
+   changed. A small pulsing dot next to "Live GPS tracking active",
+   distinct from the sharper nap-pending-pulse used for unconfirmed
+   markers (that one means "unconfirmed"; this one means "a live
+   sensor is currently updating this"). */
+.nav-gps-live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--bs-primary, #0d6efd);
+    animation: nav-gps-live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes nav-gps-live-pulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.35;
+        transform: scale(1.5);
+    }
+}
+
+/* ============================================================
+   Phase 16 (80%, translation project): prototype UI parity pass.
+   -----------------------------------------------------------
+   Purely visual polish for everything already shipped by Phases
+   4-15 (nav-card.js, nav-routing.js, nav-origin.js,
+   nav-origin-picker.js, nav-gps-origin.js, nav-technician-origin.js,
+   nav-demo-travel.js, nav-technician-marker.js, nav-route-progress.js
+   / nav-gps-route-progress.js). No JS behavior, DOM ids, or markup
+   *structure* changes here -- only rules layered on top of the
+   Bootstrap classes those files already render, so this section can
+   be read top to bottom against NavigationCard.tsx / RouteDetails.tsx
+   / OriginPicker.tsx in the prototype without needing to touch any
+   of the working nav-*.js logic.
+
+   Kept intentionally on the existing light Bootstrap `card` language
+   (that choice was made deliberately back in Phase 4 and is repeated
+   in this file's own Phase 4 comment above) rather than the
+   prototype's dark Tailwind HUD -- this phase brings across the
+   prototype's *feel* (elevated floating panel, soft motion on open,
+   compact status chrome, tight information density) without
+   reintroducing Tailwind or a dark theme into NAP-IQ's Bootstrap UI. */
+
+/* Bug fix found while doing this phase's visual pass: nav-card.js,
+   nav-destination.js, and nav-origin.js all rely on Bootstrap 5's
+   `.min-w-0` utility (min-width: 0) to let a flex child truncate
+   instead of forcing its siblings (badges/buttons marked
+   flex-shrink-0) off the edge of the card. This project's vendored
+   Bootstrap build does not include that utility class, so on any
+   destination whose type badge + title combination was wide enough,
+   the card header/destination row silently overflowed the card's own
+   rounded border instead of truncating -- most visible with the
+   admin "Live Technician Tracking" heading next to the "Awaiting
+   route" status badge. Restoring the standard Bootstrap 5 definition
+   here fixes every existing `min-w-0` usage at once, with no changes
+   needed in any of the three JS files. */
+.min-w-0 {
+    min-width: 0 !important;
+}
+
+/* Elevated "floating panel" card, closer to the prototype's
+   shadow-2xl/backdrop-blur treatment than Bootstrap's default
+   .shadow-sm. Targets .nav-card's own <div class="card"> wrapper
+   only, so it never touches unrelated Bootstrap cards elsewhere on
+   the page. */
+.nav-card > .card {
+    border: none;
+    border-radius: 0.9rem;
+    box-shadow:
+        0 14px 34px -10px rgba(15, 23, 42, 0.32),
+        0 3px 10px -2px rgba(15, 23, 42, 0.14);
+    overflow: hidden;
+}
+
+.nav-card > .card > .card-header {
+    background: linear-gradient(180deg, #ffffff 0%, #f6f9fd 100%);
+    border-bottom: 1px solid rgba(13, 110, 253, 0.12);
+}
+
+.nav-card > .card > .card-header .badge {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Collapsed pill gets the same elevated treatment as the expanded
+   card so expand/collapse doesn't feel like two different UIs. */
+.nav-card-pill-card {
+    border: none;
+    border-radius: 999px;
+    box-shadow:
+        0 12px 28px -8px rgba(15, 23, 42, 0.34),
+        0 2px 8px -1px rgba(15, 23, 42, 0.16);
+}
+
+/* Thin, unobtrusive scrollbar for the scrolling card body, echoing
+   the prototype's `.thin-scroll` utility on #navCardBody's own
+   scroll container (nav-card.js) instead of the browser default. */
+.nav-card-body {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(13, 110, 253, 0.3) transparent;
+}
+
+.nav-card-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.nav-card-body::-webkit-scrollbar-thumb {
+    background-color: rgba(13, 110, 253, 0.3);
+    border-radius: 999px;
+}
+
+/* Soft entrance motion each time nav-card.js rebuilds the card
+   (destination change, expand/collapse, route/demo/GPS updates) --
+   the Bootstrap-native equivalent of the prototype's framer-motion
+   fade/slide-in on NavigationCard. Applied by nav-card.js to the
+   outermost element it renders; purely decorative, so if a script
+   ever renders without the class nothing breaks. */
+.nav-card-enter {
+    animation: nav-card-enter 0.22s ease-out;
+}
+
+@keyframes nav-card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-card-enter {
+        animation: none;
+    }
+}
+
+/* Route / demo-travel / GPS-progress bars (nav-routing.js,
+   nav-demo-travel.js, nav-gps-route-progress.js all render a plain
+   Bootstrap `.progress` inside the card) -- thinner and fully
+   rounded, closer to the prototype's progress treatment. */
+.nav-card .progress {
+    height: 0.5rem;
+    border-radius: 999px;
+    background-color: #eef2f7;
+}
+
+.nav-card .progress-bar {
+    border-radius: 999px;
+}
+
+/* Route/origin coordinate readouts (nav-routing.js's
+   .nav-route-endpoints, nav-card.js's/nav-origin.js's inline
+   font-monospace coordinate lines) -- slightly smaller and tighter
+   so lat/lng pairs read as secondary/technical detail rather than
+   competing with labels, matching the prototype's muted mono
+   coordinate styling. */
+.nav-card-body .font-monospace {
+    font-size: 0.76rem;
+    letter-spacing: -0.01em;
+}
+
+/* Section dividers already used by nav-demo-travel.js
+   (.nav-demo-travel.border-top) and reusable by any future section
+   that wants the same "new block inside the card" convention. */
+.nav-card-body .border-top {
+    border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ---- Responsive: tablet ----
+   Phases before this one only handled desktop (fixed 340px) and
+   phone (<=576px, full width). Add an explicit tablet step so the
+   card doesn't sit at a jarring 340px on a ~768-991px iPad-class
+   viewport, where it can crowd the map. */
+@media (min-width: 577px) and (max-width: 991px) {
+    .nav-card {
+        width: 300px;
+    }
+
+    .nav-card-body {
+        max-height: 280px;
+    }
+}
+
+/* ---- Responsive: phone ----
+   Turns the floating card into a bottom sheet -- full width, docked
+   to the viewport edges, rounded only on top -- and makes sure the
+   multi-button rows several nav-*.js files render (nav-routing.js's
+   `.row.g-2.text-center` distance/duration/ETA stats, nav-origin.js's
+   `.row.gx-1.gy-1` lat/lng fields, nav-demo-travel.js's
+   `.d-flex.gap-2.flex-wrap` Start/Pause/Resume/Reset/Replay buttons)
+   wrap and space cleanly instead of overflowing or going edge to
+   edge with no gap. */
+@media (max-width: 576px) {
+    .nav-card > .card {
+        border-radius: 1rem 1rem 0 0;
+    }
+
+    .nav-card-body {
+        max-height: 45vh;
+    }
+
+    .nav-card-body .row.g-2.text-center > div,
+    .nav-card-body .row.gx-1.gy-1 > div {
+        margin-bottom: 0.35rem;
+    }
+
+    .nav-demo-travel .d-flex.gap-2.flex-wrap .btn {
+        flex: 1 1 auto;
+        min-width: 44%;
+    }
+}
+
+/* Small screens under phone breakpoint (narrow phones in portrait):
+   drop the multi-column stat row down to single-column so distance /
+   duration / ETA numbers never truncate. */
+@media (max-width: 360px) {
+    .nav-card-body .row.g-2.text-center {
+        row-gap: 0.5rem;
+    }
+
+    .nav-card-body .row.g-2.text-center > .col-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+/* ---------------------------------------------------------------
+   Phase 23 (85%, "Search -> destination -> route"): the map search
+   box (napmap.js's handleSearchInput()) now returns NAP, Subscriber,
+   and Complaint results in one dropdown instead of NAP-only. Purely
+   additive -- nothing above this comment changed. */
+
+/* Distinguishes a search result row's two independent click targets
+   (focus/open vs. explicit "set as destination") without relying on
+   .nap-search-dropdown .list-group-item's own hover/cursor rule,
+   which would make the whole row look like one button again. */
+.nap-search-dropdown .nap-search-result-item {
+    cursor: default;
+}
+
+/* Subscriber-type badge in the search dropdown, matching the purple
+   used by the subscriber marker icon (buildSubscriberIcon() in
+   napmap.js) so a result's badge color agrees with the pin it'll
+   focus. Bootstrap ships text-bg-primary/-success/-danger etc. but
+   has no built-in purple, hence this one small custom rule. */
+.napiq-badge-subscriber {
+    background-color: #6f42c1;
+    color: #fff;
+}
+
+/* ---------------------------------------------------------------
+   NAP detail slide-in panel: replaces the old marker popup for NAP
+   clicks with a right-docked panel (see #napDetailPanel in
+   naps/map.html). Anchored to .napmap-shell (already position:
+   relative, see the Navigation Card rule above), so it slides in
+   over the map viewport itself rather than the page -- same
+   "floating overlay that never displaces #napMap" approach every
+   other .napmap-float element on this page already uses. Hidden by
+   default via a translateX(100%) transform; napmap.js adds
+   .napmap-detail-panel-open to slide it into view and removes it to
+   slide back out. Matches the app's existing light theme (--napiq-*
+   tokens from dashboard.css), not a separate dark treatment. */
+.napmap-detail-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 360px;
+    max-width: calc(100% - 16px);
+    background: var(--napiq-surface, #ffffff);
+    border-left: 1px solid var(--napiq-border, #e6e9ef);
+    box-shadow: -6px 0 18px rgba(15, 23, 42, 0.12);
+    z-index: 1003; /* above .napmap-float-top-banner (1002) so it never hides behind mode banners */
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s ease-out;
+    pointer-events: none;
+}
+
+.napmap-detail-panel.napmap-detail-panel-open {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+@media (max-width: 575.98px) {
+    .napmap-detail-panel {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+.napmap-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 14px 16px 0 16px;
+}
+
+.napmap-detail-header-top {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.napmap-detail-code-badge {
+    background-color: var(--napiq-bg, #f4f6f9);
+    border: 1px solid var(--napiq-border, #e6e9ef);
+    color: var(--napiq-text-muted, #6b7280);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Usage badge color is set inline by napmap.js per-NAP (green/
+   warning/danger, mirroring the exact 90%/70% thresholds
+   reports/index.html already uses for "near capacity" -- see
+   NEAR_CAPACITY_THRESHOLD_PCT in app/routes/reports.py), so only
+   shared sizing/shape lives here. */
+.napmap-detail-usage-badge {
+    font-weight: 600;
+}
+
+.napmap-detail-body {
+    padding: 12px 16px 16px 16px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+.napmap-detail-name {
+    margin-bottom: 0.15rem;
+}
+
+.napmap-detail-location {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 1rem;
+}
+
+.napmap-detail-section {
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--napiq-border, #e6e9ef);
+    margin-top: 0.9rem;
+}
+
+.napmap-detail-section:first-of-type {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.napmap-detail-section-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.napmap-detail-progress {
+    height: 8px;
+    margin: 0.5rem 0 0.35rem 0;
+}
+
+/* One row per connected subscriber line (line code, name, payment
+   status badge, chevron) -- filled in by napmap.js. */
+.napmap-detail-line-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--napiq-border, #e6e9ef);
+    text-decoration: none;
+    color: inherit;
+}
+
+.napmap-detail-line-row:last-child {
+    border-bottom: none;
+}
+
+.napmap-detail-line-code {
+    background-color: var(--napiq-bg, #f4f6f9);
+    border: 1px solid var(--napiq-border, #e6e9ef);
+    color: var(--napiq-text-muted, #6b7280);
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+.napmap-detail-line-name {
+    flex: 1 1 auto;
+    font-size: 0.88rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.napmap-detail-line-chevron {
+    color: var(--napiq-text-muted, #6b7280);
+}
+
+.napmap-detail-empty-lines {
+    color: var(--napiq-text-muted, #6b7280);
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+}

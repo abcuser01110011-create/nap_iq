@@ -1,0 +1,39 @@
+:root {
+    --napiq-primary: #0f5fa6;
+    --napiq-primary-dark: #0b4a80;
+}
+
+body {
+    background-color: #f4f6f9;
+}
+
+.app-navbar {
+    background-color: var(--napiq-primary-dark);
+}
+
+.btn-primary {
+    background-color: var(--napiq-primary);
+    border-color: var(--napiq-primary);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--napiq-primary-dark);
+    border-color: var(--napiq-primary-dark);
+}
+
+.card {
+    border: none;
+    border-radius: 0.6rem;
+}
+
+.table thead th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+}
+
+.flash-stack .alert {
+    border: none;
+}

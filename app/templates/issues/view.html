@@ -1,0 +1,229 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ issue.issue_code }} · Issue Details{% endblock %}
+{% block page_title %}Technical Issue Details{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <a href="{{ url_for('naps.geomap') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to GeoMap
+    </a>
+    {# Phase 13 (65%, navigation destination panels): only offered
+       when this issue actually has coordinates — latitude/longitude
+       are nullable on this model, and naps.geomap()'s
+       focusNavigationFromQueryParam() silently selects nothing for
+       an issue it can't plot. #}
+    {% if issue.latitude is not none and issue.longitude is not none %}
+    <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=issue.id) }}" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-signpost-split me-1"></i>Navigate
+    </a>
+    {% endif %}
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+
+                <div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
+                    <div>
+                        <h3 class="mb-0">{{ issue.issue_code or ("Issue #" ~ issue.id) }}</h3>
+                        <div class="text-muted">{{ issue.issue_type }}</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        {% set priority_classes = {
+                            'low': 'text-bg-secondary',
+                            'medium': 'text-bg-primary',
+                            'high': 'text-bg-warning',
+                            'critical': 'text-bg-danger'
+                        } %}
+                        <span class="badge fs-6 {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
+                            {{ issue.priority|capitalize }} Priority
+                        </span>
+                        {% set status_classes = {
+                            'pending': 'text-bg-secondary',
+                            'assigned': 'text-bg-info',
+                            'in_progress': 'text-bg-primary',
+                            'resolved': 'text-bg-success',
+                            'closed': 'text-bg-dark'
+                        } %}
+                        <span class="badge fs-6 {{ status_classes.get(issue.status, 'text-bg-secondary') }}">
+                            {{ issue.status|replace('_', ' ')|capitalize }}
+                        </span>
+                    </div>
+                </div>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Subscriber</dt>
+                    <dd class="col-sm-8">
+                        {% if issue.subscriber %}
+                            {{ issue.subscriber.subscriber_code }} — {{ issue.subscriber.full_name }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">NAP</dt>
+                    <dd class="col-sm-8">
+                        {% if issue.nap %}
+                            <a href="{{ url_for('naps.view_nap', nap_id=issue.nap.id) }}">
+                                {{ issue.nap.nap_code }} — {{ issue.nap.name }}
+                            </a>
+                        {% else %}
+                            Not linked to a specific NAP
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ issue.address or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Coordinates</dt>
+                    <dd class="col-sm-8">{{ issue.latitude }}, {{ issue.longitude }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Description</dt>
+                    <dd class="col-sm-8">{{ issue.description or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Reported</dt>
+                    <dd class="col-sm-8">{{ issue.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Last Updated</dt>
+                    <dd class="col-sm-8">{{ issue.updated_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
+                </dl>
+
+                <hr class="my-4">
+
+                {% if current_user.role == 'administrator' %}
+                <div class="border rounded p-3 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0"><i class="bi bi-signpost-split me-1"></i>Dispatch</h6>
+                        {% if issue.status in ('pending', 'assigned', 'in_progress') %}
+                        <a href="{{ url_for('dispatch.recommend', issue_id=issue.id) }}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-list-ol me-1"></i>Recommend a Technician
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    {% if issue.status == 'resolved' %}
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-3 border-bottom">
+                            <p class="small mb-0">
+                                <i class="bi bi-check2-circle text-success me-1"></i>
+                                This issue has been resolved. Close it once you've confirmed the
+                                work is complete.
+                            </p>
+                            <form method="post" action="{{ url_for('issues.close_issue', issue_id=issue.id) }}"
+                                  onsubmit="return confirm('Close this issue? This confirms the resolution and ends the workflow.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-dark">
+                                    <i class="bi bi-lock-fill me-1"></i>Close Issue
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
+
+                    {% if assignment %}
+                        <p class="small mb-2">
+                            Currently assigned to
+                            <strong>{{ assignment.technician.full_name if assignment.technician else 'Unknown technician' }}</strong>
+                            &mdash; <span class="text-capitalize">{{ assignment.status|replace('_', ' ') }}</span>
+                            since {{ assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <form method="post" action="{{ url_for('dispatch.reassign', issue_id=issue.id) }}"
+                                  class="d-flex gap-2 flex-wrap">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <select name="technician_id" class="form-select form-select-sm" style="width: 220px;" required>
+                                    <option value="0">-- Reassign to --</option>
+                                    {% for tech in technicians %}
+                                        {% if tech.id != assignment.technician_id %}
+                                        <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.status }})</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Reassign</button>
+                            </form>
+                            <form method="post" action="{{ url_for('dispatch.cancel', assignment_id=assignment.id) }}"
+                                  onsubmit="return confirm('Cancel this dispatch? The issue will go back to pending with no technician assigned.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Cancel Dispatch</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <p class="small text-muted mb-2">No technician is currently dispatched to this issue.</p>
+                        <form method="post" action="{{ url_for('dispatch.assign', issue_id=issue.id) }}"
+                              class="d-flex gap-2 flex-wrap">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <select name="technician_id" class="form-select form-select-sm" style="width: 220px;" required>
+                                <option value="0">-- Select Technician --</option>
+                                {% for tech in technicians %}
+                                <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.status }})</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary">Assign</button>
+                        </form>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Technicians update this status by accepting, starting, and completing
+                    their assignment from the "My Work" page. Assigning/reassigning a
+                    technician is done by an administrator from the Dispatch Board.
+                </div>
+                {% endif %}
+
+                {% if current_user.role == 'administrator' %}
+                <hr class="my-4">
+                <h6 class="mb-3"><i class="bi bi-clock-history me-1"></i>Assignment History</h6>
+                {% if assignment_history %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Technician</th>
+                                <th>Status</th>
+                                <th>Assigned</th>
+                                <th>Completed</th>
+                                <th>Resolution Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set history_status_classes = {
+                                'assigned': 'text-bg-secondary',
+                                'accepted': 'text-bg-info',
+                                'in_progress': 'text-bg-primary',
+                                'completed': 'text-bg-success',
+                                'cancelled': 'text-bg-dark'
+                            } %}
+                            {% for a in assignment_history %}
+                            <tr>
+                                <td>{{ a.technician.full_name if a.technician else 'Unknown technician' }}</td>
+                                <td>
+                                    <span class="badge {{ history_status_classes.get(a.status, 'text-bg-secondary') }}">
+                                        {{ a.status|replace('_', ' ')|capitalize }}
+                                    </span>
+                                </td>
+                                <td class="small">{{ a.assigned_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td class="small">
+                                    {% if a.completed_at %}
+                                        {{ a.completed_at.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="small" style="max-width: 260px;">
+                                    {{ a.resolution_notes or "—" }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">No technician has ever been assigned to this issue.</p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

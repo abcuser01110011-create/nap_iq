@@ -1,0 +1,69 @@
+{% extends "dashboard_base.html" %}
+{% block title %}My Issues{% endblock %}
+{% block page_title %}My Issues{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Technical issues reported on your account</p>{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle me-1"></i>My Technical Issues</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">{{ technical_issues|length }} total</span>
+            <a href="{{ url_for('customer.report_issue') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Report an Issue
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if technical_issues %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Type</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                        <th>Reported</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+                    {% set issue_status_classes = {
+                        'pending': 'text-bg-secondary',
+                        'assigned': 'text-bg-info',
+                        'in_progress': 'text-bg-primary',
+                        'resolved': 'text-bg-success',
+                        'closed': 'text-bg-dark'
+                    } %}
+                    {% for issue in technical_issues %}
+                    <tr>
+                        <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
+                        <td>{{ issue.issue_type }}</td>
+                        <td>
+                            <span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
+                                {{ issue.priority|capitalize }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">
+                                {{ issue.status|replace('_', ' ')|capitalize }}
+                            </span>
+                        </td>
+                        <td class="text-muted small">{{ issue.description or "—" }}</td>
+                        <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
+            No technical issues reported for your account.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "dashboard_base.html" %}
+{% block title %}My Account{% endblock %}
+{% block page_title %}My Account{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">NAP-IQ Customer Portal</p>{% endblock %}
+
+{% block content %}
+{% if subscriber is none %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 mb-3">Welcome, {{ current_user.full_name }}</h2>
+        <p class="text-muted mb-0">
+            Your login isn't linked to a subscriber record yet, so we can't show your
+            specific service plan, connected NAP, or technical issues here. Please
+            contact NAP-IQ support/an administrator to have your account linked to
+            your subscriber record.
+        </p>
+    </div>
+</div>
+<div class="alert alert-info mt-4 mb-0 small">
+    <i class="bi bi-info-circle me-1"></i>
+    Need help now? Please contact NAP-IQ support directly — self-service issue
+    reporting requires your login to be linked to a subscriber record first.
+</div>
+
+{% else %}
+<div class="row g-3 mb-3 align-items-stretch">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <i class="bi bi-person-vcard me-1"></i>My Service Account
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-4 text-muted fw-normal">Subscriber Code</dt>
+                    <dd class="col-sm-8">{{ subscriber.subscriber_code }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Plan</dt>
+                    <dd class="col-sm-8">{{ subscriber.plan_type or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
+                    <dd class="col-sm-8">
+                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger'} %}
+                        <span class="badge {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
+                            {{ subscriber.status|capitalize }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ subscriber.address or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Contact Number</dt>
+                    <dd class="col-sm-8">{{ subscriber.contact_number or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Installed</dt>
+                    <dd class="col-sm-8">{{ subscriber.installed_at.strftime('%B %d, %Y') if subscriber.installed_at else "—" }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <i class="bi bi-hdd-network me-1"></i>Connected NAP
+            </div>
+            <div class="card-body">
+                {% if subscriber.nap %}
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-4 text-muted fw-normal">NAP Code</dt>
+                    <dd class="col-sm-8">{{ subscriber.nap.nap_code }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Name</dt>
+                    <dd class="col-sm-8">{{ subscriber.nap.name }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
+                    <dd class="col-sm-8">
+                        {% set nap_status_classes = {'active': 'text-bg-success', 'full': 'text-bg-warning', 'maintenance': 'text-bg-danger', 'inactive': 'text-bg-secondary'} %}
+                        <span class="badge {{ nap_status_classes.get(subscriber.nap.status, 'text-bg-secondary') }}">
+                            {{ subscriber.nap.status|capitalize }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ subscriber.nap.address or "—" }}</dd>
+                </dl>
+                {% else %}
+                <p class="text-muted mb-0">Not currently connected to a NAP.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle me-1"></i>My Technical Issues</span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">{{ technical_issues|length }} total</span>
+            <a href="{{ url_for('customer.report_issue') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Report an Issue
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if technical_issues %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Reported</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set issue_status_classes = {
+                        'pending': 'text-bg-secondary',
+                        'assigned': 'text-bg-info',
+                        'in_progress': 'text-bg-primary',
+                        'resolved': 'text-bg-success',
+                        'closed': 'text-bg-dark'
+                    } %}
+                    {% for issue in technical_issues %}
+                    <tr>
+                        <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
+                        <td>{{ issue.issue_type }}</td>
+                        <td>
+                            <span class="badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">
+                                {{ issue.status|replace('_', ' ')|capitalize }}
+                            </span>
+                        </td>
+                        <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
+            No technical issues reported for your account.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="alert alert-info mb-0 small">
+    <i class="bi bi-info-circle me-1"></i>
+    You can view your full <a href="{{ url_for('customer.my_issues') }}">issue history</a>,
+    <a href="{{ url_for('customer.my_service_requests') }}">service requests</a>, and
+    <a href="{{ url_for('customer.my_payments') }}">payment history</a> from the sidebar.
+    Paying online isn't available yet — please contact NAP-IQ support directly for that.
+</div>
+{% endif %}
+{% endblock %}

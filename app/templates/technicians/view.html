@@ -1,0 +1,81 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ technician.full_name }}{% endblock %}
+{% block page_title %}{{ technician.full_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Technicians
+    </a>
+    <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white"><i class="bi bi-person-badge me-1"></i>Profile</div>
+            <div class="card-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-sm-4 text-muted fw-normal">Contact</dt>
+                    <dd class="col-sm-8">{{ technician.contact_number or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
+                    <dd class="col-sm-8">
+                        {% set tech_status_classes = {'available': 'text-bg-success', 'busy': 'text-bg-warning', 'offline': 'text-bg-secondary'} %}
+                        <span class="badge {{ tech_status_classes.get(technician.status, 'text-bg-secondary') }}">
+                            {{ technician.status|capitalize }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Resolved Issues</dt>
+                    <dd class="col-sm-8">{{ technician.resolved_issues_count }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Linked Login</dt>
+                    <dd class="col-sm-8">
+                        {% if technician.user %}
+                            <span class="badge text-bg-light border">{{ technician.user.username }}</span>
+                        {% else %}
+                            <span class="text-muted">Not linked</span>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <i class="bi bi-clipboard-check me-1"></i>Open Assignments
+                <span class="text-muted small">({{ open_assignments|length }})</span>
+            </div>
+            <div class="card-body p-0">
+                {% if open_assignments %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead><tr><th>Issue</th><th>Status</th><th>Assigned</th></tr></thead>
+                        <tbody>
+                            {% for assignment in open_assignments %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('issues.view_issue', issue_id=assignment.technical_issue_id) }}">
+                                        {{ assignment.technical_issue.issue_code or ('#' ~ assignment.technical_issue_id) }}
+                                    </a>
+                                </td>
+                                <td><span class="badge text-bg-info">{{ assignment.status|replace('_',' ')|capitalize }}</span></td>
+                                <td>{{ assignment.assigned_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">No open assignments right now.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

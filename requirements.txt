@@ -1,0 +1,12 @@
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.1
+Flask-Limiter==3.8.0
+Flask-JWT-Extended==4.6.0
+PyMySQL==1.1.1
+cryptography==43.0.0
+python-dotenv==1.0.1
+email-validator==2.2.0
+
+# Dev/test only (Phase 19) — not needed to run the app itself.
+pytest==8.3.3

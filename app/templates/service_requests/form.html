@@ -1,0 +1,94 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ 'Edit Service Request' if mode == 'edit' else 'Add Service Request' }}{% endblock %}
+{% block page_title %}{{ 'Edit Service Request' if mode == 'edit' else 'Add New Service Request' }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Service Requests
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.request_type.label }}</label>
+                            {{ form.request_type(class="form-select" ~ (" is-invalid" if form.request_type.errors else "")) }}
+                            {% for error in form.request_type.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status(class="form-select" ~ (" is-invalid" if form.status.errors else "")) }}
+                            {% for error in form.status.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.subscriber_id.label }}</label>
+                            {{ form.subscriber_id(class="form-select" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
+                            {% for error in form.subscriber_id.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.requested_nap_id.label }}</label>
+                            {{ form.requested_nap_id(class="form-select" ~ (" is-invalid" if form.requested_nap_id.errors else "")) }}
+                            {% for error in form.requested_nap_id.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.latitude.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.latitude(class="form-control" ~ (" is-invalid" if form.latitude.errors else ""), placeholder="e.g. 14.2810000") }}
+                            {% for error in form.latitude.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.longitude.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.longitude(class="form-control" ~ (" is-invalid" if form.longitude.errors else ""), placeholder="e.g. 121.4150000") }}
+                            {% for error in form.longitude.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">Needed to recommend the nearest available NAP for this request.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">{{ form.notes.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.notes(class="form-control" ~ (" is-invalid" if form.notes.errors else ""), rows=3) }}
+                            {% for error in form.notes.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        {% if mode == 'edit' %}
+                        <a href="{{ url_for('service_requests.recommend_nap', request_id=service_request.id) }}" class="btn btn-outline-primary me-auto">
+                            <i class="bi bi-signpost-split me-1"></i>Find Nearest NAP
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {{ 'Save Changes' if mode == 'edit' else 'Create Service Request' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ 'Edit NAP' if mode == 'edit' else 'Add NAP' }}{% endblock %}
+{% block page_title %}{{ 'Edit NAP' if mode == 'edit' else 'Add New NAP' }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('naps.list_naps') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to NAP Management
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.nap_code.label }}</label>
+                            {{ form.nap_code(class="form-control" ~ (" is-invalid" if form.nap_code.errors else ""), placeholder="e.g. NAP-A103") }}
+                            {% for error in form.nap_code.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">{{ form.name.label }}</label>
+                            {{ form.name(class="form-control" ~ (" is-invalid" if form.name.errors else ""), placeholder="e.g. Sta. Cruz Poblacion NAP 3") }}
+                            {% for error in form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">{{ form.address.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), rows="2", placeholder="Street, Barangay, City/Municipality, Province") }}
+                            {% for error in form.address.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.latitude.label }}</label>
+                            {{ form.latitude(class="form-control" ~ (" is-invalid" if form.latitude.errors else ""), placeholder="e.g. 14.2810000") }}
+                            {% for error in form.latitude.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.longitude.label }}</label>
+                            {{ form.longitude(class="form-control" ~ (" is-invalid" if form.longitude.errors else ""), placeholder="e.g. 121.4150000") }}
+                            {% for error in form.longitude.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.total_ports.label }}</label>
+                            {{ form.total_ports(class="form-control" ~ (" is-invalid" if form.total_ports.errors else ""), id="totalPortsInput") }}
+                            {% for error in form.total_ports.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ form.used_ports.label }}</label>
+                            {{ form.used_ports(class="form-control" ~ (" is-invalid" if form.used_ports.errors else ""), id="usedPortsInput") }}
+                            {% for error in form.used_ports.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Available Ports</label>
+                            <input type="text" class="form-control bg-light" id="availablePortsPreview" disabled>
+                            <div class="form-text">Calculated automatically.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('naps.list_naps') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {{ 'Save Changes' if mode == 'edit' else 'Add NAP' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

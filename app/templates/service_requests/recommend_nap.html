@@ -1,0 +1,100 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Recommend NAP · Service Request #{{ service_request.id }}{% endblock %}
+{% block page_title %}Nearest Available NAP{% endblock %}
+{% block page_subtitle %}
+<p class="text-muted small mb-0">
+    Service Request #{{ service_request.id }} &middot; {{ service_request.request_type|replace('_', ' ')|capitalize }}
+    {% if service_request.subscriber %}
+        &middot; {{ service_request.subscriber.subscriber_code }} — {{ service_request.subscriber.full_name }}
+    {% endif %}
+    {% if service_request.requested_nap %}
+        &middot; currently requested NAP: {{ service_request.requested_nap.nap_code }}
+    {% endif %}
+</p>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('service_requests.edit_request', request_id=service_request.id) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Service Request
+    </a>
+</div>
+
+<div class="alert alert-secondary small mb-4">
+    <i class="bi bi-info-circle me-1"></i>
+    Ranked by a transparent, rule-based filter and sort — not a trained
+    or predictive model — over real database NAP data: active status,
+    an actual available port, then nearest by straight-line distance
+    from the customer location
+    ({{ "%.7f"|format(service_request.latitude) }}, {{ "%.7f"|format(service_request.longitude) }}).
+    Nothing here is created until you click "Use This NAP".
+    <a href="{{ url_for('naps.geomap', recommend_request_id=service_request.id) }}">View on GeoMap</a>.
+</div>
+
+{% if not recommendations %}
+<div class="card shadow-sm">
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-hdd-network display-6 d-block mb-2"></i>
+        No suitable NAP right now — every NAP is either inactive/full/under
+        maintenance or has no available ports. You can still set the
+        <a href="{{ url_for('service_requests.edit_request', request_id=service_request.id) }}">Requested NAP</a>
+        manually once one frees up.
+    </div>
+</div>
+{% else %}
+<div class="row g-3">
+    {% for row in recommendations %}
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100 {{ 'border-primary' if row.is_recommended }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h6 class="mb-0">
+                            {{ row.nap_code }} — {{ row.name }}
+                            {% if row.is_recommended %}
+                                <span class="badge text-bg-primary ms-1">Nearest</span>
+                            {% endif %}
+                        </h6>
+                        <span class="badge text-bg-success text-capitalize">{{ row.status }}</span>
+                    </div>
+                    <div class="text-end">
+                        <div class="fs-4 fw-bold">{{ row.distance_km }}</div>
+                        <div class="text-muted small">km away</div>
+                    </div>
+                </div>
+
+                <dl class="row small mb-3">
+                    <dt class="col-6">Available Ports</dt>
+                    <dd class="col-6">{{ row.available_ports }} / {{ row.total_ports }}</dd>
+
+                    <dt class="col-6">Status</dt>
+                    <dd class="col-6 text-capitalize">{{ row.status }}</dd>
+
+                    <dt class="col-6">Location</dt>
+                    <dd class="col-6">{{ "%.5f"|format(row.latitude) }}, {{ "%.5f"|format(row.longitude) }}</dd>
+                </dl>
+
+                <form method="post"
+                      action="{{ url_for('service_requests.assign_nap', request_id=service_request.id) }}"
+                      onsubmit="return confirm('Assign this NAP to the service request?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="nap_id" value="{{ row.nap.id }}">
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        <i class="bi bi-check2-circle me-1"></i>Use This NAP
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<p class="text-muted small mt-3">
+    <i class="bi bi-arrow-repeat me-1"></i>
+    Every suitable NAP is listed above, nearest first — pick whichever
+    one actually fits, not just the nearest. You can also always set
+    the Requested NAP manually from the
+    <a href="{{ url_for('service_requests.edit_request', request_id=service_request.id) }}">edit form</a>.
+</p>
+{% endif %}
+{% endblock %}

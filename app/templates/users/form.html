@@ -1,0 +1,143 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ 'Edit User' if mode == 'edit' else 'Add User' }}{% endblock %}
+{% block page_title %}{{ 'Edit User' if mode == 'edit' else 'Add New User' }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Manage Users
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.username.label }}</label>
+                            {{ form.username(class="form-control" ~ (" is-invalid" if form.username.errors else ""), placeholder="e.g. jdelacruz", autocomplete="off") }}
+                            {% for error in form.username.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.full_name.label }}</label>
+                            {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else ""), placeholder="e.g. Juan Dela Cruz") }}
+                            {% for error in form.full_name.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.email.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.email(class="form-control" ~ (" is-invalid" if form.email.errors else ""), placeholder="[email protected]") }}
+                            {% for error in form.email.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.phone_number.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.phone_number(class="form-control" ~ (" is-invalid" if form.phone_number.errors else ""), placeholder="e.g. 0917 123 4567") }}
+                            {% for error in form.phone_number.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.role.label }}</label>
+                            {{ form.role(class="form-select" ~ (" is-invalid" if form.role.errors else ""), disabled=(mode == 'edit' and user and user.id == current_user.id), id="roleSelect") }}
+                            {% for error in form.role.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            {% if mode == 'edit' and user and user.id == current_user.id %}
+                                <div class="form-text">You can't change your own role. Ask another administrator to do this.</div>
+                                {# Disabled selects aren't submitted by the browser, so resend the current value. #}
+                                <input type="hidden" name="role" value="{{ user.role }}">
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6" id="subscriberLinkField">
+                            <label class="form-label">{{ form.subscriber_id.label }}</label>
+                            {{ form.subscriber_id(class="form-select" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
+                            {% for error in form.subscriber_id.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">
+                                Only used for Customer accounts — links this login to a subscriber's
+                                service/billing record so the customer portal can show their real
+                                NAP, plan, and issues.
+                            </div>
+                        </div>
+
+                        {% if mode == 'add' %}
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.password.label }}</label>
+                            {{ form.password(class="form-control" ~ (" is-invalid" if form.password.errors else ""), autocomplete="new-password") }}
+                            {% for error in form.password.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">At least 8 characters.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.confirm_password.label }}</label>
+                            {{ form.confirm_password(class="form-control" ~ (" is-invalid" if form.confirm_password.errors else ""), autocomplete="new-password") }}
+                            {% for error in form.confirm_password.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if mode == 'edit' %}
+                    <hr class="my-4">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 bg-light rounded p-3">
+                        <div>
+                            <div class="fw-semibold small">Password</div>
+                            <div class="text-muted small">Passwords aren't shown or changed here.</div>
+                        </div>
+                        <a href="{{ url_for('users.reset_password', user_id=user.id) }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-key me-1"></i>Reset Password
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('users.list_users') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {{ 'Save Changes' if mode == 'edit' else 'Create Account' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Shows the "Linked Subscriber" field only when the selected role is
+    // 'user' (Customer) — the field is harmless to submit for any other
+    // role (the server ignores it), but showing it for e.g. Administrator
+    // accounts would just be confusing.
+    (function () {
+        const roleSelect = document.getElementById('roleSelect');
+        const linkField = document.getElementById('subscriberLinkField');
+        if (!roleSelect || !linkField) return;
+
+        function syncVisibility() {
+            linkField.style.display = roleSelect.value === 'user' ? '' : 'none';
+        }
+
+        roleSelect.addEventListener('change', syncVisibility);
+        syncVisibility();
+    })();
+</script>
+{% endblock %}

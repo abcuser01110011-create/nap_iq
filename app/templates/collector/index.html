@@ -1,0 +1,129 @@
+{% extends "dashboard_base.html" %}
+{% block title %}My Collections{% endblock %}
+{% block page_title %}My Collections{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Welcome, {{ current_user.full_name }}</p>{% endblock %}
+
+{% block content %}
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <i class="bi bi-cash-coin me-1"></i>Record a Payment
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('collector.record_payment') }}" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.subscriber_id.label }}</label>
+                        {{ form.subscriber_id(class="form-select" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
+                        {% for error in form.subscriber_id.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.amount.label }}</label>
+                            {{ form.amount(class="form-control" ~ (" is-invalid" if form.amount.errors else ""), placeholder="e.g. 1299.00") }}
+                            {% for error in form.amount.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.payment_method.label }}</label>
+                            {{ form.payment_method(class="form-select" ~ (" is-invalid" if form.payment_method.errors else "")) }}
+                            {% for error in form.payment_method.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.payment_date.label }}</label>
+                            {{ form.payment_date(class="form-control" ~ (" is-invalid" if form.payment_date.errors else ""), placeholder="YYYY-MM-DD") }}
+                            {% for error in form.payment_date.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status(class="form-select" ~ (" is-invalid" if form.status.errors else "")) }}
+                            {% for error in form.status.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.reference_number.label }} <span class="text-muted small">(optional)</span></label>
+                        {{ form.reference_number(class="form-control" ~ (" is-invalid" if form.reference_number.errors else ""), placeholder="e.g. RCPT-0001") }}
+                        {% for error in form.reference_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg me-1"></i>Record Payment
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-1"></i>My Recent Collections</span>
+                <span class="text-muted small">Last {{ recent_payments|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_payments %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Subscriber</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set payment_status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
+                            {% for payment in recent_payments %}
+                            <tr>
+                                <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if payment.subscriber %}
+                                        {{ payment.subscriber.subscriber_code }} — {{ payment.subscriber.full_name }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ "%.2f"|format(payment.amount) }}</td>
+                                <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
+                                <td>
+                                    <span class="badge {{ payment_status_classes.get(payment.status, 'text-bg-secondary') }}">
+                                        {{ payment.status|capitalize }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-cash display-6 d-block mb-2"></i>
+                    You haven't recorded any payments yet.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

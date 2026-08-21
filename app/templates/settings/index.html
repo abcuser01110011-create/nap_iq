@@ -1,0 +1,217 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+
+        {# Display Settings — visible to every role. Dark Mode is a
+           per-account preference (users.theme_preference), defaulting
+           to 'light' for every role. Saving is handled by
+           static/js/theme.js, which posts to POST /settings/theme in
+           the background — this form itself never submits the
+           checkbox. The sign-in screen always stays light regardless
+           of this setting. #}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h2 class="h6 mb-3">Display Settings</h2>
+
+                <div class="form-check form-switch d-flex align-items-center justify-content-between">
+                    <label class="form-check-label" for="darkModeToggle">
+                        <div class="fw-semibold">Dark Mode</div>
+                        <div class="form-text mb-0">Switches the app (including the sign-in screen) to a dark color theme on this browser.</div>
+                    </label>
+                    <input class="form-check-input flex-shrink-0 ms-3" type="checkbox" role="switch"
+                           id="darkModeToggle" data-theme-toggle
+                           {{ 'checked' if current_user.theme_preference == 'dark' else '' }}>
+                </div>
+            </div>
+        </div>
+
+        {% if current_user.role == 'administrator' %}
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h6 mb-3">App Settings</h2>
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.session_timeout_minutes.label }}</label>
+                        {{ form.session_timeout_minutes(class="form-control" ~ (" is-invalid" if form.session_timeout_minutes.errors else "")) }}
+                        <div class="form-text">How long an idle login stays signed in. Applies immediately — no restart needed.</div>
+                        {% for error in form.session_timeout_minutes.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.default_nap_total_ports.label }}</label>
+                        {{ form.default_nap_total_ports(class="form-control" ~ (" is-invalid" if form.default_nap_total_ports.errors else "")) }}
+                        <div class="form-text">Pre-fills the "Total Ports" field when adding a new NAP. Not a hard limit — it can still be changed per NAP.</div>
+                        {% for error in form.default_nap_total_ports.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h2 class="h6 mb-1">Default GeoMap Filters</h2>
+                    <div class="form-text mb-3">
+                        Sets what the GeoMap's <strong>Layers</strong> and <strong>Filters</strong> menus
+                        are set to the moment the page loads. This only changes the starting point —
+                        everyone can still tick, untick, or change any of these on the GeoMap itself
+                        whenever they're viewing it; that temporary, per-visit choice is never saved here.
+                    </div>
+
+                    <label class="form-label small text-muted mb-1">Layers</label>
+                    <div class="d-flex flex-wrap gap-3 mb-3">
+                        <div class="form-check">
+                            {{ form.geomap_default_show_naps(class="form-check-input", id="geomapDefaultShowNaps") }}
+                            <label class="form-check-label" for="geomapDefaultShowNaps">{{ form.geomap_default_show_naps.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_show_issues(class="form-check-input", id="geomapDefaultShowIssues") }}
+                            <label class="form-check-label" for="geomapDefaultShowIssues">{{ form.geomap_default_show_issues.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_show_subscribers(class="form-check-input", id="geomapDefaultShowSubscribers") }}
+                            <label class="form-check-label" for="geomapDefaultShowSubscribers">{{ form.geomap_default_show_subscribers.label.text }}</label>
+                        </div>
+                    </div>
+
+                    <label class="form-label small text-muted mb-1">NAP Status</label>
+                    <div class="d-flex flex-wrap gap-3 mb-2">
+                        <div class="form-check">
+                            {{ form.geomap_default_status_active(class="form-check-input", id="geomapDefaultStatusActive") }}
+                            <label class="form-check-label" for="geomapDefaultStatusActive">{{ form.geomap_default_status_active.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_status_inactive(class="form-check-input", id="geomapDefaultStatusInactive") }}
+                            <label class="form-check-label" for="geomapDefaultStatusInactive">{{ form.geomap_default_status_inactive.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_status_maintenance(class="form-check-input", id="geomapDefaultStatusMaintenance") }}
+                            <label class="form-check-label" for="geomapDefaultStatusMaintenance">{{ form.geomap_default_status_maintenance.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_status_full(class="form-check-input", id="geomapDefaultStatusFull") }}
+                            <label class="form-check-label" for="geomapDefaultStatusFull">{{ form.geomap_default_status_full.label.text }}</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" style="max-width: 320px;">
+                        <label class="form-label small text-muted mb-1">{{ form.geomap_default_ports_filter.label.text }}</label>
+                        {{ form.geomap_default_ports_filter(class="form-select form-select-sm") }}
+                    </div>
+
+                    <label class="form-label small text-muted mb-1">Issue Status</label>
+                    <div class="d-flex flex-wrap gap-3 mb-2">
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_status_pending(class="form-check-input", id="geomapDefaultIssueStatusPending") }}
+                            <label class="form-check-label" for="geomapDefaultIssueStatusPending">{{ form.geomap_default_issue_status_pending.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_status_assigned(class="form-check-input", id="geomapDefaultIssueStatusAssigned") }}
+                            <label class="form-check-label" for="geomapDefaultIssueStatusAssigned">{{ form.geomap_default_issue_status_assigned.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_status_in_progress(class="form-check-input", id="geomapDefaultIssueStatusInProgress") }}
+                            <label class="form-check-label" for="geomapDefaultIssueStatusInProgress">{{ form.geomap_default_issue_status_in_progress.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_status_resolved(class="form-check-input", id="geomapDefaultIssueStatusResolved") }}
+                            <label class="form-check-label" for="geomapDefaultIssueStatusResolved">{{ form.geomap_default_issue_status_resolved.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_status_closed(class="form-check-input", id="geomapDefaultIssueStatusClosed") }}
+                            <label class="form-check-label" for="geomapDefaultIssueStatusClosed">{{ form.geomap_default_issue_status_closed.label.text }}</label>
+                        </div>
+                    </div>
+
+                    <label class="form-label small text-muted mb-1">Issue Priority</label>
+                    <div class="d-flex flex-wrap gap-3 mb-3">
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_priority_low(class="form-check-input", id="geomapDefaultIssuePriorityLow") }}
+                            <label class="form-check-label" for="geomapDefaultIssuePriorityLow">{{ form.geomap_default_issue_priority_low.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_priority_medium(class="form-check-input", id="geomapDefaultIssuePriorityMedium") }}
+                            <label class="form-check-label" for="geomapDefaultIssuePriorityMedium">{{ form.geomap_default_issue_priority_medium.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_priority_high(class="form-check-input", id="geomapDefaultIssuePriorityHigh") }}
+                            <label class="form-check-label" for="geomapDefaultIssuePriorityHigh">{{ form.geomap_default_issue_priority_high.label.text }}</label>
+                        </div>
+                        <div class="form-check">
+                            {{ form.geomap_default_issue_priority_critical(class="form-check-input", id="geomapDefaultIssuePriorityCritical") }}
+                            <label class="form-check-label" for="geomapDefaultIssuePriorityCritical">{{ form.geomap_default_issue_priority_critical.label.text }}</label>
+                        </div>
+                    </div>
+
+                    {% if settings.updated_at %}
+                    <div class="text-muted small mb-3">
+                        Last updated {{ settings.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% if settings.updated_by %} by {{ settings.updated_by.full_name }}{% endif %}.
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-body p-4">
+                <h2 class="h6 mb-1">Plans</h2>
+                <div class="form-text mb-3">
+                    Add or remove the plan names offered in the Plan Type dropdown
+                    (subscriber form and the GeoMap's Plan Installation step).
+                    Removing a plan here doesn't change any subscriber who already has
+                    that plan — it only stops that name appearing in the dropdown going
+                    forward.
+                </div>
+
+                <form method="post" action="{{ url_for('settings.add_plan') }}" novalidate class="mb-3">
+                    {{ plan_form.hidden_tag() }}
+                    <div class="input-group">
+                        {{ plan_form.name(class="form-control" ~ (" is-invalid" if plan_form.name.errors else ""), placeholder="e.g. Fiber 50Mbps") }}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>Add Plan
+                        </button>
+                    </div>
+                    {% for error in plan_form.name.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </form>
+
+                {% if plans %}
+                <ul class="list-group">
+                    {% for plan in plans %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ plan.name }}
+                        <form method="post" action="{{ url_for('settings.delete_plan', plan_id=plan.id) }}"
+                              onsubmit="return confirm('Remove the plan \'{{ plan.name }}\'? This won\'t change any subscriber who already has this plan.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash me-1"></i>Remove
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-muted small">No plans added yet.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ 'Edit Subscriber' if mode == 'edit' else 'Add Subscriber' }}{% endblock %}
+{% block page_title %}{{ 'Edit Subscriber' if mode == 'edit' else 'Add New Subscriber' }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('subscribers.list_subscribers') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Subscribers
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.subscriber_code.label }}</label>
+                            {{ form.subscriber_code(class="form-control" ~ (" is-invalid" if form.subscriber_code.errors else ""), placeholder="e.g. SUB-0012") }}
+                            {% for error in form.subscriber_code.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.full_name.label }}</label>
+                            {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else ""), placeholder="e.g. Maria Santos") }}
+                            {% for error in form.full_name.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">{{ form.address.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), rows=2) }}
+                            {% for error in form.address.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.latitude.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.latitude(class="form-control" ~ (" is-invalid" if form.latitude.errors else "")) }}
+                            {% for error in form.latitude.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.longitude.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.longitude(class="form-control" ~ (" is-invalid" if form.longitude.errors else "")) }}
+                            {% for error in form.longitude.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.contact_number.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else "")) }}
+                            {% for error in form.contact_number.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.email.label }} <span class="text-muted small">(optional)</span></label>
+                            {{ form.email(class="form-control" ~ (" is-invalid" if form.email.errors else "")) }}
+                            {% for error in form.email.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.plan_type.label }} <span class="text-muted small">(optional)</span></label>
+                            {# Dropdown of Settings > App Settings > Plans (see app/models.py's Plan
+                               model), populated via _populate_plan_choices() in
+                               app/routes/subscribers.py. When editing, a subscriber's existing
+                               plan_type that isn't in that curated list is appended as its own
+                               "(legacy)" choice so it's never silently dropped. #}
+                            {{ form.plan_type(class="form-select" ~ (" is-invalid" if form.plan_type.errors else "")) }}
+                            {% for error in form.plan_type.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.nap_id.label }}</label>
+                            {{ form.nap_id(class="form-select" ~ (" is-invalid" if form.nap_id.errors else "")) }}
+                            {% for error in form.nap_id.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status(class="form-select" ~ (" is-invalid" if form.status.errors else "")) }}
+                            {% for error in form.status.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ form.installed_at.label }}</label>
+                            {{ form.installed_at(class="form-control" ~ (" is-invalid" if form.installed_at.errors else ""), placeholder="2025-01-15") }}
+                            {% for error in form.installed_at.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% if mode == 'edit' %}
+                    <hr class="my-4">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 bg-light rounded p-3">
+                        <div>
+                            <div class="fw-semibold small">Linked Login Account</div>
+                            <div class="text-muted small">
+                                {% if subscriber.user %}
+                                    Currently linked to <strong>{{ subscriber.user.username }}</strong>.
+                                {% else %}
+                                    Not linked to a login account yet.
+                                {% endif %}
+                                Managed from Manage Users, not here.
+                            </div>
+                        </div>
+                        {% if current_user.role == 'administrator' %}
+                        <a href="{{ url_for('users.list_users') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-people me-1"></i>Manage Users
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('subscribers.list_subscribers') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {{ 'Save Changes' if mode == 'edit' else 'Create Subscriber' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

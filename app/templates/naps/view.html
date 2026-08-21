@@ -1,0 +1,97 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ nap.nap_code }} · NAP Details{% endblock %}
+{% block page_title %}NAP Details{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('naps.list_naps') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to NAP Management
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h3 class="mb-0">{{ nap.nap_code }}</h3>
+                        <div class="text-muted">{{ nap.name }}</div>
+                    </div>
+                    {% set status_classes = {
+                        'active': 'text-bg-success',
+                        'inactive': 'text-bg-secondary',
+                        'full': 'text-bg-warning',
+                        'maintenance': 'text-bg-danger'
+                    } %}
+                    <span class="badge fs-6 {{ status_classes.get(nap.status, 'text-bg-secondary') }}">
+                        {{ nap.status|capitalize }}
+                    </span>
+                </div>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ nap.address or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Coordinates</dt>
+                    <dd class="col-sm-8">{{ nap.latitude }}, {{ nap.longitude }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Total Ports</dt>
+                    <dd class="col-sm-8">{{ nap.total_ports }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Used Ports</dt>
+                    <dd class="col-sm-8">{{ nap.used_ports }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Available Ports</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge {{ 'text-bg-success' if nap.available_ports > 0 else 'text-bg-secondary' }}">
+                            {{ nap.available_ports }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Created</dt>
+                    <dd class="col-sm-8">{{ nap.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Last Updated</dt>
+                    <dd class="col-sm-8">{{ nap.updated_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
+                </dl>
+
+                <hr class="my-4">
+
+                <div class="d-flex justify-content-end gap-2">
+                    {# Phase 13 (65%, navigation destination panels): opens the
+                       GeoMap with this NAP pre-armed as the navigation
+                       destination (naps.geomap()'s ?navigate_type=/?navigate_id=,
+                       read by napmap.js's focusNavigationFromQueryParam()) —
+                       the same "Navigate" entry point subscribers/view.html and
+                       issues/view.html now offer. #}
+                    <a href="{{ url_for('naps.geomap', navigate_type='nap', navigate_id=nap.id) }}" class="btn btn-outline-success">
+                        <i class="bi bi-signpost-split me-1"></i>Navigate
+                    </a>
+                    <a href="{{ url_for('naps.edit_nap', nap_id=nap.id) }}" class="btn btn-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                    {% if nap.status == 'inactive' %}
+                        <form method="post" action="{{ url_for('naps.activate_nap', nap_id=nap.id) }}"
+                              onsubmit="return confirm('Activate {{ nap.nap_code }}?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-success">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Activate
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{{ url_for('naps.deactivate_nap', nap_id=nap.id) }}"
+                              onsubmit="return confirm('Deactivate {{ nap.nap_code }}? Subscribers may lose visibility of this NAP for new installations.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-slash-circle me-1"></i>Deactivate
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

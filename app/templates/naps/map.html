@@ -1,0 +1,744 @@
+{% extends "dashboard_base.html" %}
+{% block title %}GeoMap{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+<link href="{{ url_for('static', filename='css/napmap.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block page_title %}GeoMap{% endblock %}
+{% block page_subtitle %}<div class="text-muted small">Live view of Network Access Points from the database</div>{% endblock %}
+
+{# Positioning-only change: the rich NAP/Subscriber/Complaint search
+   (napmap.js's findSearchMatches()/handleSearchInput(), unchanged)
+   now sits in the shared sidebar shell's topbar slot instead of its
+   own card above the map, matching the rest of the app's topbar
+   search placement. Same #napSearchInput / #napSearchResults ids, so
+   no JS changes needed. #}
+{% block topbar_search %}
+<div class="dash-topbar-search napmap-topbar-search position-relative d-none d-md-flex">
+    <i class="bi bi-search"></i>
+    <input type="text" id="napSearchInput" placeholder="Search NAP, subscriber, or complaint..." autocomplete="off">
+    <div id="napSearchResults" class="list-group shadow-sm nap-search-dropdown d-none"></div>
+</div>
+{% endblock %}
+
+{% block content %}
+{# ------------------------------------------------------------------
+   Bug fix (installation-planning notice PDF, "Need to fix"):
+   #mapAlertArea and the three mode banners (#addModeBanner,
+   #issueModeBanner, #planInstallModeBanner) used to sit as normal
+   block elements ABOVE .napmap-shell. Since .napmap-shell/
+   .napmap-fullbleed is a fixed-height (calc(100vh - topbar)) map
+   viewport, un-hiding any one of those banners inserted extra height
+   above it and pushed the whole map down the page -- exactly the
+   "geomap placement moves when I press plan installation / report
+   issues / add nap" bug. They're now floating overlays living INSIDE
+   .napmap-shell (absolutely positioned, see .napmap-float-top-banner
+   in napmap.css) so showing/hiding them never changes #napMap's size
+   or position. Same ids, same JS (napmap.js's classList.add/remove
+   "d-none" calls and nap-install-planner.js's banner-text swap are
+   completely unchanged) -- only *where* these elements live in the
+   DOM moved. #}
+<div class="napmap-shell napmap-fullbleed">
+    <div id="napMap"
+         data-focus-issue-id="{{ focus_issue_id if focus_issue_id is not none else '' }}"
+         data-recommend-request-id="{{ recommend_request_id if recommend_request_id is not none else '' }}"
+         data-navigate-type="{{ navigate_type if navigate_type else '' }}"
+         data-navigate-id="{{ navigate_id if navigate_id is not none else '' }}"
+         data-own-technician-id="{{ own_technician_id if own_technician_id is not none else '' }}"></div>
+
+    <!-- Floating top-center banners: general alerts + the three
+         mutually-exclusive placement-mode banners. Overlays the map,
+         never displaces it (see comment above). -->
+    <div class="napmap-float napmap-float-top-banner">
+        <div id="mapAlertArea"></div>
+
+        <div id="addModeBanner" class="alert alert-primary d-none d-flex justify-content-between align-items-center py-2 mb-2 shadow-sm">
+            <span>
+                <i class="bi bi-cursor-fill me-1"></i>
+                <strong>Add NAP mode active.</strong>
+                Click anywhere on the map to place the new NAP (you can click again, or drag the pin, to reposition it).
+            </span>
+            <button type="button" id="addModeCancelBtn" class="btn btn-sm btn-outline-primary">Cancel</button>
+        </div>
+
+        <div id="issueModeBanner" class="alert alert-warning d-none d-flex justify-content-between align-items-center py-2 mb-2 shadow-sm">
+            <span>
+                <i class="bi bi-cursor-fill me-1"></i>
+                <strong>Report Issue mode active.</strong>
+                Click the problem location on the map (you can click again, or drag the pin, to reposition it).
+            </span>
+            <button type="button" id="issueModeCancelBtn" class="btn btn-sm btn-outline-warning">Cancel</button>
+        </div>
+
+        {# Installation Planning, Phase 3 (40%): a third, distinct map-click
+           placement mode, admin-only (matches the prototype's
+           `role === 'admin'` check — see PLAN_INSTALL_10_PERCENT_NOTES.md §4).
+           Styled like the two banners above but with its own color
+           (alert-info / btn-outline-info) so it never reads as Add-NAP or
+           Report-Issue at a glance, and joins the same "only one placement
+           mode at a time" yield chain those two (and the navigation feature's
+           manual origin picker) already use. No suggestion panel and no
+           subscriber creation yet — that's Phase 4/5. #}
+        {% if current_user and current_user.role == 'administrator' %}
+        <div id="planInstallModeBanner" class="alert alert-info d-none d-flex justify-content-between align-items-center py-2 mb-0 shadow-sm">
+            <span>
+                <i class="bi bi-geo-fill me-1"></i>
+                <strong>Plan Installation mode active.</strong>
+                <span id="planInstallModeBannerText">Tap anywhere on the map to drop a prospect pin for a potential subscriber location.</span>
+            </span>
+            <button type="button" id="planInstallModeCancelBtn" class="btn btn-sm btn-outline-info">Cancel</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Floating top-right mode buttons (Table View / Add NAP / Report Issue) -->
+    <div class="napmap-float napmap-float-top-right d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('naps.list_naps') }}" class="btn btn-light btn-sm shadow-sm">
+            <i class="bi bi-list-ul me-1"></i>Table View
+        </a>
+        <button type="button" id="addNapModeBtn" class="btn btn-primary btn-sm shadow-sm">
+            <i class="bi bi-plus-lg me-1"></i>Add NAP
+        </button>
+        <button type="button" id="reportIssueModeBtn" class="btn btn-warning btn-sm shadow-sm">
+            <i class="bi bi-exclamation-triangle me-1"></i>Report an Issue
+        </button>
+        {# Installation Planning, Phase 3 (40%): admin-only, matching the
+           prototype's role === 'admin' toggle. Jinja-gated (stricter than
+           the two buttons above, which only the backend gates) per
+           PLAN_INSTALL_10_PERCENT_NOTES.md §3's note that this control
+           should do better than the existing pattern. #}
+        {% if current_user and current_user.role == 'administrator' %}
+        <button type="button" id="planInstallModeBtn" class="btn btn-info btn-sm shadow-sm">
+            <i class="bi bi-geo-fill me-1"></i>Plan Installation
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Floating top-left horizontal toolbar: Layers / Filters / Navigation
+         as small dropdown menus instead of a tall stacked-cards column.
+         Same control ids as before (showNapsToggle, showIssuesToggle,
+         showSubscribersToggle, status-filter/portsFilter/issue-status-filter/
+         issue-priority-filter, navDestinationPanel, navOriginPanel) so none
+         of napmap.js / nav-*.js needed any changes — only the surrounding
+         markup changed from stacked cards to dropdown menus. -->
+    <div class="napmap-float napmap-float-top-left">
+        <div class="napmap-toolbar d-flex flex-row flex-wrap gap-2">
+            <div class="dropdown napmap-toolbar-dropdown">
+                <button type="button" class="btn btn-light btn-sm shadow-sm dropdown-toggle napmap-toolbar-btn"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <i class="bi bi-layers me-1"></i>Layers
+                </button>
+                <div class="dropdown-menu napmap-dropdown-menu p-2">
+                    <div class="form-check">
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showNapsToggle" {{ 'checked' if geomap_settings.geomap_default_show_naps else '' }}>
+                        <label class="form-check-label fw-semibold" for="showNapsToggle">
+                            <i class="bi bi-hdd-network me-1"></i>Show NAPs
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showIssuesToggle" {{ 'checked' if geomap_settings.geomap_default_show_issues else '' }}>
+                        <label class="form-check-label fw-semibold" for="showIssuesToggle">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Show Issues
+                        </label>
+                    </div>
+                    <div class="form-check mb-0">
+                        <!-- Defaults to Settings > App Settings > Default GeoMap
+                             Filters (Show Subscribers is off by default there,
+                             matching this control's original always-off
+                             default) -- an administrator can change the
+                             starting state for everyone from Settings; this
+                             checkbox itself stays just as toggleable per-visit
+                             as it always was. -->
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showSubscribersToggle" {{ 'checked' if geomap_settings.geomap_default_show_subscribers else '' }}>
+                        <label class="form-check-label fw-semibold" for="showSubscribersToggle">
+                            <i class="bi bi-person-fill me-1"></i>Show Subscribers
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dropdown napmap-toolbar-dropdown">
+                <button type="button" class="btn btn-light btn-sm shadow-sm dropdown-toggle napmap-toolbar-btn"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <i class="bi bi-funnel me-1"></i>Filters
+                </button>
+                <div class="dropdown-menu napmap-dropdown-menu napmap-dropdown-menu-wide p-2">
+                    {# Initial checked/selected state for every control in this
+                       dropdown comes from Settings > App Settings > Default
+                       GeoMap Filters (geomap_settings, AppSettings.get_current()
+                       — see app/routes/naps.py's geomap()). That only decides
+                       where each control STARTS; nothing below is disabled or
+                       removed, so anyone can still tick/untick or reselect any
+                       of it for as long as they're on this page. #}
+                    <label class="form-label small text-muted mb-1">NAP Status</label>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input status-filter" type="checkbox" value="active" id="filterActive" {{ 'checked' if geomap_settings.geomap_default_status_active else '' }}>
+                            <label class="form-check-label" for="filterActive">
+                                <span class="legend-dot" style="background:#198754"></span> Active
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input status-filter" type="checkbox" value="inactive" id="filterInactive" {{ 'checked' if geomap_settings.geomap_default_status_inactive else '' }}>
+                            <label class="form-check-label" for="filterInactive">
+                                <span class="legend-dot" style="background:#6c757d"></span> Inactive
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input status-filter" type="checkbox" value="maintenance" id="filterMaintenance" {{ 'checked' if geomap_settings.geomap_default_status_maintenance else '' }}>
+                            <label class="form-check-label" for="filterMaintenance">
+                                <span class="legend-dot" style="background:#dc3545"></span> Maintenance
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input status-filter" type="checkbox" value="full" id="filterFullStatus" {{ 'checked' if geomap_settings.geomap_default_status_full else '' }}>
+                            <label class="form-check-label" for="filterFullStatus">
+                                <span class="legend-dot" style="background:#fd7e14"></span> Full
+                            </label>
+                        </div>
+                    </div>
+
+                    <label class="form-label small text-muted mb-1" for="portsFilter">Port Availability</label>
+                    <select id="portsFilter" class="form-select form-select-sm mb-3">
+                        <option value="all" {{ 'selected' if geomap_settings.geomap_default_ports_filter == 'all' else '' }}>All NAPs</option>
+                        <option value="available" {{ 'selected' if geomap_settings.geomap_default_ports_filter == 'available' else '' }}>Has Available Ports</option>
+                        <option value="full" {{ 'selected' if geomap_settings.geomap_default_ports_filter == 'full' else '' }}>No Available Ports (Full)</option>
+                    </select>
+
+                    <hr class="my-2">
+
+                    <label class="form-label small text-muted mb-1">Issue Status</label>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="pending" id="issueFilterPending" {{ 'checked' if geomap_settings.geomap_default_issue_status_pending else '' }}>
+                            <label class="form-check-label" for="issueFilterPending">Pending</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="assigned" id="issueFilterAssigned" {{ 'checked' if geomap_settings.geomap_default_issue_status_assigned else '' }}>
+                            <label class="form-check-label" for="issueFilterAssigned">Assigned</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="in_progress" id="issueFilterInProgress" {{ 'checked' if geomap_settings.geomap_default_issue_status_in_progress else '' }}>
+                            <label class="form-check-label" for="issueFilterInProgress">In Progress</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="resolved" id="issueFilterResolved" {{ 'checked' if geomap_settings.geomap_default_issue_status_resolved else '' }}>
+                            <label class="form-check-label" for="issueFilterResolved">Resolved</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="closed" id="issueFilterClosed" {{ 'checked' if geomap_settings.geomap_default_issue_status_closed else '' }}>
+                            <label class="form-check-label" for="issueFilterClosed">Closed</label>
+                        </div>
+                    </div>
+
+                    <label class="form-label small text-muted mb-1">Issue Priority</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <div class="form-check">
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="low" id="issuePriorityLow" {{ 'checked' if geomap_settings.geomap_default_issue_priority_low else '' }}>
+                            <label class="form-check-label" for="issuePriorityLow">
+                                <span class="legend-dot" style="background:#6c757d"></span> Low
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="medium" id="issuePriorityMedium" {{ 'checked' if geomap_settings.geomap_default_issue_priority_medium else '' }}>
+                            <label class="form-check-label" for="issuePriorityMedium">
+                                <span class="legend-dot" style="background:#0d6efd"></span> Medium
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="high" id="issuePriorityHigh" {{ 'checked' if geomap_settings.geomap_default_issue_priority_high else '' }}>
+                            <label class="form-check-label" for="issuePriorityHigh">
+                                <span class="legend-dot" style="background:#fd7e14"></span> High
+                            </label>
+                        </div>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="critical" id="issuePriorityCritical" {{ 'checked' if geomap_settings.geomap_default_issue_priority_critical else '' }}>
+                            <label class="form-check-label" for="issuePriorityCritical">
+                                <span class="legend-dot" style="background:#dc3545"></span> Critical
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dropdown napmap-toolbar-dropdown">
+                <button type="button" class="btn btn-light btn-sm shadow-sm dropdown-toggle napmap-toolbar-btn"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <i class="bi bi-signpost-split me-1"></i>Navigation
+                </button>
+                <div class="dropdown-menu napmap-dropdown-menu p-2">
+                    <!-- Phase 23 (15%): navigation destination selection. Purely a
+                         read-out of NapIQNavigation's in-memory state (see
+                         nav-destination.js) — clicking a NAP/issue/subscriber
+                         marker's "Set as destination" popup button is what actually
+                         populates this. No routing/GPS/demo travel here. -->
+                    <label class="form-label small text-muted mb-1">
+                        <i class="bi bi-signpost-split me-1"></i>Navigation destination
+                    </label>
+                    <div id="navDestinationPanel"></div>
+
+                    <!-- Phase 8 (adapted onto Phase 23's navigation
+                         architecture): manual navigation origin, set
+                         either by clicking a point on the map
+                         (nav-origin-picker.js) or by typing coordinates
+                         (nav-origin.js's own small form). -->
+                    <hr class="my-2">
+                    <label class="form-label small text-muted mb-1">
+                        <i class="bi bi-flag me-1"></i>Navigation origin
+                    </label>
+                    <div id="navOriginPanel"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating bottom-left legend: small, horizontal, no background
+         (legend items sit directly over the map instead of inside a
+         card). Same content/ids as before (#mapResultCount unchanged)
+         plus two new connection-line swatches for the subscriber↔NAP
+         and issue↔NAP link lines. -->
+    <div class="napmap-float napmap-float-bottom-left">
+        <div class="napmap-legend-panel">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span><span class="legend-dot" style="background:#198754"></span>Active</span>
+                <span><span class="legend-dot" style="background:#6c757d"></span>Inactive</span>
+                <span><span class="legend-dot" style="background:#fd7e14"></span>Full</span>
+                <span><span class="legend-dot" style="background:#dc3545"></span>Maintenance</span>
+                <span class="napmap-legend-sep"></span>
+                <span><span class="legend-dot legend-dot-square" style="background:#6c757d"></span>Low</span>
+                <span><span class="legend-dot legend-dot-square" style="background:#0d6efd"></span>Medium</span>
+                <span><span class="legend-dot legend-dot-square" style="background:#fd7e14"></span>High</span>
+                <span><span class="legend-dot legend-dot-square" style="background:#dc3545"></span>Critical</span>
+                <span class="napmap-legend-sep"></span>
+                <span><span class="legend-dot" style="background:#6f42c1"></span>Subscribers</span>
+                <span><span class="legend-line" style="background:#198754"></span>Subscriber→NAP (green = no open issue, else worst issue's priority color)</span>
+                <span><span class="legend-line" style="background:#dc3545"></span>Issue→NAP (colored by issue priority)</span>
+            </div>
+            <div id="mapResultCount" class="napmap-legend-count"></div>
+        </div>
+    </div>
+
+    <!-- Navigation Card — foundation only this phase (destination
+       summary + idle/no-route status + empty controls container
+       for later phases). Rendered by nav-card.js from the same
+       NapIQNavigation store the "Navigation destination" panel
+       above already uses, so both always agree. data-role
+       drives the admin/technician heading, same distinction the
+       prototype's NavigationCard makes. -->
+    <div id="navigationCard" class="nav-card"
+         data-role="{{ current_user.role if current_user else '' }}"></div>
+
+    {# Installation Planning, Phase 4 (55%): Installation Planner
+       suggestion panel. Shares the exact same bottom-right slot as
+       the Navigation Card above (same .nav-card positioning class) —
+       nap-install-planner.js toggles which of the two is visible so
+       they are mutually exclusive, mirroring the prototype's
+       `{!planning && <NavigationCard/>}` / `{planning && proposed &&
+       <InstallationPlanner/>}` pattern exactly. Starts empty/hidden;
+       nap-install-planner.js fills it once a pin is dropped in
+       planning mode (Phase 3) and a Phase 2 lookup resolves. Only
+       rendered for administrators, matching the rest of this
+       feature. #}
+    {% if current_user and current_user.role == 'administrator' %}
+    <div id="installPlannerCard" class="nav-card d-none"></div>
+    {# Installation Planning, Phase 5 (70%): plan-type suggestions for
+       the form step's "Plan type" field, sourced from a union of the
+       database's own distinct existing Subscriber.plan_type values
+       and Settings > App Settings > Plans' curated list (passed by
+       naps.geomap()) — not a hard-coded list. Any value can still be
+       typed; this is only a convenience, exactly like every other
+       <input list="..."> datalist. #}
+    <datalist id="installPlannerPlanTypes">
+        {% for plan_type in subscriber_plan_types %}
+        <option value="{{ plan_type }}"></option>
+        {% endfor %}
+    </datalist>
+    {% endif %}
+
+    <!-- NAP detail slide-in panel: opened by napmap.js when a NAP
+         marker is clicked (replaces the old marker popup for NAPs).
+         Lives inside .napmap-shell (position: relative, see below)
+         so it docks to the map viewport itself rather than the page,
+         the same "floating overlay, never displaces the map" pattern
+         the mode banners and Navigation Card already use above.
+         Starts off-screen (translateX(100%) in CSS) and slides in via
+         the .napmap-detail-panel-open class; napmap.js toggles that
+         class and fills in the fields below on marker click. Markup/
+         styling only in this phase -- populating it is a later task. -->
+    <div id="napDetailPanel" class="napmap-detail-panel" aria-hidden="true">
+        <div class="napmap-detail-header">
+            <div class="napmap-detail-header-top">
+                <span class="badge napmap-detail-code-badge" id="napDetailCode"></span>
+                <span class="badge napmap-detail-usage-badge" id="napDetailUsageBadge"></span>
+            </div>
+            <button type="button" class="btn-close" id="napDetailCloseBtn" aria-label="Close"></button>
+        </div>
+        <div class="napmap-detail-body">
+            <h5 class="napmap-detail-name" id="napDetailName"></h5>
+            <div class="napmap-detail-location text-muted small" id="napDetailLocation"></div>
+
+            <div class="napmap-detail-section">
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <span class="napmap-detail-section-title">Slot capacity</span>
+                    <span class="small text-muted" id="napDetailSlotSummary"></span>
+                </div>
+                <div class="progress napmap-detail-progress">
+                    <div class="progress-bar" id="napDetailProgressBar" role="progressbar"
+                         aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="small text-muted" id="napDetailTotalSlots"></div>
+            </div>
+
+            <div class="napmap-detail-section">
+                <span class="napmap-detail-section-title" id="napDetailLinesHeading">Connected lines</span>
+                <div id="napDetailLinesList" class="napmap-detail-lines-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick-add NAP modal: opened after a map click selects a location.
+     backdrop is disabled on purpose so the admin can still click (or
+     drag the pin) on the map while this panel is open, to fine-tune
+     the location before saving. -->
+<div class="modal" id="quickAddModal" tabindex="-1" data-bs-backdrop="false" aria-hidden="true">
+    <div class="modal-dialog side-modal-dialog">
+        <div class="modal-content">
+            <form id="quickAddForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-geo-alt-fill me-1"></i>Add NAP</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="quickAddGeneralError" class="alert alert-danger d-none py-2 small"></div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Latitude</label>
+                            <input type="text" class="form-control form-control-sm" name="latitude"
+                                   id="quickAddLatitude" readonly required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Longitude</label>
+                            <input type="text" class="form-control form-control-sm" name="longitude"
+                                   id="quickAddLongitude" readonly required>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">NAP Code</label>
+                        <input type="text" class="form-control" name="nap_code" id="quickAddCode"
+                               placeholder="e.g. NAP-C303" required>
+                        <div class="invalid-feedback d-block small" data-error-for="nap_code"></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Name</label>
+                        <input type="text" class="form-control" name="name" id="quickAddName"
+                               placeholder="e.g. Brgy. Calios NAP 2" required>
+                        <div class="invalid-feedback d-block small" data-error-for="name"></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Address <span class="text-muted">(optional)</span></label>
+                        <textarea class="form-control" name="address" id="quickAddAddress" rows="2"></textarea>
+                        <div class="invalid-feedback d-block small" data-error-for="address"></div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Total Ports</label>
+                            <input type="number" class="form-control" name="total_ports" id="quickAddTotalPorts"
+                                   min="1" step="1" required>
+                            <div class="invalid-feedback d-block small" data-error-for="total_ports"></div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Status</label>
+                            <select class="form-select" name="status" id="quickAddStatus">
+                                <option value="active" selected>Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="full">Full</option>
+                                <option value="maintenance">Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">Available ports will be set automatically ( = Total Ports, since a new NAP starts with 0 used).</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="quickAddCancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="quickAddSubmitBtn">
+                        <i class="bi bi-check-lg me-1"></i>Save NAP
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Report Issue modal: opened after a map click selects the problem
+     location. Same non-blocking, side-docked pattern as the NAP
+     quick-add modal, for the same reason: the admin can still click
+     or drag the pending marker to fine-tune the location while this
+     is open. -->
+<div class="modal" id="reportIssueModal" tabindex="-1" data-bs-backdrop="false" aria-hidden="true">
+    <div class="modal-dialog side-modal-dialog">
+        <div class="modal-content">
+            <form id="reportIssueForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>Report an Issue</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="reportIssueGeneralError" class="alert alert-danger d-none py-2 small"></div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Latitude</label>
+                            <input type="text" class="form-control form-control-sm" name="latitude"
+                                   id="reportIssueLatitude" readonly required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Longitude</label>
+                            <input type="text" class="form-control form-control-sm" name="longitude"
+                                   id="reportIssueLongitude" readonly required>
+                        </div>
+                    </div>
+                    <!-- "Point it in a subscriber's exact location, or it
+                         will not proceed / show pin error" -- selecting a
+                         subscriber below snaps the pin above onto their
+                         exact registered coordinates; this line reports
+                         whether the current pin still matches, and the
+                         Submit button stays disabled until it does. -->
+                    <div id="reportIssuePinStatus" class="small mt-1 mb-2 text-muted">
+                        Select the affected subscriber to snap the pin to their exact registered location.
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Issue Type</label>
+                        <select class="form-select" name="issue_type" id="reportIssueType">
+                            <option value="No Internet">No Internet</option>
+                            <option value="Slow Internet">Slow Internet</option>
+                            <option value="Fiber/Cable Problem">Fiber/Cable Problem</option>
+                            <option value="NAP Problem">NAP Problem</option>
+                            <option value="Connection Problem">Connection Problem</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <div class="invalid-feedback d-block small" data-error-for="issue_type"></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Subscriber</label>
+                        <select class="form-select" name="subscriber_id" id="reportIssueSubscriber">
+                            <option value="0" selected>-- Select Subscriber --</option>
+                        </select>
+                        <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">NAP <span class="text-muted">(if applicable)</span></label>
+                        <select class="form-select" name="nap_id" id="reportIssueNap">
+                            <option value="0" selected>None</option>
+                        </select>
+                        <div class="invalid-feedback d-block small" data-error-for="nap_id"></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Address <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control" name="address" id="reportIssueAddress">
+                        <div class="invalid-feedback d-block small" data-error-for="address"></div>
+                        <div class="form-text">Auto-filled from the selected subscriber; edit if needed.</div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Priority</label>
+                        <select class="form-select" name="priority" id="reportIssuePriority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                        <div class="invalid-feedback d-block small" data-error-for="priority"></div>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label small text-muted mb-1">Description</label>
+                        <textarea class="form-control" name="description" id="reportIssueDescription" rows="3"
+                                  placeholder="What's happening?"></textarea>
+                        <div class="invalid-feedback d-block small" data-error-for="description"></div>
+                    </div>
+                    <div class="form-text">Issue ID and status are assigned automatically.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="reportIssueCancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-warning" id="reportIssueSubmitBtn" disabled>
+                        <i class="bi bi-check-lg me-1"></i>Submit Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+{# Phase 23 (15%): nav-destination.js defines window.NapIQNavigation and
+   must load before napmap.js, which calls into it when a "Set as
+   destination" popup button is clicked. #}
+<script src="{{ url_for('static', filename='js/nav-destination.js') }}"></script>
+{# NAP marker icon artwork: exposed as a global so napmap.js's buildIcon()
+   can reference the real static URL without hard-coding a path in the JS
+   file itself (same "let Jinja resolve the static path" reasoning as every
+   <script src="{{ url_for('static', ...) }}"> tag on this page). #}
+<script>window.NAP_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
+<script src="{{ url_for('static', filename='js/napmap.js') }}"></script>
+{# Phase 8 (adapted onto Phase 23's navigation architecture):
+   nav-origin.js defines window.NapIQNavOrigin (mirrors
+   nav-destination.js) and must load before nav-origin-picker.js,
+   which calls into it. Both load after napmap.js so
+   window.NapIQMap already exists by the time their own
+   DOMContentLoaded handlers run (nav-origin-picker.js also listens
+   for napiq:map-ready as a fallback in case load order ever
+   changes). #}
+<script src="{{ url_for('static', filename='js/nav-origin.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nav-origin-picker.js') }}"></script>
+{% if current_user and current_user.role == 'administrator' %}
+{# Installation Planning, Phase 3 (40%): nap-install-planner.js is a
+   fourth map-click placement mode, following the exact "new small JS
+   module" precedent nav-origin-picker.js itself set (see that file's
+   own header comment). It reads window.NapIQMap (napmap.js, loaded
+   above) and, on activation, calls window.NapIQMapModes.exitPlacementModes()
+   and window.NapIQNavOriginPicker.stopPicking() (both loaded above) so
+   it joins the same "only one placement mode at a time" chain Add-NAP/
+   Report-Issue/origin-picker already enforce among themselves —
+   napmap.js's enterAddMode()/enterIssueMode() and
+   NapIQMapModes.exitPlacementModes() now call back into this module's
+   own exitPlanningMode() the same way they already call
+   NapIQNavOriginPicker.stopPicking(). Only loaded for administrators at
+   all, matching the Jinja-gated button/banner above — the underlying
+   template control doesn't exist in the DOM for a technician, so this
+   script has nothing to attach to and is skipped entirely rather than
+   loaded and no-op'd. #}
+<script src="{{ url_for('static', filename='js/nap-install-planner.js') }}"></script>
+{% endif %}
+{# Phase 11 (55%, translation project): nav-gps-origin.js is the real
+   device-GPS origin (navigator.geolocation.watchPosition). It reads
+   window.NapIQNavOrigin (already loaded above) and renders into
+   nav-origin.js's #navOriginGpsControls container, the same
+   "render into a container inside nav-origin.js's panel" pattern
+   nav-origin-picker.js already uses for #navOriginPickerControls, so
+   it must load after nav-origin.js. It also coordinates with
+   nav-origin-picker.js's cancelPicking() and napmap.js's
+   NapIQMapModes.exitPlacementModes() (both already loaded above) so
+   only one origin-acquisition flow is ever active at once. It never
+   calls OSRM directly -- nav-routing.js's existing
+   napiq:origin-changed listener (unchanged) already requests the
+   road route the moment a GPS fix becomes the origin. #}
+<script src="{{ url_for('static', filename='js/nav-gps-origin.js') }}"></script>
+{# Phase 14 (70%, technician dispatch integration): nav-technician-origin.js
+   is the third origin source -- a technician's own last-known DB
+   position (technicians.current_latitude/current_longitude, via the
+   existing GET /api/technicians/<id>/location endpoint). It reads
+   window.NapIQNavOrigin (already loaded above) and renders into
+   nav-origin.js's #navOriginTechnicianControls container, the same
+   pattern nav-gps-origin.js uses for #navOriginGpsControls, so it
+   must load after nav-origin.js. It is a one-shot fetch, not a live
+   watch, and never calls OSRM itself -- same "just push a point into
+   the origin store" boundary as nav-gps-origin.js. Renders nothing
+   at all unless #napMap's data-own-technician-id attribute is set
+   (i.e. the signed-in user is a technician with a linked profile). #}
+<script src="{{ url_for('static', filename='js/nav-technician-origin.js') }}"></script>
+{# Phase 4 (20%, translation project): nav-card.js renders the
+   floating Navigation Card from the same NapIQNavigation store, so
+   it must load after nav-destination.js too. It doesn't call into
+   napmap.js, nav-origin.js, or nav-origin-picker.js, and none of
+   them call into it, so its position relative to those doesn't
+   matter. #}
+<script src="{{ url_for('static', filename='js/nav-card.js') }}"></script>
+{# Phase 5 (25%, translation project): nav-routing.js is the OSRM
+   route-line engine. It renders into nav-card.js's
+   #navCardRouteStatus / #navCardControls hook points and listens
+   for nav-card.js's napiq:navcard-rendered event, so it must load
+   after nav-card.js. It also reads window.NapIQNavOrigin (already
+   loaded above) and draws the route polyline on window.NapIQMap,
+   which napmap.js (loaded above) already exposes. #}
+<script src="{{ url_for('static', filename='js/nav-routing.js') }}"></script>
+{# Phase 9 (45%, translation project): nav-demo-travel.js is the
+   demo-travel state machine (idle/running/paused/complete). It reads
+   window.NapIQNavRouting.getState() for the real OSRM route geometry,
+   so it must load after nav-routing.js. It appends its Start/Pause/
+   Resume/Reset/Replay controls into nav-card.js's #navCardControls
+   (registered after nav-routing.js's own napiq:navcard-rendered
+   listener, so its buttons are appended after nav-routing.js's origin
+   form on every rebuild instead of being wiped by it), and dispatches
+   napiq:demo-travel-changed, which nav-routing.js listens for to
+   refresh the Route Details Panel's real progress/remaining values. #}
+<script src="{{ url_for('static', filename='js/nav-demo-travel.js') }}"></script>
+{# Phase 10 (50%, translation project): nav-technician-marker.js draws
+   the dedicated navigation/technician marker on window.NapIQMap
+   (napmap.js, loaded above). It listens for nav-demo-travel.js's
+   napiq:demo-travel-changed event, so it must load after
+   nav-demo-travel.js, but it never calls into nav-demo-travel.js,
+   nav-routing.js, nav-card.js, or napmap.js directly -- it only reads
+   window.NapIQMap and window.NapIQNavDemoTravel.getState(). #}
+<script src="{{ url_for('static', filename='js/nav-technician-marker.js') }}"></script>
+{# Phase 12 (60%), TASK 1 ONLY: nav-route-progress.js is the
+   nearest-point-on-route progress calculation engine (progress %,
+   remaining distance/ETA, off-route distance) as a standalone pure
+   function, window.NapIQNavRouteProgress.computeProgress(route,
+   gpsPoint). It has no dependency on load order -- it reads no
+   other module's state and touches no DOM -- so it is loaded here
+   only for proximity to the other nav-*.js files. It is NOT yet
+   called by nav-gps-origin.js or any other file: wiring live GPS
+   fixes into this engine, updating the technician marker/Route
+   Details Panel from it, and guarding against noisy backward/
+   forward jumps are separate, later Phase 12 tasks. #}
+<script src="{{ url_for('static', filename='js/nav-route-progress.js') }}"></script>
+{# Phase 12 (60%), TASK 2 OF N (+ TASK 5 OF N, + TASK 6 OF N): nav-gps-route-progress.js
+   wires real GPS fixes into the Task 1 engine above. It listens for
+   the napiq:gps-fix-received event (dispatched by nav-gps-origin.js,
+   loaded above, on every accepted watchPosition() fix) and the
+   napiq:gps-tracking-stopped event (dispatched by nav-gps-origin.js
+   on stopTracking()/onError()), so it must load after nav-gps-origin.js.
+   It also reads window.NapIQNavRouting's route state (loaded above)
+   and calls window.NapIQNavRouteProgress.computeProgress() (loaded
+   just above this line), so it must load after both. It renders
+   nothing itself -- nav-gps-technician-marker.js (task 3, below) and
+   nav-routing.js's Route Details Panel (task 4, above in the script
+   order but wired by event listener, so load order between the two
+   doesn't matter -- see nav-routing.js's own comment) both read it.
+   TASK 5 (this session): a noise/monotonicity guard now sits in front
+   of every state update in this file -- a fix that projects behind
+   the last *accepted* fix by more than a small jitter tolerance, or
+   implausibly far/fast ahead of it, is rejected and the previously
+   shown progress is kept rather than overwritten. See this file's own
+   header comment for the full rationale and thresholds. Task 1's
+   engine (nav-route-progress.js) and Tasks 3/4's consumers are
+   unmodified by this.
+   TASK 6 (this session): a second, independent guard now also runs --
+   a fix whose perpendicular distance from the mapped road (Task 1's
+   offRouteDistanceMeters, already computed since Task 1 but unused
+   until now) exceeds a generous threshold is rejected too, even as
+   the very first fix against a route. Same file, same reject/keep
+   policy, no new script tag. #}
+<script src="{{ url_for('static', filename='js/nav-gps-route-progress.js') }}"></script>
+{# Phase 12 (60%), TASK 3 OF N: nav-gps-technician-marker.js bridges
+   the live-progress state above into the existing Phase 10 marker
+   (nav-technician-marker.js, loaded earlier in this file) by calling
+   its unchanged render()/clear() functions -- no second marker layer
+   is created. It reads both window.NapIQNavGpsRouteProgress (just
+   above) and window.NapIQNavTechnicianMarker (earlier in this file),
+   so it must load after both. #}
+<script src="{{ url_for('static', filename='js/nav-gps-technician-marker.js') }}"></script>
+{# Phase 12 (60%), TASK 4 OF N: no new script tag -- this task only
+   modified nav-routing.js (loaded earlier above) so its existing
+   Route Details Panel ("Route completion" block and "Remaining"
+   metric) also reflects window.NapIQNavGpsRouteProgress's state
+   (just above) when active, giving it precedence over demo travel,
+   the same precedence Task 3 already used for the technician marker.
+   nav-routing.js listens for the new napiq:gps-route-progress-changed
+   event to know when to re-render, so there is no load-order
+   requirement between it and nav-gps-route-progress.js. #}
+{% endblock %}

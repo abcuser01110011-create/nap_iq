@@ -1,0 +1,15 @@
+{
+  "name": "nap-iq-mobile",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "app": "yarn workspace nap-iq-app start",
+    "android": "yarn workspace nap-iq-app android",
+    "ios": "yarn workspace nap-iq-app ios",
+    "build:api-client": "yarn workspace @nap-iq/api-client build"
+  },
+  "packageManager": "yarn@4.1.1"
+}

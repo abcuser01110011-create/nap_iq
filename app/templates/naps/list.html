@@ -1,0 +1,153 @@
+{% extends "dashboard_base.html" %}
+{% block title %}NAP Management{% endblock %}
+{% block page_title %}Network Access Points{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ naps|length }} record{{ '' if naps|length == 1 else 's' }} shown</p>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('naps.add_nap') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Add NAP
+    </a>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('naps.list_naps') }}" class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-5">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input
+                        type="text" class="form-control" name="q"
+                        placeholder="Search by NAP code or name..."
+                        value="{{ search_term }}"
+                    >
+                </div>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                    <option value="full" {% if status_filter == 'full' %}selected{% endif %}>Full</option>
+                    <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Maintenance</option>
+                </select>
+            </div>
+            <div class="col-sm-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+                {% if search_term or status_filter %}
+                    <a href="{{ url_for('naps.list_naps') }}" class="btn btn-link text-decoration-none">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>NAP Code</th>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th class="text-center">Total Ports</th>
+                    <th class="text-center">Available Ports</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nap in naps %}
+                <tr>
+                    <td><span class="fw-semibold">{{ nap.nap_code }}</span></td>
+                    <td>{{ nap.name }}</td>
+                    <td class="text-muted small">
+                        {{ nap.address or (nap.latitude ~ ', ' ~ nap.longitude) }}
+                    </td>
+                    <td class="text-center">{{ nap.total_ports }}</td>
+                    <td class="text-center">
+                        <span class="badge {{ 'text-bg-success' if nap.available_ports > 0 else 'text-bg-secondary' }}">
+                            {{ nap.available_ports }}
+                        </span>
+                    </td>
+                    <td>
+                        {% set status_classes = {
+                            'active': 'text-bg-success',
+                            'inactive': 'text-bg-secondary',
+                            'full': 'text-bg-warning',
+                            'maintenance': 'text-bg-danger'
+                        } %}
+                        <span class="badge {{ status_classes.get(nap.status, 'text-bg-secondary') }}">
+                            {{ nap.status|capitalize }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}"
+                               class="btn btn-outline-secondary" title="View details">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('naps.edit_nap', nap_id=nap.id) }}"
+                               class="btn btn-outline-primary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% if nap.status == 'inactive' %}
+                                <button type="button" class="btn btn-outline-success" title="Activate"
+                                        data-bs-toggle="modal" data-bs-target="#statusModal"
+                                        data-nap-id="{{ nap.id }}"
+                                        data-nap-label="{{ nap.nap_code }} — {{ nap.name }}"
+                                        data-action-type="activate">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            {% else %}
+                                <button type="button" class="btn btn-outline-danger" title="Deactivate"
+                                        data-bs-toggle="modal" data-bs-target="#statusModal"
+                                        data-nap-id="{{ nap.id }}"
+                                        data-nap-label="{{ nap.nap_code }} — {{ nap.name }}"
+                                        data-action-type="deactivate">
+                                    <i class="bi bi-slash-circle"></i>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox display-6 d-block mb-2"></i>
+                        No NAPs found{% if search_term or status_filter %} matching your filters{% endif %}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Shared confirmation modal for Deactivate / Activate -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="statusChangeForm" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="statusModalTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1" id="statusModalBody">Are you sure?</p>
+                    <p class="text-muted small mb-0" id="statusModalNapLabel"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn" id="statusModalConfirmBtn">Confirm</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

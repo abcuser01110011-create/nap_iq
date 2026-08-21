@@ -1,0 +1,107 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Subscribers{% endblock %}
+{% block page_title %}Subscribers{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ subscribers|length }} record{{ '' if subscribers|length == 1 else 's' }} shown</p>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('subscribers.add_subscriber') }}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i>Add Subscriber
+    </a>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('subscribers.list_subscribers') }}" class="row g-2 align-items-end">
+            <div class="col-sm-7 col-md-8">
+                <label class="form-label small text-muted mb-1">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input
+                        type="text" class="form-control" name="q"
+                        placeholder="Search by code, name, or email..."
+                        value="{{ search_term }}"
+                    >
+                </div>
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                    <option value="disconnected" {% if status_filter == 'disconnected' %}selected{% endif %}>Disconnected</option>
+                </select>
+            </div>
+            <div class="col-sm-2 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+                {% if search_term or status_filter %}
+                    <a href="{{ url_for('subscribers.list_subscribers') }}" class="btn btn-link text-decoration-none">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Code</th>
+                    <th>Full Name</th>
+                    <th>Plan</th>
+                    <th>Connected NAP</th>
+                    <th>Linked Login</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subscriber in subscribers %}
+                <tr>
+                    <td class="fw-semibold">{{ subscriber.subscriber_code }}</td>
+                    <td>{{ subscriber.full_name }}</td>
+                    <td>{{ subscriber.plan_type or "—" }}</td>
+                    <td>{{ subscriber.nap.nap_code if subscriber.nap else "—" }}</td>
+                    <td>
+                        {% if subscriber.user %}
+                            <span class="badge text-bg-light border">{{ subscriber.user.username }}</span>
+                        {% else %}
+                            <span class="text-muted small">Not linked</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger'} %}
+                        <span class="badge {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
+                            {{ subscriber.status|capitalize }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}"
+                               class="btn btn-outline-secondary" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('subscribers.edit_subscriber', subscriber_id=subscriber.id) }}"
+                               class="btn btn-outline-primary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-person-vcard display-6 d-block mb-2"></i>
+                        No subscribers found{% if search_term or status_filter %} matching your filters{% endif %}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
