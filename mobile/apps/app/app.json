@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NAP-IQ",
-    "slug": "nap-iq",
+    "slug": "usernamei",
     "scheme": "napiq",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -38,7 +38,7 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "https://your-nap-iq-backend.example.com",
+      "apiBaseUrl": "https://nap-iq.vercel.app",
       "eas": {
         "projectId": "b62aa4b3-fdc4-4bc3-959c-cd58d86c9b62"
       }
