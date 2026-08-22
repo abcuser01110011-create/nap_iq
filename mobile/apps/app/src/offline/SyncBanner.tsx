@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme";
+import { colors } from '../theme/shared';
 import { useOffline } from "./OfflineContext";
 
 /** Sits at the top of the Jobs/History tabs. Silent when everything's
