@@ -1,7 +1,7 @@
 /**
  * ApiClient doesn't know or care how tokens are persisted — each app
  * supplies its own implementation (both apps use expo-secure-store,
- * see apps/*/src/auth/secureTokenStorage.ts) so this package stays
+ * see apps//src/auth/secureTokenStorage.ts) so this package stays
  * usable outside Expo too (tests, a future web admin client, etc).
  */
 export interface TokenPair {
