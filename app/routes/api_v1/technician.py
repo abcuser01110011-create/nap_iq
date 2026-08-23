@@ -22,13 +22,13 @@ Routes:
     POST /api/v1/technician/assignments/<id>/complete -> complete_assignment
 """
 
-import os
 import uuid
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request
+import cloudinary
+import cloudinary.uploader
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import current_user
-from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
@@ -91,14 +91,11 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None,
         "completed_at": assignment.completed_at.isoformat() if assignment.completed_at else None,
         "resolution_notes": assignment.resolution_notes,
-        # Absolute URL (not just a filename) so the mobile app can
-        # drop this straight into an <Image source={{ uri: ... }}>
-        # without needing to know the API's base URL separately.
-        "photo_url": (
-            f"{request.host_url.rstrip('/')}/static/uploads/assignment_photos/{assignment.photo_filename}"
-            if assignment.photo_filename
-            else None
-        ),
+        # assignment.photo_filename now stores the full Cloudinary
+        # URL directly (set in upload_assignment_photo() above), so
+        # this is just a passthrough — kept as its own field here
+        # rather than renaming the column, to avoid an extra migration.
+        "photo_url": assignment.photo_filename,
         "issue": {
             "id": issue.id,
             "issue_code": issue.issue_code,
@@ -259,6 +256,13 @@ def upload_assignment_photo(assignment_id):
     before completing it. complete_assignment() below refuses to
     transition to 'completed' until this has been set at least once.
 
+    Stored on Cloudinary rather than local disk — Vercel's serverless
+    functions have a read-only filesystem, so there's nowhere on the
+    server itself a file could persist between requests. Cloudinary's
+    config (cloud name / API key / API secret) is picked up
+    automatically from the CLOUDINARY_* environment variables, no
+    explicit cloudinary.config() call needed.
+
     Expects multipart/form-data with a single "photo" file field —
     unlike every other route in this module, not a JSON body, since
     this blueprint is already csrf-exempt as a whole (see this
@@ -283,27 +287,35 @@ def upload_assignment_photo(assignment_id):
     if ext not in ALLOWED_PHOTO_EXTENSIONS:
         return jsonify(error="Unsupported photo format. Use JPG, PNG, HEIC, or WEBP."), 400
 
-    upload_folder = current_app.config["UPLOAD_FOLDER"]
-    os.makedirs(upload_folder, exist_ok=True)
+    # public_id (not the original filename) is what Cloudinary keys
+    # the asset on — a random one avoids collisions the same way the
+    # old local-disk filename did.
+    public_id = f"assignment-photos/assignment-{assignment.id}-{uuid.uuid4().hex}"
 
-    # A random filename (rather than the original) avoids collisions
-    # and avoids trusting anything about the client-supplied name
-    # beyond its extension, which was already validated above.
-    filename = secure_filename(f"assignment-{assignment.id}-{uuid.uuid4().hex}.{ext}")
-    photo.save(os.path.join(upload_folder, filename))
+    try:
+        upload_result = cloudinary.uploader.upload(photo, public_id=public_id, overwrite=True)
+    except Exception:
+        return jsonify(error="Photo upload failed. Please try again."), 502
 
-    # The old file (if this is a replacement, e.g. the tech retakes
-    # the photo) is only removed after the new one saves successfully
-    # and the DB commit succeeds — so a failed upload never leaves the
-    # assignment pointing at a photo that no longer exists on disk.
-    old_filename = assignment.photo_filename
-    assignment.photo_filename = filename
+    # The old image (if this is a replacement, e.g. the tech retakes
+    # the photo) is only removed after the new one uploads
+    # successfully and the DB commit succeeds — so a failed upload
+    # never leaves the assignment pointing at an image that's gone.
+    old_photo_url = assignment.photo_filename
+    assignment.photo_filename = upload_result["secure_url"]
     db.session.commit()
 
-    if old_filename:
-        old_path = os.path.join(upload_folder, old_filename)
-        if os.path.exists(old_path):
-            os.remove(old_path)
+    if old_photo_url:
+        try:
+            # Recover the public_id we originally uploaded under from
+            # the stored URL, so the old image can be cleaned up too —
+            # best-effort only, a failure here doesn't affect the
+            # response since the new photo is already saved.
+            old_public_id = old_photo_url.split("/upload/")[1].rsplit(".", 1)[0]
+            old_public_id = "/".join(old_public_id.split("/")[1:])  # drop the version segment
+            cloudinary.uploader.destroy(old_public_id)
+        except Exception:
+            pass
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
