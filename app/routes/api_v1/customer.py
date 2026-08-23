@@ -19,13 +19,10 @@ Routes:
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import current_user
-from math import radians, sin, cos, sqrt, atan2
 
 from app.extensions import db
 from app.forms import ISSUE_TYPE_CHOICES
 from app.jwt_auth import jwt_role_required
-from app.models import Subscriber, TechnicalIssue, Nap, Plan
-from app.notifications_utils import notify_new_issue_reported
 from app.models import Plan, Subscriber, TechnicalIssue
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
