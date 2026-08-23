@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,11 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker, type LatLng } from "react-native-maps";
+import { WebView } from "react-native-webview";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
+
+type LatLng = { latitude: number; longitude: number };
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 
@@ -22,7 +24,60 @@ type Step = "location" | "plan" | "details";
 
 // Manila as a reasonable default map center — first pin drop replaces
 // this, it's never submitted as-is.
-const DEFAULT_REGION = { latitude: 14.5995, longitude: 120.9842, latitudeDelta: 0.05, longitudeDelta: 0.05 };
+const DEFAULT_CENTER: LatLng = { latitude: 14.5995, longitude: 120.9842 };
+
+// Builds the HTML page that runs inside the WebView. Uses Leaflet.js
+// pulling free OpenStreetMap tiles — no Google Maps SDK, no API key,
+// no billing account required. Tapping/dragging the pin posts the
+// coordinate back to React Native via window.ReactNativeWebView.postMessage.
+function buildMapHtml(center: LatLng) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <script>
+        const map = L.map('map').setView([${center.latitude}, ${center.longitude}], 13);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let marker = null;
+
+        function sendPin(lat, lng) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ latitude: lat, longitude: lng }));
+        }
+
+        function placeMarker(lat, lng) {
+          if (marker) {
+            marker.setLatLng([lat, lng]);
+          } else {
+            marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+            marker.on('dragend', function (e) {
+              const pos = marker.getLatLng();
+              sendPin(pos.lat, pos.lng);
+            });
+          }
+        }
+
+        map.on('click', function (e) {
+          placeMarker(e.latlng.lat, e.latlng.lng);
+          sendPin(e.latlng.lat, e.latlng.lng);
+        });
+      </script>
+    </body>
+    </html>
+  `;
+}
 
 export default function RegisterScreen({ navigation }: Props) {
   const { register, lastError } = useAuth();
@@ -45,13 +100,25 @@ export default function RegisterScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // Client used only for the two public pre-login calls below — the
-  // same instance AuthContext already built, reached through useAuth
-  // so this screen doesn't construct a second one.
+  const webviewRef = useRef<WebView>(null);
+
+  // Same client instance AuthContext already built, reached through
+  // useAuth so this screen doesn't construct a second one.
   const { client } = useAuth();
+
+  const handleMapMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      setPin({ latitude: data.latitude, longitude: data.longitude });
+      setCoverageResult(null);
+    } catch {
+      // ignore malformed messages
+    }
+  };
 
   const handleCheckCoverage = async () => {
     if (!pin) return;
+    setLocalError(null);
     setChecking(true);
     setCoverageResult(null);
     try {
@@ -109,16 +176,13 @@ export default function RegisterScreen({ navigation }: Props) {
         {step === "location" && (
           <>
             <View style={styles.mapWrap}>
-              <MapView
+              <WebView
+                ref={webviewRef}
+                originWhitelist={["*"]}
+                source={{ html: buildMapHtml(DEFAULT_CENTER) }}
+                onMessage={handleMapMessage}
                 style={styles.map}
-                initialRegion={DEFAULT_REGION}
-                onPress={(e) => {
-                  setPin(e.nativeEvent.coordinate);
-                  setCoverageResult(null);
-                }}
-              >
-                {pin && <Marker coordinate={pin} draggable onDragEnd={(e) => setPin(e.nativeEvent.coordinate)} />}
-              </MapView>
+              />
             </View>
             <Text style={styles.hint}>Tap the map to drop a pin, drag to fine-tune.</Text>
 
@@ -129,6 +193,8 @@ export default function RegisterScreen({ navigation }: Props) {
                   : "Sorry, we don't currently have coverage at this location."}
               </Text>
             )}
+
+            {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
 
             <TouchableOpacity
               style={[styles.button, !pin && styles.buttonDisabled]}
