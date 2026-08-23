@@ -19,7 +19,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
 import { colors } from "../../theme/technician";
-import { STATUS_LABELS } from "./statusLabels";
+import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -66,6 +66,16 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Phase 28: the customer's sign-off, install-only — same
+  // immediate-upload pattern as the completion photo above (see that
+  // state's comment), just against
+  // client.technician.uploadAssignmentSignature() and a different
+  // response field (assignment.signature_url).
+  const isInstallation = assignment.job_type === "installation";
+  const [signatureUri, setSignatureUri] = useState<string | null>(null);
+  const [signatureUploading, setSignatureUploading] = useState(false);
+  const [signatureError, setSignatureError] = useState<string | null>(null);
 
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
@@ -151,9 +161,69 @@ export default function JobDetailScreen({ route, navigation }: any) {
     uploadPhoto(result.assets[0].uri, result.assets[0].mimeType);
   };
 
+  const uploadSignature = async (uri: string, mimeType: string | undefined) => {
+    if (!isOnline) {
+      setSignatureError("You're offline — connect to the internet to upload a signature.");
+      return;
+    }
+    setSignatureError(null);
+    setSignatureUri(uri);
+    setSignatureUploading(true);
+    try {
+      const extFromUri = uri.split(".").pop()?.toLowerCase() || "jpg";
+      const type = mimeType ?? `image/${extFromUri === "jpg" ? "jpeg" : extFromUri}`;
+      const name = `signature-${assignment.id}.${extFromUri}`;
+      const result = await client.technician.uploadAssignmentSignature(assignment.id, { uri, name, type });
+      applyAssignmentUpdate(result.assignment);
+    } catch (err) {
+      setSignatureUri(null);
+      setSignatureError(
+        err instanceof ApiError ? err.body.error ?? "Upload failed. Try again." : "Upload failed. Try again."
+      );
+    } finally {
+      setSignatureUploading(false);
+    }
+  };
+
+  const handleTakeSignature = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Camera access needed",
+        "Enable camera access for NAP-IQ in your device settings to capture the customer's sign-off."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
+    if (result.canceled || !result.assets?.[0]) return;
+    uploadSignature(result.assets[0].uri, result.assets[0].mimeType);
+  };
+
+  const handlePickSignatureFromLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Photo library access needed",
+        "Enable photo library access for NAP-IQ in your device settings to attach the customer's sign-off."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    uploadSignature(result.assets[0].uri, result.assets[0].mimeType);
+  };
+
   const handleComplete = () => {
     if (!assignment.photo_url) {
       setError("Add a completion photo before marking this job complete.");
+      return;
+    }
+    if (isInstallation && !assignment.signature_url) {
+      setError("Add the customer's signature before marking this installation complete.");
       return;
     }
     if (!notes.trim() && !assignment.resolution_notes) {
@@ -175,8 +245,9 @@ export default function JobDetailScreen({ route, navigation }: any) {
   };
 
   const openMaps = () => {
-    const lat = assignment.subscriber?.latitude ?? assignment.issue?.latitude;
-    const lng = assignment.subscriber?.longitude ?? assignment.issue?.longitude;
+    const lat = assignment.subscriber?.latitude ?? assignment.issue?.latitude ?? assignment.service_request?.latitude;
+    const lng =
+      assignment.subscriber?.longitude ?? assignment.issue?.longitude ?? assignment.service_request?.longitude;
     if (lat == null || lng == null) return;
     const url = Platform.select({
       ios: `maps:0,0?q=${lat},${lng}`,
@@ -186,8 +257,8 @@ export default function JobDetailScreen({ route, navigation }: any) {
     Linking.openURL(url!).catch(() => {});
   };
 
-  const lat = assignment.subscriber?.latitude ?? assignment.issue?.latitude;
-  const lng = assignment.subscriber?.longitude ?? assignment.issue?.longitude;
+  const lat = assignment.subscriber?.latitude ?? assignment.issue?.latitude ?? assignment.service_request?.latitude;
+  const lng = assignment.subscriber?.longitude ?? assignment.issue?.longitude ?? assignment.service_request?.longitude;
 
   const canAccept = assignment.status === "assigned";
   const canStart = assignment.status === "accepted";
@@ -213,8 +284,19 @@ export default function JobDetailScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        <Text style={styles.title}>{assignment.issue?.issue_code ?? `Job #${assignment.id}`}</Text>
-        <Text style={styles.subtitle}>{assignment.issue?.issue_type}</Text>
+        <Text style={styles.jobTypeLabel}>{JOB_TYPE_LABELS[assignment.job_type] ?? assignment.job_type}</Text>
+        <Text style={styles.title}>
+          {assignment.issue?.issue_code ??
+            (assignment.service_request
+              ? assignment.subscriber?.subscriber_code ?? `Installation #${assignment.service_request.id}`
+              : `Job #${assignment.id}`)}
+        </Text>
+        <Text style={styles.subtitle}>
+          {assignment.issue?.issue_type ??
+            (assignment.service_request
+              ? REQUEST_TYPE_LABELS[assignment.service_request.request_type] ?? assignment.service_request.request_type
+              : "")}
+        </Text>
 
         {!isOnline && pendingCount > 0 && (
           <View style={styles.queuedBanner}>
@@ -260,12 +342,26 @@ export default function JobDetailScreen({ route, navigation }: any) {
           )}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Issue</Text>
-          <InfoRow label="Priority" value={assignment.issue?.priority} />
-          <InfoRow label="Description" value={assignment.issue?.description} />
-          {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
-        </View>
+        {assignment.issue && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Issue</Text>
+            <InfoRow label="Priority" value={assignment.issue.priority} />
+            <InfoRow label="Description" value={assignment.issue.description} />
+            {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
+          </View>
+        )}
+
+        {assignment.service_request && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Installation</Text>
+            <InfoRow
+              label="Request type"
+              value={REQUEST_TYPE_LABELS[assignment.service_request.request_type] ?? assignment.service_request.request_type}
+            />
+            <InfoRow label="Plan / notes" value={assignment.service_request.notes} />
+            {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
+          </View>
+        )}
 
         {(canEditNotes || isClosed) && (
           <View style={styles.card}>
@@ -337,6 +433,50 @@ export default function JobDetailScreen({ route, navigation }: any) {
           </View>
         )}
 
+        {isInstallation && showPhotoCard && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Customer sign-off</Text>
+            {signatureUri || assignment.signature_url ? (
+              <Image
+                source={{ uri: signatureUri ?? assignment.signature_url! }}
+                style={styles.photoPreview}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.notesText}>
+                {canEditNotes
+                  ? "No signature added yet — required before completing this installation."
+                  : "No signature was attached."}
+              </Text>
+            )}
+            {signatureUploading && (
+              <View style={styles.photoUploadingRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.photoUploadingText}>Uploading…</Text>
+              </View>
+            )}
+            {signatureError && <Text style={styles.error}>{signatureError}</Text>}
+            {canEditNotes && (
+              <View style={styles.photoButtonRow}>
+                <TouchableOpacity
+                  style={styles.secondaryButtonSmall}
+                  onPress={handleTakeSignature}
+                  disabled={signatureUploading}
+                >
+                  <Text style={styles.secondaryButtonText}>Photograph sign-off</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryButtonSmall}
+                  onPress={handlePickSignatureFromLibrary}
+                  disabled={signatureUploading}
+                >
+                  <Text style={styles.secondaryButtonText}>Choose from library</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={styles.actions}>
           {canAccept && (
             <TouchableOpacity style={styles.primaryButton} onPress={handleAccept}>
@@ -374,7 +514,15 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   statusBadgeText: { color: "#8FB6FF", fontSize: 12, fontWeight: "700" },
-  title: { color: colors.text, fontSize: 22, fontWeight: "800", marginTop: 16 },
+  jobTypeLabel: {
+    color: colors.textFaint,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 16,
+  },
+  title: { color: colors.text, fontSize: 22, fontWeight: "800", marginTop: 2 },
   subtitle: { color: colors.textFaint, fontSize: 14, marginTop: 2, marginBottom: 16 },
   error: { color: colors.danger, marginBottom: 12 },
   queuedBanner: {

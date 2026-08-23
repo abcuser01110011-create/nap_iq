@@ -7,6 +7,81 @@ import { colors } from "../../theme/customer";
 const OPEN_ISSUE_STATUSES = new Set(["pending", "assigned", "accepted", "in_progress"]);
 const PENDING_REQUEST_STATUSES = new Set(["pending", "approved", "scheduled"]);
 
+// Phase 29 (auto-activation): the four stages a self-registered
+// application moves through, in order, mirroring
+// ServiceRequest.status's own enum (database/schema.sql) minus
+// 'rejected' — that one's handled as its own distinct state below
+// rather than a step on this track, since a rejected application
+// isn't "further along", it's stopped.
+const INSTALL_STEPS: { key: string; label: string }[] = [
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "scheduled", label: "Scheduled" },
+  { key: "completed", label: "Installed" },
+];
+
+function StatusTracker({ status }: { status: string }) {
+  const currentIndex = INSTALL_STEPS.findIndex((s) => s.key === status);
+  return (
+    <View style={styles.trackerRow}>
+      {INSTALL_STEPS.map((step, i) => {
+        const reached = currentIndex >= 0 && i <= currentIndex;
+        const isLast = i === INSTALL_STEPS.length - 1;
+        return (
+          <View key={step.key} style={styles.trackerStep}>
+            <View style={styles.trackerDotRow}>
+              <View style={[styles.trackerDot, reached && styles.trackerDotActive]} />
+              {!isLast && <View style={[styles.trackerLine, reached && styles.trackerLineActive]} />}
+            </View>
+            <Text style={[styles.trackerLabel, reached && styles.trackerLabelActive]}>{step.label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Phase 29: what to say under the tracker for each stage — kept
+// separate from the tracker itself so the wording can be customer-
+// friendly without cluttering StatusTracker's layout logic.
+const STEP_MESSAGES: Record<string, string> = {
+  pending: "We're reviewing your application. This usually only takes a day or two.",
+  approved: "Your application was approved — we'll schedule a technician to install your service soon.",
+  scheduled: "A technician has been scheduled for your installation. We'll notify you once it's done.",
+  completed: "Your installation is complete — refresh to see your account.",
+};
+
+function PendingApplicationCard({
+  subscriber,
+  installRequest,
+}: {
+  subscriber: Subscriber;
+  installRequest: ServiceRequest | null;
+}) {
+  if (installRequest?.status === "rejected") {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>Application status</Text>
+        <Text style={styles.cardValue}>Not approved</Text>
+        <Text style={styles.trackerMessage}>
+          Your application wasn't approved. Please contact NAP-IQ support for details.
+        </Text>
+      </View>
+    );
+  }
+
+  const status = installRequest?.status ?? "pending";
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardLabel}>Application status</Text>
+      <Text style={styles.cardValue}>{subscriber.subscriber_code}</Text>
+      <StatusTracker status={status} />
+      <Text style={styles.trackerMessage}>{STEP_MESSAGES[status] ?? STEP_MESSAGES.pending}</Text>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { client, user } = useAuth();
   const [subscriber, setSubscriber] = useState<Subscriber | null>(null);
@@ -50,6 +125,15 @@ export default function HomeScreen() {
   const pendingRequestCount = requests.filter((r) => PENDING_REQUEST_STATUSES.has(r.status)).length;
   const lastPayment = payments[0];
 
+  const isPendingReview = subscriber?.status === "pending_review";
+  // Phase 29: `requests` comes back newest-first (Subscriber.service_
+  // requests' own ordering — see app/models.py), so the *last*
+  // 'new_installation' entry is the original one Phase 26's register()
+  // created — the one whose lifecycle the tracker follows, even if the
+  // customer has since filed other request types.
+  const installRequests = requests.filter((r) => r.request_type === "new_installation");
+  const installRequest = installRequests.length > 0 ? installRequests[installRequests.length - 1] : null;
+
   return (
     <ScrollView
       style={styles.screen}
@@ -59,48 +143,54 @@ export default function HomeScreen() {
       <Text style={styles.greeting}>Hi, {user?.full_name ?? "there"}</Text>
       {error && <Text style={styles.error}>{error}</Text>}
 
-      {subscriber && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Account</Text>
-          <Text style={styles.cardValue}>{subscriber.subscriber_code}</Text>
-          <View style={styles.row}>
-            <View>
-              <Text style={styles.rowLabel}>Plan</Text>
-              <Text style={styles.rowValue}>{subscriber.plan_type ?? "—"}</Text>
+      {isPendingReview && subscriber ? (
+        <PendingApplicationCard subscriber={subscriber} installRequest={installRequest} />
+      ) : (
+        <>
+          {subscriber && (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Account</Text>
+              <Text style={styles.cardValue}>{subscriber.subscriber_code}</Text>
+              <View style={styles.row}>
+                <View>
+                  <Text style={styles.rowLabel}>Plan</Text>
+                  <Text style={styles.rowValue}>{subscriber.plan_type ?? "—"}</Text>
+                </View>
+                <View>
+                  <Text style={styles.rowLabel}>Status</Text>
+                  <Text style={styles.rowValue}>{subscriber.status}</Text>
+                </View>
+                <View>
+                  <Text style={styles.rowLabel}>NAP</Text>
+                  <Text style={styles.rowValue}>{subscriber.nap?.nap_code ?? "—"}</Text>
+                </View>
+              </View>
             </View>
-            <View>
-              <Text style={styles.rowLabel}>Status</Text>
-              <Text style={styles.rowValue}>{subscriber.status}</Text>
+          )}
+
+          <View style={styles.statsRow}>
+            <View style={[styles.statCard, styles.statPrimary]}>
+              <Text style={styles.statValue}>{openIssueCount}</Text>
+              <Text style={styles.statLabel}>Open issues</Text>
             </View>
-            <View>
-              <Text style={styles.rowLabel}>NAP</Text>
-              <Text style={styles.rowValue}>{subscriber.nap?.nap_code ?? "—"}</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{pendingRequestCount}</Text>
+              <Text style={styles.statLabel}>Pending requests</Text>
             </View>
           </View>
-        </View>
-      )}
 
-      <View style={styles.statsRow}>
-        <View style={[styles.statCard, styles.statPrimary]}>
-          <Text style={styles.statValue}>{openIssueCount}</Text>
-          <Text style={styles.statLabel}>Open issues</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{pendingRequestCount}</Text>
-          <Text style={styles.statLabel}>Pending requests</Text>
-        </View>
-      </View>
-
-      {lastPayment && (
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Last payment</Text>
-          <Text style={styles.cardValue}>
-            {lastPayment.amount !== null ? `₱${lastPayment.amount.toFixed(2)}` : "—"}
-          </Text>
-          <Text style={styles.rowLabel}>
-            {lastPayment.payment_method} · {lastPayment.status}
-          </Text>
-        </View>
+          {lastPayment && (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Last payment</Text>
+              <Text style={styles.cardValue}>
+                {lastPayment.amount !== null ? `₱${lastPayment.amount.toFixed(2)}` : "—"}
+              </Text>
+              <Text style={styles.rowLabel}>
+                {lastPayment.payment_method} · {lastPayment.status}
+              </Text>
+            </View>
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -136,4 +226,19 @@ const styles = StyleSheet.create({
   statPrimary: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight },
   statValue: { color: colors.text, fontSize: 24, fontWeight: "800" },
   statLabel: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  trackerRow: { flexDirection: "row", marginTop: 4, marginBottom: 4 },
+  trackerStep: { flex: 1, alignItems: "flex-start" },
+  trackerDotRow: { flexDirection: "row", alignItems: "center", width: "100%" },
+  trackerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.border,
+  },
+  trackerDotActive: { backgroundColor: colors.primary },
+  trackerLine: { flex: 1, height: 2, backgroundColor: colors.border, marginHorizontal: 4 },
+  trackerLineActive: { backgroundColor: colors.primary },
+  trackerLabel: { color: colors.textFaint, fontSize: 11, marginTop: 6, fontWeight: "600" },
+  trackerLabelActive: { color: colors.primary },
+  trackerMessage: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 12 },
 });
