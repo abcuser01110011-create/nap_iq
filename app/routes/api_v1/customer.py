@@ -19,11 +19,15 @@ Routes:
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import current_user
+from math import radians, sin, cos, sqrt, atan2
 
 from app.extensions import db
 from app.forms import ISSUE_TYPE_CHOICES
 from app.jwt_auth import jwt_role_required
-from app.models import Subscriber, TechnicalIssue
+from app.models import Subscriber, TechnicalIssue, Nap, Plan
+from app.notifications_utils import notify_new_issue_reported
+from app.models import Plan, Subscriber, TechnicalIssue
+from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
 
 api_v1_customer_bp = Blueprint("api_v1_customer", __name__, url_prefix="/api/v1/customer")
@@ -34,6 +38,44 @@ api_v1_customer_bp = Blueprint("api_v1_customer", __name__, url_prefix="/api/v1/
 _VALID_ISSUE_TYPES = {value for value, _label in ISSUE_TYPE_CHOICES}
 _VALID_PRIORITIES = {"low", "medium", "high", "critical"}
 _DESCRIPTION_MAX_LENGTH = 2000
+
+
+# Phase 26 — deliberately NOT behind @jwt_role_required: a prospective
+# customer needs to check coverage and see plan options *before* they
+# have an account. Everything else in this blueprint stays
+# authenticated; these two are the only public routes here.
+@api_v1_customer_bp.route("/coverage-check", methods=["POST"])
+def coverage_check():
+    """Pre-registration coverage check for the mobile app's Register
+    flow. Thin wrapper around the existing app.nap_recommendation
+    engine (built in Phase 22 for the admin's service-request NAP
+    assignment) — reused as-is, not reimplemented."""
+    data = request.get_json(silent=True) or {}
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return jsonify(error="Valid latitude and longitude are required."), 400
+
+    matches = recommend_naps(latitude, longitude, limit=1)
+    if not matches:
+        return jsonify(available=False), 200
+
+    nearest = matches[0]
+    return jsonify(
+        available=True,
+        nearest_nap_code=nearest["nap_code"],
+        distance_km=nearest["distance_km"],
+    ), 200
+
+
+@api_v1_customer_bp.route("/plans", methods=["GET"])
+def list_plans():
+    """Public plan list for the Register flow's plan-selection step.
+    Same source table (Settings > App Settings > Plans) the admin
+    dropdowns already read from — see Plan's docstring in app/models.py."""
+    plans = Plan.query.order_by(Plan.name).all()
+    return jsonify(plans=[p.name for p in plans]), 200
 
 
 def _own_subscriber_or_none():
@@ -203,3 +245,52 @@ def list_payments():
     if subscriber is None:
         return _no_subscriber_response()
     return jsonify(payments=[_serialize_payment(p) for p in subscriber.payments]), 200
+
+# Coverage radius (km) — a location is "covered" if it falls within
+# this distance of at least one active NAP. Adjust as needed once
+# real service-area rules are defined.
+_COVERAGE_RADIUS_KM = 2.0
+
+
+def _haversine_km(lat1, lon1, lat2, lon2) -> float:
+    """Great-circle distance between two lat/lon points, in km."""
+    R = 6371.0  # Earth's radius in km
+    lat1, lon1, lat2, lon2 = map(radians, [float(lat1), float(lon1), float(lat2), float(lon2)])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+
+@api_v1_customer_bp.route("/coverage-check", methods=["POST"])
+def check_coverage():
+    """Public (pre-login) endpoint used by the registration flow's
+    location step. Finds the nearest active NAP to the submitted
+    coordinates and reports whether it falls within service range."""
+    data = request.get_json(silent=True) or {}
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
+
+    if latitude is None or longitude is None:
+        return jsonify(error="Latitude and longitude are required."), 400
+
+    naps = Nap.query.filter_by(status="active").all()
+    if not naps:
+        return jsonify(available=False), 200
+
+    nearest_km = min(
+        _haversine_km(latitude, longitude, nap.latitude, nap.longitude) for nap in naps
+    )
+
+    return jsonify(
+        available=nearest_km <= _COVERAGE_RADIUS_KM,
+        distance_km=round(nearest_km, 2),
+    ), 200
+
+
+@api_v1_customer_bp.route("/plans", methods=["GET"])
+def list_plans():
+    """Public (pre-login) list of available plan names, shown to a
+    new customer after a successful coverage check."""
+    plans = Plan.query.order_by(Plan.name).all()
+    return jsonify(plans=[p.name for p in plans]), 200

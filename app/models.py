@@ -195,7 +195,7 @@ class Subscriber(db.Model):
     # account can link to at most one subscriber.
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=True)
     status = db.Column(
-        db.Enum("active", "inactive", "disconnected", name="subscriber_status"),
+        db.Enum("active", "inactive", "disconnected", "pending_review", name="subscriber_status"),
         nullable=False,
         default="active",
     )

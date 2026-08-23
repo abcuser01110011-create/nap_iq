@@ -90,6 +90,7 @@ class Config:
     # deployment without a code change.
     LOGIN_RATE_LIMIT_PER_IP = os.environ.get("LOGIN_RATE_LIMIT_PER_IP", "10 per minute")
     LOGIN_RATE_LIMIT_PER_USERNAME = os.environ.get("LOGIN_RATE_LIMIT_PER_USERNAME", "5 per minute")
+    REGISTER_RATE_LIMIT_PER_IP = os.environ.get("REGISTER_RATE_LIMIT_PER_IP", "5 per hour")
 
     # ---- HTTPS enforcement (Phase 18) ----
     # SESSION_COOKIE_SECURE (above) only controls whether the session

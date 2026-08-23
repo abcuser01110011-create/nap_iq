@@ -2,10 +2,12 @@ import type { TokenStorage } from "./tokenStorage";
 import type {
   ApiErrorBody,
   Assignment,
+  CoverageCheckResult,
   CustomerIssue,
   LoginResponse,
   Payment,
   RefreshResponse,
+  RegisterInput,
   ReportIssueInput,
   ServiceRequest,
   Subscriber,
@@ -166,6 +168,21 @@ export class ApiClient {
       return data;
     },
 
+    /** Self-service registration (Phase 26). Same auto-login shape as
+     * login() — a successful register() leaves the caller signed in. */
+    register: async (input: RegisterInput): Promise<LoginResponse> => {
+      const data = await this.request<LoginResponse>("/api/v1/auth/register", {
+        method: "POST",
+        auth: false,
+        body: input,
+      });
+      await this.tokenStorage.setTokens({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      });
+      return data;
+    },
+
     /** Revokes both tokens server-side (one call per token, matching
      * app/routes/api_v1/auth.py's logout() docstring) and clears local
      * storage regardless of whether the network calls succeed — a
@@ -303,7 +320,21 @@ export class ApiClient {
     listServiceRequests: () =>
       this.request<{ service_requests: ServiceRequest[] }>("/api/v1/customer/service-requests"),
 
-    listPayments: () => this.request<{ payments: Payment[] }>("/api/v1/customer/payments"),
+listPayments: () => this.request<{ payments: Payment[] }>("/api/v1/customer/payments"),
+  };
+
+  // ---- public (pre-login) surface — Phase 26 -----------------------------
+
+  readonly public = {
+    checkCoverage: (latitude: number, longitude: number) =>
+      this.request<CoverageCheckResult>("/api/v1/customer/coverage-check", {
+        method: "POST",
+        auth: false,
+        body: { latitude, longitude },
+      }),
+
+    listPlans: () =>
+      this.request<{ plans: string[] }>("/api/v1/customer/plans", { auth: false }),
   };
 
   /** True once a token pair is stored locally. Doesn't verify the

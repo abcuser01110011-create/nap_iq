@@ -143,3 +143,21 @@ export interface Payment {
   reference_number: string | null;
   status: string;
 }
+
+export interface RegisterInput {
+  username: string;
+  password: string;
+  full_name: string;
+  email?: string;
+  phone_number?: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  plan_name?: string;
+}
+
+export interface CoverageCheckResult {
+  available: boolean;
+  nearest_nap_code?: string;
+  distance_km?: number;
+}
