@@ -168,6 +168,7 @@ def login():
 # credential-guessing target the same way), but still capped per-IP
 # — an uncapped register endpoint is a spam/fake-account vector.
 @limiter.limit(lambda: current_app.config["REGISTER_RATE_LIMIT_PER_IP"])
+
 def register():
     """Self-service customer registration (Phase 26). Creates a User
     (role='user'), a linked Subscriber in 'pending_review' status
@@ -302,71 +303,3 @@ def logout():
     db.session.add(RevokedToken(jti=jti))
     db.session.commit()
     return jsonify(message="Logged out."), 200
-
-@api_v1_auth_bp.route("/register", methods=["POST"])
-def register():
-    """Self-service registration for the Customer mobile app (Phase 26).
-    Creates a User (role='user') and a linked Subscriber in one step,
-    then logs the new account straight in — same token pair shape as
-    login(), so the mobile app's register() can reuse its post-login
-    flow unchanged."""
-    data = request.get_json(silent=True) or {}
-
-    username = str(data.get("username") or "").strip()
-    password = str(data.get("password") or "")
-    full_name = str(data.get("full_name") or "").strip()
-    email = (data.get("email") or "").strip() or None
-    phone_number = (data.get("phone_number") or "").strip() or None
-    address = (data.get("address") or "").strip() or None
-    plan_name = (data.get("plan_name") or "").strip() or None
-    latitude = data.get("latitude")
-    longitude = data.get("longitude")
-
-    if not username or not password or not full_name:
-        return jsonify(error="Username, password, and full name are required."), 400
-    if latitude is None or longitude is None:
-        return jsonify(error="Installation location is required."), 400
-    if len(password) < 8:
-        return jsonify(error="Password must be at least 8 characters."), 400
-
-    if User.query.filter_by(username=username).first() is not None:
-        return jsonify(error="That username is already taken."), 409
-    if email and User.query.filter_by(email=email).first() is not None:
-        return jsonify(error="That email is already registered."), 409
-
-    user = User(
-        username=username,
-        full_name=full_name,
-        role="user",
-        email=email,
-        phone_number=phone_number,
-        status="active",
-    )
-    user.set_password(password)
-    db.session.add(user)
-    db.session.flush()  # assigns user.id without committing yet
-
-    subscriber = Subscriber(
-        subscriber_code=f"SUB-{user.id:06d}",
-        full_name=full_name,
-        address=address,
-        latitude=latitude,
-        longitude=longitude,
-        contact_number=phone_number,
-        email=email,
-        plan_type=plan_name,
-        user_id=user.id,
-        status="active",
-    )
-    db.session.add(subscriber)
-    db.session.commit()
-
-    identity = str(user.id)
-    access_token = create_access_token(identity=identity)
-    refresh_token = create_refresh_token(identity=identity)
-
-    return jsonify(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=_user_payload(user),
-    ), 201
