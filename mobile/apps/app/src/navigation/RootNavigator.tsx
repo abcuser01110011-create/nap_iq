@@ -14,6 +14,7 @@ import { colors as sharedColors } from "../theme/shared";
 import { colors as customerColors } from "../theme/customer";
 import { colors as technicianColors } from "../theme/technician";
 import LoginScreen from "../screens/LoginScreen";
+import RegisterScreen from "../screens/RegisterScreen";
 
 // Customer screens
 import HomeScreen from "../screens/customer/HomeScreen";
@@ -28,6 +29,27 @@ import AssignmentsScreen from "../screens/technician/AssignmentsScreen";
 import HistoryScreen from "../screens/technician/HistoryScreen";
 import JobDetailScreen from "../screens/technician/JobDetailScreen";
 import TechnicianProfileScreen from "../screens/technician/ProfileScreen";
+
+/* ------------------------------- Signed-out (auth) ----------------------------- */
+
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+};
+
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+
+function AuthFlow() {
+  return (
+    <NavigationContainer>
+      <StatusBar style="light" />
+      <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+        <AuthStack.Screen name="Login" component={LoginScreen} />
+        <AuthStack.Screen name="Register" component={RegisterScreen} />
+      </AuthStack.Navigator>
+    </NavigationContainer>
+  );
+}
 
 /* ---------------------------------- Customer ---------------------------------- */
 
@@ -165,14 +187,7 @@ export default function RootNavigator() {
   }
 
   if (status !== "signedIn" || !role) {
-    // No navigator needed for a single screen — LoginScreen doesn't
-    // use any navigation prop.
-    return (
-      <>
-        <StatusBar style="light" />
-        <LoginScreen />
-      </>
-    );
+    return <AuthFlow />;
   }
 
   return role === "technician" ? <TechnicianApp /> : <CustomerApp />;

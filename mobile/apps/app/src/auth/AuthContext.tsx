@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
-import { ApiClient, ApiError, type ApiUser } from "@nap-iq/api-client";
+import { ApiClient, ApiError, type ApiUser, type RegisterInput } from "@nap-iq/api-client";
 import { secureTokenStorage } from "./secureTokenStorage";
 import { registerPushToken, unregisterPushToken } from "../notifications/registerPushToken";
 
@@ -29,9 +29,14 @@ interface AuthContextValue {
   role: AppRole | null;
   client: ApiClient;
   login: (username: string, password: string) => Promise<void>;
+  /** Phase 26 — self-service registration. On success behaves exactly
+   * like login(): stores the returned tokens/user and flips status to
+   * signedIn, landing a brand-new (pending_review) customer straight
+   * on their status screen instead of back at the login form. */
+  register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
-  /** Surfaced so the login screen can show a friendly message without
-   * every screen re-deriving it from ApiError itself. */
+  /** Surfaced so the login/register screens can show a friendly
+   * message without every screen re-deriving it from ApiError itself. */
   lastError: string | null;
 }
 
@@ -121,6 +126,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const register = async (input: RegisterInput) => {
+    setLastError(null);
+    try {
+      const result = await client.auth.register(input);
+      // Always "customer" here in practice (register only ever
+      // creates role='user' accounts), but derive it the same way
+      // login() does rather than hardcoding it.
+      const appRole = toAppRole(result.user.role);
+      if (!appRole) {
+        await client.auth.logout();
+        setLastError("Something went wrong creating your account. Please contact support.");
+        return;
+      }
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(result.user));
+      setUser(result.user);
+      setRole(appRole);
+      setStatus("signedIn");
+      registerPushToken(client, appRole);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // errors (validation) vs error (single message) — see
+        // register()'s two response shapes in api_v1/auth.py.
+        const firstFieldError = err.body.errors ? Object.values(err.body.errors)[0] : undefined;
+        setLastError(err.body.error ?? firstFieldError ?? "Couldn't create your account. Please try again.");
+      } else {
+        setLastError("Couldn't reach the server. Check your connection.");
+      }
+    }
+  };
+
   const logout = async () => {
     await unregisterPushToken(client, role); // best-effort — see registerPushToken.ts
     await client.auth.logout();
@@ -131,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ status, user, role, client, login, logout, lastError }}>
+    <AuthContext.Provider value={{ status, user, role, client, login, register, logout, lastError }}>
       {children}
     </AuthContext.Provider>
   );

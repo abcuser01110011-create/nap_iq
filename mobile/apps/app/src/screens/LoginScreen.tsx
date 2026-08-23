@@ -9,8 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
+import type { AuthStackParamList } from "../navigation/RootNavigator";
+
+type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 /**
  * One login screen for both technician and customer accounts — this
@@ -18,7 +22,7 @@ import { colors } from "../theme/shared";
  * valid account for being the "wrong" one. AuthContext derives the
  * role from the login response and RootNavigator routes accordingly.
  */
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }: Props) {
   const { login, lastError } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -79,6 +83,10 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>Sign in</Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.navigate("Register")}>
+          <Text style={styles.link}>New customer? Apply for service</Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -136,5 +144,13 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  linkWrap: {
+    marginTop: 18,
+    alignItems: "center",
+  },
+  link: {
+    color: colors.primary,
+    fontSize: 13,
   },
 });
