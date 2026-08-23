@@ -283,11 +283,3 @@ def check_coverage():
         available=nearest_km <= _COVERAGE_RADIUS_KM,
         distance_km=round(nearest_km, 2),
     ), 200
-
-
-@api_v1_customer_bp.route("/plans", methods=["GET"])
-def list_plans():
-    """Public (pre-login) list of available plan names, shown to a
-    new customer after a successful coverage check."""
-    plans = Plan.query.order_by(Plan.name).all()
-    return jsonify(plans=[p.name for p in plans]), 200
