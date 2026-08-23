@@ -761,6 +761,16 @@ class SubscriberForm(FlaskForm):
             ("active", "Active"),
             ("inactive", "Inactive"),
             ("disconnected", "Disconnected"),
+            # Phase 26: this enum value has existed on the Subscriber
+            # model / database since self-registration was added — it
+            # was missing here, so this dropdown had no matching
+            # <option> for a pending applicant's real status and
+            # silently fell back to rendering "Active" (the first
+            # choice) instead. Saving the form in that state would
+            # then write "active" straight over the subscriber's true
+            # pending_review status. See PHASE28_BUGFIX_NOTES (NAP
+            # dispatch investigation) for how this was found.
+            ("pending_review", "Pending Review"),
         ],
         default="active",
         validators=[DataRequired()],

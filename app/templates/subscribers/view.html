@@ -36,9 +36,9 @@
 
                     <dt class="col-sm-4 text-muted fw-normal">Status</dt>
                     <dd class="col-sm-8">
-                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger'} %}
+                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger', 'pending_review': 'text-bg-warning'} %}
                         <span class="badge {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
-                            {{ subscriber.status|capitalize }}
+                            {{ subscriber.status|replace('_', ' ')|capitalize }}
                         </span>
                     </dd>
 

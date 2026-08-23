@@ -31,6 +31,9 @@
                     <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
                     <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
                     <option value="disconnected" {% if status_filter == 'disconnected' %}selected{% endif %}>Disconnected</option>
+                    <!-- Phase 26: same enum-value gap as SubscriberForm.status (app/forms.py) —
+                         missing here meant filtering to pending applicants had no dedicated option. -->
+                    <option value="pending_review" {% if status_filter == 'pending_review' %}selected{% endif %}>Pending Review</option>
                 </select>
             </div>
             <div class="col-sm-2 col-md-2 d-flex gap-2">
@@ -74,9 +77,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger'} %}
+                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger', 'pending_review': 'text-bg-warning'} %}
                         <span class="badge {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
-                            {{ subscriber.status|capitalize }}
+                            {{ subscriber.status|replace('_', ' ')|capitalize }}
                         </span>
                     </td>
                     <td class="text-end">
