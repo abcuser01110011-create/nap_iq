@@ -79,6 +79,10 @@ export interface Assignment {
   assigned_at: string | null;
   completed_at: string | null;
   resolution_notes: string | null;
+  /** Absolute URL to the technician's required completion photo, or
+   * null until one's been uploaded. Set via
+   * ApiClient.technician.uploadAssignmentPhoto(). */
+  photo_url: string | null;
   issue: AssignmentIssue | null;
   subscriber: AssignmentSubscriber | null;
   nap: AssignmentNap | null;

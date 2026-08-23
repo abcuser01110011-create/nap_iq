@@ -399,6 +399,10 @@ class Assignment(db.Model):
     # the technician's own free-text notes on what was found/done,
     # kept per-assignment so reassignment history stays intact.
     resolution_notes = db.Column(db.Text, nullable=True)
+    # Filename (not full path/URL) of the technician's required
+    # completion photo — see database/schema.sql's comment on this
+    # column and api_v1/technician.py's upload_assignment_photo().
+    photo_filename = db.Column(db.String(255), nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(

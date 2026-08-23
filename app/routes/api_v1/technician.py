@@ -18,13 +18,17 @@ Routes:
     POST /api/v1/technician/assignments/<id>/accept   -> accept_assignment
     POST /api/v1/technician/assignments/<id>/start    -> start_assignment
     POST /api/v1/technician/assignments/<id>/notes    -> save_notes
+    POST /api/v1/technician/assignments/<id>/photo    -> upload_assignment_photo
     POST /api/v1/technician/assignments/<id>/complete -> complete_assignment
 """
 
+import os
+import uuid
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import current_user
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
@@ -34,6 +38,11 @@ from app.notifications_utils import notify_issue_status_change
 api_v1_technician_bp = Blueprint(
     "api_v1_technician", __name__, url_prefix="/api/v1/technician"
 )
+
+# Extensions accepted by upload_assignment_photo() below. Matches the
+# formats expo-image-picker's camera/library pickers can hand back on
+# both iOS (HEIC by default on newer devices) and Android.
+ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
 
 # Kept identical to (and in sync with) app/routes/technician.py's own
 # copies of these two tuples — see that module's comment for why.
@@ -82,6 +91,14 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None,
         "completed_at": assignment.completed_at.isoformat() if assignment.completed_at else None,
         "resolution_notes": assignment.resolution_notes,
+        # Absolute URL (not just a filename) so the mobile app can
+        # drop this straight into an <Image source={{ uri: ... }}>
+        # without needing to know the API's base URL separately.
+        "photo_url": (
+            f"{request.host_url.rstrip('/')}/static/uploads/assignment_photos/{assignment.photo_filename}"
+            if assignment.photo_filename
+            else None
+        ),
         "issue": {
             "id": issue.id,
             "issue_code": issue.issue_code,
@@ -232,6 +249,63 @@ def save_notes(assignment_id):
     return jsonify(assignment=_serialize_assignment(assignment)), 200
 
 
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/photo", methods=["POST"])
+@jwt_role_required("technician")
+def upload_assignment_photo(assignment_id):
+    """Uploads (or replaces) the required completion photo for an
+    assignment. Valid from the same statuses as save_notes() —
+    'accepted' or 'in_progress' — so a technician can attach it any
+    time while actively working the job, not only in the instant
+    before completing it. complete_assignment() below refuses to
+    transition to 'completed' until this has been set at least once.
+
+    Expects multipart/form-data with a single "photo" file field —
+    unlike every other route in this module, not a JSON body, since
+    this blueprint is already csrf-exempt as a whole (see this
+    module's docstring) so that isn't a concern here either.
+    """
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return jsonify(error="A photo can only be added to an assignment you've accepted or started."), 409
+
+    photo = request.files.get("photo")
+    if photo is None or photo.filename == "":
+        return jsonify(error="No photo file was included in the request."), 400
+
+    ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else ""
+    if ext not in ALLOWED_PHOTO_EXTENSIONS:
+        return jsonify(error="Unsupported photo format. Use JPG, PNG, HEIC, or WEBP."), 400
+
+    upload_folder = current_app.config["UPLOAD_FOLDER"]
+    os.makedirs(upload_folder, exist_ok=True)
+
+    # A random filename (rather than the original) avoids collisions
+    # and avoids trusting anything about the client-supplied name
+    # beyond its extension, which was already validated above.
+    filename = secure_filename(f"assignment-{assignment.id}-{uuid.uuid4().hex}.{ext}")
+    photo.save(os.path.join(upload_folder, filename))
+
+    # The old file (if this is a replacement, e.g. the tech retakes
+    # the photo) is only removed after the new one saves successfully
+    # and the DB commit succeeds — so a failed upload never leaves the
+    # assignment pointing at a photo that no longer exists on disk.
+    old_filename = assignment.photo_filename
+    assignment.photo_filename = filename
+    db.session.commit()
+
+    if old_filename:
+        old_path = os.path.join(upload_folder, old_filename)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    return jsonify(assignment=_serialize_assignment(assignment)), 200
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
 @jwt_role_required("technician")
 def complete_assignment(assignment_id):
@@ -250,6 +324,9 @@ def complete_assignment(assignment_id):
 
     if assignment.status != "in_progress":
         return jsonify(error="That assignment isn't in progress yet, so it can't be marked complete."), 409
+
+    if not assignment.photo_filename:
+        return jsonify(error="A completion photo is required before this assignment can be marked complete."), 400
 
     data = request.get_json(silent=True) or {}
     notes = str(data.get("resolution_notes") or assignment.resolution_notes or "").strip()

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -11,7 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import type { Assignment } from "@nap-iq/api-client";
+import * as ImagePicker from "expo-image-picker";
+import { ApiError, type Assignment } from "@nap-iq/api-client";
+import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
 import { colors } from "../../theme/technician";
@@ -29,12 +33,14 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 
 export default function JobDetailScreen({ route, navigation }: any) {
   const initial: Assignment = route.params.assignment;
+  const { client } = useAuth();
   const {
     getAssignment,
     acceptJob,
     startJob,
     saveNotes,
     completeJob,
+    applyAssignmentUpdate,
     pendingByAssignment,
     conflicts,
     dismissConflict,
@@ -49,6 +55,17 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const assignment = getAssignment(initial.id) ?? initial;
   const [notes, setNotes] = useState(assignment.resolution_notes ?? "");
   const [error, setError] = useState<string | null>(null);
+
+  // The completion photo is uploaded immediately on pick (it isn't
+  // queued through the offline pending-actions system like
+  // accept/start/notes/complete are — see applyAssignmentUpdate's
+  // comment in OfflineContext for why). photoUri holds a local
+  // preview the moment something's picked, before the network call
+  // resolves; assignment.photo_url (from the server, via
+  // applyAssignmentUpdate) is the source of truth once it lands.
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
@@ -80,7 +97,65 @@ export default function JobDetailScreen({ route, navigation }: any) {
     saveNotes(assignment.id, notes.trim());
   };
 
+  const uploadPhoto = async (uri: string, mimeType: string | undefined) => {
+    if (!isOnline) {
+      setPhotoError("You're offline — connect to the internet to upload a photo.");
+      return;
+    }
+    setPhotoError(null);
+    setPhotoUri(uri);
+    setPhotoUploading(true);
+    try {
+      const extFromUri = uri.split(".").pop()?.toLowerCase() || "jpg";
+      const type = mimeType ?? `image/${extFromUri === "jpg" ? "jpeg" : extFromUri}`;
+      const name = `completion-${assignment.id}.${extFromUri}`;
+      const result = await client.technician.uploadAssignmentPhoto(assignment.id, { uri, name, type });
+      applyAssignmentUpdate(result.assignment);
+    } catch (err) {
+      setPhotoUri(null);
+      setPhotoError(err instanceof ApiError ? err.body.error ?? "Upload failed. Try again." : "Upload failed. Try again.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Camera access needed",
+        "Enable camera access for NAP-IQ in your device settings to take a completion photo."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
+    if (result.canceled || !result.assets?.[0]) return;
+    uploadPhoto(result.assets[0].uri, result.assets[0].mimeType);
+  };
+
+  const handlePickFromLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Photo library access needed",
+        "Enable photo library access for NAP-IQ in your device settings to attach a completion photo."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    uploadPhoto(result.assets[0].uri, result.assets[0].mimeType);
+  };
+
   const handleComplete = () => {
+    if (!assignment.photo_url) {
+      setError("Add a completion photo before marking this job complete.");
+      return;
+    }
     if (!notes.trim() && !assignment.resolution_notes) {
       setError("Resolution notes are required to complete a job.");
       return;
@@ -119,6 +194,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const canEditNotes = assignment.status === "accepted" || assignment.status === "in_progress";
   const canComplete = assignment.status === "in_progress";
   const isClosed = assignment.status === "completed" || assignment.status === "cancelled";
+  const showPhotoCard = canEditNotes || isClosed || Boolean(assignment.photo_url);
 
   return (
     <KeyboardAvoidingView
@@ -217,6 +293,50 @@ export default function JobDetailScreen({ route, navigation }: any) {
           </View>
         )}
 
+        {showPhotoCard && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Completion photo</Text>
+            {photoUri || assignment.photo_url ? (
+              <Image
+                source={{ uri: photoUri ?? assignment.photo_url! }}
+                style={styles.photoPreview}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.notesText}>
+                {canEditNotes
+                  ? "No photo added yet — required before completing this job."
+                  : "No photo was attached."}
+              </Text>
+            )}
+            {photoUploading && (
+              <View style={styles.photoUploadingRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.photoUploadingText}>Uploading…</Text>
+              </View>
+            )}
+            {photoError && <Text style={styles.error}>{photoError}</Text>}
+            {canEditNotes && (
+              <View style={styles.photoButtonRow}>
+                <TouchableOpacity
+                  style={styles.secondaryButtonSmall}
+                  onPress={handleTakePhoto}
+                  disabled={photoUploading}
+                >
+                  <Text style={styles.secondaryButtonText}>Take photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryButtonSmall}
+                  onPress={handlePickFromLibrary}
+                  disabled={photoUploading}
+                >
+                  <Text style={styles.secondaryButtonText}>Choose from library</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={styles.actions}>
           {canAccept && (
             <TouchableOpacity style={styles.primaryButton} onPress={handleAccept}>
@@ -305,6 +425,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   secondaryButtonText: { color: colors.primary, fontSize: 14, fontWeight: "700" },
+  photoPreview: {
+    width: "100%",
+    height: 180,
+    borderRadius: 10,
+    backgroundColor: colors.bg,
+    marginBottom: 10,
+  },
+  photoButtonRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  secondaryButtonSmall: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  photoUploadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  photoUploadingText: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
   actions: { marginTop: 8, gap: 12 },
   primaryButton: {
     backgroundColor: colors.primary,

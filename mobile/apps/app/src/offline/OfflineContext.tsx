@@ -36,6 +36,14 @@ interface OfflineContextValue {
   syncNow: () => Promise<void>;
   dismissConflict: (assignmentId: number) => void;
   getAssignment: (id: number) => Assignment | undefined;
+  /** Merges a freshly-returned Assignment (e.g. from
+   * client.technician.uploadAssignmentPhoto()) into the cache and
+   * screen state, the same way a synced queued action's server
+   * response does. Photo uploads aren't queued through
+   * pendingActionsRepo like accept/start/notes/complete are — a
+   * binary file doesn't fit that JSON-payload queue — so callers
+   * that upload directly need this to reflect the result. */
+  applyAssignmentUpdate: (updated: Assignment) => void;
   acceptJob: (id: number) => void;
   startJob: (id: number) => void;
   saveNotes: (id: number, notes: string) => void;
@@ -244,6 +252,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       syncNow,
       dismissConflict,
       getAssignment,
+      applyAssignmentUpdate: applyServerResult,
       acceptJob: (id) => enqueue(id, "accept", null),
       startJob: (id) => enqueue(id, "start", null),
       saveNotes: (id, notes) => enqueue(id, "notes", { resolution_notes: notes }),
@@ -263,6 +272,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       dismissConflict,
       getAssignment,
       enqueue,
+      applyServerResult,
     ]
   );
 

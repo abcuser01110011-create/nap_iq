@@ -111,6 +111,24 @@ class Config:
     # correctly — trusting it blindly with no proxy in front would let
     # a client fake "already HTTPS" by setting the header itself.
     TRUST_X_FORWARDED_PROTO = _get_bool("TRUST_X_FORWARDED_PROTO", "False")
+    # ---- Technician assignment completion photos (mobile app) ----
+    # Where POST /api/v1/technician/assignments/<id>/photo saves the
+    # required completion photo. Lives under app/static so it's
+    # servable directly by Flask's static handler without a separate
+    # route — see _serialize_assignment()'s photo_url in
+    # api_v1/technician.py for how the mobile app is given a URL to it.
+    UPLOAD_FOLDER = os.environ.get(
+        "ASSIGNMENT_PHOTO_UPLOAD_FOLDER",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads", "assignment_photos"),
+    )
+    # Flask rejects any request body larger than this with a 413
+    # before it even reaches the route — a blanket safety net against
+    # an oversized upload, on top of the mobile app already
+    # compressing photos before sending them. 8 MB comfortably covers
+    # a compressed phone photo with headroom.
+    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(8 * 1024 * 1024)))
+
+    # ---- MySQL connection settings ----
 
     # ---- MySQL connection settings ----
     MYSQL_HOST = os.environ.get("MYSQL_HOST", "localhost")

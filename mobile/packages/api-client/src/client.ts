@@ -234,6 +234,46 @@ export class ApiClient {
      * verify this against the backend before relying on it in
      * production. A failed call is always non-fatal to the caller —
      * see `registerPushToken` in the technician app. */
+    /** Uploads (or replaces) the required completion photo for an
+     * assignment. Sent as multipart/form-data directly via fetch
+     * rather than through the shared request() helper above, since a
+     * photo isn't JSON — auth is attached the same way request()
+     * does it, but unlike request(), a 401 here is NOT silently
+     * retried after a refresh; the caller (JobDetailScreen) is
+     * expected to just let the person try the upload again. */
+    uploadAssignmentPhoto: async (
+      assignmentId: number,
+      photo: { uri: string; name: string; type: string }
+    ): Promise<{ assignment: Assignment }> => {
+      const tokens = await this.tokenStorage.getTokens();
+      const form = new FormData();
+      // React Native's FormData accepts this { uri, name, type } shape
+      // directly — it's exactly what expo-image-picker's result gives
+      // the caller, so JobDetailScreen can pass it straight through.
+      form.append("photo", { uri: photo.uri, name: photo.name, type: photo.type } as unknown as Blob);
+
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}/api/v1/technician/assignments/${assignmentId}/photo`, {
+          method: "POST",
+          headers: tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : undefined,
+          // No Content-Type header here on purpose — fetch/React
+          // Native sets the multipart boundary itself from the
+          // FormData body, and overriding it manually breaks the
+          // upload.
+          body: form,
+        });
+      } catch {
+        throw new ApiError(0, { error: "Couldn't reach the server. Check your connection." });
+      }
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!response.ok) {
+        throw new ApiError(response.status, data as ApiErrorBody);
+      }
+      return data as { assignment: Assignment };
+    },
     registerDeviceToken: (token: string, platform: "ios" | "android") =>
       this.request<{ ok: true }>("/api/v1/technician/device-token", {
         method: "POST",
