@@ -1,0 +1,133 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Recommend Technician · Installation #{{ service_request.id }}{% endblock %}
+{% block page_title %}Recommended Technicians{% endblock %}
+{% block page_subtitle %}
+<p class="text-muted small mb-0">
+    Installation #{{ service_request.id }} &middot; {{ service_request.request_type|replace('_', ' ')|capitalize }}
+    {% if service_request.subscriber %}
+        &middot; {{ service_request.subscriber.subscriber_code }} — {{ service_request.subscriber.full_name }}
+    {% endif %}
+    {% if current_assignment %}
+        &middot; currently assigned to {{ current_assignment.technician.full_name if current_assignment.technician else 'Unknown technician' }}
+    {% endif %}
+</p>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('service_requests.edit_request', request_id=service_request.id) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Request
+    </a>
+</div>
+
+<div class="alert alert-secondary small mb-4">
+    <i class="bi bi-info-circle me-1"></i>
+    Ranked by the same transparent, rule-based scoring formula used for repair
+    dispatch — plain arithmetic over fixed weights, not a trained or predictive
+    model — weighing availability, current workload, distance from the
+    installation site, and (once a technician has enough completed jobs on
+    record) past performance. Every number below feeds directly into the
+    score shown; nothing is hidden. Picking a technician here still requires
+    your confirmation — no assignment is created until you click
+    "Assign Technician".
+</div>
+
+{% if not recommendations %}
+<div class="card shadow-sm">
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-person-x display-6 d-block mb-2"></i>
+        No technicians are available to recommend right now (everyone on
+        the roster is offline). You can still dispatch manually from the
+        <a href="{{ url_for('dispatch.index') }}">dispatch board</a>
+        once someone comes online.
+    </div>
+</div>
+{% else %}
+<div class="row g-3">
+    {% for row in recommendations %}
+    {% set tech = row.technician %}
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100 {{ 'border-primary' if loop.first }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h6 class="mb-0">
+                            {{ tech.full_name }}
+                            {% if loop.first %}
+                                <span class="badge text-bg-primary ms-1">Top Pick</span>
+                            {% endif %}
+                        </h6>
+                        <span class="badge {{ 'text-bg-success' if row.technician_status == 'available' else 'text-bg-warning' }} text-capitalize">
+                            {{ row.technician_status }}
+                        </span>
+                    </div>
+                    <div class="text-end">
+                        <div class="fs-4 fw-bold">{{ row.total_score }}</div>
+                        <div class="text-muted small">/ 100</div>
+                    </div>
+                </div>
+
+                <p class="small text-muted mb-3">{{ row.reason }}</p>
+
+                <dl class="row small mb-3">
+                    <dt class="col-6">Current workload</dt>
+                    <dd class="col-6">
+                        {{ row.open_assignment_count }} open job{{ '' if row.open_assignment_count == 1 else 's' }}
+                        <span class="text-muted">({{ row.workload_score }}/100)</span>
+                    </dd>
+
+                    <dt class="col-6">Distance</dt>
+                    <dd class="col-6">
+                        {% if row.distance_known %}
+                            {{ row.distance_km }} km
+                        {% else %}
+                            <span class="text-muted">Unknown</span>
+                        {% endif %}
+                        <span class="text-muted">({{ row.distance_score }}/100)</span>
+                    </dd>
+
+                    <dt class="col-6">Availability</dt>
+                    <dd class="col-6">
+                        <span class="text-capitalize">{{ row.technician_status }}</span>
+                        <span class="text-muted">({{ row.availability_score }}/100)</span>
+                    </dd>
+
+                    <dt class="col-6">Relevant performance</dt>
+                    <dd class="col-6">
+                        {% if row.performance_known %}
+                            {{ row.avg_resolution_hours }}h avg &middot; {{ row.completed_count }} resolved
+                        {% else %}
+                            <span class="text-muted">Not enough history ({{ row.completed_count }}/3 completed)</span>
+                        {% endif %}
+                        <span class="text-muted">({{ row.performance_score }}/100)</span>
+                    </dd>
+
+                    <dt class="col-6">Total resolved</dt>
+                    <dd class="col-6">{{ row.resolved_issues_count }}</dd>
+                </dl>
+
+                <form method="post"
+                      action="{{ url_for('dispatch.reassign_request' if current_assignment else 'dispatch.assign_request', request_id=service_request.id) }}"
+                      onsubmit="return confirm('Dispatch this technician to the installation?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="technician_id" value="{{ tech.id }}">
+                    <input type="hidden" name="recommendation_score" value="{{ row.total_score }}">
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        <i class="bi bi-check2-circle me-1"></i>Assign Technician
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<p class="text-muted small mt-3">
+    <i class="bi bi-arrow-repeat me-1"></i>
+    Not seeing the right fit? Every candidate is listed above — scroll
+    through and assign whichever one you prefer. You can also always
+    dispatch manually from the
+    <a href="{{ url_for('dispatch.index') }}">dispatch board</a>.
+</p>
+{% endif %}
+{% endblock %}

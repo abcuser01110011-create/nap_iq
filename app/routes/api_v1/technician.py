@@ -1,5 +1,5 @@
 """
-Mobile API — Technician Assignments (Phase 25)
+Mobile API — Technician Assignments (Phase 25; extended Phase 28)
 --------------------------------------------------
 The JSON counterpart to app/routes/technician.py, for the Technician
 mobile app. Every status-transition rule, ownership check, and side
@@ -10,20 +10,51 @@ redirect) and *how* input arrives (a JSON body, not a WTForms
 CSRF-protected `<form>` post — see app/__init__.py's csrf.exempt() for
 why that's safe here).
 
+Phase 28 (installation dispatch): app/routes/dispatch.py's
+assign_request()/reassign_request() can now route an Assignment at a
+`service_request` (installation) instead of a `technical_issue`
+(repair) — see Assignment's docstring in app/models.py. Every route
+below has to work for either source, since the mobile app's
+accept -> start -> complete flow is the same one screen either way
+(the roadmap's "reusing the same accept -> in-progress -> complete
+flow already built for repairs" — no separate install-only endpoints).
+Two things differ by source rather than being unified:
+  - `service_requests.status` has no 'in_progress' value (see that
+    enum in database/schema.sql) the way `technical_issues.status`
+    does, so start_assignment() only mirrors status onto the linked
+    record for a repair; an install's ServiceRequest simply stays
+    'scheduled' while its Assignment moves through accepted ->
+    in_progress, same as it already was the moment dispatch happened.
+  - An install additionally requires a customer signature (not just
+    the completion photo every job requires) before it can be marked
+    complete — see upload_assignment_signature() and
+    complete_assignment() below.
+Phase 29 (auto-activation): `complete_assignment()` below now also
+flips the linked Subscriber to 'active' (with today's `installed_at`)
+and the ServiceRequest to 'completed' the moment an install
+Assignment's own status reaches 'completed' — the hook this module's
+Phase 28 docstring above flagged as deliberately out of scope at the
+time. It lives here rather than in a separate handler because
+`Assignment.status == 'completed'` (set two lines above the hook) is
+itself the trigger the roadmap names, and this is the one place that
+transition happens for an install job.
+
 Routes:
-    GET  /api/v1/technician/assignments              -> list_assignments
-                                                          (open workload)
-    GET  /api/v1/technician/assignments/history       -> assignment_history
-                                                          (completed/cancelled)
-    POST /api/v1/technician/assignments/<id>/accept   -> accept_assignment
-    POST /api/v1/technician/assignments/<id>/start    -> start_assignment
-    POST /api/v1/technician/assignments/<id>/notes    -> save_notes
-    POST /api/v1/technician/assignments/<id>/photo    -> upload_assignment_photo
-    POST /api/v1/technician/assignments/<id>/complete -> complete_assignment
+    GET  /api/v1/technician/assignments                 -> list_assignments
+                                                             (open workload)
+    GET  /api/v1/technician/assignments/history          -> assignment_history
+                                                             (completed/cancelled)
+    POST /api/v1/technician/assignments/<id>/accept      -> accept_assignment
+    POST /api/v1/technician/assignments/<id>/start       -> start_assignment
+    POST /api/v1/technician/assignments/<id>/notes       -> save_notes
+    POST /api/v1/technician/assignments/<id>/photo       -> upload_assignment_photo
+    POST /api/v1/technician/assignments/<id>/signature   -> upload_assignment_signature
+                                                             (Phase 28, install-only)
+    POST /api/v1/technician/assignments/<id>/complete    -> complete_assignment
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import cloudinary
 import cloudinary.uploader
@@ -33,15 +64,19 @@ from flask_jwt_extended import current_user
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
 from app.models import Assignment, Technician
-from app.notifications_utils import notify_issue_status_change
+from app.notifications_utils import notify, notify_issue_status_change
 
 api_v1_technician_bp = Blueprint(
     "api_v1_technician", __name__, url_prefix="/api/v1/technician"
 )
 
-# Extensions accepted by upload_assignment_photo() below. Matches the
-# formats expo-image-picker's camera/library pickers can hand back on
-# both iOS (HEIC by default on newer devices) and Android.
+# Extensions accepted by upload_assignment_photo() and
+# upload_assignment_signature() below. Matches the formats
+# expo-image-picker's camera/library pickers can hand back on both
+# iOS (HEIC by default on newer devices) and Android — the signature
+# is captured through the same camera/library picker as the
+# completion photo (see upload_assignment_signature()'s docstring for
+# why), so it accepts the same set.
 ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
 
 # Kept identical to (and in sync with) app/routes/technician.py's own
@@ -79,15 +114,35 @@ def _get_own_assignment_or_404(profile, assignment_id):
 
 def _serialize_assignment(assignment: Assignment) -> dict:
     """The fields the mobile app needs per assignment — including
-    enough of the linked issue/subscriber/NAP to show a job card and
-    drop a map pin without a second round-trip per assignment."""
+    enough of the linked issue-or-request/subscriber/NAP to show a
+    job card and drop a map pin without a second round-trip per
+    assignment.
+
+    Phase 28: exactly one of `assignment.technical_issue` /
+    `assignment.service_request` is ever set (see Assignment's
+    docstring in app/models.py) — `job_type` tells the mobile app
+    which, so it doesn't have to infer it from which of `issue` /
+    `service_request` is non-null. `subscriber` is populated from
+    whichever source is set (a service_request's own `.subscriber`
+    relationship — the same Subscriber row Phase 26 created at
+    registration — for an install; the issue's `.subscriber` for a
+    repair, unchanged) so the mobile app's existing subscriber-card UI
+    needs no branching at all — only the job-detail-specific fields
+    (`issue` vs `service_request`) differ by type.
+    """
     issue = assignment.technical_issue
-    subscriber = issue.subscriber if issue else None
-    nap = issue.nap if issue else None
+    service_request = assignment.service_request
+    subscriber = issue.subscriber if issue else (service_request.subscriber if service_request else None)
+    nap = issue.nap if issue else (service_request.requested_nap if service_request else None)
 
     return {
         "id": assignment.id,
         "status": assignment.status,
+        # Phase 28: "repair" for a technical_issue-sourced row,
+        # "installation" for a service_request-sourced one — lets the
+        # mobile app group/label jobs without inspecting which of
+        # `issue`/`service_request` is non-null itself.
+        "job_type": "repair" if issue is not None else "installation",
         "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None,
         "completed_at": assignment.completed_at.isoformat() if assignment.completed_at else None,
         "resolution_notes": assignment.resolution_notes,
@@ -96,6 +151,10 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         # this is just a passthrough — kept as its own field here
         # rather than renaming the column, to avoid an extra migration.
         "photo_url": assignment.photo_filename,
+        # Phase 28: same passthrough pattern as photo_url above — only
+        # ever non-null for an installation (see
+        # upload_assignment_signature()'s docstring below).
+        "signature_url": assignment.signature_filename,
         "issue": {
             "id": issue.id,
             "issue_code": issue.issue_code,
@@ -108,6 +167,24 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "longitude": float(issue.longitude) if issue.longitude is not None else None,
         }
         if issue
+        else None,
+        # Phase 28: the installation counterpart to `issue` above.
+        # ServiceRequest has no `address` column of its own (Phase 22
+        # only added latitude/longitude — see that column's comment
+        # in app/models.py), so unlike `issue` there's no separate
+        # address field here; the mobile app falls back to
+        # `subscriber.address` for installs, the same way it already
+        # falls back to `issue.address` when a repair's own subscriber
+        # has none.
+        "service_request": {
+            "id": service_request.id,
+            "request_type": service_request.request_type,
+            "status": service_request.status,
+            "notes": service_request.notes,
+            "latitude": float(service_request.latitude) if service_request.latitude is not None else None,
+            "longitude": float(service_request.longitude) if service_request.longitude is not None else None,
+        }
+        if service_request
         else None,
         "subscriber": {
             "id": subscriber.id,
@@ -195,9 +272,21 @@ def accept_assignment(assignment_id):
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
 @jwt_role_required("technician")
 def start_assignment(assignment_id):
-    """accepted -> in_progress. Mirrors the status onto the linked
-    issue and marks the technician 'busy', exactly as technician.py's
-    start_assignment() does."""
+    """accepted -> in_progress. Marks the technician 'busy' either
+    way; mirrors the status onto the linked issue only for a repair,
+    exactly as technician.py's start_assignment() does.
+
+    Phase 28: an installation's linked service_request has no
+    'in_progress' value in its own status enum (see that enum in
+    database/schema.sql) — it's already 'scheduled' from the moment
+    dispatch.py's assign_request() ran, and stays 'scheduled' right
+    through the technician accepting and starting work, only moving
+    again once Phase 29's completion hook lands. So for an
+    installation this only flips the Assignment's own status (already
+    done below, unconditionally) and the technician's busy state —
+    there's no linked-record status to mirror and nothing new to
+    notify the customer about, unlike the repair path.
+    """
     profile = _get_own_profile_or_404()
     if profile is None:
         return jsonify(error="No technician profile is linked to this account yet."), 404
@@ -210,9 +299,10 @@ def start_assignment(assignment_id):
         return jsonify(error="That assignment needs to be accepted before you can start work on it."), 409
 
     assignment.status = "in_progress"
-    assignment.technical_issue.status = "in_progress"
+    if assignment.technical_issue is not None:
+        assignment.technical_issue.status = "in_progress"
+        notify_issue_status_change(assignment.technical_issue)
     profile.status = "busy"
-    notify_issue_status_change(assignment.technical_issue)
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
@@ -318,14 +408,98 @@ def upload_assignment_photo(assignment_id):
             pass
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
+
+
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/signature", methods=["POST"])
+@jwt_role_required("technician")
+def upload_assignment_signature(assignment_id):
+    """Phase 28: uploads (or replaces) the customer's sign-off for an
+    *installation* assignment — the install-only counterpart to
+    upload_assignment_photo() above, required by complete_assignment()
+    below the same way that route already requires a photo. A repair
+    (technical_issue-sourced) assignment has no signature step at all
+    (see Assignment.signature_filename's comment in app/models.py), so
+    this rejects with 409 rather than silently accepting one.
+
+    Captured through the same camera/library picker as the completion
+    photo — reusing expo-image-picker rather than adding a dedicated
+    signature-canvas library, matching this codebase's own "same
+    pattern, new column" approach to this phase (see the roadmap's
+    Phase 28 section). In practice this is a photo of a signed
+    printout/tablet, not a drawn signature captured live in-app; a
+    proper signature-pad widget is a reasonable future enhancement,
+    but isn't required by anything currently in scope for this phase.
+
+    Same statuses valid as upload_assignment_photo() — 'accepted' or
+    'in_progress' — and stored on Cloudinary for the same
+    read-only-filesystem reason described on that route.
+    """
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.service_request_id is None:
+        return jsonify(error="A signature only applies to an installation assignment."), 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return jsonify(error="A signature can only be added to an assignment you've accepted or started."), 409
+
+    signature = request.files.get("signature")
+    if signature is None or signature.filename == "":
+        return jsonify(error="No signature file was included in the request."), 400
+
+    ext = signature.filename.rsplit(".", 1)[-1].lower() if "." in signature.filename else ""
+    if ext not in ALLOWED_PHOTO_EXTENSIONS:
+        return jsonify(error="Unsupported image format. Use JPG, PNG, HEIC, or WEBP."), 400
+
+    public_id = f"assignment-signatures/assignment-{assignment.id}-{uuid.uuid4().hex}"
+
+    try:
+        upload_result = cloudinary.uploader.upload(signature, public_id=public_id, overwrite=True)
+    except Exception:
+        return jsonify(error="Signature upload failed. Please try again."), 502
+
+    # Same "only clean up the old asset after the new one is safely
+    # saved" ordering as upload_assignment_photo() above.
+    old_signature_url = assignment.signature_filename
+    assignment.signature_filename = upload_result["secure_url"]
+    db.session.commit()
+
+    if old_signature_url:
+        try:
+            old_public_id = old_signature_url.split("/upload/")[1].rsplit(".", 1)[0]
+            old_public_id = "/".join(old_public_id.split("/")[1:])
+            cloudinary.uploader.destroy(old_public_id)
+        except Exception:
+            pass
+
+    return jsonify(assignment=_serialize_assignment(assignment)), 200
+
+
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
 @jwt_role_required("technician")
 def complete_assignment(assignment_id):
-    """in_progress -> completed (issue -> resolved). Requires
-    resolution notes, exactly as technician.py's complete_assignment()
-    does — accepts a fresh `resolution_notes` value in the body, or
-    falls back to whatever was already saved via save_notes() above if
-    the body omits it."""
+    """in_progress -> completed (a repair's issue -> resolved).
+    Requires resolution notes, exactly as technician.py's
+    complete_assignment() does — accepts a fresh `resolution_notes`
+    value in the body, or falls back to whatever was already saved via
+    save_notes() above if the body omits it.
+
+    Phase 28: an installation additionally requires a customer
+    signature (not just the completion photo every job requires)
+    before it can be marked complete — see
+    upload_assignment_signature()'s docstring.
+
+    Phase 29: once those checks pass and the Assignment itself moves
+    to 'completed' below, an installation additionally flips
+    `service_request.status` to 'completed' and `subscriber.status`
+    to 'active' (with `installed_at` set to today) — see the "Phase
+    29" comment further down this function.
+    """
     profile = _get_own_profile_or_404()
     if profile is None:
         return jsonify(error="No technician profile is linked to this account yet."), 404
@@ -340,6 +514,10 @@ def complete_assignment(assignment_id):
     if not assignment.photo_filename:
         return jsonify(error="A completion photo is required before this assignment can be marked complete."), 400
 
+    is_installation = assignment.service_request_id is not None
+    if is_installation and not assignment.signature_filename:
+        return jsonify(error="A customer signature is required before this installation can be marked complete."), 400
+
     data = request.get_json(silent=True) or {}
     notes = str(data.get("resolution_notes") or assignment.resolution_notes or "").strip()
     if not notes:
@@ -348,8 +526,38 @@ def complete_assignment(assignment_id):
     assignment.resolution_notes = notes
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
-    assignment.technical_issue.status = "resolved"
-    profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
+
+    if assignment.technical_issue is not None:
+        assignment.technical_issue.status = "resolved"
+        # Named specifically for repairs (see this column's comment in
+        # app/models.py) — an installation's completion isn't a
+        # "resolved issue", so it isn't counted here. Phase 29's
+        # auto-activation is the right place for any install-specific
+        # completion metric, if one's ever wanted.
+        profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
+        notify_issue_status_change(assignment.technical_issue)
+
+    # Phase 29 (auto-activation): the install counterpart to the
+    # repair branch above. Closes the Register -> review -> dispatch
+    # -> activation loop the roadmap describes — the moment a
+    # technician marks an install Assignment complete, the applicant's
+    # account goes live with no separate admin action required.
+    if assignment.service_request is not None:
+        service_request = assignment.service_request
+        subscriber = service_request.subscriber
+        service_request.status = "completed"
+        if subscriber is not None:
+            subscriber.status = "active"
+            subscriber.installed_at = date.today()
+            notify(
+                "service_request",
+                "You're connected!",
+                f"Your installation is complete — {subscriber.subscriber_code} is now active. "
+                "Welcome to NAP-IQ!",
+                customer_user_id=subscriber.user_id,
+                entity_type="service_request",
+                entity_id=service_request.id,
+            )
 
     still_has_open_work = (
         Assignment.query.filter(
@@ -362,7 +570,6 @@ def complete_assignment(assignment_id):
     if not still_has_open_work:
         profile.status = "available"
 
-    notify_issue_status_change(assignment.technical_issue)
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200

@@ -45,6 +45,14 @@ read-only GET that never writes to the database; `assign_nap()` is the
 only route that actually sets `requested_nap_id`, and only in
 response to a real POST with a CSRF token.
 
+Phase 27 (KYC review queue): `list_requests()` below now defaults to
+showing only `pending` requests on a fresh visit (no query string at
+all) — see that function's own docstring for exactly what counts as
+"fresh" vs. an administrator's explicit "All Requests" choice. The
+KYC document itself (`ServiceRequest.id_document_filename`) is
+uploaded by the customer mobile API (app/routes/api_v1/customer.py)
+and simply displayed here, read-only, on the edit form once set.
+
 Routes:
     GET  /service-requests/                    -> list_requests    (search + type/status filter)
     GET  /service-requests/add                 -> add_request       (show add form)
@@ -120,10 +128,28 @@ def _notify_status_change(service_request):
 def list_requests():
     """Displays all service requests, with optional search (by
     subscriber name/code or notes) and request-type/status filtering
-    via query string parameters (?q=...&type=...&status=...)."""
+    via query string parameters (?q=...&type=...&status=...).
+
+    Phase 27 (KYC review queue): a fresh visit to this page — no query
+    string at all — defaults `status_filter` to 'pending' instead of
+    "All Statuses", so a new self-registration doesn't get lost among
+    already-settled disconnection/relocation/upgrade rows. This is
+    distinct from an administrator explicitly choosing "All Statuses"
+    from the dropdown (?status= with an empty value), which still
+    shows every request regardless of status exactly as before — see
+    service_requests/list.html's "Pending Applications" / "All
+    Requests" quick links, which submit that explicit empty value
+    rather than omitting the parameter.
+    """
     search_term = request.args.get("q", "").strip()
     type_filter = request.args.get("type", "").strip()
-    status_filter = request.args.get("status", "").strip()
+    raw_status_filter = request.args.get("status")
+    # Only an explicit ?status= (even empty, from the "All Requests"
+    # link) counts as the administrator having chosen a value —
+    # omitting the parameter entirely (a fresh visit to this page) is
+    # what triggers the pending-queue default below.
+    default_pending_view = raw_status_filter is None
+    status_filter = (raw_status_filter if raw_status_filter is not None else "pending").strip()
 
     query = ServiceRequest.query
 
@@ -151,6 +177,7 @@ def list_requests():
         search_term=search_term,
         type_filter=type_filter,
         status_filter=status_filter,
+        default_pending_view=default_pending_view,
     )
 
 
@@ -192,7 +219,7 @@ def edit_request(request_id):
         form.requested_nap_id.data = service_request.requested_nap_id or 0
 
     if form.validate_on_submit():
-        status_changed = form.status.data != service_request.status
+        old_status = service_request.status
 
         service_request.request_type = form.request_type.data
         service_request.subscriber_id = form.subscriber_id.data or None
@@ -202,6 +229,18 @@ def edit_request(request_id):
         service_request.longitude = form.longitude.data
         service_request.notes = (form.notes.data or "").strip() or None
 
+        # Phase 28: same auto-advance rule as assign_nap() below — a
+        # request that's 'approved' and has a NAP attached is ready
+        # for dispatch, regardless of whether the NAP was attached
+        # here (via this form's dropdown) or through the dedicated
+        # "Recommend NAP" -> assign_nap() flow. Without this, a NAP
+        # picked from this dropdown never reaches app/routes/
+        # dispatch.py's DISPATCHABLE_REQUEST_STATUSES and the request
+        # silently never shows up on the dispatch board.
+        if service_request.status == "approved" and service_request.requested_nap_id:
+            service_request.status = "scheduled"
+
+        status_changed = service_request.status != old_status
         if status_changed:
             _notify_status_change(service_request)
 
@@ -294,11 +333,13 @@ def assign_nap(request_id):
     (`service_requests/recommend_nap.html`), one per candidate, same
     shape as Phase 21's dispatch `assign()`/`reassign()` forms.
 
-    Deliberately does not force any status transition — assigning a
-    NAP is orthogonal to a request's approval workflow (a request can
-    already carry a `requested_nap_id` picked manually via the Edit
-    form's dropdown at any status, unchanged since Phase 15/16), so
-    this route only ever changes the one field it's named for.
+    Phase 28 update: does move status 'approved' -> 'scheduled' when a
+    NAP is assigned — that transition is what makes the request show
+    up on the dispatch board (see app/routes/dispatch.py). The Edit
+    form's manual NAP dropdown (Phase 15/16) still does NOT do this —
+    only this dedicated route does, since it's the one confirming an
+    admin has deliberately picked a NAP for dispatch, not just editing
+    a field.
     """
     service_request = ServiceRequest.query.get_or_404(request_id)
     nap_id = request.form.get("nap_id", type=int)
@@ -325,6 +366,17 @@ def assign_nap(request_id):
         return redirect(request.referrer or url_for("service_requests.list_requests"))
 
     service_request.requested_nap_id = nap.id
+
+    # Phase 28: assigning a NAP to an already-approved request is what
+    # actually makes it dispatchable — see app/routes/dispatch.py's
+    # DISPATCHABLE_REQUEST_STATUSES. Only auto-advance from 'approved';
+    # a still-'pending' request picking up a NAP early (e.g. via the
+    # Edit form) shouldn't silently skip the approval step, and a
+    # request that's already 'scheduled' or beyond just keeps its NAP
+    # updated without moving status backward/forward again.
+    if service_request.status == "approved":
+        service_request.status = "scheduled"
+
     db.session.commit()
 
     flash(f"NAP '{nap.nap_code}' was assigned to this service request.", "success")

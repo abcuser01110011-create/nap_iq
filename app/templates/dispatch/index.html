@@ -4,12 +4,14 @@
 {% block page_subtitle %}
 <p class="text-muted small mb-0">
     {{ issues|length }} open issue{{ '' if issues|length == 1 else 's' }} &middot;
+    {{ requests|length }} installation{{ '' if requests|length == 1 else 's' }} needing dispatch &middot;
     {{ available_technician_count }} of {{ technician_count }} technicians available
 </p>
 {% endblock %}
 
 {% block content %}
 
+<h6 class="text-muted text-uppercase small fw-bold mb-2">Repairs</h6>
 <div class="card shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
@@ -110,6 +112,113 @@
                     <td colspan="6" class="text-center text-muted py-5">
                         <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
                         No open issues right now — nothing to dispatch.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Phase 28: installation dispatch — the requests-side counterpart of
+   the repairs table above. Lists every new-installation service_request
+   that's either approved (awaiting its first dispatch) or scheduled
+   (already dispatched, so it can be reassigned/cancelled from here
+   too) — see app/routes/dispatch.py's index()/DISPATCHABLE_REQUEST_
+   STATUSES for exactly which statuses land here. A request that's
+   still 'pending' (not yet approved) never appears on this board; it
+   belongs on the Service Requests review queue
+   (service_requests.list_requests()) until an administrator approves
+   it. #}
+<h6 class="text-muted text-uppercase small fw-bold mb-2 mt-4">Installations</h6>
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Request</th>
+                    <th>Subscriber</th>
+                    <th>NAP</th>
+                    <th>Status</th>
+                    <th>Current Assignment</th>
+                    <th style="min-width: 260px;">Dispatch</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                {% set assignment = assignment_by_request.get(req.id) %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('service_requests.edit_request', request_id=req.id) }}">
+                            #{{ req.id }}
+                        </a>
+                        <div class="text-muted small">{{ req.request_type|replace('_', ' ')|capitalize }}</div>
+                    </td>
+                    <td class="small">
+                        {% if req.subscriber %}
+                            {{ req.subscriber.subscriber_code }} — {{ req.subscriber.full_name }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td class="small">
+                        {% if req.requested_nap %}
+                            {{ req.requested_nap.nap_code }} — {{ req.requested_nap.name }}
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set request_status_classes = {'approved': 'text-bg-info', 'scheduled': 'text-bg-primary'} %}
+                        <span class="badge {{ request_status_classes.get(req.status, 'text-bg-secondary') }}">
+                            {{ req.status|replace('_', ' ')|capitalize }}
+                        </span>
+                    </td>
+                    <td class="small">
+                        {% if assignment %}
+                            {{ assignment.technician.full_name if assignment.technician else 'Unknown technician' }}
+                            <div class="text-muted">{{ assignment.status|replace('_', ' ')|capitalize }} &middot; {{ assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                        {% else %}
+                            <span class="text-muted">Unassigned</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1 align-items-start flex-wrap">
+                            <a href="{{ url_for('dispatch.recommend_request', request_id=req.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Get technician recommendations">
+                                <i class="bi bi-list-ol"></i> Recommend
+                            </a>
+                            <form method="post"
+                                  action="{{ url_for('dispatch.reassign_request' if assignment else 'dispatch.assign_request', request_id=req.id) }}"
+                                  class="d-flex gap-1">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <select name="technician_id" class="form-select form-select-sm" style="width: 160px;" required>
+                                    <option value="0">-- Technician --</option>
+                                    {% for tech in technicians %}
+                                        {% if not assignment or tech.id != assignment.technician_id %}
+                                        <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.status }})</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    {{ 'Reassign' if assignment else 'Assign' }}
+                                </button>
+                            </form>
+                            {% if assignment %}
+                            <form method="post" action="{{ url_for('dispatch.cancel', assignment_id=assignment.id) }}"
+                                  onsubmit="return confirm('Cancel this dispatch? The request will go back to approved with no technician assigned.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-5">
+                        <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
+                        No installations need dispatch right now.
                     </td>
                 </tr>
                 {% endfor %}
