@@ -12,3 +12,12 @@ pytest==8.3.3
 
 cloudinary==1.41.0
 gunicorn==22.0.0
+
+# Phase 28 (signature scan cleanup): server-side image processing for
+# upload_assignment_signature() in app/routes/api_v1/technician.py —
+# turns a phone photo of a paper signature into a clean black-ink /
+# transparent-background cutout. pillow-heif registers a Pillow opener
+# for .heic/.heif (default camera format on many iPhones), which
+# Pillow itself can't decode out of the box.
+Pillow==10.4.0
+pillow-heif==0.18.0

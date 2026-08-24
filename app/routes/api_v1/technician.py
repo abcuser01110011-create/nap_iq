@@ -55,11 +55,26 @@ Routes:
 
 import uuid
 from datetime import date, datetime
+from io import BytesIO
 
 import cloudinary
 import cloudinary.uploader
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import current_user
+from PIL import Image, ImageOps
+
+try:
+    # Registers a Pillow opener for .heic/.heif — the default camera
+    # format on many iPhones — which Pillow can't decode on its own.
+    # Import is optional/best-effort: if the dependency isn't
+    # installed for some reason, HEIC signature photos just skip the
+    # scan-cleanup step below (see _scan_signature_image) rather than
+    # breaking signature upload entirely.
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+except ImportError:  # pragma: no cover - exercised only if the dep is missing
+    pass
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
@@ -410,6 +425,72 @@ def upload_assignment_photo(assignment_id):
     return jsonify(assignment=_serialize_assignment(assignment)), 200
 
 
+def _scan_signature_image(file_storage):
+    """Turns a phone photo of a paper signature into a clean cutout:
+    solid black ink on a transparent background, cropped tight to the
+    ink itself — the same shape a "scan document" feature or a
+    signature-stamp tool produces, so the result looks like a proper
+    digital signature rather than a photo of a piece of paper.
+
+    Steps: undo whatever EXIF rotation the phone recorded (a raw
+    upload can otherwise come out sideways) -> grayscale ->
+    autocontrast (spreads out whatever range of grays the photo
+    actually used, so lighting/shadow differences between photos
+    don't change how dark "ink" has to be to register) -> threshold
+    into pure ink/background -> crop to the ink's bounding box (with a
+    small margin) -> ink pixels painted solid black, everything else
+    made fully transparent.
+
+    Returns a BytesIO of a PNG (transparency needs PNG; JPEG has no
+    alpha channel) ready to hand to cloudinary.uploader.upload(), or
+    None if the photo couldn't be processed for any reason (unreadable
+    format despite passing the extension check, corrupted upload, or
+    a photo with no ink dark enough to detect at all — e.g. a blank
+    page). None is a deliberate "processing didn't happen" signal, not
+    an error: the caller falls back to uploading the original photo
+    unprocessed rather than blocking a technician's job over a photo
+    this cleanup step merely couldn't improve.
+    """
+    try:
+        image = Image.open(file_storage.stream)
+        image = ImageOps.exif_transpose(image)  # undo phone rotation
+        gray = image.convert("L")
+        gray = ImageOps.autocontrast(gray, cutoff=1)
+
+        # Threshold: this pixel value split was tuned against ordinary
+        # ballpoint-pen-on-white-paper photos, not against very light
+        # pencil or heavily shadowed photos — see this function's
+        # docstring for why a bad result here just falls back to the
+        # original photo rather than failing the upload.
+        THRESHOLD = 140
+        ink_mask = gray.point(lambda p: 255 if p < THRESHOLD else 0)
+
+        bbox = ink_mask.getbbox()
+        if bbox is None:
+            # No pixel was dark enough to count as ink at all.
+            return None
+
+        margin = 12
+        left, top, right, bottom = bbox
+        left = max(left - margin, 0)
+        top = max(top - margin, 0)
+        right = min(right + margin, ink_mask.width)
+        bottom = min(bottom + margin, ink_mask.height)
+        ink_mask = ink_mask.crop((left, top, right, bottom))
+
+        # Solid black ink, everything else fully transparent — the
+        # mask itself becomes the alpha channel.
+        black_ink = Image.new("RGBA", ink_mask.size, (0, 0, 0, 0))
+        black_ink.putalpha(ink_mask)
+
+        output = BytesIO()
+        black_ink.save(output, format="PNG")
+        output.seek(0)
+        return output
+    except Exception:
+        return None
+
+
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/signature", methods=["POST"])
 @jwt_role_required("technician")
 def upload_assignment_signature(assignment_id):
@@ -426,9 +507,21 @@ def upload_assignment_signature(assignment_id):
     signature-canvas library, matching this codebase's own "same
     pattern, new column" approach to this phase (see the roadmap's
     Phase 28 section). In practice this is a photo of a signed
-    printout/tablet, not a drawn signature captured live in-app; a
-    proper signature-pad widget is a reasonable future enhancement,
-    but isn't required by anything currently in scope for this phase.
+    printout, not a signature drawn live on the device — deliberately,
+    since it's a much lower-friction ask for a non-technical
+    subscriber than handing them the technician's phone to draw on. A
+    proper signature-pad widget for subscribers who'd prefer that
+    remains a reasonable future enhancement, but isn't required by
+    anything currently in scope for this phase.
+
+    Before upload, `_scan_signature_image()` above turns that raw
+    photo into a clean cutout — solid black ink on a transparent
+    background, tightly cropped — so the stored result looks like an
+    actual digital signature rather than a photo of a piece of paper.
+    If that processing fails for any reason (see that function's
+    docstring for when), this falls back to uploading the original,
+    unprocessed photo rather than blocking the technician's job over a
+    photo the cleanup step merely couldn't improve.
 
     Same statuses valid as upload_assignment_photo() — 'accepted' or
     'in_progress' — and stored on Cloudinary for the same
@@ -458,8 +551,20 @@ def upload_assignment_signature(assignment_id):
 
     public_id = f"assignment-signatures/assignment-{assignment.id}-{uuid.uuid4().hex}"
 
+    # Scan-cleanup happens before upload: whatever _scan_signature_image()
+    # returns (a processed PNG, or None if it couldn't process this
+    # particular photo) decides what actually gets sent to Cloudinary.
+    processed = _scan_signature_image(signature)
+    upload_target = processed if processed is not None else signature
+    upload_kwargs = {"public_id": public_id, "overwrite": True}
+    if processed is not None:
+        # Tell Cloudinary explicitly rather than relying on filename
+        # sniffing — `processed` is a bare BytesIO, not a FileStorage
+        # with a real filename/content-type attached.
+        upload_kwargs["format"] = "png"
+
     try:
-        upload_result = cloudinary.uploader.upload(signature, public_id=public_id, overwrite=True)
+        upload_result = cloudinary.uploader.upload(upload_target, **upload_kwargs)
     except Exception:
         return jsonify(error="Signature upload failed. Please try again."), 502
 
