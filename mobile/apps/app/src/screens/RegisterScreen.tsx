@@ -16,6 +16,7 @@ import * as Location from "expo-location";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
+import PasswordInput from "../components/PasswordInput";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
 
 type LatLng = { latitude: number; longitude: number };
@@ -421,8 +422,8 @@ export default function RegisterScreen({ navigation }: Props) {
               <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
               <TextInput style={styles.input} placeholder="Phone number" placeholderTextColor={colors.textFaint} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
               <TextInput style={styles.input} placeholder="Choose a username" placeholderTextColor={colors.textFaint} autoCapitalize="none" value={username} onChangeText={setUsername} />
-              <TextInput style={styles.input} placeholder="Password" placeholderTextColor={colors.textFaint} secureTextEntry value={password} onChangeText={setPassword} />
-              <TextInput style={styles.input} placeholder="Confirm password" placeholderTextColor={colors.textFaint} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+              <PasswordInput placeholder="Password" value={password} onChangeText={setPassword} />
+              <PasswordInput placeholder="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} />
 
               {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
 
