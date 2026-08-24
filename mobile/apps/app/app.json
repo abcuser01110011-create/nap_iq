@@ -22,7 +22,7 @@
     "android": {
       "package": "com.napiq.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/icon-adaptive-foreground.png",
         "backgroundColor": "#0B1F3A"
       },
       "config": {
