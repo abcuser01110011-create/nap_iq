@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.napiq.app"
+      "bundleIdentifier": "com.napiq.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "NAP-IQ uses your device's current location to verify your installation address when you apply for service."
+      }
     },
     "android": {
       "package": "com.napiq.app",
@@ -41,6 +44,12 @@
         {
           "photosPermission": "NAP-IQ uses your photo library so you can attach a completion photo to a job.",
           "cameraPermission": "NAP-IQ uses your camera so you can take a completion photo for a job."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "NAP-IQ uses your device's current location to verify your installation address when you apply for service."
         }
       ]
     ],
