@@ -25,9 +25,14 @@
 
                     <div class="mb-3">
                         {{ form.password.label(class="form-label") }}
-                        {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password") }}
+                        <div class="input-group">
+                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password") }}
+                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false" tabindex="-1">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
                         {% for error in form.password.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
+                            <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
 
@@ -43,3 +48,5 @@
     </div>
 </div>
 {% endblock %}
+
+
