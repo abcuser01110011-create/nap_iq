@@ -207,9 +207,20 @@ CREATE TABLE IF NOT EXISTS payments (
 -- ---------------------------------------------------------------------
 -- assignments: links a technical_issue to the technician dispatched to it
 -- ---------------------------------------------------------------------
+-- ---------------------------------------------------------------------
+-- assignments: links a technical_issue OR a service_request (Phase 28:
+-- installs) to the technician dispatched to it. Exactly one of
+-- technical_issue_id / service_request_id is set on any given row —
+-- an app-layer rule (see Assignment._check_exactly_one_source in
+-- app/models.py), not a DB CHECK, so both columns stay plain nullable
+-- FKs here.
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS assignments (
     id                    INT AUTO_INCREMENT PRIMARY KEY,
-    technical_issue_id    INT NOT NULL,
+    technical_issue_id    INT NULL,
+    -- Phase 28: the install this assignment dispatches a technician
+    -- for, when this row is an installation rather than a repair.
+    service_request_id    INT NULL,
     technician_id         INT NOT NULL,
     assigned_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status                ENUM('assigned', 'accepted', 'in_progress', 'completed', 'cancelled')
@@ -222,6 +233,13 @@ CREATE TABLE IF NOT EXISTS assignments (
     -- issue) so reassignment history stays intact per-technician,
     -- same reasoning as the rest of this table's design.
     resolution_notes      TEXT NULL,
+    -- Phase 25 (mobile technician app): filename (in practice, the
+    -- full Cloudinary secure_url — see app/models.py's comment on
+    -- this column) of the technician's required completion photo.
+    photo_filename        VARCHAR(255) NULL,
+    -- Phase 28: an install's required customer sign-off, stored the
+    -- same way as photo_filename above. NULL for repair assignments.
+    signature_filename     VARCHAR(255) NULL,
     completed_at          TIMESTAMP NULL,
     created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -229,6 +247,9 @@ CREATE TABLE IF NOT EXISTS assignments (
 
     CONSTRAINT fk_assignments_issue
         FOREIGN KEY (technical_issue_id) REFERENCES technical_issues(id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_assignments_request
+        FOREIGN KEY (service_request_id) REFERENCES service_requests(id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_assignments_technician
         FOREIGN KEY (technician_id) REFERENCES technicians(id)

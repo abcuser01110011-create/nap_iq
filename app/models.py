@@ -22,6 +22,7 @@ Table overview:
 from datetime import datetime
 
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.orm import validates
 
 from app.extensions import db
 
@@ -374,15 +375,33 @@ class Payment(db.Model):
 
 
 class Assignment(db.Model):
-    """Links a technical_issue to the technician dispatched to resolve
-    it. Kept as its own table (rather than a column on technical_issues)
-    so that reassignment history can be preserved in later phases."""
+    """Links a technician to the job they're dispatched to: either a
+    technical_issue (a repair — the only source this table supported
+    through Phase 25) or, as of Phase 28, a service_request (an
+    install). Kept as its own table (rather than a column on either
+    source table) so that reassignment history can be preserved.
+
+    Exactly one of technical_issue_id / service_request_id is set on
+    any given row — enforced in the app layer (see
+    `_check_exactly_one_source` below) rather than a DB CHECK
+    constraint. Every existing repair-dispatch code path keeps working
+    exactly as it did before this phase — it simply never sets
+    service_request_id, so technical_issue_id continues to be the
+    only column populated for those rows.
+    """
 
     __tablename__ = "assignments"
 
     id = db.Column(db.Integer, primary_key=True)
     technical_issue_id = db.Column(
-        db.Integer, db.ForeignKey("technical_issues.id"), nullable=False
+        db.Integer, db.ForeignKey("technical_issues.id"), nullable=True
+    )
+    # Phase 28: set instead of technical_issue_id when this assignment
+    # dispatches a technician to perform a new_installation (or, in
+    # principle, any other service_request) rather than repair an
+    # existing technical_issue.
+    service_request_id = db.Column(
+        db.Integer, db.ForeignKey("service_requests.id"), nullable=True
     )
     technician_id = db.Column(db.Integer, db.ForeignKey("technicians.id"), nullable=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -403,6 +422,12 @@ class Assignment(db.Model):
     # completion photo — see database/schema.sql's comment on this
     # column and api_v1/technician.py's upload_assignment_photo().
     photo_filename = db.Column(db.String(255), nullable=True)
+    # Phase 28: an install's required customer sign-off, stored the
+    # same way (full Cloudinary secure_url — see
+    # api_v1/technician.py's upload_assignment_signature()). Only ever
+    # set for a service_request-linked (installation) assignment; a
+    # repair assignment has no signature step and this stays NULL.
+    signature_filename = db.Column(db.String(255), nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -410,10 +435,32 @@ class Assignment(db.Model):
     )
 
     technical_issue = db.relationship("TechnicalIssue", back_populates="assignments")
+    # Phase 28. No back_populates on ServiceRequest — nothing needs
+    # the reverse "all assignments for this request" collection yet.
+    service_request = db.relationship("ServiceRequest")
     technician = db.relationship("Technician", back_populates="assignments")
 
+    @validates("technical_issue_id", "service_request_id")
+    def _check_exactly_one_source(self, key, value):
+        """App-layer equivalent of a DB CHECK constraint (see this
+        class's docstring): exactly one of technical_issue_id /
+        service_request_id may be non-None."""
+        other_key = "service_request_id" if key == "technical_issue_id" else "technical_issue_id"
+        other_value = getattr(self, other_key, None)
+        if value is not None and other_value is not None:
+            raise ValueError(
+                "An Assignment must link to exactly one of technical_issue_id or "
+                "service_request_id, not both."
+            )
+        return value
+
     def __repr__(self):
-        return f"<Assignment issue={self.technical_issue_id} tech={self.technician_id}>"
+        source = (
+            f"issue={self.technical_issue_id}"
+            if self.technical_issue_id is not None
+            else f"request={self.service_request_id}"
+        )
+        return f"<Assignment {source} tech={self.technician_id}>"
 
 
 class AppSettings(db.Model):

@@ -76,11 +76,13 @@ candidate, ranked, each with their own "Assign Technician" button, so
 choosing a different one is just clicking a different row's button.
 """
 
+from types import SimpleNamespace
+
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import TechnicalIssue, Technician, Assignment
+from app.models import TechnicalIssue, ServiceRequest, Technician, Assignment
 from app.forms import AssignTechnicianForm
 from app.notifications_utils import notify_issue_status_change
 from app.recommendation import get_recommendations
@@ -92,6 +94,15 @@ dispatch_bp = Blueprint("dispatch", __name__, url_prefix="/dispatch")
 # import from models directly rather than sharing a constants module.
 OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
+
+# Phase 28: the only service_request status a technician can be
+# dispatched against. A service_request has no dedicated "dispatched"
+# status distinct from "ready to be installed" the way a
+# technical_issue does (compare 'assigned' there) — it just stays
+# 'scheduled' for the whole install, from first dispatch through to
+# completion, at which point Phase 29's install-completion hook moves
+# it straight to 'completed'.
+DISPATCHABLE_REQUEST_STATUSES = ("scheduled",)
 
 
 def _populate_technician_choices(form, *, exclude_technician_id=None):
@@ -121,6 +132,36 @@ def _current_open_assignment(issue_id):
     )
 
 
+def _current_open_assignment_for_request(request_id):
+    """The service_request counterpart of `_current_open_assignment()`
+    above — same "at most one open assignment at a time" invariant."""
+    return (
+        Assignment.query.filter(
+            Assignment.service_request_id == request_id,
+            Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
+        )
+        .order_by(Assignment.assigned_at.desc())
+        .first()
+    )
+
+
+def _service_request_recommendation_source(service_request):
+    """Adapts a ServiceRequest for app/recommendation.py's
+    `get_recommendations()`, which was written against a
+    `technical_issue` and only ever reads `.latitude`, `.longitude`,
+    and `.nap` off whatever it's given. A ServiceRequest already has
+    `.latitude`/`.longitude` of its own (Phase 22), just under a
+    differently-named NAP relationship (`.requested_nap`) — this is a
+    tiny read-only stand-in exposing `.nap` too, so
+    `get_recommendations()` itself never needs to know or care which
+    kind of source it was called for."""
+    return SimpleNamespace(
+        latitude=service_request.latitude,
+        longitude=service_request.longitude,
+        nap=service_request.requested_nap,
+    )
+
+
 def _release_technician_if_idle(technician):
     """Sets a 'busy' technician back to 'available' if this was their
     last open assignment. Mirrors the same check Phase 9's
@@ -140,21 +181,36 @@ def _release_technician_if_idle(technician):
 @dispatch_bp.route("/")
 @role_required("administrator")
 def index():
-    """Dispatch board: every technical_issue that's still open, with
-    its current assignment (if any) so an administrator can see at a
-    glance what needs a technician, what's already out, and to whom.
+    """Dispatch board: every technical_issue that's still open, plus
+    (Phase 28) every service_request that's reached 'scheduled', each
+    with its current assignment (if any) so an administrator can see
+    at a glance what needs a technician, what's already out, and to
+    whom — for repairs and installs alike.
     """
     issues = (
         TechnicalIssue.query.filter(TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES))
         .order_by(TechnicalIssue.created_at.desc())
         .all()
     )
+    # Phase 28: see DISPATCHABLE_REQUEST_STATUSES above for why a
+    # single-status filter is enough here (unlike OPEN_ISSUE_STATUSES,
+    # which needs a range).
+    requests = (
+        ServiceRequest.query.filter(ServiceRequest.status.in_(DISPATCHABLE_REQUEST_STATUSES))
+        .order_by(ServiceRequest.updated_at.desc())
+        .all()
+    )
 
-    # One query for all open assignments rather than N+1 per issue row.
+    # One query for all open assignments rather than N+1 per row.
     open_assignments = Assignment.query.filter(
         Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES)
     ).all()
-    assignment_by_issue = {a.technical_issue_id: a for a in open_assignments}
+    assignment_by_issue = {
+        a.technical_issue_id: a for a in open_assignments if a.technical_issue_id is not None
+    }
+    assignment_by_request = {
+        a.service_request_id: a for a in open_assignments if a.service_request_id is not None
+    }
 
     technicians = Technician.query.order_by(Technician.full_name).all()
     available_technician_count = sum(1 for t in technicians if t.status == "available")
@@ -163,6 +219,8 @@ def index():
         "dispatch/index.html",
         issues=issues,
         assignment_by_issue=assignment_by_issue,
+        requests=requests,
+        assignment_by_request=assignment_by_request,
         technicians=technicians,
         technician_count=len(technicians),
         available_technician_count=available_technician_count,
@@ -314,28 +372,154 @@ def reassign(issue_id):
     return redirect(request.referrer or url_for("dispatch.index"))
 
 
+@dispatch_bp.route("/requests/<int:request_id>/recommend")
+@role_required("administrator")
+def recommend_request(request_id):
+    """Phase 28: the service_request counterpart of recommend() above
+    — see this module's docstring for how a ServiceRequest is adapted
+    for app/recommendation.py's scoring formula."""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    current_assignment = _current_open_assignment_for_request(service_request.id)
+
+    recommendations = get_recommendations(
+        _service_request_recommendation_source(service_request)
+    )
+    if current_assignment is not None:
+        recommendations = [
+            row for row in recommendations
+            if row["technician"].id != current_assignment.technician_id
+        ]
+
+    return render_template(
+        "dispatch/recommend_request.html",
+        service_request=service_request,
+        current_assignment=current_assignment,
+        recommendations=recommendations,
+    )
+
+
+@dispatch_bp.route("/requests/<int:request_id>/assign", methods=["POST"])
+@role_required("administrator")
+def assign_request(request_id):
+    """Phase 28: the service_request counterpart of assign() above.
+    Only valid once the request has reached 'scheduled' — an
+    administrator can't dispatch a technician for an install that
+    hasn't been approved and given a NAP yet."""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    request_label = f"Request #{service_request.id}"
+
+    if service_request.status not in DISPATCHABLE_REQUEST_STATUSES:
+        flash(
+            f"{request_label} isn't scheduled yet — approve it and assign a NAP "
+            "before dispatching a technician.",
+            "warning",
+        )
+        return redirect(request.referrer or url_for("dispatch.index"))
+
+    if _current_open_assignment_for_request(service_request.id) is not None:
+        flash(f"{request_label} already has an open assignment — use Reassign instead.", "warning")
+        return redirect(request.referrer or url_for("dispatch.index"))
+
+    form = AssignTechnicianForm()
+    _populate_technician_choices(form)
+
+    if form.validate_on_submit():
+        technician = Technician.query.get_or_404(form.technician_id.data)
+        assignment = Assignment(
+            service_request_id=service_request.id,
+            technician_id=technician.id,
+            status="assigned",
+            dispatch_score=form.recommendation_score.data,
+        )
+        # Deliberately no service_request.status change here — see
+        # this module's docstring for why 'scheduled' already covers
+        # "dispatched but not yet installed" for a service_request.
+        db.session.add(assignment)
+        db.session.commit()
+
+        flash(f"{request_label} dispatched to {technician.full_name}.", "success")
+    else:
+        for field_errors in form.errors.values():
+            for message in field_errors:
+                flash(message, "danger")
+
+    return redirect(request.referrer or url_for("dispatch.index"))
+
+
+@dispatch_bp.route("/requests/<int:request_id>/reassign", methods=["POST"])
+@role_required("administrator")
+def reassign_request(request_id):
+    """Phase 28: the service_request counterpart of reassign() above."""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    request_label = f"Request #{service_request.id}"
+    current = _current_open_assignment_for_request(service_request.id)
+
+    if current is None:
+        flash(f"{request_label} has no open assignment to reassign — use Assign instead.", "warning")
+        return redirect(request.referrer or url_for("dispatch.index"))
+
+    form = AssignTechnicianForm()
+    _populate_technician_choices(form, exclude_technician_id=current.technician_id)
+
+    if form.validate_on_submit():
+        new_technician = Technician.query.get_or_404(form.technician_id.data)
+        old_technician = current.technician
+
+        current.status = "cancelled"
+        _release_technician_if_idle(old_technician)
+
+        new_assignment = Assignment(
+            service_request_id=service_request.id,
+            technician_id=new_technician.id,
+            status="assigned",
+            dispatch_score=form.recommendation_score.data,
+        )
+        db.session.add(new_assignment)
+        db.session.commit()
+
+        flash(
+            f"{request_label} reassigned from "
+            f"{old_technician.full_name if old_technician else 'previous technician'} "
+            f"to {new_technician.full_name}.",
+            "success",
+        )
+    else:
+        for field_errors in form.errors.values():
+            for message in field_errors:
+                flash(message, "danger")
+
+    return redirect(request.referrer or url_for("dispatch.index"))
+
+
 @dispatch_bp.route("/assignments/<int:assignment_id>/cancel", methods=["POST"])
 @role_required("administrator")
 def cancel(assignment_id):
     """Cancels an open assignment with no replacement technician
-    dispatched. The linked issue drops back to 'pending' so it
-    reappears at the top of the dispatch board as needing attention."""
+    dispatched. For a repair (technical_issue-linked) assignment, the
+    linked issue drops back to 'pending' so it reappears at the top of
+    the dispatch board. For an install (service_request-linked, Phase
+    28) assignment, the linked request simply stays 'scheduled' — see
+    this module's docstring for why that status already means "needs
+    a technician" regardless of whether one's currently dispatched."""
     assignment = Assignment.query.get_or_404(assignment_id)
 
     if assignment.status not in OPEN_ASSIGNMENT_STATUSES:
         flash("That assignment isn't open, so it can't be cancelled.", "warning")
         return redirect(request.referrer or url_for("dispatch.index"))
 
-    issue = assignment.technical_issue
     technician = assignment.technician
-
     assignment.status = "cancelled"
-    issue.status = "pending"
     _release_technician_if_idle(technician)
-    notify_issue_status_change(issue)
 
-    db.session.commit()
+    if assignment.technical_issue_id is not None:
+        issue = assignment.technical_issue
+        issue.status = "pending"
+        notify_issue_status_change(issue)
+        db.session.commit()
+        label = issue.issue_code or f"#{issue.id}"
+    else:
+        db.session.commit()
+        label = f"Request #{assignment.service_request_id}"
 
-    issue_label = issue.issue_code or f"#{issue.id}"
-    flash(f"Dispatch for {issue_label} was cancelled.", "success")
+    flash(f"Dispatch for {label} was cancelled.", "success")
     return redirect(request.referrer or url_for("dispatch.index"))
