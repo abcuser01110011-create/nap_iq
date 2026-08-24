@@ -174,6 +174,12 @@ export default function JobDetailScreen({ route, navigation }: any) {
       const type = mimeType ?? `image/${extFromUri === "jpg" ? "jpeg" : extFromUri}`;
       const name = `signature-${assignment.id}.${extFromUri}`;
       const result = await client.technician.uploadAssignmentSignature(assignment.id, { uri, name, type });
+      // Clear the local raw-photo preview now that the upload has
+      // succeeded — otherwise it would keep shadowing
+      // assignment.signature_url below forever, hiding the
+      // server-side scanned/cropped e-signature behind the original
+      // unprocessed phone photo.
+      setSignatureUri(null);
       applyAssignmentUpdate(result.assignment);
     } catch (err) {
       setSignatureUri(null);
