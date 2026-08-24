@@ -8,3 +8,6 @@ instance/
 *.db 
 .DS_Store
 node_modules/
+
+.expo/
+.expo-shared/
