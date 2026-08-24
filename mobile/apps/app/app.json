@@ -45,7 +45,7 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "https://nap-iq.vercel.app",
+      "apiBaseUrl": "https://napiq-production.up.railway.app",
       "eas": {
         "projectId": "b62aa4b3-fdc4-4bc3-959c-cd58d86c9b62"
       }
