@@ -291,6 +291,40 @@ export class ApiClient {
       }
       return data as { assignment: Assignment };
     },
+    /** Uploads (or replaces) the customer sign-off photo for an
+     * installation assignment. Mirrors uploadAssignmentPhoto above —
+     * multipart/form-data via fetch, auth attached the same way,
+     * no silent 401 retry — but posts to the /signature endpoint
+     * under the "signature" field name, matching
+     * upload_assignment_signature() in api_v1/technician.py. */
+    uploadAssignmentSignature: async (
+      assignmentId: number,
+      signature: { uri: string; name: string; type: string }
+    ): Promise<{ assignment: Assignment }> => {
+      const tokens = await this.tokenStorage.getTokens();
+      const form = new FormData();
+      form.append("signature", { uri: signature.uri, name: signature.name, type: signature.type } as unknown as Blob);
+
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}/api/v1/technician/assignments/${assignmentId}/signature`, {
+          method: "POST",
+          headers: tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : undefined,
+          // No Content-Type header here on purpose — see the same
+          // note in uploadAssignmentPhoto above.
+          body: form,
+        });
+      } catch {
+        throw new ApiError(0, { error: "Couldn't reach the server. Check your connection." });
+      }
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!response.ok) {
+        throw new ApiError(response.status, data as ApiErrorBody);
+      }
+      return data as { assignment: Assignment };
+    },
     registerDeviceToken: (token: string, platform: "ios" | "android") =>
       this.request<{ ok: true }>("/api/v1/technician/device-token", {
         method: "POST",
