@@ -14,10 +14,12 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { ApiError, type Assignment } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
+import SignaturePad from "../../components/SignaturePad";
 import { colors } from "../../theme/technician";
 import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
 
@@ -76,6 +78,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const [signatureUri, setSignatureUri] = useState<string | null>(null);
   const [signatureUploading, setSignatureUploading] = useState(false);
   const [signatureError, setSignatureError] = useState<string | null>(null);
+  const [signaturePadVisible, setSignaturePadVisible] = useState(false);
 
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
@@ -191,18 +194,28 @@ export default function JobDetailScreen({ route, navigation }: any) {
     }
   };
 
-  const handleTakeSignature = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        "Camera access needed",
-        "Enable camera access for NAP-IQ in your device settings to capture the customer's sign-off."
-      );
+  const handleDrawSignature = () => {
+    setSignaturePadVisible(true);
+  };
+
+  // Fires once the customer taps "Use this signature" in the pad —
+  // base64 is the raw PNG (no data-URL prefix, see SignaturePad's
+  // onOK handler) of what they drew on a plain white background.
+  // Written out to a temp file so it can go through the exact same
+  // uploadSignature(uri, mimeType) path as the old photo-based flow
+  // — same endpoint, same server-side scan/cleanup, same error
+  // handling — no backend or upload-plumbing changes needed for this
+  // to work.
+  const handleSignatureCaptured = async (base64: string) => {
+    setSignaturePadVisible(false);
+    const uri = `${FileSystem.cacheDirectory}signature-${assignment.id}-${Date.now()}.png`;
+    try {
+      await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+    } catch {
+      setSignatureError("Couldn't save the signature. Please try again.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    uploadSignature(result.assets[0].uri, result.assets[0].mimeType);
+    uploadSignature(uri, "image/png");
   };
 
   const handlePickSignatureFromLibrary = async () => {
@@ -466,10 +479,10 @@ export default function JobDetailScreen({ route, navigation }: any) {
               <View style={styles.photoButtonRow}>
                 <TouchableOpacity
                   style={styles.secondaryButtonSmall}
-                  onPress={handleTakeSignature}
+                  onPress={handleDrawSignature}
                   disabled={signatureUploading}
                 >
-                  <Text style={styles.secondaryButtonText}>Photograph sign-off</Text>
+                  <Text style={styles.secondaryButtonText}>Draw signature</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.secondaryButtonSmall}
@@ -504,6 +517,11 @@ export default function JobDetailScreen({ route, navigation }: any) {
           )}
         </View>
       </ScrollView>
+      <SignaturePad
+        visible={signaturePadVisible}
+        onCancel={() => setSignaturePadVisible(false)}
+        onSave={handleSignatureCaptured}
+      />
     </KeyboardAvoidingView>
   );
 }
