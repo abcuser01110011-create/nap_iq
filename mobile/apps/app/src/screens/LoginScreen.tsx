@@ -5,13 +5,13 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
+import FloatingLabelInput from "../components/FloatingLabelInput";
 import PasswordInput from "../components/PasswordInput";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
 
@@ -50,22 +50,23 @@ export default function LoginScreen({ navigation }: Props) {
         <Text style={styles.title}>NAP-IQ</Text>
         <Text style={styles.subtitle}>Sign in with your technician or customer account</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor={colors.textFaint}
+        <FloatingLabelInput
+          containerStyle={styles.input}
+          label="Username"
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
           onChangeText={setUsername}
           editable={!submitting}
+          returnKeyType="next"
         />
         <PasswordInput
           containerStyle={styles.passwordWrap}
-          placeholder="Password"
+          label="Password"
           value={password}
           onChangeText={setPassword}
           editable={!submitting}
+          returnKeyType="done"
           onSubmitEditing={handleSubmit}
         />
 
@@ -116,12 +117,6 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: colors.bg,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
-    marginBottom: 12,
-    borderWidth: 1,
     borderColor: colors.border,
   },
   passwordWrap: {

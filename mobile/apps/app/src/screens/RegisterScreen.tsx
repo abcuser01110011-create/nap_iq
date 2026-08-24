@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -16,6 +15,7 @@ import * as Location from "expo-location";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
+import FloatingLabelInput from "../components/FloatingLabelInput";
 import PasswordInput from "../components/PasswordInput";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
 
@@ -417,13 +417,13 @@ export default function RegisterScreen({ navigation }: Props) {
 
           {step === "details" && (
             <>
-              <TextInput style={styles.input} placeholder="Full name" placeholderTextColor={colors.textFaint} value={fullName} onChangeText={setFullName} />
-              <TextInput style={styles.input} placeholder="Installation address" placeholderTextColor={colors.textFaint} value={address} onChangeText={setAddress} />
-              <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
-              <TextInput style={styles.input} placeholder="Phone number" placeholderTextColor={colors.textFaint} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-              <TextInput style={styles.input} placeholder="Choose a username" placeholderTextColor={colors.textFaint} autoCapitalize="none" value={username} onChangeText={setUsername} />
-              <PasswordInput placeholder="Password" value={password} onChangeText={setPassword} />
-              <PasswordInput placeholder="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} />
+              <FloatingLabelInput label="Full name" value={fullName} onChangeText={setFullName} />
+              <FloatingLabelInput label="Installation address" value={address} onChangeText={setAddress} />
+              <FloatingLabelInput label="Email" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
+              <FloatingLabelInput label="Phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+              <FloatingLabelInput label="Choose a username" autoCapitalize="none" value={username} onChangeText={setUsername} />
+              <PasswordInput label="Password" value={password} onChangeText={setPassword} />
+              <PasswordInput label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword} />
 
               {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
 
