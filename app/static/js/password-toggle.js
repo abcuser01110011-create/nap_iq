@@ -5,6 +5,16 @@
 // bootstrap-icons <i> child (bi-eye). Works for any number of password
 // fields on a page — no per-field script needed.
 (function () {
+    // On mobile, tapping the button first blurs the focused password input,
+    // which closes the on-screen keyboard and reflows the page *before* the
+    // click event fires — so the tap lands on the wrong spot (or nothing).
+    // Prevent the default mousedown behavior so the input never loses focus
+    // and the layout stays put; the click handler below still runs normally.
+    document.addEventListener('mousedown', function (event) {
+        var btn = event.target.closest('[data-toggle-password]');
+        if (btn) event.preventDefault();
+    });
+
     document.addEventListener('click', function (event) {
         var btn = event.target.closest('[data-toggle-password]');
         if (!btn) return;
