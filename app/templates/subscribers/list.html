@@ -1,7 +1,7 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Subscribers{% endblock %}
 {% block page_title %}Subscribers{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">{{ subscribers|length }} record{{ '' if subscribers|length == 1 else 's' }} shown</p>{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0" id="subsRecordCount">{{ subscribers|length }} record{{ '' if subscribers|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
 {% set status_options = [
@@ -19,18 +19,16 @@
 </div>
 
 <div class="subs-filterbar">
-    <form method="get" action="{{ url_for('subscribers.list_subscribers') }}" class="subs-search-form">
+    <form method="get" action="{{ url_for('subscribers.list_subscribers') }}" class="subs-search-form" id="subsSearchForm">
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
         <i class="bi bi-search"></i>
         <input
-            type="text" name="q"
+            type="text" name="q" id="subsSearchInput"
             placeholder="Filter by name, code, address..."
             value="{{ search_term }}"
             aria-label="Filter subscribers"
+            autocomplete="off"
         >
-        {% if search_term %}
-            <button type="submit" class="subs-search-go" aria-label="Search"><i class="bi bi-arrow-return-left"></i></button>
-        {% endif %}
     </form>
 
     <div class="subs-pill-group" role="group" aria-label="Filter by status">
@@ -57,9 +55,18 @@
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="subsTableBody">
                 {% for subscriber in subscribers %}
-                <tr class="subs-row" onclick="window.location='{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}';">
+                {% set search_blob = [
+                    subscriber.full_name,
+                    subscriber.address,
+                    subscriber.subscriber_code,
+                    subscriber.nap.nap_code if subscriber.nap else "",
+                    subscriber.plan_type,
+                    subscriber.user.username if subscriber.user else "",
+                    subscriber.status|replace('_', ' '),
+                ]|select|join(' ')|lower %}
+                <tr class="subs-row" data-search="{{ search_blob }}" onclick="window.location='{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}';">
                     <td>
                         <div class="subs-name">{{ subscriber.full_name }}</div>
                         <div class="subs-subtext">{{ subscriber.address or "No address on file" }}</div>
@@ -91,15 +98,73 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr>
+                <tr id="subsEmptyRow">
                     <td colspan="7" class="text-center text-muted py-5">
                         <i class="bi bi-person-vcard display-6 d-block mb-2"></i>
                         No subscribers found{% if search_term or status_filter %} matching your filters{% endif %}.
                     </td>
                 </tr>
                 {% endfor %}
+                {% if subscribers %}
+                <tr id="subsNoMatchRow" class="d-none">
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-search display-6 d-block mb-2"></i>
+                        No subscribers match "<span id="subsNoMatchQuery"></span>".
+                    </td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Instant client-side filtering as the admin types — filters the
+    // rows already on the page (name, address, code, connected NAP,
+    // plan, linked login, status) with no page reload / no Enter key
+    // required. The status pills above still do a real server-side
+    // filter (they navigate), so this only narrows *within* whatever
+    // status subset is currently loaded.
+    (function () {
+        var input = document.getElementById('subsSearchInput');
+        var body = document.getElementById('subsTableBody');
+        if (!input || !body) return;
+
+        var rows = Array.prototype.slice.call(body.querySelectorAll('tr.subs-row'));
+        var noMatchRow = document.getElementById('subsNoMatchRow');
+        var noMatchQuery = document.getElementById('subsNoMatchQuery');
+        var recordCount = document.getElementById('subsRecordCount');
+
+        function applyFilter() {
+            var term = input.value.trim().toLowerCase();
+            var visibleCount = 0;
+
+            rows.forEach(function (row) {
+                var match = !term || (row.dataset.search || '').indexOf(term) !== -1;
+                row.classList.toggle('d-none', !match);
+                if (match) visibleCount += 1;
+            });
+
+            if (noMatchRow) {
+                var showEmpty = term && visibleCount === 0;
+                noMatchRow.classList.toggle('d-none', !showEmpty);
+                if (showEmpty && noMatchQuery) {
+                    noMatchQuery.textContent = input.value.trim();
+                }
+            }
+
+            if (recordCount) {
+                recordCount.textContent = visibleCount + (visibleCount === 1 ? ' record shown' : ' records shown');
+            }
+        }
+
+        input.addEventListener('input', applyFilter);
+
+        // No-JS / slow-typist fallback: Enter still submits a real
+        // server-side search (?q=...), which also covers subscribers
+        // outside the currently loaded status subset.
+    })();
+</script>
 {% endblock %}
