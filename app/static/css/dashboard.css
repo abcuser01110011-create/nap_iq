@@ -931,6 +931,24 @@
     color: #0aa8c4;
 }
 
+.disp-badge-resolved {
+    background: rgba(25, 135, 84, 0.15);
+    color: var(--napiq-success);
+}
+
+.disp-badge-closed {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--napiq-text-muted);
+}
+
+/* Opt-in modifier: makes an entire disp-row navigate on click (used by
+   the Issues list, app/templates/issues/list.html). Left off .disp-row
+   itself so the Dispatch Board's rows — which are full of interactive
+   selects/buttons — keep their normal click behavior. */
+.disp-row-clickable {
+    cursor: pointer;
+}
+
 .disp-assignment {
     font-size: 0.85rem;
 }
