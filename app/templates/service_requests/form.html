@@ -27,19 +27,20 @@
     }
     .sr-doc-watermark {
         position: absolute;
-        top: -50px;
-        left: -50px;
-        width: 320px;
-        height: 320px;
+        top: 320px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 480px;
+        height: auto;
         object-fit: contain;
-        opacity: .07;
+        opacity: .055;
         z-index: 0;
         pointer-events: none;
     }
     .sr-doc-header, .sr-doc-section, .sr-doc-footer { position: relative; z-index: 1; }
     .sr-doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #7c3aed; font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
-    .sr-doc-brand-logo { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex: none; }
+    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #0d2182; font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+    .sr-doc-brand-logo { height: 40px; width: auto; object-fit: contain; flex: none; }
     .sr-doc-title { font-size: 1.9rem; font-weight: 800; color: #14171f; margin-bottom: 2px; }
     .sr-doc-subtitle { font-size: .95rem; color: #6b7280; font-weight: 500; }
     .sr-doc-statusbox { border: 1.5px solid #dcdee6; border-radius: 6px; padding: 10px 20px; text-align: center; min-width: 130px; }
@@ -58,7 +59,7 @@
     .sr-doc-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e3e5ea; font-size: .72rem; color: #8890a0; font-style: italic; }
     @media (max-width: 820px) {
         .sr-doc { padding: 36px 24px 28px; min-height: 0; }
-        .sr-doc-watermark { width: 200px; height: 200px; }
+        .sr-doc-watermark { width: 300px; top: 260px; }
         .sr-doc-row { gap: 16px; }
     }
 </style>
@@ -86,12 +87,12 @@
 {% set status_colors = {'pending': '#8890a0', 'approved': '#2563eb', 'scheduled': '#7c3aed', 'completed': '#15803d', 'rejected': '#dc2626'} %}
 <div class="sr-doc-wrapper">
     <div class="sr-doc">
-        <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" class="sr-doc-watermark" alt="" aria-hidden="true">
+        <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-watermark" alt="" aria-hidden="true">
 
         <div class="sr-doc-header">
             <div>
                 <div class="sr-doc-brand">
-                    <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" class="sr-doc-brand-logo" alt="PG Networks logo">
+                    <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-brand-logo" alt="PG Networks logo">
                     <span>PG Networks</span>
                 </div>
                 <div class="sr-doc-title">Service Request</div>
