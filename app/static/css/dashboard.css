@@ -941,6 +941,23 @@
     color: var(--napiq-text-muted);
 }
 
+/* NAP status values (app/templates/naps/list.html) reusing the shared
+   disp-badge palette. */
+.disp-badge-active {
+    background: rgba(25, 135, 84, 0.15);
+    color: var(--napiq-success);
+}
+
+.disp-badge-full {
+    background: rgba(253, 126, 20, 0.15);
+    color: var(--napiq-warning);
+}
+
+.disp-badge-maintenance {
+    background: rgba(220, 53, 69, 0.15);
+    color: var(--napiq-danger);
+}
+
 /* Opt-in modifier: makes an entire disp-row navigate on click (used by
    the Issues list, app/templates/issues/list.html). Left off .disp-row
    itself so the Dispatch Board's rows — which are full of interactive

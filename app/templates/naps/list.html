@@ -5,22 +5,24 @@
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('naps.add_nap') }}" class="btn btn-primary">
+    <a href="{{ url_for('naps.add_nap') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-plus-lg me-1"></i>Add NAP
     </a>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
+<div class="subs-table-card mb-3">
+    <div class="p-3">
         <form method="get" action="{{ url_for('naps.list_naps') }}" class="row g-2 align-items-end">
             <div class="col-sm-6 col-md-5">
                 <label class="form-label small text-muted mb-1">Search</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <div class="subs-search-form mb-0">
+                    <i class="bi bi-search"></i>
                     <input
-                        type="text" class="form-control" name="q"
+                        type="text" name="q"
                         placeholder="Search by NAP code or name..."
                         value="{{ search_term }}"
+                        aria-label="Search NAPs"
+                        autocomplete="off"
                     >
                 </div>
             </div>
@@ -34,8 +36,8 @@
                     <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Maintenance</option>
                 </select>
             </div>
-            <div class="col-sm-2 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary">
+            <div class="col-sm-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-3">
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 {% if search_term or status_filter %}
@@ -46,13 +48,12 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="disp-table-card">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <table class="table disp-table align-middle mb-0">
+            <thead>
                 <tr>
-                    <th>NAP Code</th>
-                    <th>Name</th>
+                    <th>NAP</th>
                     <th>Location</th>
                     <th class="text-center">Total Ports</th>
                     <th class="text-center">Available Ports</th>
@@ -62,62 +63,63 @@
             </thead>
             <tbody>
                 {% for nap in naps %}
-                <tr>
-                    <td><span class="fw-semibold">{{ nap.nap_code }}</span></td>
-                    <td>{{ nap.name }}</td>
-                    <td class="text-muted small">
+                <tr class="disp-row disp-row-clickable" onclick="window.location='{{ url_for('naps.view_nap', nap_id=nap.id) }}';">
+                    <td>
+                        <a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}" class="disp-primary-link">
+                            {{ nap.nap_code }}
+                        </a>
+                        <div class="disp-subtext">{{ nap.name }}</div>
+                    </td>
+                    <td class="small disp-subtext">
                         {{ nap.address or (nap.latitude ~ ', ' ~ nap.longitude) }}
                     </td>
                     <td class="text-center">{{ nap.total_ports }}</td>
                     <td class="text-center">
-                        <span class="badge {{ 'text-bg-success' if nap.available_ports > 0 else 'text-bg-secondary' }}">
+                        <span class="disp-badge {{ 'disp-badge-resolved' if nap.available_ports > 0 else 'disp-badge-closed' }}">
                             {{ nap.available_ports }}
                         </span>
                     </td>
                     <td>
-                        {% set status_classes = {
-                            'active': 'text-bg-success',
-                            'inactive': 'text-bg-secondary',
-                            'full': 'text-bg-warning',
-                            'maintenance': 'text-bg-danger'
-                        } %}
-                        <span class="badge {{ status_classes.get(nap.status, 'text-bg-secondary') }}">
+                        <span class="disp-badge disp-badge-{{ nap.status }}">
                             {{ nap.status|capitalize }}
                         </span>
                     </td>
                     <td class="text-end">
-                        <div class="btn-group btn-group-sm">
+                        <div class="subs-row-actions">
                             <a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}"
-                               class="btn btn-outline-secondary" title="View details">
+                               class="subs-edit-btn" title="View details" onclick="event.stopPropagation();">
                                 <i class="bi bi-eye"></i>
                             </a>
                             <a href="{{ url_for('naps.edit_nap', nap_id=nap.id) }}"
-                               class="btn btn-outline-primary" title="Edit">
+                               class="subs-edit-btn" title="Edit" onclick="event.stopPropagation();">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             {% if nap.status == 'inactive' %}
-                                <button type="button" class="btn btn-outline-success" title="Activate"
+                                <button type="button" class="subs-edit-btn" title="Activate"
                                         data-bs-toggle="modal" data-bs-target="#statusModal"
                                         data-nap-id="{{ nap.id }}"
                                         data-nap-label="{{ nap.nap_code }} — {{ nap.name }}"
-                                        data-action-type="activate">
+                                        data-action-type="activate"
+                                        onclick="event.stopPropagation();">
                                     <i class="bi bi-arrow-counterclockwise"></i>
                                 </button>
                             {% else %}
-                                <button type="button" class="btn btn-outline-danger" title="Deactivate"
+                                <button type="button" class="subs-edit-btn" title="Deactivate"
                                         data-bs-toggle="modal" data-bs-target="#statusModal"
                                         data-nap-id="{{ nap.id }}"
                                         data-nap-label="{{ nap.nap_code }} — {{ nap.name }}"
-                                        data-action-type="deactivate">
+                                        data-action-type="deactivate"
+                                        onclick="event.stopPropagation();">
                                     <i class="bi bi-slash-circle"></i>
                                 </button>
                             {% endif %}
+                            <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
                         </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-5">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-inbox display-6 d-block mb-2"></i>
                         No NAPs found{% if search_term or status_filter %} matching your filters{% endif %}.
                     </td>
