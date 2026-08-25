@@ -8,6 +8,12 @@ cryptography==43.0.0
 python-dotenv==1.0.1
 email-validator==2.2.0
 
+# Phase 29 (Gmail SMTP -> Resend): Railway blocks outbound SMTP
+# (ports 465/587) on every plan below Pro, so app/email_utils.py sends
+# through Resend's HTTPS API instead of smtplib — HTTPS on port 443 is
+# never blocked. See app/email_utils.py's module docstring.
+requests==2.32.3
+
 pytest==8.3.3
 
 cloudinary==1.41.0

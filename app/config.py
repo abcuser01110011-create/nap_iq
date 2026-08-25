@@ -129,22 +129,28 @@ class Config:
     # a compressed phone photo with headroom.
     MAX_CONTENT_LENGTH = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(8 * 1024 * 1024)))
 
-    # ---- Email / Gmail SMTP settings (applicant email verification) ----
+    # ---- Email sending (applicant email verification) — Resend ----
     # Used by app/email_utils.py to send the one-time verification code
     # during mobile self-registration, and the approved/scheduled
     # status-change emails from app/routes/service_requests.py.
     #
-    # GMAIL_ADDRESS / GMAIL_APP_PASSWORD must both be set in .env for
-    # real sending to work. GMAIL_APP_PASSWORD is a 16-character Google
-    # "App Password" (Google Account -> Security -> 2-Step Verification
-    # -> App passwords) — NOT the normal Gmail login password, which
-    # Google will reject for SMTP if 2FA is on (and 2FA is required to
-    # even generate an App Password in the first place).
-    GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
-    GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+    # Sends via Resend's HTTPS API (https://api.resend.com/emails)
+    # rather than raw SMTP — Railway (and most PaaS free/hobby tiers)
+    # block outbound SMTP ports (465/587) entirely, but never block
+    # plain HTTPS on port 443, so an HTTP-API email provider is what
+    # actually works there. See https://resend.com — free tier is
+    # 3,000 emails/month / 100 per day, no credit card required.
+    #
+    # RESEND_API_KEY must be set in .env (or Railway's Variables tab)
+    # for real sending to work; get one from the Resend dashboard.
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+    # Until you verify your own domain in Resend's dashboard, Resend
+    # only lets you send FROM this address (their shared sandbox
+    # sender) and only TO the email you signed up to Resend with.
+    # Once a domain is verified there, set this to something like
+    # "NAP-IQ <no-reply@yourdomain.com>" to send from it and to anyone.
+    RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
     MAIL_DEFAULT_SENDER_NAME = os.environ.get("MAIL_DEFAULT_SENDER_NAME", "NAP-IQ")
-    MAIL_SMTP_HOST = os.environ.get("MAIL_SMTP_HOST", "smtp.gmail.com")
-    MAIL_SMTP_PORT = int(os.environ.get("MAIL_SMTP_PORT", "465"))
 
     # How long a sent verification code stays valid, and how many wrong
     # attempts are tolerated before the applicant has to request a new
