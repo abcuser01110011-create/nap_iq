@@ -5,22 +5,24 @@
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('technicians.add_technician') }}" class="btn btn-primary">
+    <a href="{{ url_for('technicians.add_technician') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-person-plus me-1"></i>Add Technician
     </a>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
+<div class="subs-table-card mb-3">
+    <div class="p-3">
         <form method="get" action="{{ url_for('technicians.list_technicians') }}" class="row g-2 align-items-end">
             <div class="col-sm-7 col-md-8">
                 <label class="form-label small text-muted mb-1">Search</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <div class="subs-search-form mb-0">
+                    <i class="bi bi-search"></i>
                     <input
-                        type="text" class="form-control" name="q"
+                        type="text" name="q"
                         placeholder="Search by name or contact number..."
                         value="{{ search_term }}"
+                        aria-label="Search technicians"
+                        autocomplete="off"
                     >
                 </div>
             </div>
@@ -34,7 +36,7 @@
                 </select>
             </div>
             <div class="col-sm-2 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary">
+                <button type="submit" class="btn btn-primary rounded-pill px-3">
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 {% if search_term or status_filter %}
@@ -45,10 +47,10 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="disp-table-card">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <table class="table disp-table align-middle mb-0">
+            <thead>
                 <tr>
                     <th>Full Name</th>
                     <th>Contact</th>
@@ -60,31 +62,35 @@
             </thead>
             <tbody>
                 {% for technician in technicians %}
-                <tr>
-                    <td class="fw-semibold">{{ technician.full_name }}</td>
-                    <td>{{ technician.contact_number or "—" }}</td>
+                <tr class="disp-row">
+                    <td><span class="disp-primary-link">{{ technician.full_name }}</span></td>
+                    <td class="disp-subtext">{{ technician.contact_number or "—" }}</td>
                     <td>
                         {% if technician.user %}
-                            <span class="badge text-bg-light border">{{ technician.user.username }}</span>
+                            <span class="disp-code-pill">{{ technician.user.username }}</span>
                         {% else %}
-                            <span class="text-muted small">Not linked</span>
+                            <span class="disp-subtext">Not linked</span>
                         {% endif %}
                     </td>
                     <td>
-                        {% set tech_status_classes = {'available': 'text-bg-success', 'busy': 'text-bg-warning', 'offline': 'text-bg-secondary'} %}
-                        <span class="badge {{ tech_status_classes.get(technician.status, 'text-bg-secondary') }}">
+                        {% set tech_status_classes = {
+                            'available': 'disp-badge-resolved',
+                            'busy': 'disp-badge-high',
+                            'offline': 'disp-badge-low'
+                        } %}
+                        <span class="disp-badge {{ tech_status_classes.get(technician.status, 'disp-badge-low') }}">
                             {{ technician.status|capitalize }}
                         </span>
                     </td>
                     <td>{{ technician.resolved_issues_count }}</td>
                     <td class="text-end">
-                        <div class="btn-group btn-group-sm">
+                        <div class="subs-row-actions">
                             <a href="{{ url_for('technicians.view_technician', technician_id=technician.id) }}"
-                               class="btn btn-outline-secondary" title="View">
+                               class="subs-edit-btn" title="View">
                                 <i class="bi bi-eye"></i>
                             </a>
                             <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}"
-                               class="btn btn-outline-primary" title="Edit">
+                               class="subs-edit-btn" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
                         </div>
@@ -92,7 +98,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-5">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-person-badge display-6 d-block mb-2"></i>
                         No technicians found{% if search_term or status_filter %} matching your filters{% endif %}.
                     </td>
