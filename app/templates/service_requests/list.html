@@ -5,19 +5,25 @@
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('service_requests.add_request') }}" class="btn btn-primary">
+    <a href="{{ url_for('service_requests.add_request') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-plus-lg me-1"></i>Add Service Request
     </a>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
+<div class="subs-table-card mb-3">
+    <div class="p-3">
         <form method="get" action="{{ url_for('service_requests.list_requests') }}" class="row g-2 align-items-end">
             <div class="col-sm-6 col-md-5">
                 <label class="form-label small text-muted mb-1">Search</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" name="q" placeholder="Subscriber or notes..." value="{{ search_term }}">
+                <div class="subs-search-form mb-0">
+                    <i class="bi bi-search"></i>
+                    <input
+                        type="text" name="q"
+                        placeholder="Subscriber or notes..."
+                        value="{{ search_term }}"
+                        aria-label="Search service requests"
+                        autocomplete="off"
+                    >
                 </div>
             </div>
             <div class="col-sm-3 col-md-3">
@@ -39,7 +45,9 @@
                 </select>
             </div>
             <div class="col-sm-12 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
+                <button type="submit" class="btn btn-primary rounded-pill px-3">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
                 {% if search_term or type_filter or status_filter %}
                     <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-link text-decoration-none">Clear</a>
                 {% endif %}
@@ -48,10 +56,10 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="disp-table-card">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <table class="table disp-table align-middle mb-0">
+            <thead>
                 <tr>
                     <th>Type</th>
                     <th>Subscriber</th>
@@ -62,33 +70,50 @@
                 </tr>
             </thead>
             <tbody>
-                {% set status_classes = {'pending': 'text-bg-secondary', 'approved': 'text-bg-info', 'scheduled': 'text-bg-primary', 'completed': 'text-bg-success', 'rejected': 'text-bg-danger'} %}
+                {% set status_classes = {
+                    'pending': 'disp-badge-high',
+                    'approved': 'disp-badge-assigned',
+                    'scheduled': 'disp-badge-medium',
+                    'completed': 'disp-badge-resolved',
+                    'rejected': 'disp-badge-critical'
+                } %}
                 {% for r in requests %}
-                <tr class="service-request-row" style="cursor: pointer;"
+                <tr class="disp-row disp-row-clickable"
                     onclick="window.location='{{ url_for('service_requests.edit_request', request_id=r.id) }}';">
-                    <td class="text-capitalize">{{ r.request_type|replace('_', ' ') }}</td>
-                    <td>{% if r.subscriber %}{{ r.subscriber.subscriber_code }} — {{ r.subscriber.full_name }}{% else %}<span class="text-muted small">No subscriber record</span>{% endif %}</td>
                     <td>
+                        <span class="disp-primary-link text-capitalize">{{ r.request_type|replace('_', ' ') }}</span>
+                    </td>
+                    <td class="small">
+                        {% if r.subscriber %}
+                            <span class="disp-code-pill">{{ r.subscriber.subscriber_code }}</span>
+                            {{ r.subscriber.full_name }}
+                        {% else %}
+                            <span class="disp-subtext">No subscriber record</span>
+                        {% endif %}
+                    </td>
+                    <td class="disp-subtext">
                         {% if r.requested_nap %}
                             <i class="bi bi-check-circle text-success me-1"></i>{{ r.requested_nap.nap_code }} — {{ r.requested_nap.name }}
                         {% elif r.suggested_nap %}
-                            <span class="text-warning-emphasis">
-                                <i class="bi bi-signpost-split me-1"></i>Suggested: {{ r.suggested_nap.nap_code }}
-                                <span class="text-muted">({{ r.suggested_nap.distance_km }} km)</span>
-                            </span>
+                            <i class="bi bi-signpost-split me-1"></i>Suggested: {{ r.suggested_nap.nap_code }}
+                            <span>({{ r.suggested_nap.distance_km }} km)</span>
                         {% elif r.latitude is not none and r.longitude is not none %}
-                            <span class="text-muted small">No NAP available nearby</span>
+                            No NAP available nearby
                         {% else %}
                             —
                         {% endif %}
                     </td>
-                    <td><span class="badge {{ status_classes.get(r.status, 'text-bg-secondary') }}">{{ r.status|capitalize }}</span></td>
-                    <td class="text-muted small">{{ (r.notes or "—")|truncate(60) }}</td>
-                    <td>{{ r.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <span class="disp-badge {{ status_classes.get(r.status, 'disp-badge-low') }}">
+                            {{ r.status|capitalize }}
+                        </span>
+                    </td>
+                    <td class="disp-subtext">{{ (r.notes or "—")|truncate(60) }}</td>
+                    <td class="disp-subtext">{{ r.created_at.strftime('%Y-%m-%d') }}</td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-5">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-clipboard-x display-6 d-block mb-2"></i>
                         No service requests found{% if search_term or type_filter or status_filter %} matching your filters{% endif %}.
                     </td>
