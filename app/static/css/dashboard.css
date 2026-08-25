@@ -797,6 +797,193 @@
 }
 
 /* ---------------------------------------------------------------- */
+/* DISPATCH BOARD — row-card table matching the subscribers theme    */
+/* (app/templates/dispatch/index.html)                                */
+/* ---------------------------------------------------------------- */
+
+.disp-section + .disp-section {
+    margin-top: 1.75rem;
+}
+
+.disp-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.disp-section-count {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 2rem;
+    background: var(--napiq-bg);
+    color: var(--napiq-text-muted);
+    border: 1px solid var(--napiq-border);
+}
+
+.disp-table-card {
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.9rem;
+    overflow: hidden;
+}
+
+.disp-table {
+    margin-bottom: 0;
+}
+
+.disp-table thead th {
+    border-bottom: 1px solid var(--napiq-border);
+    border-top: none;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--napiq-text-muted);
+    font-weight: 700;
+    padding: 0.9rem 1.1rem;
+    background: transparent;
+}
+
+.disp-table tbody td {
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid var(--napiq-border);
+    background: transparent;
+    vertical-align: middle;
+}
+
+.disp-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.disp-row td {
+    transition: background-color 0.12s ease;
+}
+
+.disp-row:hover td {
+    background: var(--napiq-bg);
+}
+
+.disp-primary-link {
+    font-weight: 600;
+    color: var(--napiq-primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.disp-primary-link:hover {
+    text-decoration: underline;
+}
+
+.disp-subtext {
+    font-size: 0.78rem;
+    color: var(--napiq-text-muted);
+    margin-top: 0.1rem;
+}
+
+.disp-code-pill {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.25rem 0.55rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--napiq-border);
+    color: var(--napiq-text-muted);
+    background: var(--napiq-bg);
+}
+
+.disp-badge {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border-radius: 2rem;
+    white-space: nowrap;
+}
+
+.disp-badge-low,
+.disp-badge-inactive {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--napiq-text-muted);
+}
+
+.disp-badge-medium,
+.disp-badge-in_progress,
+.disp-badge-scheduled {
+    background: rgba(15, 95, 166, 0.12);
+    color: var(--napiq-primary);
+}
+
+.disp-badge-high,
+.disp-badge-pending {
+    background: rgba(253, 126, 20, 0.15);
+    color: var(--napiq-warning);
+}
+
+.disp-badge-critical {
+    background: rgba(220, 53, 69, 0.15);
+    color: var(--napiq-danger);
+}
+
+.disp-badge-assigned,
+.disp-badge-approved {
+    background: rgba(13, 202, 240, 0.15);
+    color: #0aa8c4;
+}
+
+.disp-assignment {
+    font-size: 0.85rem;
+}
+
+.disp-assignment-name {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.disp-assignment-meta {
+    font-size: 0.76rem;
+    color: var(--napiq-text-muted);
+    margin-top: 0.1rem;
+}
+
+.disp-nav-link {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.76rem;
+    color: var(--napiq-text-muted);
+    text-decoration: none;
+    margin-top: 0.2rem;
+    transition: color 0.15s ease;
+}
+
+.disp-nav-link:hover {
+    color: var(--napiq-primary);
+}
+
+.disp-actions {
+    display: flex;
+    gap: 0.4rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.disp-select {
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.5rem;
+    background: var(--napiq-bg);
+}
+
+.disp-empty {
+    text-align: center;
+    color: var(--napiq-text-muted);
+    padding: 3rem 1rem;
+}
+
+.disp-empty i {
+    color: var(--napiq-border);
+}
+
+/* ---------------------------------------------------------------- */
 /* RESPONSIVE                                                        */
 /* ---------------------------------------------------------------- */
 
