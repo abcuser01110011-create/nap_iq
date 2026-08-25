@@ -562,6 +562,241 @@
 }
 
 /* ---------------------------------------------------------------- */
+/* SUBSCRIBERS LIST — search bar, quick-filter pills, row-card table */
+/* (app/templates/subscribers/list.html)                             */
+/* ---------------------------------------------------------------- */
+
+.subs-filterbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.subs-search-form {
+    flex: 1 1 320px;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    border-radius: 2rem;
+    padding: 0.65rem 1.1rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.subs-search-form:focus-within {
+    border-color: var(--napiq-primary);
+    box-shadow: 0 0 0 3px rgba(15, 95, 166, 0.15);
+}
+
+.subs-search-form i.bi-search {
+    color: var(--napiq-text-muted);
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.subs-search-form input {
+    border: none;
+    background: transparent;
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+    color: inherit;
+}
+
+.subs-search-go {
+    border: none;
+    background: transparent;
+    color: var(--napiq-primary);
+    flex-shrink: 0;
+    display: inline-flex;
+    padding: 0.15rem;
+}
+
+.subs-pill-group {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    border-radius: 2rem;
+    padding: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.subs-pill {
+    padding: 0.45rem 0.9rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--napiq-text-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.subs-pill:hover {
+    color: #1f2937;
+    background: var(--napiq-bg);
+}
+
+.subs-pill-active,
+.subs-pill-active:hover {
+    background: var(--napiq-primary);
+    color: #fff;
+}
+
+.subs-table-card {
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.9rem;
+    overflow: hidden;
+}
+
+.subs-table {
+    margin-bottom: 0;
+}
+
+.subs-table thead th {
+    border-bottom: 1px solid var(--napiq-border);
+    border-top: none;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--napiq-text-muted);
+    font-weight: 700;
+    padding: 0.9rem 1.1rem;
+    background: transparent;
+}
+
+.subs-table tbody td {
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid var(--napiq-border);
+    background: transparent;
+    vertical-align: middle;
+}
+
+.subs-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.subs-row {
+    cursor: pointer;
+}
+
+.subs-row td {
+    transition: background-color 0.12s ease;
+}
+
+.subs-row:hover td {
+    background: var(--napiq-bg);
+}
+
+.subs-name {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.9rem;
+}
+
+.subs-subtext {
+    font-size: 0.78rem;
+    color: var(--napiq-text-muted);
+    margin-top: 0.1rem;
+}
+
+.subs-code-pill {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.25rem 0.55rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--napiq-primary);
+    color: var(--napiq-primary);
+    background: rgba(15, 95, 166, 0.08);
+}
+
+.subs-login-pill {
+    border-color: var(--napiq-border);
+    color: var(--napiq-text-muted);
+    background: var(--napiq-bg);
+}
+
+.subs-status-pill {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.3rem 0.7rem;
+    border-radius: 2rem;
+}
+
+.subs-status-active {
+    background: rgba(25, 135, 84, 0.15);
+    color: var(--napiq-success);
+}
+
+.subs-status-inactive {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--napiq-text-muted);
+}
+
+.subs-status-disconnected {
+    background: rgba(220, 53, 69, 0.15);
+    color: var(--napiq-danger);
+}
+
+.subs-status-pending {
+    background: rgba(253, 126, 20, 0.15);
+    color: var(--napiq-warning);
+}
+
+.subs-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+
+.subs-edit-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--napiq-text-muted);
+    border: 1px solid var(--napiq-border);
+    text-decoration: none;
+    flex-shrink: 0;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.subs-edit-btn:hover {
+    color: var(--napiq-primary);
+    border-color: var(--napiq-primary);
+}
+
+.subs-chevron {
+    color: var(--napiq-text-muted);
+    font-size: 0.85rem;
+    display: inline-flex;
+}
+
+@media (max-width: 575.98px) {
+    .subs-pill-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .subs-pill {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* ---------------------------------------------------------------- */
 /* RESPONSIVE                                                        */
 /* ---------------------------------------------------------------- */
 

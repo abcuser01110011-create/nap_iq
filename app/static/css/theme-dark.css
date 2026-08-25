@@ -154,6 +154,26 @@
 }
 
 /* ---------------------------------------------------------------- */
+/* SUBSCRIBERS LIST (subscribers/list.html, dashboard.css .subs-*)   */
+/* ---------------------------------------------------------------- */
+
+[data-bs-theme="dark"] .subs-search-form:focus-within {
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.22);
+}
+
+[data-bs-theme="dark"] .subs-pill:hover {
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .subs-name {
+    color: #f1f4f9;
+}
+
+[data-bs-theme="dark"] .subs-code-pill {
+    background: rgba(139, 92, 246, 0.12);
+}
+
+/* ---------------------------------------------------------------- */
 /* GEOMAP (naps/map.html, napmap.css)                                */
 /* ---------------------------------------------------------------- */
 
