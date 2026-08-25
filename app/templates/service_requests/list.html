@@ -59,49 +59,47 @@
                     <th>Status</th>
                     <th>Notes</th>
                     <th>Submitted</th>
-                    <th class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% set status_classes = {'pending': 'text-bg-secondary', 'approved': 'text-bg-info', 'scheduled': 'text-bg-primary', 'completed': 'text-bg-success', 'rejected': 'text-bg-danger'} %}
                 {% for r in requests %}
-                <tr>
+                <tr class="service-request-row" style="cursor: pointer;"
+                    onclick="window.location='{{ url_for('service_requests.edit_request', request_id=r.id) }}';">
                     <td class="text-capitalize">{{ r.request_type|replace('_', ' ') }}</td>
                     <td>{% if r.subscriber %}{{ r.subscriber.subscriber_code }} — {{ r.subscriber.full_name }}{% else %}<span class="text-muted small">No subscriber record</span>{% endif %}</td>
-                    <td>{{ r.requested_nap.nap_code if r.requested_nap else "—" }}</td>
+                    <td onclick="event.stopPropagation();">
+                        {% if r.requested_nap %}
+                            {{ r.requested_nap.nap_code }} — {{ r.requested_nap.name }}
+                        {% elif r.suggested_nap %}
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                <span class="badge text-bg-warning-subtle text-warning-emphasis border border-warning-subtle"
+                                      title="Nearest available NAP — not yet confirmed">
+                                    <i class="bi bi-signpost-split me-1"></i>Suggested: {{ r.suggested_nap.nap_code }}
+                                    <span class="text-muted">({{ r.suggested_nap.distance_km }} km)</span>
+                                </span>
+                                <form method="post" action="{{ url_for('service_requests.assign_nap', request_id=r.id) }}"
+                                      onsubmit="return confirm('Connect this request to the nearest available NAP (' + '{{ r.suggested_nap.nap_code }}' + ')?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="nap_id" value="{{ r.suggested_nap.nap.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-1" title="Connect to nearest NAP">
+                                        <i class="bi bi-link-45deg"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        {% elif r.latitude is not none and r.longitude is not none %}
+                            <span class="text-muted small">No NAP available nearby</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                     <td><span class="badge {{ status_classes.get(r.status, 'text-bg-secondary') }}">{{ r.status|capitalize }}</span></td>
                     <td class="text-muted small">{{ (r.notes or "—")|truncate(60) }}</td>
                     <td>{{ r.created_at.strftime('%Y-%m-%d') }}</td>
-                    <td class="text-end">
-                        <div class="d-flex gap-2 justify-content-end">
-                            {% if r.status == 'pending' %}
-                            <form method="post" action="{{ url_for('service_requests.approve_request', request_id=r.id) }}"
-                                  onsubmit="return confirm('Approve this service request?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Approve">
-                                    <i class="bi bi-check-lg"></i>
-                                </button>
-                            </form>
-                            <form method="post" action="{{ url_for('service_requests.reject_request', request_id=r.id) }}"
-                                  onsubmit="return confirm('Reject this service request?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </form>
-                            {% endif %}
-                            <a href="{{ url_for('service_requests.recommend_nap', request_id=r.id) }}" class="btn btn-sm btn-outline-primary" title="Find Nearest NAP">
-                                <i class="bi bi-signpost-split"></i>
-                            </a>
-                            <a href="{{ url_for('service_requests.edit_request', request_id=r.id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                        </div>
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-5">
+                    <td colspan="6" class="text-center text-muted py-5">
                         <i class="bi bi-clipboard-x display-6 d-block mb-2"></i>
                         No service requests found{% if search_term or type_filter or status_filter %} matching your filters{% endif %}.
                     </td>

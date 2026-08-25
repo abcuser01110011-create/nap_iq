@@ -205,6 +205,24 @@ def list_requests():
 
     requests_ = query.order_by(ServiceRequest.created_at.desc()).all()
 
+    # Phase 29 (list-view NAP suggestion): a request with a customer
+    # location on file but no `requested_nap_id` yet (typically a
+    # mobile self-registration/coverage-check, per Phase 22/27) gets
+    # the same nearest-suitable-NAP lookup `recommend_nap()` already
+    # runs, computed here so the "Requested NAP" column can show it as
+    # a suggestion without the administrator opening the dedicated
+    # recommendation page first. Purely a read — see
+    # app/nap_recommendation.py's "THIS MODULE NEVER WRITES TO THE
+    # DATABASE" section; `requested_nap_id` itself is only ever set by
+    # `assign_nap()`. Attached as a plain instance attribute (not a
+    # mapped column), so it's available to the template but never
+    # persisted.
+    for r in requests_:
+        r.suggested_nap = None
+        if not r.requested_nap_id and r.latitude is not None and r.longitude is not None:
+            top = recommend_naps(r.latitude, r.longitude, limit=1)
+            r.suggested_nap = top[0] if top else None
+
     return render_template(
         "service_requests/list.html",
         requests=requests_,
