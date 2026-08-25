@@ -1,6 +1,6 @@
 {% extends "dashboard_base.html" %}
-{% block title %}{{ 'Edit Service Request' if mode == 'edit' else 'Add Service Request' }}{% endblock %}
-{% block page_title %}{{ 'Edit Service Request' if mode == 'edit' else 'Add New Service Request' }}{% endblock %}
+{% block title %}{{ 'Service Request Details' if mode == 'edit' else 'Add Service Request' }}{% endblock %}
+{% block page_title %}{{ 'Service Request Details' if mode == 'edit' else 'Add New Service Request' }}{% endblock %}
 
 {% block content %}
 <div class="mb-3">
@@ -9,6 +9,121 @@
     </a>
 </div>
 
+{% if mode == 'edit' %}
+{#
+    Phase 30 (read-only review screen): the Edit Service Request form
+    was replaced with a read-only detail view for KYC-style review —
+    an administrator approving/rejecting a self-registered request
+    needs to see what the customer submitted, not edit it inline.
+    Actual field changes (reassigning a NAP, correcting a typo'd
+    address, etc.) still go through Subscribers/NAP management or the
+    dedicated "Find Nearest NAP" -> assign_nap flow; this page is
+    purely "read the application, then decide". Approve/Reject remain
+    the only actions here, same routes as before (approve_request /
+    reject_request), only offered while the request is still
+    'pending' — once it's moved past that first decision, this page
+    is just a record of what was approved/rejected and for whom.
+#}
+{% set status_classes = {'pending': 'text-bg-secondary', 'approved': 'text-bg-info', 'scheduled': 'text-bg-primary', 'completed': 'text-bg-success', 'rejected': 'text-bg-danger'} %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white"><i class="bi bi-clipboard-data me-1"></i>Service Request</div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-5 text-muted fw-normal">Type</dt>
+                            <dd class="col-sm-7 text-capitalize">{{ service_request.request_type|replace('_', ' ') }}</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Status</dt>
+                            <dd class="col-sm-7">
+                                <span class="badge {{ status_classes.get(service_request.status, 'text-bg-secondary') }}">
+                                    {{ service_request.status|capitalize }}
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Requested NAP</dt>
+                            <dd class="col-sm-7">
+                                {% if service_request.requested_nap %}
+                                    {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
+                                {% elif service_request.suggested_nap %}
+                                    <span class="text-warning-emphasis">Suggested: {{ service_request.suggested_nap.nap_code }} ({{ service_request.suggested_nap.distance_km }} km)</span>
+                                {% else %}
+                                    Not yet assigned
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Service Location</dt>
+                            <dd class="col-sm-7">
+                                {% if service_request.latitude is not none and service_request.longitude is not none %}
+                                    {{ service_request.latitude }}, {{ service_request.longitude }}
+                                {% else %}
+                                    Not provided
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Submitted</dt>
+                            <dd class="col-sm-7">{{ service_request.created_at.strftime('%B %d, %Y') }}</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Notes</dt>
+                            <dd class="col-sm-7">{{ service_request.notes or "—" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white"><i class="bi bi-person-vcard me-1"></i>Customer Information</div>
+                    <div class="card-body">
+                        {% if service_request.subscriber %}
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-5 text-muted fw-normal">Name</dt>
+                            <dd class="col-sm-7">{{ service_request.subscriber.full_name }}</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Subscriber Code</dt>
+                            <dd class="col-sm-7">{{ service_request.subscriber.subscriber_code }}</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Contact Number</dt>
+                            <dd class="col-sm-7">{{ service_request.subscriber.contact_number or "—" }}</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Email</dt>
+                            <dd class="col-sm-7">{{ service_request.subscriber.email or "—" }}</dd>
+
+                            <dt class="col-sm-5 text-muted fw-normal">Installation Address</dt>
+                            <dd class="col-sm-7">{{ service_request.subscriber.address or "—" }}</dd>
+                        </dl>
+                        {% else %}
+                        <p class="text-muted mb-0">No subscriber record linked to this request.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if service_request.status == 'pending' %}
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <form method="post" action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
+                  onsubmit="return confirm('Approve this service request?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-success">
+                    <i class="bi bi-check-lg me-1"></i>Approve
+                </button>
+            </form>
+            <form method="post" action="{{ url_for('service_requests.reject_request', request_id=service_request.id) }}"
+                  onsubmit="return confirm('Reject this service request?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-danger">
+                    <i class="bi bi-x-lg me-1"></i>Reject
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card shadow-sm">
@@ -75,31 +190,9 @@
                     <hr class="my-4">
 
                     <div class="d-flex justify-content-end gap-2">
-                        {% if mode == 'edit' %}
-                        <a href="{{ url_for('service_requests.recommend_nap', request_id=service_request.id) }}" class="btn btn-outline-primary me-auto">
-                            <i class="bi bi-signpost-split me-1"></i>Find Nearest NAP
-                        </a>
-                        {% if service_request.status == 'pending' %}
-                        <form method="post" action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
-                              onsubmit="return confirm('Approve this service request?');" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-success">
-                                <i class="bi bi-check-lg me-1"></i>Approve
-                            </button>
-                        </form>
-                        <form method="post" action="{{ url_for('service_requests.reject_request', request_id=service_request.id) }}"
-                              onsubmit="return confirm('Reject this service request?');" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-danger">
-                                <i class="bi bi-x-lg me-1"></i>Reject
-                            </button>
-                        </form>
-                        {% endif %}
-                        {% endif %}
                         <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-outline-secondary">Cancel</a>
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg me-1"></i>
-                            {{ 'Save Changes' if mode == 'edit' else 'Create Service Request' }}
+                            <i class="bi bi-check-lg me-1"></i>Create Service Request
                         </button>
                     </div>
                 </form>
@@ -107,4 +200,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

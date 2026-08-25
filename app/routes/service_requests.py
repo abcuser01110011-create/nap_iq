@@ -264,6 +264,22 @@ def edit_request(request_id):
     """Shows and processes the Edit Service Request form."""
     service_request = ServiceRequest.query.get_or_404(request_id)
 
+    # Same on-the-fly nearest-NAP suggestion list_requests() computes
+    # (see that route's comment) — attached here too so the read-only
+    # detail view shows the same "Suggested: NAP-XXXX" a reviewer
+    # would have already seen on the list, rather than just "Not yet
+    # assigned" when this page is opened directly. Never persisted —
+    # see app/nap_recommendation.py's "THIS MODULE NEVER WRITES TO THE
+    # DATABASE" section.
+    service_request.suggested_nap = None
+    if (
+        not service_request.requested_nap_id
+        and service_request.latitude is not None
+        and service_request.longitude is not None
+    ):
+        top = recommend_naps(service_request.latitude, service_request.longitude, limit=1)
+        service_request.suggested_nap = top[0] if top else None
+
     form = ServiceRequestForm(obj=service_request)
     _populate_choices(form)
     if request.method == "GET":
