@@ -360,7 +360,10 @@ def approve_request(request_id):
     ):
         top = recommend_naps(service_request.latitude, service_request.longitude, limit=1)
         if top:
-            assigned_nap = top[0]
+            # recommend_naps() returns a list of plain dicts, not Nap
+            # ORM objects (see its own "RETURN SHAPE" docstring) — the
+            # actual Nap row lives under the "nap" key.
+            assigned_nap = top[0]["nap"]
             service_request.requested_nap_id = assigned_nap.id
 
     # Same auto-advance rule assign_nap()/edit_request() use elsewhere:
