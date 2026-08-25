@@ -142,11 +142,23 @@
             <div class="sr-doc-row">
                 <div class="sr-doc-field full">
                     <div class="flabel">Linked Login</div>
-                    <div class="fvalue" style="border-bottom: none;">
+                    <div class="fvalue" style="border-bottom: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                        <span>
+                            {% if subscriber.user %}
+                                {{ subscriber.user.username }}
+                            {% else %}
+                                Not linked
+                            {% endif %}
+                        </span>
                         {% if subscriber.user %}
-                            {{ subscriber.user.username }}
-                        {% else %}
-                            Not linked
+                        <form method="post" action="{{ url_for('users.delete_user', user_id=subscriber.user.id) }}"
+                              onsubmit="return confirm('Permanently delete the login account \'' + {{ subscriber.user.username|tojson }} + '\'? This cannot be undone — the account will be gone for good and will never be able to log in again.');"
+                              style="margin: 0;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Permanently delete linked login account">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
                         {% endif %}
                     </div>
                 </div>

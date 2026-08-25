@@ -21,6 +21,7 @@ Routes:
     POST /users/<id>/edit             -> edit_user        (process edit form)
     POST /users/<id>/deactivate       -> deactivate_user  (soft-deactivate)
     POST /users/<id>/activate         -> activate_user    (reactivate)
+    POST /users/<id>/delete           -> delete_user       (permanent, irreversible)
     GET  /users/<id>/reset-password   -> reset_password   (show reset form)
     POST /users/<id>/reset-password   -> reset_password   (process reset form)
 """
@@ -233,6 +234,53 @@ def activate_user(user_id):
     user.status = "active"
     db.session.commit()
     flash(f"Account '{user.username}' has been reactivated.", "success")
+    return redirect(request.referrer or url_for("users.list_users"))
+
+
+@users_bp.route("/<int:user_id>/delete", methods=["POST"])
+@role_required("administrator")
+def delete_user(user_id):
+    """Permanently deletes a login account row from `users` — unlike
+    `deactivate_user()` above, this is not reversible and is not the
+    normal day-to-day path (that's still deactivate/activate). This
+    exists for the development-stage need to free up a unique
+    email/username (e.g. an OTP-provider account like Resend that
+    only supports one recipient address) so it can be reused to sign
+    up again.
+
+    Safe to hard-delete: every FK that can reference `users.id`
+    (subscribers.user_id, technicians.user_id, payments.collector_id,
+    settings/audit updated_by_id, notifications.user_id) is declared
+    in database/schema.sql with `ON DELETE SET NULL` or `ON DELETE
+    CASCADE`, so the database itself detaches or cleans up any
+    dependent rows — a linked Subscriber or Technician profile row is
+    NOT deleted, only unlinked (its `user_id` becomes NULL), so
+    billing/issue/service-request history tied to that Subscriber
+    stays intact exactly as it does today via deactivate_user().
+    """
+    user = User.query.get_or_404(user_id)
+
+    if user.id == g.user.id:
+        flash("You can't delete your own account while signed in as it.", "danger")
+        return redirect(request.referrer or url_for("users.list_users"))
+
+    if user.role == "administrator":
+        other_admins = User.query.filter(
+            User.role == "administrator",
+            User.id != user.id,
+        ).count()
+        if other_admins == 0:
+            flash(
+                "Can't delete the last Administrator account — "
+                "promote another account to Administrator first.",
+                "danger",
+            )
+            return redirect(request.referrer or url_for("users.list_users"))
+
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"Account '{username}' was permanently deleted.", "success")
     return redirect(request.referrer or url_for("users.list_users"))
 
 
