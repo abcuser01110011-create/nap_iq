@@ -47,7 +47,7 @@ export default function LoginScreen({ navigation }: Props) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>NAP-IQ</Text>
+        <Text style={styles.title}>PG Networks</Text>
         <Text style={styles.subtitle}>Sign in with your technician or customer account</Text>
 
         <FloatingLabelInput

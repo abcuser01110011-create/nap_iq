@@ -49,7 +49,7 @@ export default function ServiceRequestsScreen() {
           !loading ? (
             <Text style={styles.empty}>
               No service requests on file. New requests (relocation, upgrade, etc.) are opened by
-              NAP-IQ staff on your behalf for now.
+              PG Networks staff on your behalf for now.
             </Text>
           ) : null
         }

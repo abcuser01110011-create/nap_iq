@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NAP-IQ",
+    "name": "PG Networks",
     "slug": "usernamei",
     "scheme": "napiq",
     "version": "1.0.0",
@@ -16,7 +16,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.napiq.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "NAP-IQ uses your device's current location to verify your installation address when you apply for service."
+        "NSLocationWhenInUseUsageDescription": "PG Networks uses your device's current location to verify your installation address when you apply for service."
       }
     },
     "android": {
@@ -42,14 +42,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "NAP-IQ uses your photo library so you can attach a completion photo to a job.",
-          "cameraPermission": "NAP-IQ uses your camera so you can take a completion photo for a job."
+          "photosPermission": "PG Networks uses your photo library so you can attach a completion photo to a job.",
+          "cameraPermission": "PG Networks uses your camera so you can take a completion photo for a job."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "NAP-IQ uses your device's current location to verify your installation address when you apply for service."
+          "locationWhenInUsePermission": "PG Networks uses your device's current location to verify your installation address when you apply for service."
         }
       ]
     ],

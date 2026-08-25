@@ -137,7 +137,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
     if (!permission.granted) {
       Alert.alert(
         "Camera access needed",
-        "Enable camera access for NAP-IQ in your device settings to take a completion photo."
+        "Enable camera access for PG Networks in your device settings to take a completion photo."
       );
       return;
     }
@@ -151,7 +151,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
     if (!permission.granted) {
       Alert.alert(
         "Photo library access needed",
-        "Enable photo library access for NAP-IQ in your device settings to attach a completion photo."
+        "Enable photo library access for PG Networks in your device settings to attach a completion photo."
       );
       return;
     }
@@ -223,7 +223,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
     if (!permission.granted) {
       Alert.alert(
         "Photo library access needed",
-        "Enable photo library access for NAP-IQ in your device settings to attach the customer's sign-off."
+        "Enable photo library access for PG Networks in your device settings to attach the customer's sign-off."
       );
       return;
     }

@@ -64,7 +64,7 @@ function PendingApplicationCard({
         <Text style={styles.cardLabel}>Application status</Text>
         <Text style={styles.cardValue}>Not approved</Text>
         <Text style={styles.trackerMessage}>
-          Your application wasn't approved. Please contact NAP-IQ support for details.
+          Your application wasn't approved. Please contact PG Networks support for details.
         </Text>
       </View>
     );

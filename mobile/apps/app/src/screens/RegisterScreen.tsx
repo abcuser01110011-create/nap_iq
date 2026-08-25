@@ -195,7 +195,7 @@ export default function RegisterScreen({ navigation }: Props) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setGeoState("error");
-        setGeoError("Location permission was denied. Allow location access for NAP-IQ in your device settings, then try again.");
+        setGeoError("Location permission was denied. Allow location access for PG Networks in your device settings, then try again.");
         return;
       }
 
@@ -426,7 +426,7 @@ export default function RegisterScreen({ navigation }: Props) {
               <View style={styles.modalCard}>
                 <Text style={styles.modalTitle}>Share your location?</Text>
                 <Text style={styles.modalBody}>
-                  NAP-IQ uses your device's current location to verify your installation
+                  PG Networks uses your device's current location to verify your installation
                   address is real and to check service coverage there. Your location is
                   only used for this application and isn't tracked afterward.
                 </Text>
