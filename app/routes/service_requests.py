@@ -327,16 +327,58 @@ def approve_request(request_id):
     """Quick action: moves a pending request straight to 'approved'
     without opening the full edit form. Only valid from 'pending' —
     a request already past that first decision should go through the
-    edit form like any other status change."""
+    edit form like any other status change.
+
+    Auto-NAP-assign on approve: if the request doesn't already have a
+    requested_nap_id and has a customer location on file, this now
+    looks up the same nearest-suitable-NAP list list_requests()/
+    edit_request() already compute for display (recommend_naps() —
+    see app/nap_recommendation.py; it only ever returns active NAPs
+    with free ports, so whatever it picks is always a safe candidate)
+    and assigns the top match immediately, rather than making the
+    administrator open "Recommend NAP" as a separate manual step.
+    Same auto-advance rule assign_nap()/edit_request() already use
+    then applies: 'approved' + a requested_nap_id -> 'scheduled', so
+    an approval with a location on file goes straight to the Dispatch
+    Board in one click. A request with no location (nothing to
+    recommend from) still just lands on 'approved', same as before —
+    an administrator can assign a NAP for it manually via the edit
+    form or "Recommend NAP" whenever a location becomes available.
+    """
     service_request = ServiceRequest.query.get_or_404(request_id)
     if service_request.status != "pending":
         flash("Only a pending service request can be approved this way.", "warning")
         return redirect(request.referrer or url_for("service_requests.list_requests"))
 
     service_request.status = "approved"
+
+    assigned_nap = None
+    if (
+        not service_request.requested_nap_id
+        and service_request.latitude is not None
+        and service_request.longitude is not None
+    ):
+        top = recommend_naps(service_request.latitude, service_request.longitude, limit=1)
+        if top:
+            assigned_nap = top[0]
+            service_request.requested_nap_id = assigned_nap.id
+
+    # Same auto-advance rule assign_nap()/edit_request() use elsewhere:
+    # 'approved' + a NAP attached is ready for dispatch.
+    if service_request.status == "approved" and service_request.requested_nap_id:
+        service_request.status = "scheduled"
+
     _notify_status_change(service_request)
     db.session.commit()
-    flash("Service request was approved.", "success")
+
+    if assigned_nap is not None:
+        flash(
+            f"Service request was approved and NAP '{assigned_nap.nap_code}' "
+            "was assigned automatically.",
+            "success",
+        )
+    else:
+        flash("Service request was approved.", "success")
     return redirect(request.referrer or url_for("service_requests.list_requests"))
 
 
