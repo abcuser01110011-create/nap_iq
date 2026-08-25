@@ -5,22 +5,24 @@
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('users.add_user') }}" class="btn btn-primary">
+    <a href="{{ url_for('users.add_user') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-person-plus me-1"></i>Add User
     </a>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
+<div class="subs-table-card mb-3">
+    <div class="p-3">
         <form method="get" action="{{ url_for('users.list_users') }}" class="row g-2 align-items-end">
             <div class="col-sm-6 col-md-5">
                 <label class="form-label small text-muted mb-1">Search</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                <div class="subs-search-form mb-0">
+                    <i class="bi bi-search"></i>
                     <input
-                        type="text" class="form-control" name="q"
+                        type="text" name="q"
                         placeholder="Search by username, name, or email..."
                         value="{{ search_term }}"
+                        aria-label="Search users"
+                        autocomplete="off"
                     >
                 </div>
             </div>
@@ -42,7 +44,7 @@
                 </select>
             </div>
             <div class="col-sm-12 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary">
+                <button type="submit" class="btn btn-primary rounded-pill px-3">
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 {% if search_term or role_filter or status_filter %}
@@ -53,10 +55,10 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="disp-table-card">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <table class="table disp-table align-middle mb-0">
+            <thead>
                 <tr>
                     <th>Username</th>
                     <th>Full Name</th>
@@ -68,47 +70,47 @@
             </thead>
             <tbody>
                 {% for user in users %}
-                <tr>
+                <tr class="disp-row">
                     <td>
-                        <span class="fw-semibold">{{ user.username }}</span>
+                        <span class="disp-primary-link">{{ user.username }}</span>
                         {% if user.id == current_user.id %}
-                            <span class="badge text-bg-light border ms-1">You</span>
+                            <span class="disp-code-pill ms-1">You</span>
                         {% endif %}
                     </td>
                     <td>{{ user.full_name }}</td>
                     <td>
                         {% set role_classes = {
-                            'administrator': 'text-bg-primary',
-                            'technician': 'text-bg-info',
-                            'payment_collector': 'text-bg-warning',
-                            'user': 'text-bg-secondary'
+                            'administrator': 'disp-badge-medium',
+                            'technician': 'disp-badge-assigned',
+                            'payment_collector': 'disp-badge-high',
+                            'user': 'disp-badge-low'
                         } %}
-                        <span class="badge {{ role_classes.get(user.role, 'text-bg-secondary') }}">
+                        <span class="disp-badge {{ role_classes.get(user.role, 'disp-badge-low') }}">
                             {{ role_labels.get(user.role, user.role) }}
                         </span>
                     </td>
-                    <td class="text-muted small">
+                    <td class="disp-subtext">
                         {% if user.email %}<div><i class="bi bi-envelope me-1"></i>{{ user.email }}</div>{% endif %}
                         {% if user.phone_number %}<div><i class="bi bi-telephone me-1"></i>{{ user.phone_number }}</div>{% endif %}
                         {% if not user.email and not user.phone_number %}&mdash;{% endif %}
                     </td>
                     <td>
-                        <span class="badge {{ 'text-bg-success' if user.status == 'active' else 'text-bg-secondary' }}">
+                        <span class="subs-status-pill {{ 'subs-status-active' if user.status == 'active' else 'subs-status-inactive' }}">
                             {{ 'Active' if user.status == 'active' else 'Inactive' }}
                         </span>
                     </td>
                     <td class="text-end">
-                        <div class="btn-group btn-group-sm">
+                        <div class="subs-row-actions">
                             <a href="{{ url_for('users.edit_user', user_id=user.id) }}"
-                               class="btn btn-outline-primary" title="Edit">
+                               class="subs-edit-btn" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <a href="{{ url_for('users.reset_password', user_id=user.id) }}"
-                               class="btn btn-outline-secondary" title="Reset password">
+                               class="subs-edit-btn" title="Reset password">
                                 <i class="bi bi-key"></i>
                             </a>
                             {% if user.status == 'active' %}
-                                <button type="button" class="btn btn-outline-danger" title="Deactivate"
+                                <button type="button" class="subs-edit-btn" title="Deactivate"
                                         data-bs-toggle="modal" data-bs-target="#userStatusModal"
                                         data-user-id="{{ user.id }}"
                                         data-user-label="{{ user.username }} — {{ user.full_name }}"
@@ -117,7 +119,7 @@
                                     <i class="bi bi-slash-circle"></i>
                                 </button>
                             {% else %}
-                                <button type="button" class="btn btn-outline-success" title="Activate"
+                                <button type="button" class="subs-edit-btn" title="Activate"
                                         data-bs-toggle="modal" data-bs-target="#userStatusModal"
                                         data-user-id="{{ user.id }}"
                                         data-user-label="{{ user.username }} — {{ user.full_name }}"
@@ -130,7 +132,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-5">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-people display-6 d-block mb-2"></i>
                         No accounts found{% if search_term or role_filter or status_filter %} matching your filters{% endif %}.
                     </td>
