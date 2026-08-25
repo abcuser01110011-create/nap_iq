@@ -2,6 +2,69 @@
 {% block title %}{{ 'Service Request Details' if mode == 'edit' else 'Add Service Request' }}{% endblock %}
 {% block page_title %}{{ 'Service Request Details' if mode == 'edit' else 'Add New Service Request' }}{% endblock %}
 
+{% block extra_head %}
+{% if mode == 'edit' %}
+<style>
+    /* Phase 31: printable-document styling for the read-only Service
+       Request review screen — scoped entirely under .sr-doc-wrapper
+       so it never leaks into the rest of the (dark-themed) dashboard.
+       Sized to A4 proportions (210mm x 297mm, ~794x1123px at 96dpi)
+       and rendered as a light "paper" card regardless of the active
+       dashboard theme, since this is meant to read like a printed/
+       exportable record, not a themed app screen. */
+    .sr-doc-wrapper { display: flex; justify-content: center; }
+    .sr-doc {
+        position: relative;
+        width: 100%;
+        max-width: 794px;
+        min-height: 1123px;
+        background: #ffffff;
+        color: #1b1f28;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+        padding: 56px 60px 40px;
+        overflow: hidden;
+    }
+    .sr-doc-watermark {
+        position: absolute;
+        top: -50px;
+        left: -50px;
+        width: 320px;
+        height: 320px;
+        object-fit: contain;
+        opacity: .07;
+        z-index: 0;
+        pointer-events: none;
+    }
+    .sr-doc-header, .sr-doc-section, .sr-doc-footer { position: relative; z-index: 1; }
+    .sr-doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #7c3aed; font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+    .sr-doc-brand-logo { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex: none; }
+    .sr-doc-title { font-size: 1.9rem; font-weight: 800; color: #14171f; margin-bottom: 2px; }
+    .sr-doc-subtitle { font-size: .95rem; color: #6b7280; font-weight: 500; }
+    .sr-doc-statusbox { border: 1.5px solid #dcdee6; border-radius: 6px; padding: 10px 20px; text-align: center; min-width: 130px; }
+    .sr-doc-statusbox .label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #8890a0; }
+    .sr-doc-statusbox .value { font-weight: 700; margin-top: 2px; font-size: .95rem; }
+    .sr-doc-section { margin-top: 28px; }
+    .sr-doc-section-bar { display: flex; align-items: center; gap: 10px; background: #f4f5f8; padding: 9px 14px; border-radius: 4px; margin-bottom: 18px; }
+    .sr-doc-section-bar .bar { width: 4px; height: 16px; background: #7c3aed; border-radius: 2px; flex: none; }
+    .sr-doc-section-bar .title { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #2b2f3a; }
+    .sr-doc-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 18px; }
+    .sr-doc-row:last-child { margin-bottom: 0; }
+    .sr-doc-field { flex: 1 1 0; min-width: 160px; }
+    .sr-doc-field.full { flex: 1 1 100%; }
+    .sr-doc-field .flabel { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #8890a0; margin-bottom: 4px; }
+    .sr-doc-field .fvalue { font-size: .92rem; font-weight: 600; color: #1b1f28; padding-bottom: 8px; border-bottom: 1px solid #e3e5ea; min-height: 1.4em; }
+    .sr-doc-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e3e5ea; font-size: .72rem; color: #8890a0; font-style: italic; }
+    @media (max-width: 820px) {
+        .sr-doc { padding: 36px 24px 28px; min-height: 0; }
+        .sr-doc-watermark { width: 200px; height: 200px; }
+        .sr-doc-row { gap: 16px; }
+    }
+</style>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
     <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-sm btn-outline-secondary">
@@ -11,117 +74,144 @@
 
 {% if mode == 'edit' %}
 {#
-    Phase 30 (read-only review screen): the Edit Service Request form
-    was replaced with a read-only detail view for KYC-style review —
-    an administrator approving/rejecting a self-registered request
-    needs to see what the customer submitted, not edit it inline.
-    Actual field changes (reassigning a NAP, correcting a typo'd
-    address, etc.) still go through Subscribers/NAP management or the
-    dedicated "Find Nearest NAP" -> assign_nap flow; this page is
-    purely "read the application, then decide". Approve/Reject remain
-    the only actions here, same routes as before (approve_request /
-    reject_request), only offered while the request is still
-    'pending' — once it's moved past that first decision, this page
-    is just a record of what was approved/rejected and for whom.
+    Phase 31 (printable review document): the read-only Service
+    Request review screen (Phase 30) is now styled as an A4-proportioned
+    "paper" record — see the scoped CSS in extra_head above — with a
+    faint PG Networks watermark, matching the look of a printed/
+    exportable bio-data-style form rather than another dashboard card.
+    Content and behavior are unchanged from Phase 30: still purely
+    read-only, still Approve/Reject as the only actions, still only
+    offered while 'pending'.
 #}
-{% set status_classes = {'pending': 'text-bg-secondary', 'approved': 'text-bg-info', 'scheduled': 'text-bg-primary', 'completed': 'text-bg-success', 'rejected': 'text-bg-danger'} %}
-<div class="row justify-content-center">
-    <div class="col-lg-9">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white"><i class="bi bi-clipboard-data me-1"></i>Service Request</div>
-                    <div class="card-body">
-                        <dl class="row mb-0 small">
-                            <dt class="col-sm-5 text-muted fw-normal">Type</dt>
-                            <dd class="col-sm-7 text-capitalize">{{ service_request.request_type|replace('_', ' ') }}</dd>
+{% set status_colors = {'pending': '#8890a0', 'approved': '#2563eb', 'scheduled': '#7c3aed', 'completed': '#15803d', 'rejected': '#dc2626'} %}
+<div class="sr-doc-wrapper">
+    <div class="sr-doc">
+        <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" class="sr-doc-watermark" alt="" aria-hidden="true">
 
-                            <dt class="col-sm-5 text-muted fw-normal">Status</dt>
-                            <dd class="col-sm-7">
-                                <span class="badge {{ status_classes.get(service_request.status, 'text-bg-secondary') }}">
-                                    {{ service_request.status|capitalize }}
-                                </span>
-                            </dd>
+        <div class="sr-doc-header">
+            <div>
+                <div class="sr-doc-brand">
+                    <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" class="sr-doc-brand-logo" alt="PG Networks logo">
+                    <span>PG Networks</span>
+                </div>
+                <div class="sr-doc-title">Service Request</div>
+                <div class="sr-doc-subtitle">Customer Application Record</div>
+            </div>
+            <div class="sr-doc-statusbox">
+                <div class="label">Status</div>
+                <div class="value" style="color: {{ status_colors.get(service_request.status, '#6b7280') }};">
+                    {{ service_request.status|capitalize }}
+                </div>
+            </div>
+        </div>
 
-                            <dt class="col-sm-5 text-muted fw-normal">Requested NAP</dt>
-                            <dd class="col-sm-7">
-                                {% if service_request.requested_nap %}
-                                    {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
-                                {% elif service_request.suggested_nap %}
-                                    <span class="text-warning-emphasis">Suggested: {{ service_request.suggested_nap.nap_code }} ({{ service_request.suggested_nap.distance_km }} km)</span>
-                                {% else %}
-                                    Not yet assigned
-                                {% endif %}
-                            </dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Service Location</dt>
-                            <dd class="col-sm-7">
-                                {% if service_request.latitude is not none and service_request.longitude is not none %}
-                                    {{ service_request.latitude }}, {{ service_request.longitude }}
-                                {% else %}
-                                    Not provided
-                                {% endif %}
-                            </dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Submitted</dt>
-                            <dd class="col-sm-7">{{ service_request.created_at.strftime('%B %d, %Y') }}</dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Notes</dt>
-                            <dd class="col-sm-7">{{ service_request.notes or "—" }}</dd>
-                        </dl>
+        <div class="sr-doc-section">
+            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Request Details</span></div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Request Type</div>
+                    <div class="fvalue text-capitalize">{{ service_request.request_type|replace('_', ' ') }}</div>
+                </div>
+                <div class="sr-doc-field">
+                    <div class="flabel">Date Submitted</div>
+                    <div class="fvalue">{{ service_request.created_at.strftime('%B %d, %Y') }}</div>
+                </div>
+            </div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Requested NAP</div>
+                    <div class="fvalue">
+                        {% if service_request.requested_nap %}
+                            {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
+                        {% elif service_request.suggested_nap %}
+                            Suggested: {{ service_request.suggested_nap.nap_code }} ({{ service_request.suggested_nap.distance_km }} km away)
+                        {% else %}
+                            Not yet assigned
+                        {% endif %}
                     </div>
                 </div>
             </div>
-
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white"><i class="bi bi-person-vcard me-1"></i>Customer Information</div>
-                    <div class="card-body">
-                        {% if service_request.subscriber %}
-                        <dl class="row mb-0 small">
-                            <dt class="col-sm-5 text-muted fw-normal">Name</dt>
-                            <dd class="col-sm-7">{{ service_request.subscriber.full_name }}</dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Subscriber Code</dt>
-                            <dd class="col-sm-7">{{ service_request.subscriber.subscriber_code }}</dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Contact Number</dt>
-                            <dd class="col-sm-7">{{ service_request.subscriber.contact_number or "—" }}</dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Email</dt>
-                            <dd class="col-sm-7">{{ service_request.subscriber.email or "—" }}</dd>
-
-                            <dt class="col-sm-5 text-muted fw-normal">Installation Address</dt>
-                            <dd class="col-sm-7">{{ service_request.subscriber.address or "—" }}</dd>
-                        </dl>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Service Location</div>
+                    <div class="fvalue">
+                        {% if service_request.latitude is not none and service_request.longitude is not none %}
+                            {{ service_request.latitude }}, {{ service_request.longitude }}
                         {% else %}
-                        <p class="text-muted mb-0">No subscriber record linked to this request.</p>
+                            Not provided
                         {% endif %}
                     </div>
                 </div>
             </div>
         </div>
 
-        {% if service_request.status == 'pending' %}
-        <div class="d-flex justify-content-end gap-2 mt-3">
-            <form method="post" action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
-                  onsubmit="return confirm('Approve this service request?');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-outline-success">
-                    <i class="bi bi-check-lg me-1"></i>Approve
-                </button>
-            </form>
-            <form method="post" action="{{ url_for('service_requests.reject_request', request_id=service_request.id) }}"
-                  onsubmit="return confirm('Reject this service request?');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-outline-danger">
-                    <i class="bi bi-x-lg me-1"></i>Reject
-                </button>
-            </form>
+        <div class="sr-doc-section">
+            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Customer Information</span></div>
+            {% if service_request.subscriber %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Full Name</div>
+                    <div class="fvalue">{{ service_request.subscriber.full_name }}</div>
+                </div>
+                <div class="sr-doc-field">
+                    <div class="flabel">Subscriber Code</div>
+                    <div class="fvalue">{{ service_request.subscriber.subscriber_code }}</div>
+                </div>
+            </div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Mobile Number</div>
+                    <div class="fvalue">{{ service_request.subscriber.contact_number or "—" }}</div>
+                </div>
+                <div class="sr-doc-field">
+                    <div class="flabel">Email Address</div>
+                    <div class="fvalue">{{ service_request.subscriber.email or "—" }}</div>
+                </div>
+            </div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Installation Address</div>
+                    <div class="fvalue">{{ service_request.subscriber.address or "—" }}</div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">No subscriber record linked to this request.</p>
+            {% endif %}
         </div>
-        {% endif %}
+
+        <div class="sr-doc-section">
+            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Notes</span></div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="fvalue" style="border-bottom: none; font-weight: 500;">{{ service_request.notes or "—" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sr-doc-footer">
+            This record reflects the information submitted for this service request and is used by PG Networks staff to review and process the application.
+        </div>
     </div>
 </div>
+
+{% if service_request.status == 'pending' %}
+<div class="d-flex justify-content-center gap-2 mt-4">
+    <form method="post" action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
+          onsubmit="return confirm('Approve this service request?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-success">
+            <i class="bi bi-check-lg me-1"></i>Approve
+        </button>
+    </form>
+    <form method="post" action="{{ url_for('service_requests.reject_request', request_id=service_request.id) }}"
+          onsubmit="return confirm('Reject this service request?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger">
+            <i class="bi bi-x-lg me-1"></i>Reject
+        </button>
+    </form>
+</div>
+{% endif %}
 
 {% else %}
 <div class="row justify-content-center">
