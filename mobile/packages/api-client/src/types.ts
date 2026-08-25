@@ -156,6 +156,15 @@ export interface RegisterInput {
   plan_name?: string;
 }
 
+export interface SendVerificationCodeResponse {
+  message: string;
+}
+
+export interface VerifyEmailCodeResponse {
+  message: string;
+  verified: true;
+}
+
 export interface CoverageCheckResult {
   available: boolean;
   nearest_nap_code?: string;

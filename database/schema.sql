@@ -390,3 +390,23 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
     jti             VARCHAR(36) NOT NULL UNIQUE,
     revoked_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- email_verifications: one-time codes sent to an email address to
+-- verify it during mobile self-registration (Gmail-sent OTP flow —
+-- see app/email_utils.py and app/routes/api_v1/auth.py). Deliberately
+-- not tied to a users row: the address is verified BEFORE any account
+-- exists. Looked up by (email, purpose) instead of a foreign key.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_verifications (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    email           VARCHAR(100) NOT NULL,
+    purpose         VARCHAR(30) NOT NULL DEFAULT 'registration',
+    code            VARCHAR(6) NOT NULL,
+    attempts        INT NOT NULL DEFAULT 0,
+    is_verified     BOOLEAN NOT NULL DEFAULT FALSE,
+    expires_at      TIMESTAMP NOT NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_email_verifications_email (email)
+) ENGINE=InnoDB;

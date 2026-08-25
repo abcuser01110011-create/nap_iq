@@ -706,3 +706,34 @@ class RevokedToken(db.Model):
 
     def __repr__(self):
         return f"<RevokedToken {self.jti}>"
+
+
+class EmailVerification(db.Model):
+    """A one-time verification code sent to an email address, backing
+    the mobile app's "verify your email before submitting the
+    application" step (see app/email_utils.py and
+    app/routes/api_v1/auth.py's send-verification-code / verify-email-
+    code / register endpoints).
+
+    Deliberately NOT tied to a `users` row by foreign key — the whole
+    point is to verify an address BEFORE any account exists yet. Rows
+    are looked up by `email` + `purpose` instead.
+
+    `purpose` keeps this table reusable beyond registration (e.g. a
+    future "change my email" flow could use purpose='email_change')
+    without needing a second, near-identical table.
+    """
+
+    __tablename__ = "email_verifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), nullable=False, index=True)
+    purpose = db.Column(db.String(30), nullable=False, default="registration")
+    code = db.Column(db.String(6), nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    is_verified = db.Column(db.Boolean, nullable=False, default=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<EmailVerification {self.email} ({self.purpose})>"

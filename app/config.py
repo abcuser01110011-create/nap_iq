@@ -129,6 +129,40 @@ class Config:
     # a compressed phone photo with headroom.
     MAX_CONTENT_LENGTH = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(8 * 1024 * 1024)))
 
+    # ---- Email / Gmail SMTP settings (applicant email verification) ----
+    # Used by app/email_utils.py to send the one-time verification code
+    # during mobile self-registration, and the approved/scheduled
+    # status-change emails from app/routes/service_requests.py.
+    #
+    # GMAIL_ADDRESS / GMAIL_APP_PASSWORD must both be set in .env for
+    # real sending to work. GMAIL_APP_PASSWORD is a 16-character Google
+    # "App Password" (Google Account -> Security -> 2-Step Verification
+    # -> App passwords) — NOT the normal Gmail login password, which
+    # Google will reject for SMTP if 2FA is on (and 2FA is required to
+    # even generate an App Password in the first place).
+    GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
+    GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
+    MAIL_DEFAULT_SENDER_NAME = os.environ.get("MAIL_DEFAULT_SENDER_NAME", "NAP-IQ")
+    MAIL_SMTP_HOST = os.environ.get("MAIL_SMTP_HOST", "smtp.gmail.com")
+    MAIL_SMTP_PORT = int(os.environ.get("MAIL_SMTP_PORT", "465"))
+
+    # How long a sent verification code stays valid, and how many wrong
+    # attempts are tolerated before the applicant has to request a new
+    # one — mirrors the same "short-lived, attempt-limited" shape used
+    # by JWT_ACCESS_TOKEN_EXPIRES / LOGIN_RATE_LIMIT_PER_USERNAME above.
+    EMAIL_VERIFICATION_CODE_TTL_MINUTES = int(
+        os.environ.get("EMAIL_VERIFICATION_CODE_TTL_MINUTES", "10")
+    )
+    EMAIL_VERIFICATION_MAX_ATTEMPTS = int(
+        os.environ.get("EMAIL_VERIFICATION_MAX_ATTEMPTS", "5")
+    )
+    # Per-email rate limit on POST /api/v1/auth/send-verification-code —
+    # stops one applicant (or an abuser targeting someone else's inbox)
+    # from triggering unlimited sends.
+    EMAIL_VERIFICATION_SEND_RATE_LIMIT = os.environ.get(
+        "EMAIL_VERIFICATION_SEND_RATE_LIMIT", "3 per 5 minutes"
+    )
+
     # ---- MySQL connection settings ----
 
     # ---- MySQL connection settings ----

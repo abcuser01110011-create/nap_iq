@@ -73,6 +73,7 @@ from app.models import ServiceRequest, Subscriber, Nap
 from app.forms import ServiceRequestForm
 from app.notifications_utils import notify
 from app.nap_recommendation import recommend_naps
+from app.email_utils import send_status_email
 
 service_requests_bp = Blueprint("service_requests", __name__, url_prefix="/service-requests")
 
@@ -121,6 +122,39 @@ def _notify_status_change(service_request):
         entity_type="service_request",
         entity_id=service_request.id,
     )
+
+    # Applicant email notification (Gmail SMTP) — separate from the
+    # in-app Notification row above, for the statuses an applicant
+    # actually cares about hearing via email even if they don't have
+    # the app open: approved, scheduled, and rejected. Silently does
+    # nothing if the subscriber has no email on file, or if sending
+    # fails (see app/email_utils.py's send_status_email()) — the
+    # in-app notification above always still gets recorded either way.
+    subscriber_email = service_request.subscriber.email if service_request.subscriber else None
+    if subscriber_email and service_request.status in ("approved", "scheduled", "rejected"):
+        status_copy = {
+            "approved": (
+                "Your application has been approved!",
+                "Good news — your service request has been approved. "
+                "We'll follow up shortly to schedule your installation.",
+            ),
+            "scheduled": (
+                "Your installation has been scheduled",
+                "Your service request has moved to 'scheduled'. "
+                "A technician will be assigned and dispatched soon.",
+            ),
+            "rejected": (
+                "Update on your service application",
+                "Unfortunately, your service request could not be approved "
+                "at this time. Please contact support if you have questions.",
+            ),
+        }[service_request.status]
+        send_status_email(
+            subscriber_email,
+            subject=f"NAP-IQ — {status_copy[0]}",
+            heading=status_copy[0],
+            body_text=status_copy[1],
+        )
 
 
 @service_requests_bp.route("/")

@@ -30,10 +30,28 @@ from app.extensions import db, limiter
 from app.jwt_auth import MOBILE_API_ROLES
 from app.models import Plan, RevokedToken, ServiceRequest, Subscriber, User
 from app.nap_recommendation import recommend_naps
+from app.email_utils import (
+    consume_verification,
+    is_email_verified,
+    send_verification_code,
+    verify_code,
+)
 
 api_v1_auth_bp = Blueprint("api_v1_auth", __name__, url_prefix="/api/v1/auth")
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_REGISTRATION_EMAIL_PURPOSE = "registration"
+
+
+def _send_code_email_key() -> str:
+    """Rate-limit key for POST /api/v1/auth/send-verification-code —
+    keyed by the submitted email (lowercased) rather than IP, so the
+    limit is "how many codes can this address be sent" regardless of
+    which device/IP is asking. Falls back to a constant string on a
+    malformed body, same reasoning as _login_username_key above."""
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip().lower()
+    return email or "no-email-submitted"
 
 
 def _login_username_key() -> str:
@@ -92,6 +110,16 @@ def _validate_registration(data: dict) -> dict:
             errors["email"] = "Enter a valid email address."
         elif User.query.filter_by(email=email).first() is not None:
             errors["email"] = "This email is already registered."
+        elif not is_email_verified(email, purpose=_REGISTRATION_EMAIL_PURPOSE):
+            # Applicant must have completed the send-code / verify-code
+            # exchange below for this exact email before the account
+            # can be created — see app/email_utils.py's is_email_verified().
+            errors["email"] = "Please verify this email address before submitting."
+    else:
+        # Email verification is the whole point of this phase, so an
+        # applicant can no longer skip providing one the way the
+        # earlier optional-email registration allowed.
+        errors["email"] = "Email is required so we can verify it and send you updates."
 
     phone_number = str(data.get("phone_number") or "").strip() or None
     if phone_number and len(phone_number) > 20:
@@ -260,6 +288,11 @@ def register():
     db.session.add(service_request)
     db.session.commit()
 
+    # The email's verification record has now done its job — remove it
+    # so it can't be replayed against a second registration attempt.
+    if email:
+        consume_verification(email, purpose=_REGISTRATION_EMAIL_PURPOSE)
+
     identity = str(user.id)
     access_token = create_access_token(identity=identity)
     refresh_token = create_refresh_token(identity=identity)
@@ -269,6 +302,51 @@ def register():
         refresh_token=refresh_token,
         user=_user_payload(user),
     ), 201
+
+
+@api_v1_auth_bp.route("/send-verification-code", methods=["POST"])
+@limiter.limit(lambda: current_app.config["EMAIL_VERIFICATION_SEND_RATE_LIMIT"], key_func=_send_code_email_key)
+def send_verification_code_route():
+    """Sends a 6-digit one-time code to the submitted email via Gmail
+    SMTP (app/email_utils.py), for the mobile Register screen's "verify
+    your email" step. Always returns 200 with the same generic message
+    regardless of whether the address is already registered or the
+    send actually succeeded server-side — this endpoint intentionally
+    never confirms/denies "is this email already in our system" (that
+    check happens later, at register()) and never reveals SMTP
+    delivery failures to the client, only logs them.
+    """
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip()
+
+    if not email or len(email) > 100 or not _EMAIL_RE.match(email):
+        return jsonify(error="Enter a valid email address."), 400
+
+    send_verification_code(email, purpose=_REGISTRATION_EMAIL_PURPOSE)
+    return jsonify(message="If that email is valid, a verification code has been sent."), 200
+
+
+@api_v1_auth_bp.route("/verify-email-code", methods=["POST"])
+@limiter.limit(lambda: current_app.config["EMAIL_VERIFICATION_SEND_RATE_LIMIT"], key_func=_send_code_email_key)
+def verify_email_code_route():
+    """Checks the code the applicant typed in against the one most
+    recently sent to that email (app/email_utils.py's verify_code()).
+    On success, the email is marked verified so register() above will
+    accept it; on failure, returns the specific reason (expired, wrong,
+    too many attempts, none requested) so the mobile UI can show it.
+    """
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip()
+    code = str(data.get("code") or "").strip()
+
+    if not email or not code:
+        return jsonify(error="Email and code are required."), 400
+
+    ok, message = verify_code(email, code, purpose=_REGISTRATION_EMAIL_PURPOSE)
+    if not ok:
+        return jsonify(error=message), 400
+
+    return jsonify(message="Email verified.", verified=True), 200
 
 
 @api_v1_auth_bp.route("/refresh", methods=["POST"])

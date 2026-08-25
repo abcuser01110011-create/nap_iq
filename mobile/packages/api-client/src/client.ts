@@ -9,8 +9,10 @@ import type {
   RefreshResponse,
   RegisterInput,
   ReportIssueInput,
+  SendVerificationCodeResponse,
   ServiceRequest,
   Subscriber,
+  VerifyEmailCodeResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -369,6 +371,30 @@ listPayments: () => this.request<{ payments: Payment[] }>("/api/v1/customer/paym
 
     listPlans: () =>
       this.request<{ plans: string[] }>("/api/v1/customer/plans", { auth: false }),
+
+    /** Sends a 6-digit one-time code to `email` via Gmail SMTP
+     * (app/email_utils.py). Always resolves — the backend deliberately
+     * never reveals whether the address is already registered, so a
+     * thrown ApiError here only ever means a malformed email or a
+     * rate limit, not "that email is taken". */
+    sendVerificationCode: (email: string) =>
+      this.request<SendVerificationCodeResponse>("/api/v1/auth/send-verification-code", {
+        method: "POST",
+        auth: false,
+        body: { email },
+      }),
+
+    /** Checks the code the applicant typed against the most recently
+     * sent one. Throws ApiError(400) with a specific message (expired
+     * / wrong / too many attempts / none requested) on failure — show
+     * `error.message` directly, it's already user-facing copy from
+     * app/email_utils.py's verify_code(). */
+    verifyEmailCode: (email: string, code: string) =>
+      this.request<VerifyEmailCodeResponse>("/api/v1/auth/verify-email-code", {
+        method: "POST",
+        auth: false,
+        body: { email, code },
+      }),
   };
 
   /** True once a token pair is stored locally. Doesn't verify the
