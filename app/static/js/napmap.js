@@ -1238,7 +1238,7 @@
             // the badge's color/glyph and the pulse change.
             const svg =
                 '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
-                '<circle cx="11" cy="11" r="7" fill="' + color + '" stroke="#ffffff" stroke-width="1.75"/>' +
+                '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
                 '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
                 'font-family="Arial, sans-serif">!</text>' +
                 "</svg>";
