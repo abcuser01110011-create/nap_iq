@@ -1142,6 +1142,15 @@
         const toggle = document.getElementById("showSubscribersToggle");
         const showSubscribers = toggle ? toggle.checked : false;
 
+        // The alert badge + pulse only shows on a subscriber's own
+        // marker when "Show Issues" is checked -- unchecked, every
+        // subscriber marker stays the plain person icon regardless of
+        // whether it has an open issue, so "Show Issues" is what
+        // switches the pulsing alert look on, not just the presence
+        // of an issue.
+        const showIssuesToggle = document.getElementById("showIssuesToggle");
+        const showIssuesEnabled = showIssuesToggle ? showIssuesToggle.checked : false;
+
         if (showSubscribers) {
             if (!map.hasLayer(subscriberMarkerLayer)) subscriberMarkerLayer.addTo(map);
             if (!map.hasLayer(subscriberConnectionLayer)) subscriberConnectionLayer.addTo(map);
@@ -1155,10 +1164,13 @@
         allSubscribers.forEach((subscriber) => {
             if (subscriber.latitude == null || subscriber.longitude == null) return;
 
-            // Computed once per subscriber and reused for both the
-            // marker icon (person vs. pulsing alert badge) and the
-            // connection line color below, so they never disagree.
-            const worstPriority = getSubscriberWorstOpenPriority(subscriber.id);
+            // Computed once per subscriber and reused for the marker
+            // icon (person vs. pulsing alert badge) -- but only fed
+            // to the icon builder when "Show Issues" is on, so the
+            // alert badge/pulse appears together with that toggle
+            // instead of always showing for a subscriber with an
+            // open issue.
+            const worstPriority = showIssuesEnabled ? getSubscriberWorstOpenPriority(subscriber.id) : null;
 
             const marker = L.marker([subscriber.latitude, subscriber.longitude], {
                 icon: buildSubscriberIcon(worstPriority),
@@ -1220,14 +1232,14 @@
         if (priority) {
             const color = PRIORITY_COLORS[priority] || NO_ISSUE_LINE_COLOR;
             const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
-            // Same r=9 circle as the normal (no-issue) icon below, so
+            // Same r=7 circle as the normal (no-issue) icon below, so
             // the subscriber marker reads as the same on-screen size
             // whether or not it currently has an open issue -- only
             // the badge's color/glyph and the pulse change.
             const svg =
                 '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
-                '<circle cx="11" cy="11" r="9" fill="' + color + '" stroke="#ffffff" stroke-width="2"/>' +
-                '<text x="11" y="15.5" font-size="13" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+                '<circle cx="11" cy="11" r="7" fill="' + color + '" stroke="#ffffff" stroke-width="1.75"/>' +
+                '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
                 'font-family="Arial, sans-serif">!</text>' +
                 "</svg>";
             const html =
@@ -1244,11 +1256,15 @@
             });
         }
 
+        // Body circle at r=7 -- matches the alert badge's r=7 circle
+        // above so the marker is the same on-screen size in both
+        // states. Head/shoulders scaled down to match (originally
+        // drawn around an r=9 body).
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
-            '<circle cx="11" cy="11" r="9" fill="#6f42c1" stroke="#ffffff" stroke-width="2"/>' +
-            '<circle cx="11" cy="8.5" r="2.6" fill="#ffffff"/>' +
-            '<path d="M5.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" fill="#ffffff"/>' +
+            '<circle cx="11" cy="11" r="7" fill="#6f42c1" stroke="#ffffff" stroke-width="2"/>' +
+            '<circle cx="11" cy="9.06" r="2.02" fill="#ffffff"/>' +
+            '<path d="M6.72 15.28c0-2.33 1.94-3.89 4.28-3.89s4.28 1.56 4.28 3.89" fill="#ffffff"/>' +
             "</svg>";
 
         return L.divIcon({
