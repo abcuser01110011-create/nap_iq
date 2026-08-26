@@ -120,23 +120,51 @@ def naps_json():
             )
         return lines
 
-    data = [
-        {
-            "id": nap.id,
-            "nap_code": nap.nap_code,
-            "name": nap.name,
-            "address": nap.address,
-            "latitude": float(nap.latitude),
-            "longitude": float(nap.longitude),
-            "total_ports": nap.total_ports,
-            "used_ports": nap.used_ports,
-            "available_ports": nap.available_ports,
-            "status": nap.status,
-            "connected_lines": _connected_lines(nap),
-        }
-        for nap in naps
-        if nap.latitude is not None and nap.longitude is not None
-    ]
+    def _slot_usage(nap):
+        """`nap.used_ports`/`available_ports` are stored counters that
+        are only ever written by the NAP add/edit forms
+        (app/routes/naps.py) — every route that actually links a
+        subscriber to a NAP (add_subscriber(), quick_add_subscriber(),
+        assign_nap()) explicitly leaves them untouched (see
+        app/routes/subscribers.py's quick_add_subscriber() docstring),
+        so they drift from reality as soon as a subscriber is
+        connected: the GeoMap panel was showing "0 used" for a NAP
+        with 3 connected lines.
+
+        Rather than bolting bookkeeping onto every one of those write
+        paths (and risking missing the next one), the GeoMap feed
+        derives slot usage directly from the actual linked
+        subscribers, the same source of truth `connected_lines`
+        already uses. A subscriber counts as occupying a physical
+        port unless they've been fully disconnected — "active",
+        "inactive" (e.g. suspended for non-payment), and
+        "pending_review" all still have a live drop cable into the
+        NAP; only "disconnected" frees the slot back up.
+        """
+        used = sum(1 for s in nap.subscribers if s.status != "disconnected")
+        total = nap.total_ports or 0
+        return used, max(total - used, 0)
+
+    data = []
+    for nap in naps:
+        if nap.latitude is None or nap.longitude is None:
+            continue
+        used_ports, available_ports = _slot_usage(nap)
+        data.append(
+            {
+                "id": nap.id,
+                "nap_code": nap.nap_code,
+                "name": nap.name,
+                "address": nap.address,
+                "latitude": float(nap.latitude),
+                "longitude": float(nap.longitude),
+                "total_ports": nap.total_ports,
+                "used_ports": used_ports,
+                "available_ports": available_ports,
+                "status": nap.status,
+                "connected_lines": _connected_lines(nap),
+            }
+        )
     return jsonify(data)
 
 
