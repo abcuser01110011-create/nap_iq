@@ -541,18 +541,16 @@
      * visual boundary only, never something you click on.
      */
     function buildCoverageRadiusCircle(nap) {
-        const dark = isDarkTheme();
-        const color = dark ? "#38bdf8" : "#0f5fa6"; // --napiq-info / --napiq-primary
+        const color = "#39ff14"; // neon green, solid ring on both themes
         return L.circle([nap.latitude, nap.longitude], {
             radius: napConnectionRadiusMeters,
             interactive: false,
             color: color,
-            weight: 1.5,
-            opacity: dark ? 0.8 : 0.65,
-            dashArray: "6 5",
+            weight: 4,
+            opacity: 1,
             fillColor: color,
-            fillOpacity: dark ? 0.09 : 0.06,
-            className: "napiq-coverage-ring " + (dark ? "napiq-coverage-ring-dark" : "napiq-coverage-ring-light"),
+            fillOpacity: 0.12,
+            className: "napiq-coverage-ring napiq-coverage-ring-neon",
         });
     }
 
@@ -965,9 +963,8 @@
                     ],
                     {
                         color: PRIORITY_COLORS[issue.priority] || "#dc3545",
-                        weight: 2.5,
-                        opacity: 0.8,
-                        dashArray: "4,4",
+                        weight: 5,
+                        opacity: 1,
                         interactive: false,
                     }
                 );
@@ -1155,9 +1152,8 @@
                     ],
                     {
                         color: getSubscriberConnectionColor(subscriber.id),
-                        weight: 2.5,
-                        opacity: 0.8,
-                        dashArray: "4,4",
+                        weight: 5,
+                        opacity: 1,
                         interactive: false,
                     }
                 );

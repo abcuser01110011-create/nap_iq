@@ -251,7 +251,7 @@
         window.L.polyline(latlngs, {
             pane: ROUTE_PANE_NAME,
             color: "#0b2540",
-            weight: 9,
+            weight: 13,
             opacity: 0.55,
             lineCap: "round",
             lineJoin: "round",
@@ -261,36 +261,38 @@
 
         window.L.polyline(latlngs, {
             pane: ROUTE_PANE_NAME,
-            color: "#0d6efd", // Bootstrap primary, matching the rest of the NAP-IQ UI
-            weight: 4.5,
-            opacity: 0.95,
+            color: "#39ff14", // neon green, solid — no dashArray
+            weight: 7,
+            opacity: 1,
             lineCap: "round",
             lineJoin: "round",
             interactive: false,
-            className: "napiq-route-polyline",
+            className: "napiq-route-polyline napiq-route-polyline-neon",
         }).addTo(routeLayer);
 
-        // Endpoint markers — origin (sky-blue ring) and destination
-        // (solid blue), positioned on the route's own snapped-to-road
+        // Endpoint markers — origin (neon ring) and destination
+        // (solid neon), positioned on the route's own snapped-to-road
         // start/end points, same convention as the prototype's
         // routePositions[0] / destination CircleMarkers.
         window.L.circleMarker(latlngs[0], {
             pane: ROUTE_ENDPOINTS_PANE_NAME,
-            radius: 7,
+            radius: 9,
             color: "#e0f2fe",
-            fillColor: "#0ea5e9",
+            fillColor: "#39ff14",
             fillOpacity: 1,
-            weight: 2.5,
+            weight: 3,
+            className: "napiq-route-endpoint-neon",
             interactive: false,
         }).addTo(routeLayer);
 
         window.L.circleMarker(latlngs[latlngs.length - 1], {
             pane: ROUTE_ENDPOINTS_PANE_NAME,
-            radius: 8,
+            radius: 10,
             color: "#f8fafc",
-            fillColor: "#1d4ed8",
+            fillColor: "#ff073a",
             fillOpacity: 1,
-            weight: 3,
+            weight: 3.5,
+            className: "napiq-route-endpoint-neon",
             interactive: false,
         }).addTo(routeLayer);
 
