@@ -293,6 +293,45 @@
     50% { opacity: 0.55; }
 }
 
+/* Priority-pulse ring, used by reported-issue markers and by a
+   subscriber marker once that subscriber has an open issue (see
+   buildIssueIcon()/buildSubscriberIcon() in napmap.js). A soft ring
+   expands out from behind the badge and fades, in the same color as
+   the badge itself (`color` is set inline per marker so `currentColor`
+   picks it up) -- kept small and simple so it reads as "this needs
+   attention" without overwhelming the map. `--pulse-duration` is set
+   inline per marker from PRIORITY_PULSE_SECONDS, so critical-priority
+   markers visibly pulse faster than low-priority ones. */
+.priority-pulse-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.priority-pulse-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.6;
+    animation: napiq-priority-pulse var(--pulse-duration, 1.6s) ease-out infinite;
+    pointer-events: none;
+}
+
+.priority-pulse-wrap svg {
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes napiq-priority-pulse {
+    0% { transform: scale(0.85); opacity: 0.55; }
+    75%, 100% { transform: scale(1.55); opacity: 0; }
+}
+
 /* Coverage-radius ring (napmap.js's buildCoverageRadiusCircle()): a
    true-to-scale geographic circle (Leaflet L.circle, radius in
    meters) marking Settings > App Settings > Max Connection Radius
@@ -310,14 +349,12 @@
     animation: napiq-coverage-pulse 3.4s ease-in-out infinite;
 }
 
-/* Turn-by-turn route polyline + endpoint markers (nav-routing.js):
-   solid neon-green line with a soft glow, no dashArray. */
-.napiq-route-polyline-neon {
-    filter: drop-shadow(0 0 4px rgba(57, 255, 20, 0.75)) drop-shadow(0 0 8px rgba(57, 255, 20, 0.4));
+.napiq-coverage-ring-light {
+    filter: drop-shadow(0 0 4px rgba(15, 95, 166, 0.4));
 }
 
-.napiq-route-endpoint-neon {
-    filter: drop-shadow(0 0 4px rgba(57, 255, 20, 0.65));
+.napiq-coverage-ring-dark {
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
 }
 
 @keyframes napiq-coverage-pulse {

@@ -24,8 +24,19 @@
     const PRIORITY_COLORS = {
         low: "#6c757d",
         medium: "#0d6efd",
-        high: "#f0a52a",
-        critical: "#782a31",
+        high: "#fd7e14",
+        critical: "#dc3545",
+    };
+
+    // How fast a priority-colored marker pulses, in seconds per pulse
+    // cycle -- lower is faster. Critical pulses noticeably faster than
+    // the rest so it reads as more urgent at a glance, with each lower
+    // priority pulsing a bit slower than the one above it.
+    const PRIORITY_PULSE_SECONDS = {
+        critical: 0.6,
+        high: 1.1,
+        medium: 1.6,
+        low: 2.2,
     };
 
     // Responsive icon sizing: Leaflet divIcons are plain HTML/CSS, so
@@ -64,7 +75,7 @@
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
     // "healthy" at a glance, same green as an Active NAP.
-    const NO_ISSUE_LINE_COLOR = "#2fbf71";
+    const NO_ISSUE_LINE_COLOR = "#198754";
 
     const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
         ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
@@ -120,7 +131,11 @@
      * ignored -- once a problem is fixed the line should go back to
      * "healthy" green rather than staying colored forever.
      */
-    function getSubscriberConnectionColor(subscriberId) {
+    /** Returns the priority key ("critical"/"high"/"medium"/"low") of a
+     * subscriber's worst currently-open reported issue, or null if
+     * they have none. Shared by the connection-line color and the
+     * subscriber marker icon so both agree on the same issue. */
+    function getSubscriberWorstOpenPriority(subscriberId) {
         let worstPriority = null;
         allIssues.forEach((issue) => {
             if (issue.subscriber_id !== subscriberId) return;
@@ -129,6 +144,11 @@
                 worstPriority = issue.priority;
             }
         });
+        return worstPriority;
+    }
+
+    function getSubscriberConnectionColor(subscriberId) {
+        const worstPriority = getSubscriberWorstOpenPriority(subscriberId);
         return worstPriority ? (PRIORITY_COLORS[worstPriority] || NO_ISSUE_LINE_COLOR) : NO_ISSUE_LINE_COLOR;
     }
 
@@ -549,9 +569,10 @@
             color: color,
             weight: 1.5,
             opacity: dark ? 0.8 : 0.65,
+            dashArray: "6 5",
             fillColor: color,
             fillOpacity: dark ? 0.09 : 0.06,
-            className: "napiq-coverage-ring",
+            className: "napiq-coverage-ring " + (dark ? "napiq-coverage-ring-dark" : "napiq-coverage-ring-light"),
         });
     }
 
@@ -963,9 +984,10 @@
                         [nap.latitude, nap.longitude],
                     ],
                     {
-                        color: PRIORITY_COLORS[issue.priority] || "#782a31",
-                        weight: 3,
-                        opacity: 0.95,
+                        color: PRIORITY_COLORS[issue.priority] || "#dc3545",
+                        weight: 2.5,
+                        opacity: 0.8,
+                        dashArray: "4,4",
                         interactive: false,
                     }
                 );
@@ -980,10 +1002,14 @@
      * Builds a marker icon for a technical issue. Deliberately a
      * circular warning badge (not the teardrop pin used for NAPs) so
      * issue markers are visually distinguishable from NAP markers at
-     * a glance, colored by priority rather than status.
+     * a glance, colored by priority rather than status. Wrapped in a
+     * priority-pulse ring (see .priority-pulse-wrap in napmap.css) so
+     * a reported issue reads as "live" on the map, pulsing faster the
+     * more urgent its priority is.
      */
     function buildIssueIcon(priority) {
         const color = PRIORITY_COLORS[priority] || "#0d6efd";
+        const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
         const s = Math.round(28 * getIconScale());
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
@@ -991,9 +1017,13 @@
             '<text x="14" y="19" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
+        const html =
+            '<div class="priority-pulse-wrap" style="color:' + color + ';--pulse-duration:' + pulseSeconds + 's;">' +
+            svg +
+            "</div>";
 
         return L.divIcon({
-            html: svg,
+            html: html,
             className: "issue-marker-icon",
             iconSize: [s, s],
             iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
@@ -1002,7 +1032,7 @@
     }
 
     /** Builds a "pending" (not-yet-saved) issue marker icon — same
-     * shape, distinct pulsing blue color. */
+     * shape, distinct pulsing blue color, at the "medium" pulse rate. */
     function buildPendingIssueIcon() {
         const s = Math.round(28 * getIconScale());
         const svg =
@@ -1011,9 +1041,15 @@
             '<text x="14" y="19" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
+        const html =
+            '<div class="priority-pulse-wrap" style="color:#0d6efd;--pulse-duration:' +
+            PRIORITY_PULSE_SECONDS.medium +
+            's;">' +
+            svg +
+            "</div>";
 
         return L.divIcon({
-            html: svg,
+            html: html,
             className: "issue-marker-icon issue-marker-pending",
             iconSize: [s, s],
             iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
@@ -1119,8 +1155,13 @@
         allSubscribers.forEach((subscriber) => {
             if (subscriber.latitude == null || subscriber.longitude == null) return;
 
+            // Computed once per subscriber and reused for both the
+            // marker icon (person vs. pulsing alert badge) and the
+            // connection line color below, so they never disagree.
+            const worstPriority = getSubscriberWorstOpenPriority(subscriber.id);
+
             const marker = L.marker([subscriber.latitude, subscriber.longitude], {
-                icon: buildSubscriberIcon(),
+                icon: buildSubscriberIcon(worstPriority),
                 title: subscriber.subscriber_code + " - " + subscriber.full_name,
             });
             marker.bindPopup(buildSubscriberPopupHtml(subscriber));
@@ -1153,8 +1194,9 @@
                     ],
                     {
                         color: getSubscriberConnectionColor(subscriber.id),
-                        weight: 3,
-                        opacity: 0.95,
+                        weight: 2.5,
+                        opacity: 0.8,
+                        dashArray: "4,4",
                         interactive: false,
                     }
                 );
@@ -1166,9 +1208,38 @@
     }
 
     /** Small circular marker for subscribers — visually distinct from
-     * both the NAP teardrop pin and the issue warning badge. */
-    function buildSubscriberIcon() {
+     * both the NAP teardrop pin and the issue warning badge. When the
+     * subscriber has a currently-open reported issue, `priority` is
+     * passed in and the normal person icon is swapped for the same
+     * warning-badge look issues use (colored + pulsed at that
+     * priority's rate) so a subscriber with a problem stands out from
+     * a healthy one without needing to open its popup. */
+    function buildSubscriberIcon(priority) {
         const s = Math.round(22 * getIconScale());
+
+        if (priority) {
+            const color = PRIORITY_COLORS[priority] || NO_ISSUE_LINE_COLOR;
+            const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
+            const svg =
+                '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+                '<circle cx="11" cy="11" r="9" fill="' + color + '" stroke="#ffffff" stroke-width="2"/>' +
+                '<text x="11" y="15.5" font-size="12" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+                'font-family="Arial, sans-serif">!</text>' +
+                "</svg>";
+            const html =
+                '<div class="priority-pulse-wrap" style="color:' + color + ';--pulse-duration:' + pulseSeconds + 's;">' +
+                svg +
+                "</div>";
+
+            return L.divIcon({
+                html: html,
+                className: "subscriber-marker-icon subscriber-marker-icon-alert",
+                iconSize: [s, s],
+                iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
+                popupAnchor: [0, -Math.round(s / 2)],
+            });
+        }
+
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
             '<circle cx="11" cy="11" r="9" fill="#6f42c1" stroke="#ffffff" stroke-width="2"/>' +

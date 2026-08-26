@@ -261,38 +261,36 @@
 
         window.L.polyline(latlngs, {
             pane: ROUTE_PANE_NAME,
-            color: "#39ff14", // neon green, solid — no dashArray
+            color: "#0d6efd", // Bootstrap primary, matching the rest of the NAP-IQ UI
             weight: 4.5,
-            opacity: 1,
+            opacity: 0.95,
             lineCap: "round",
             lineJoin: "round",
             interactive: false,
-            className: "napiq-route-polyline napiq-route-polyline-neon",
+            className: "napiq-route-polyline",
         }).addTo(routeLayer);
 
-        // Endpoint markers — origin (neon ring) and destination
-        // (solid neon), positioned on the route's own snapped-to-road
+        // Endpoint markers — origin (sky-blue ring) and destination
+        // (solid blue), positioned on the route's own snapped-to-road
         // start/end points, same convention as the prototype's
         // routePositions[0] / destination CircleMarkers.
         window.L.circleMarker(latlngs[0], {
             pane: ROUTE_ENDPOINTS_PANE_NAME,
-            radius: 9,
+            radius: 7,
             color: "#e0f2fe",
-            fillColor: "#39ff14",
+            fillColor: "#0ea5e9",
             fillOpacity: 1,
-            weight: 3,
-            className: "napiq-route-endpoint-neon",
+            weight: 2.5,
             interactive: false,
         }).addTo(routeLayer);
 
         window.L.circleMarker(latlngs[latlngs.length - 1], {
             pane: ROUTE_ENDPOINTS_PANE_NAME,
-            radius: 10,
+            radius: 8,
             color: "#f8fafc",
-            fillColor: "#ff073a",
+            fillColor: "#1d4ed8",
             fillOpacity: 1,
-            weight: 3.5,
-            className: "napiq-route-endpoint-neon",
+            weight: 3,
             interactive: false,
         }).addTo(routeLayer);
 
