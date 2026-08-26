@@ -145,6 +145,35 @@ from app.models import Nap, AppSettings
 from app.recommendation import haversine_km
 
 
+def _effective_available_ports(nap):
+    """Real available capacity for `nap`, derived from actually-linked
+    subscribers rather than the stored `available_ports` column.
+
+    BUGFIX: `nap.used_ports`/`available_ports` are only ever written
+    by the NAP add/edit forms (app/routes/naps.py) -- every route
+    that actually links a subscriber to a NAP (add_subscriber(),
+    quick_add_subscriber(), assign_nap()) leaves them untouched, so
+    they drift from reality the moment a subscriber is connected any
+    other way. `/api/naps` (app/routes/api.py's `_slot_usage()`)
+    already works around exactly this drift for the GeoMap's own
+    "used/open" display and its over-100% utilization badge --
+    without this fix, `recommend_naps()` could still treat a NAP the
+    map itself shows as full (e.g. "200%") as having an open slot,
+    drawing a connector line to it and offering it as the suggestion
+    in Plan Installation mode even though it can't actually take a
+    new connection. This mirrors that same derivation here so both
+    features agree on what "full" means.
+
+    A subscriber occupies a port unless fully disconnected --
+    "active", "inactive" (e.g. suspended for non-payment), and
+    "pending_review" all still have a live drop cable into the NAP;
+    only "disconnected" frees the slot back up.
+    """
+    used = sum(1 for s in nap.subscribers if s.status != "disconnected")
+    total = nap.total_ports or 0
+    return max(total - used, 0)
+
+
 def recommend_naps(customer_latitude, customer_longitude, limit=None):
     """Returns a ranked list of recommendation dicts for a customer
     location, nearest suitable NAP first. Empty list if no NAP is
@@ -177,7 +206,7 @@ def recommend_naps(customer_latitude, customer_longitude, limit=None):
     candidates = [
         nap
         for nap in Nap.query.filter_by(status="active").all()
-        if (nap.available_ports or 0) > 0
+        if _effective_available_ports(nap) > 0
     ]
 
     rows = []
@@ -193,7 +222,7 @@ def recommend_naps(customer_latitude, customer_longitude, limit=None):
                 "nap_code": nap.nap_code,
                 "name": nap.name,
                 "distance_km": round(distance_km, 2),
-                "available_ports": nap.available_ports,
+                "available_ports": _effective_available_ports(nap),
                 "total_ports": nap.total_ports,
                 "status": nap.status,
                 "latitude": float(nap.latitude),
