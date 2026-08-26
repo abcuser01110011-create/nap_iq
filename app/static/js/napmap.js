@@ -84,6 +84,14 @@
     // the subscriber connection so both read the same way at a glance.
     let subscriberConnectionLayer;
     let issueConnectionLayer;
+    // Coverage radius ring: one L.circle per shown NAP, radius sourced
+    // from Settings > App Settings > Max Connection Radius (meters) --
+    // see AppSettings.nap_connection_radius_meters in app/models.py.
+    // A geographic L.circle (not a fixed-pixel divIcon) so the ring is
+    // always a true to-scale radius in meters at any zoom level,
+    // rather than an approximation that only looks right at one zoom.
+    let coverageRadiusLayer;
+    let napConnectionRadiusMeters = 0; // 0 = no limit set / feature off
     let allNaps = [];              // full NAP dataset from the API
     let allIssues = [];            // full technical issue dataset from the API
     let allSubscribers = [];       // active subscribers, for the Report Issue form
@@ -177,8 +185,13 @@
     }
 
     // Live-swap the basemap if Dark Mode is toggled while this page is
-    // already open, instead of requiring a reload.
-    window.addEventListener("napiq:theme-changed", applyBasemapForCurrentTheme);
+    // already open, instead of requiring a reload. The coverage radius
+    // ring's color is theme-dependent too (see buildCoverageRadiusCircle()),
+    // so it needs rebuilding right alongside the basemap.
+    window.addEventListener("napiq:theme-changed", function () {
+        applyBasemapForCurrentTheme();
+        renderNapMarkers();
+    });
 
     document.addEventListener("DOMContentLoaded", init);
 
@@ -196,9 +209,19 @@
 
         applyBasemapForCurrentTheme();
 
+        // Added to the map before markerLayer so the rings always sit
+        // *underneath* the NAP icons/labels in the stacking order,
+        // instead of drawing over and partly hiding them.
+        coverageRadiusLayer = L.layerGroup().addTo(map);
         markerLayer = L.layerGroup().addTo(map);
         issueMarkerLayer = L.layerGroup().addTo(map);
         recommendationLayer = L.layerGroup().addTo(map);
+        // Read once at load -- set from Settings > App Settings, so it
+        // can't change without a page reload anyway (see map.html's
+        // data-nap-connection-radius-meters, rendered from
+        // AppSettings.nap_connection_radius_meters).
+        napConnectionRadiusMeters =
+            parseInt(document.getElementById("napMap").dataset.napConnectionRadiusMeters, 10) || 0;
         // Phase 23 (15%): subscriber markers start OFF the map (not
         // added to `map` yet) since they're a brand-new layer no prior
         // phase had — the "Show Subscribers" toggle below decides
@@ -350,6 +373,7 @@
     function renderNapMarkers() {
         markerLayer.clearLayers();
         Object.keys(markersById).forEach((key) => delete markersById[key]);
+        coverageRadiusLayer.clearLayers();
 
         const showNaps = document.getElementById("showNapsToggle").checked;
         if (!showNaps) {
@@ -357,10 +381,21 @@
             return;
         }
 
+        // Coverage radius toggle only exists in the DOM at all when an
+        // admin has set a Max Connection Radius above 0 (see map.html)
+        // -- 0 means "no limit", so there's nothing to draw either way.
+        const coverageToggle = document.getElementById("showCoverageRadiusToggle");
+        const showCoverageRadius =
+            napConnectionRadiusMeters > 0 && !!coverageToggle && coverageToggle.checked;
+
         const filters = getActiveFilters();
         let shown = 0;
         allNaps.forEach((nap) => {
             if (!passesFilters(nap, filters)) return;
+
+            if (showCoverageRadius) {
+                coverageRadiusLayer.addLayer(buildCoverageRadiusCircle(nap));
+            }
 
             const marker = L.marker([nap.latitude, nap.longitude], {
                 icon: buildIcon(nap),
@@ -377,6 +412,40 @@
         });
 
         updateResultCount();
+    }
+
+    /**
+     * Builds one coverage-radius ring for a NAP: a true geographic
+     * L.circle (radius in meters, not pixels) centered on the NAP, so
+     * it stays accurate to Settings > App Settings > Max Connection
+     * Radius at every zoom level instead of just approximating it at
+     * whichever zoom it was drawn at.
+     *
+     * Styled as a soft dashed glow rather than a solid shape so it
+     * reads as a boundary/coverage indicator layered on top of the
+     * basemap, not as another opaque map feature competing with the
+     * NAP/issue/subscriber markers -- colored from the app's own
+     * --napiq-primary (light) / --napiq-info (dark) tokens so it
+     * matches whichever display theme is active (see theme.js /
+     * theme-dark.css) instead of a fixed color that would clash with
+     * one of the two modes. `interactive: false` keeps clicks passing
+     * straight through to the map/marker underneath -- the ring is a
+     * visual boundary only, never something you click on.
+     */
+    function buildCoverageRadiusCircle(nap) {
+        const dark = isDarkTheme();
+        const color = dark ? "#38bdf8" : "#0f5fa6"; // --napiq-info / --napiq-primary
+        return L.circle([nap.latitude, nap.longitude], {
+            radius: napConnectionRadiusMeters,
+            interactive: false,
+            color: color,
+            weight: 1.5,
+            opacity: dark ? 0.8 : 0.65,
+            dashArray: "6 5",
+            fillColor: color,
+            fillOpacity: dark ? 0.09 : 0.06,
+            className: "napiq-coverage-ring " + (dark ? "napiq-coverage-ring-dark" : "napiq-coverage-ring-light"),
+        });
     }
 
     /** Updates the "X of Y shown" counter for whichever layers are visible. */

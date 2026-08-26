@@ -205,6 +205,10 @@
     background: rgba(223, 227, 238, 0.35);
 }
 
+[data-bs-theme="dark"] .napmap-legend-panel .legend-ring {
+    border-color: var(--napiq-info);
+}
+
 [data-bs-theme="dark"] .napmap-detail-panel {
     box-shadow: -6px 0 18px rgba(0, 0, 0, 0.45);
 }

@@ -46,7 +46,8 @@
          data-recommend-request-id="{{ recommend_request_id if recommend_request_id is not none else '' }}"
          data-navigate-type="{{ navigate_type if navigate_type else '' }}"
          data-navigate-id="{{ navigate_id if navigate_id is not none else '' }}"
-         data-own-technician-id="{{ own_technician_id if own_technician_id is not none else '' }}"></div>
+         data-own-technician-id="{{ own_technician_id if own_technician_id is not none else '' }}"
+         data-nap-connection-radius-meters="{{ geomap_settings.nap_connection_radius_meters }}"></div>
 
     <!-- Floating top-center banners: general alerts + the three
          mutually-exclusive placement-mode banners. Overlays the map,
@@ -156,6 +157,23 @@
                             <i class="bi bi-person-fill me-1"></i>Show Subscribers
                         </label>
                     </div>
+                    {# Coverage radius ring: only meaningful when Settings > App
+                       Settings > Max Connection Radius is set above 0 (0 means
+                       "no limit" / feature off, same convention
+                       nap_connection_radius_meters already uses everywhere
+                       else -- see app/models.py's AppSettings docstring). Drawn
+                       per-NAP by napmap.js's buildCoverageRadiusCircle() using
+                       the exact value in data-nap-connection-radius-meters
+                       above, so this toggle and that admin setting can never
+                       drift out of sync. #}
+                    {% if geomap_settings.nap_connection_radius_meters and geomap_settings.nap_connection_radius_meters > 0 %}
+                    <div class="form-check mb-0">
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showCoverageRadiusToggle" checked>
+                        <label class="form-check-label fw-semibold" for="showCoverageRadiusToggle">
+                            <i class="bi bi-broadcast me-1"></i>Show Coverage Radius
+                        </label>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -315,6 +333,10 @@
                 <span><span class="legend-dot" style="background:#6f42c1"></span>Subscribers</span>
                 <span><span class="legend-line" style="background:#198754"></span>Subscriber→NAP (green = no open issue, else worst issue's priority color)</span>
                 <span><span class="legend-line" style="background:#dc3545"></span>Issue→NAP (colored by issue priority)</span>
+                {% if geomap_settings.nap_connection_radius_meters and geomap_settings.nap_connection_radius_meters > 0 %}
+                <span class="napmap-legend-sep"></span>
+                <span><span class="legend-ring"></span>Max connection radius ({{ geomap_settings.nap_connection_radius_meters }}m)</span>
+                {% endif %}
             </div>
             <div id="mapResultCount" class="napmap-legend-count"></div>
         </div>
