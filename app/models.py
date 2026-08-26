@@ -483,21 +483,13 @@ class AppSettings(db.Model):
     form — it's a starting suggestion, not a hard rule, so an
     administrator can still type a different value for a specific NAP.
 
-    GeoMap default filters (`geomap_default_*`, added alongside the
-    above): what the GeoMap's Layers/Filters dropdowns are set to the
-    moment the page loads, administrator-configurable from Settings >
-    App Settings so every role sees the same starting view. This only
-    ever changes the *starting* checkbox/select state that
-    app/templates/naps/map.html renders — it does not remove or lock
-    any control. Every checkbox and the ports <select> stay exactly as
-    interactive as before; anyone (any role) can still tick/untick or
-    change them per-visit, same as always, and that in-session choice
-    is never written back here. One column per control (rather than a
-    single JSON blob) to match this table's existing typed-column
-    style. Column defaults below intentionally reproduce the
-    hard-coded `checked`/`selected` attributes naps/map.html shipped
-    with before this setting existed, so an administrator who never
-    visits Settings sees no behavior change.
+    NOTE: this table previously also had a "GeoMap default filters"
+    section (`geomap_default_*` columns) letting an administrator set
+    the GeoMap's Layers/Filters dropdown starting state. That's been
+    removed — each control on naps/map.html now remembers its own
+    last-used state per browser via localStorage (see
+    static/js/napmap.js) instead, so there's nothing left to
+    configure here.
     """
 
     __tablename__ = "app_settings"
@@ -532,36 +524,6 @@ class AppSettings(db.Model):
     # what gets *recommended*, not what an administrator can
     # deliberately override by hand.
     nap_connection_radius_meters = db.Column(db.Integer, nullable=False, default=0)
-
-
-    # GeoMap default filters — Layers dropdown.
-    geomap_default_show_naps = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_show_issues = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_show_subscribers = db.Column(db.Boolean, nullable=False, default=False)
-
-    # GeoMap default filters — NAP Status + Port Availability.
-    geomap_default_status_active = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_status_inactive = db.Column(db.Boolean, nullable=False, default=False)
-    geomap_default_status_maintenance = db.Column(db.Boolean, nullable=False, default=False)
-    geomap_default_status_full = db.Column(db.Boolean, nullable=False, default=False)
-    geomap_default_ports_filter = db.Column(
-        db.Enum("all", "available", "full", name="geomap_default_ports_filter"),
-        nullable=False,
-        default="all",
-    )
-
-    # GeoMap default filters — Issue Status.
-    geomap_default_issue_status_pending = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_issue_status_assigned = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_issue_status_in_progress = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_issue_status_resolved = db.Column(db.Boolean, nullable=False, default=False)
-    geomap_default_issue_status_closed = db.Column(db.Boolean, nullable=False, default=False)
-
-    # GeoMap default filters — Issue Priority.
-    geomap_default_issue_priority_low = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_issue_priority_medium = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_issue_priority_high = db.Column(db.Boolean, nullable=False, default=True)
-    geomap_default_issue_priority_critical = db.Column(db.Boolean, nullable=False, default=True)
 
     updated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     updated_at = db.Column(
