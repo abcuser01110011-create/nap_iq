@@ -799,6 +799,25 @@
         panel.classList.add("napmap-detail-panel-open");
     }
 
+    /** Converts a "#rrggbb" hex color into an "rgba(r,g,b,alpha)"
+     * string -- used to derive a slot LED segment's translucent fill
+     * and glow from its solid border color. */
+    function hexToRgba(hex, alpha) {
+        const clean = hex.replace("#", "");
+        const r = parseInt(clean.substring(0, 2), 16);
+        const g = parseInt(clean.substring(2, 4), 16);
+        const b = parseInt(clean.substring(4, 6), 16);
+        return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+    }
+
+    /** Current usage-tier color, matching the badge/text-bg-* colors
+     * populateNapDetailPanel() already used for the same thresholds. */
+    function getUsageTierColor(usagePct) {
+        if (usagePct >= NAP_USAGE_DANGER_PCT) return "#dc3545";
+        if (usagePct >= NAP_USAGE_WARNING_PCT) return "#ffc107";
+        return "#198754";
+    }
+
     /**
      * Fills #napDetailPanel's fields in from `nap`'s data. Split out
      * of openNapDetailPanel() so the slide-out/slide-in swap above can
@@ -830,17 +849,24 @@
         document.getElementById("napDetailSlotSummary").textContent =
             nap.used_ports + " used \u00b7 " + nap.available_ports + " open";
 
-        const progressBar = document.getElementById("napDetailProgressBar");
-        progressBar.style.width = usagePct + "%";
-        progressBar.setAttribute("aria-valuenow", String(usagePct));
-        progressBar.classList.remove("bg-success", "bg-warning", "bg-danger");
-        progressBar.classList.add(
-            usagePct >= NAP_USAGE_DANGER_PCT
-                ? "bg-danger"
-                : usagePct >= NAP_USAGE_WARNING_PCT
-                    ? "bg-warning"
-                    : "bg-success"
-        );
+        const slotBar = document.getElementById("napDetailSlotBar");
+        if (slotBar) {
+            slotBar.innerHTML = "";
+            const ledColor = getUsageTierColor(usagePct);
+            const total = Math.max(0, nap.total_ports || 0);
+            const used = Math.max(0, Math.min(nap.used_ports || 0, total));
+            for (let i = 0; i < total; i++) {
+                const segment = document.createElement("div");
+                const isOn = i < used;
+                segment.className = "napmap-detail-slot-segment" + (isOn ? " napmap-detail-slot-segment-on" : "");
+                if (isOn) {
+                    segment.style.setProperty("--slot-led-color", ledColor);
+                    segment.style.setProperty("--slot-led-fill", hexToRgba(ledColor, 0.35));
+                    segment.style.setProperty("--slot-led-glow", hexToRgba(ledColor, 0.55));
+                }
+                slotBar.appendChild(segment);
+            }
+        }
 
         document.getElementById("napDetailTotalSlots").textContent = nap.total_ports + " total slots";
 

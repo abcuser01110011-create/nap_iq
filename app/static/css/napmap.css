@@ -984,9 +984,40 @@
     font-size: 0.92rem;
 }
 
-.napmap-detail-progress {
-    height: 8px;
+/* Slot capacity "LED strip" -- one segment per physical slot on the
+   NAP (see napDetailSlotBar in napmap.js), instead of one continuous
+   progress-bar fill. Each segment is a small pill with a colored
+   border; a "lit" (used) segment fills with the same color at low
+   opacity plus a soft matching glow so it reads like an LED that's
+   on, while an "unlit" (open) segment stays a plain outline in the
+   panel's neutral border color so it reads as off. The lit color
+   itself is set inline per marker from the same green/yellow/red
+   usage-tier logic the old progress bar used (see
+   NAP_USAGE_WARNING_PCT/NAP_USAGE_DANGER_PCT in napmap.js), so the
+   whole strip still reads "healthy vs. filling up vs. full" at a
+   glance. */
+.napmap-detail-slot-bar {
+    display: flex;
+    align-items: stretch;
+    gap: 3px;
+    height: 14px;
     margin: 0.5rem 0 0.35rem 0;
+}
+
+.napmap-detail-slot-segment {
+    flex: 1 1 0;
+    min-width: 4px;
+    height: 100%;
+    border-radius: 3px;
+    border: 1.5px solid var(--napiq-border, #e6e9ef);
+    background: transparent;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.napmap-detail-slot-segment-on {
+    border-color: var(--slot-led-color, #198754);
+    background: var(--slot-led-fill, rgba(25, 135, 84, 0.35));
+    box-shadow: 0 0 5px 0 var(--slot-led-glow, rgba(25, 135, 84, 0.55));
 }
 
 /* One row per connected subscriber line (line code, name, payment
