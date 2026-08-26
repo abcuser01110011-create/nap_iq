@@ -1045,6 +1045,13 @@ class SettingsForm(FlaskForm):
             NumberRange(min=1, max=1000, message="Enter a value between 1 and 1000."),
         ],
     )
+    nap_connection_radius_meters = IntegerField(
+        "Max Connection Radius (meters)",
+        validators=[
+            DataRequired(message="Max connection radius is required."),
+            NumberRange(min=0, max=100000, message="Enter a value between 0 and 100,000 meters."),
+        ],
+    )
 
     # --- GeoMap default filters: Layers -------------------------------
     geomap_default_show_naps = BooleanField("Show NAPs")

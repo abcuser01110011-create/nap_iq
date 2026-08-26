@@ -506,6 +506,34 @@ class AppSettings(db.Model):
     session_timeout_minutes = db.Column(db.Integer, nullable=False, default=60)
     default_nap_total_ports = db.Column(db.Integer, nullable=False, default=8)
 
+    # Max Connection Radius (meters): the farthest a subscriber's pin
+    # is allowed to be from a NAP for that NAP to still count as a
+    # "suitable" candidate. Enforced in exactly one place —
+    # app/nap_recommendation.py's recommend_naps() — since every
+    # NAP-suggestion/auto-assign entry point in the app already
+    # funnels through that one function (mobile self-registration's
+    # coverage check, the GeoMap's "Plan Installation" nearest-NAP
+    # lookup, and the Service Requests "Recommend NAP" page /
+    # approve_request's auto-assign all call it — see that module's
+    # docstring). A NAP beyond this radius is treated exactly like a
+    # full/inactive NAP: filtered out of the candidate pool before
+    # distance-sorting, never just sorted to the bottom, so it can
+    # never be auto-suggested or auto-assigned no matter how empty the
+    # rest of the map is.
+    #
+    # 0 means "no limit" — the feature is opt-in; an admin who never
+    # visits this setting sees no behavior change (same
+    # zero-is-off-by-default pattern this app already uses, e.g.
+    # NEAR_CAPACITY_THRESHOLD_PCT-style admin-tunable constants).
+    # Deliberately advisory-only for a NAP an administrator picks
+    # *manually* (the Service Request Add/Edit form's plain NAP
+    # dropdown) — same "suggest, don't remove control" philosophy the
+    # GeoMap default-filters settings above already use; this caps
+    # what gets *recommended*, not what an administrator can
+    # deliberately override by hand.
+    nap_connection_radius_meters = db.Column(db.Integer, nullable=False, default=0)
+
+
     # GeoMap default filters — Layers dropdown.
     geomap_default_show_naps = db.Column(db.Boolean, nullable=False, default=True)
     geomap_default_show_issues = db.Column(db.Boolean, nullable=False, default=True)

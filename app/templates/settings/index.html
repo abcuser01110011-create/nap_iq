@@ -55,6 +55,22 @@
                         {% endfor %}
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.nap_connection_radius_meters.label }}</label>
+                        {{ form.nap_connection_radius_meters(class="form-control" ~ (" is-invalid" if form.nap_connection_radius_meters.errors else "")) }}
+                        <div class="form-text">
+                            Caps how far (in meters) a subscriber location can be from a NAP for that NAP to
+                            be suggested or auto-assigned — applies to mobile sign-up coverage checks, the
+                            GeoMap's "Plan Installation" suggestion, and Service Requests' "Recommend NAP".
+                            Set to <strong>0</strong> for no limit. An administrator can still manually pick
+                            any NAP on the Service Request Add/Edit form regardless of this setting.
+                        </div>
+                        {% for error in form.nap_connection_radius_meters.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+
                     <hr class="my-4">
 
                     <h2 class="h6 mb-1">Default GeoMap Filters</h2>

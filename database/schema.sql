@@ -268,6 +268,13 @@ CREATE TABLE IF NOT EXISTS app_settings (
     session_timeout_minutes   INT NOT NULL DEFAULT 60,
     default_nap_total_ports   INT NOT NULL DEFAULT 8,
 
+    -- Max Connection Radius, meters (Settings > App Settings): caps
+    -- how far a customer location can be from a NAP for that NAP to
+    -- be recommended/auto-assigned (app/nap_recommendation.py). 0 =
+    -- no limit (default; opt-in feature, no behavior change until an
+    -- administrator sets it).
+    nap_connection_radius_meters INT NOT NULL DEFAULT 0,
+
     -- Default GeoMap Filters (Settings > App Settings): what the
     -- GeoMap's Layers/Filters dropdown controls (naps/map.html) start
     -- set to when the page loads. Every control stays fully
@@ -328,6 +335,13 @@ INSERT IGNORE INTO app_settings (id) VALUES (1);
 --       ADD COLUMN geomap_default_issue_priority_medium BOOLEAN NOT NULL DEFAULT TRUE AFTER geomap_default_issue_priority_low,
 --       ADD COLUMN geomap_default_issue_priority_high BOOLEAN NOT NULL DEFAULT TRUE AFTER geomap_default_issue_priority_medium,
 --       ADD COLUMN geomap_default_issue_priority_critical BOOLEAN NOT NULL DEFAULT TRUE AFTER geomap_default_issue_priority_high;
+
+-- For a database that already ran the ALTER TABLE block above (i.e.
+-- already has the geomap_default_* columns) but predates the Max
+-- Connection Radius setting:
+--   ALTER TABLE app_settings
+--       ADD COLUMN nap_connection_radius_meters INT NOT NULL DEFAULT 0 AFTER default_nap_total_ports;
+
 
 -- ---------------------------------------------------------------------
 -- plans: admin-managed list of subscription plan names (Settings >

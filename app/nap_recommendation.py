@@ -63,7 +63,7 @@ THE WORKFLOW, MAPPED TO phase_11.pdf'S DIAGRAM
 
 CANDIDATE POOL (REQUIREMENTS 2-4)
 ====================================
-Two independent filters, both required before a NAP is even a
+Three independent filters, all required before a NAP is even a
 candidate:
     1. `status == 'active'` — an 'inactive', 'full', or 'maintenance'
        NAP is never suitable regardless of what its port count says
@@ -78,7 +78,13 @@ candidate:
        app/models.py's `Nap` docstring and app/routes/naps.py); a NAP
        with zero free ports can't take a new connection no matter how
        close it is.
-Both must pass — a NAP failing either is dropped before distance is
+    3. Within `AppSettings.nap_connection_radius_meters`, if that
+       admin-configured setting is nonzero (Settings > App Settings >
+       "Max Connection Radius") — a NAP farther than this from the
+       customer location is excluded the same way a full/inactive NAP
+       is, not merely sorted last. `0` (the default) disables this
+       filter entirely.
+All three must pass — a NAP failing any is dropped before distance is
 even computed for it.
 
 DISTANCE (REQUIREMENT 5)
@@ -135,7 +141,7 @@ computed twice by the template:
     is_recommended   -> True for rows[0] only, False otherwise
 """
 
-from app.models import Nap
+from app.models import Nap, AppSettings
 from app.recommendation import haversine_km
 
 
@@ -154,7 +160,20 @@ def recommend_naps(customer_latitude, customer_longitude, limit=None):
     app/recommendation.py's `get_recommendations(limit=...)` parameter
     for the same reason — most callers want the full suitable pool,
     but a future widget might only want the single nearest one).
+
+    Max Connection Radius (Settings > App Settings): a third candidate
+    filter alongside status/available_ports, added to
+    `AppSettings.nap_connection_radius_meters` — see that column's
+    docstring in app/models.py. A NAP farther than the configured
+    radius from `(customer_latitude, customer_longitude)` is dropped
+    from the candidate pool the same way a full/inactive NAP is,
+    before distance-sorting, so it can never be the recommendation no
+    matter how few closer NAPs exist. `0` (the default) disables this
+    filter entirely, matching that column's "opt-in, no behavior
+    change until configured" contract.
     """
+    radius_m = AppSettings.get_current().nap_connection_radius_meters or 0
+
     candidates = [
         nap
         for nap in Nap.query.filter_by(status="active").all()
@@ -166,6 +185,8 @@ def recommend_naps(customer_latitude, customer_longitude, limit=None):
         distance_km = haversine_km(
             customer_latitude, customer_longitude, nap.latitude, nap.longitude
         )
+        if radius_m > 0 and (distance_km * 1000) > radius_m:
+            continue
         rows.append(
             {
                 "nap": nap,

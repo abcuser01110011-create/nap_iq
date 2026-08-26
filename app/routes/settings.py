@@ -78,6 +78,7 @@ def index():
     if g.user.role == "administrator" and form.validate_on_submit():
         settings.session_timeout_minutes = form.session_timeout_minutes.data
         settings.default_nap_total_ports = form.default_nap_total_ports.data
+        settings.nap_connection_radius_meters = form.nap_connection_radius_meters.data
 
         # GeoMap default filters — only the *starting* state of each
         # naps/map.html control; the controls themselves stay fully
