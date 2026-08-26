@@ -140,9 +140,10 @@
             </div>
         </div>
 
+        <div class="disp-table-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table disp-table align-middle mb-0">
+                <thead>
                     <tr>
                         <th>Issue</th>
                         <th>Priority</th>
@@ -153,33 +154,32 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
-                    {% set status_classes = {'pending': 'text-bg-secondary', 'assigned': 'text-bg-info', 'in_progress': 'text-bg-primary', 'resolved': 'text-bg-success', 'closed': 'text-bg-dark'} %}
                     {% for issue in issues_rows %}
-                    <tr>
+                    <tr class="disp-row">
                         <td>
-                            <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="text-decoration-none">
+                            <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="disp-primary-link">
                                 {{ issue.issue_code or ('#' ~ issue.id) }}
                             </a>
-                            <div class="text-muted small">{{ issue.issue_type|replace('_', ' ')|capitalize }}</div>
+                            <div class="disp-subtext">{{ issue.issue_type|replace('_', ' ')|capitalize }}</div>
                         </td>
                         <td>
-                            <span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
+                            <span class="disp-badge disp-badge-{{ issue.priority }}">
                                 {{ issue.priority|capitalize }}
                             </span>
                         </td>
-                        <td>{% if issue.subscriber %}{{ issue.subscriber.subscriber_code }} — {{ issue.subscriber.full_name }}{% else %}—{% endif %}</td>
+                        <td class="small">{% if issue.subscriber %}<span class="disp-code-pill">{{ issue.subscriber.subscriber_code }}</span> {{ issue.subscriber.full_name }}{% else %}<span class="disp-subtext">—</span>{% endif %}</td>
                         <td>{{ issue.nap.nap_code if issue.nap else "—" }}</td>
                         <td>
-                            <span class="badge {{ status_classes.get(issue.status, 'text-bg-secondary') }}">
+                            <span class="disp-badge disp-badge-{{ issue.status }}">
                                 {{ issue.status|replace('_', ' ')|capitalize }}
                             </span>
                         </td>
-                        <td class="small text-muted">{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td class="disp-subtext">{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
         </div>
         {% endif %}
     </div>
@@ -226,9 +226,10 @@
             <span>{{ s|capitalize }}: <strong>{{ inventory_status_counts.get(s, 0) }}</strong></span>
             {% endfor %}
         </div>
+        <div class="disp-table-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table disp-table align-middle mb-0">
+                <thead>
                     <tr>
                         <th>NAP Code</th>
                         <th>Name</th>
@@ -239,22 +240,21 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% set nap_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'full': 'text-bg-warning', 'maintenance': 'text-bg-danger'} %}
                     {% for nap in inventory_naps %}
-                    <tr>
-                        <td class="fw-semibold">
-                            <a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}" class="text-decoration-none">{{ nap.nap_code }}</a>
+                    <tr class="disp-row">
+                        <td>
+                            <a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}" class="disp-primary-link">{{ nap.nap_code }}</a>
                         </td>
                         <td>{{ nap.name }}</td>
-                        <td class="text-muted small">{{ nap.address or (nap.latitude ~ ', ' ~ nap.longitude) }}</td>
+                        <td class="disp-subtext">{{ nap.address or (nap.latitude ~ ', ' ~ nap.longitude) }}</td>
                         <td class="text-center">{{ nap.total_ports }}</td>
                         <td class="text-center">
-                            <span class="badge {{ 'text-bg-success' if nap.available_ports > 0 else 'text-bg-secondary' }}">
+                            <span class="disp-badge {{ 'disp-badge-resolved' if nap.available_ports > 0 else 'disp-badge-closed' }}">
                                 {{ nap.available_ports }}
                             </span>
                         </td>
                         <td>
-                            <span class="badge {{ nap_status_classes.get(nap.status, 'text-bg-secondary') }}">
+                            <span class="disp-badge disp-badge-{{ nap.status }}">
                                 {{ nap.status|capitalize }}
                             </span>
                         </td>
@@ -262,6 +262,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
         </div>
         {% endif %}
     </div>
@@ -320,9 +321,10 @@
             </div>
             {% endif %}
 
+            <div class="disp-table-card">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+                <table class="table disp-table align-middle mb-0">
+                    <thead>
                         <tr>
                             <th>NAP Code</th>
                             <th>Name</th>
@@ -332,16 +334,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% set nap_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'full': 'text-bg-warning', 'maintenance': 'text-bg-danger'} %}
                         {% for row in nap_utilization %}
-                        <tr>
-                            <td class="fw-semibold">
-                                <a href="{{ url_for('naps.view_nap', nap_id=row.id) }}" class="text-decoration-none">{{ row.nap_code }}</a>
+                        <tr class="disp-row">
+                            <td>
+                                <a href="{{ url_for('naps.view_nap', nap_id=row.id) }}" class="disp-primary-link">{{ row.nap_code }}</a>
                             </td>
                             <td>{{ row.name }}</td>
                             <td>
-                                <span class="badge {{ nap_status_classes.get(row.status, 'text-bg-secondary') }} text-capitalize">
-                                    {{ row.status }}
+                                <span class="disp-badge disp-badge-{{ row.status }}">
+                                    {{ row.status|capitalize }}
                                 </span>
                             </td>
                             <td>
@@ -351,14 +352,15 @@
                                              role="progressbar" style="width: {{ row.pct }}%;"
                                              aria-valuenow="{{ row.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
                                     </div>
-                                    <span class="small text-muted" style="min-width: 3.5em;">{{ row.pct }}%</span>
+                                    <span class="disp-subtext" style="min-width: 3.5em;">{{ row.pct }}%</span>
                                 </div>
                             </td>
-                            <td class="text-end small text-muted">{{ row.used_ports }} / {{ row.total_ports }}</td>
+                            <td class="text-end disp-subtext">{{ row.used_ports }} / {{ row.total_ports }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
             </div>
         {% endif %}
     </div>
@@ -422,9 +424,10 @@
             <span>{{ s|capitalize }}: <strong>{{ subscriber_status_counts.get(s, 0) }}</strong></span>
             {% endfor %}
         </div>
+        <div class="disp-table-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table disp-table align-middle mb-0">
+                <thead>
                     <tr>
                         <th>Code</th>
                         <th>Full Name</th>
@@ -435,25 +438,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger'} %}
+                    {% set sub_badge_classes = {'active': 'disp-badge-active', 'inactive': 'disp-badge-inactive', 'disconnected': 'disp-badge-critical', 'pending_review': 'disp-badge-pending'} %}
                     {% for subscriber in subscribers_rows %}
-                    <tr>
-                        <td class="fw-semibold">
-                            <a href="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}" class="text-decoration-none">{{ subscriber.subscriber_code }}</a>
+                    <tr class="disp-row">
+                        <td>
+                            <a href="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}" class="disp-primary-link">{{ subscriber.subscriber_code }}</a>
                         </td>
                         <td>{{ subscriber.full_name }}</td>
                         <td>{{ subscriber.plan_type or "—" }}</td>
                         <td>{{ subscriber.nap.nap_code if subscriber.nap else "—" }}</td>
                         <td>
-                            <span class="badge {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
-                                {{ subscriber.status|capitalize }}
+                            <span class="disp-badge {{ sub_badge_classes.get(subscriber.status, 'disp-badge-inactive') }}">
+                                {{ subscriber.status|replace('_', ' ')|capitalize }}
                             </span>
                         </td>
-                        <td class="small text-muted">{{ subscriber.installed_at.strftime('%Y-%m-%d') if subscriber.installed_at else "—" }}</td>
+                        <td class="disp-subtext">{{ subscriber.installed_at.strftime('%Y-%m-%d') if subscriber.installed_at else "—" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
         </div>
         {% endif %}
     </div>
@@ -526,9 +530,10 @@
             <span>{{ s|capitalize }}: <strong>{{ service_request_status_counts.get(s, 0) }}</strong></span>
             {% endfor %}
         </div>
+        <div class="disp-table-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table disp-table align-middle mb-0">
+                <thead>
                     <tr>
                         <th>Type</th>
                         <th>Subscriber</th>
@@ -538,22 +543,23 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% set status_classes = {'pending': 'text-bg-secondary', 'approved': 'text-bg-info', 'scheduled': 'text-bg-primary', 'completed': 'text-bg-success', 'rejected': 'text-bg-danger'} %}
+                    {% set sr_status_classes = {'pending': 'disp-badge-high', 'approved': 'disp-badge-assigned', 'scheduled': 'disp-badge-medium', 'completed': 'disp-badge-resolved', 'rejected': 'disp-badge-critical'} %}
                     {% for r in service_requests_rows %}
-                    <tr>
-                        <td class="text-capitalize">
-                            <a href="{{ url_for('service_requests.edit_request', request_id=r.id) }}" class="text-decoration-none">
+                    <tr class="disp-row">
+                        <td>
+                            <a href="{{ url_for('service_requests.edit_request', request_id=r.id) }}" class="disp-primary-link text-capitalize">
                                 {{ r.request_type|replace('_', ' ') }}
                             </a>
                         </td>
-                        <td>{% if r.subscriber %}{{ r.subscriber.subscriber_code }} — {{ r.subscriber.full_name }}{% else %}<span class="text-muted small">No subscriber record</span>{% endif %}</td>
+                        <td class="small">{% if r.subscriber %}<span class="disp-code-pill">{{ r.subscriber.subscriber_code }}</span> {{ r.subscriber.full_name }}{% else %}<span class="disp-subtext">No subscriber record</span>{% endif %}</td>
                         <td>{{ r.requested_nap.nap_code if r.requested_nap else "—" }}</td>
-                        <td><span class="badge {{ status_classes.get(r.status, 'text-bg-secondary') }}">{{ r.status|capitalize }}</span></td>
-                        <td class="small text-muted">{{ r.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td><span class="disp-badge {{ sr_status_classes.get(r.status, 'disp-badge-low') }}">{{ r.status|capitalize }}</span></td>
+                        <td class="disp-subtext">{{ r.created_at.strftime('%Y-%m-%d') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
         </div>
         {% endif %}
     </div>
@@ -617,9 +623,10 @@
             <span>{{ s|capitalize }}: <strong>{{ payment_status_counts.get(s, 0) }}</strong></span>
             {% endfor %}
         </div>
+        <div class="disp-table-card">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+            <table class="table disp-table align-middle mb-0">
+                <thead>
                     <tr>
                         <th>Date</th>
                         <th>Subscriber</th>
@@ -631,20 +638,21 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% set status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
+                    {% set pay_status_classes = {'confirmed': 'disp-badge-resolved', 'pending': 'disp-badge-pending', 'overdue': 'disp-badge-critical', 'voided': 'disp-badge-closed'} %}
                     {% for payment in payments_rows %}
-                    <tr>
-                        <td class="small text-muted">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
-                        <td>{{ payment.subscriber.subscriber_code }} — {{ payment.subscriber.full_name }}</td>
+                    <tr class="disp-row">
+                        <td class="disp-subtext">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                        <td class="small"><span class="disp-code-pill">{{ payment.subscriber.subscriber_code }}</span> {{ payment.subscriber.full_name }}</td>
                         <td>{{ "%.2f"|format(payment.amount) }}</td>
                         <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
                         <td>{{ payment.reference_number or "—" }}</td>
                         <td>{{ payment.collector.full_name if payment.collector else "—" }}</td>
-                        <td><span class="badge {{ status_classes.get(payment.status, 'text-bg-secondary') }}">{{ payment.status|capitalize }}</span></td>
+                        <td><span class="disp-badge {{ pay_status_classes.get(payment.status, 'disp-badge-low') }}">{{ payment.status|capitalize }}</span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
         </div>
         {% endif %}
     </div>
@@ -694,9 +702,10 @@
                 No technicians match the current filters.
             </div>
         {% else %}
+            <div class="disp-table-card">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+                <table class="table disp-table align-middle mb-0">
+                    <thead>
                         <tr>
                             <th>Technician</th>
                             <th>Status</th>
@@ -710,14 +719,14 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% set tech_status_classes = {'available': 'text-bg-success', 'busy': 'text-bg-warning', 'offline': 'text-bg-secondary'} %}
+                        {% set tech_status_classes = {'available': 'disp-badge-resolved', 'busy': 'disp-badge-high', 'offline': 'disp-badge-low'} %}
                         {% for row in technician_workload %}
-                        <tr>
-                            <td class="fw-semibold">
-                                <a href="{{ url_for('technicians.view_technician', technician_id=row.id) }}" class="text-decoration-none">{{ row.full_name }}</a>
+                        <tr class="disp-row">
+                            <td>
+                                <a href="{{ url_for('technicians.view_technician', technician_id=row.id) }}" class="disp-primary-link">{{ row.full_name }}</a>
                             </td>
                             <td>
-                                <span class="badge {{ tech_status_classes.get(row.status, 'text-bg-secondary') }} text-capitalize">
+                                <span class="disp-badge {{ tech_status_classes.get(row.status, 'disp-badge-low') }} text-capitalize">
                                     {{ row.status }}
                                 </span>
                             </td>
@@ -727,17 +736,18 @@
                             <td class="text-end fw-semibold">{{ row.total_open }}</td>
                             <td class="text-end">{{ row.completed_in_range }}</td>
                             <td class="text-end">{{ row.resolved_issues_count }}</td>
-                            <td class="text-end small">
+                            <td class="text-end disp-subtext">
                                 {% if row.avg_resolution_hours is not none %}
                                     {{ row.avg_resolution_hours }} hrs
                                 {% else %}
-                                    <span class="text-muted">No completed work yet</span>
+                                    <span class="disp-subtext">No completed work yet</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
             </div>
         {% endif %}
     </div>
