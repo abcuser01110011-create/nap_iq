@@ -23,7 +23,7 @@
 
     const PRIORITY_COLORS = {
         low: "#6c757d",
-        medium: "#0d6efd",
+        medium: "#ffc107",
         high: "#fd7e14",
         critical: "#dc3545",
     };
@@ -56,6 +56,18 @@
     const ICON_FULL_SIZE_ZOOM = 15;
     const ICON_MIN_SCALE_ZOOM = 8;
     const ICON_MIN_SCALE = 0.35;
+
+    // Shared base pixel size (before getIconScale() zoom-scaling) for
+    // every "small round badge" marker on the map: standalone issue
+    // markers (buildIssueIcon/buildPendingIssueIcon) AND the subscriber
+    // marker (buildSubscriberIcon), whether or not it's showing an
+    // open-issue badge. They all used to be different sizes (issue
+    // markers were drawn at 28px vs. the subscriber's 22px), so
+    // switching on "Show Issues" made badges appear noticeably bigger
+    // than the subscriber markers already on the map. Keeping them on
+    // one constant means toggling issues on/off never changes how big
+    // any marker looks.
+    const BADGE_ICON_BASE_SIZE = 22;
 
     /** Current icon scale factor (0 < scale <= 1) for the live map zoom. */
     function getIconScale() {
@@ -1010,7 +1022,7 @@
     function buildIssueIcon(priority) {
         const color = PRIORITY_COLORS[priority] || "#0d6efd";
         const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
-        const s = Math.round(28 * getIconScale());
+        const s = Math.round(BADGE_ICON_BASE_SIZE * getIconScale());
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
             '<circle cx="14" cy="14" r="12" fill="' + color + '" stroke="#ffffff" stroke-width="2"/>' +
@@ -1034,7 +1046,7 @@
     /** Builds a "pending" (not-yet-saved) issue marker icon — same
      * shape, distinct pulsing blue color, at the "medium" pulse rate. */
     function buildPendingIssueIcon() {
-        const s = Math.round(28 * getIconScale());
+        const s = Math.round(BADGE_ICON_BASE_SIZE * getIconScale());
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
             '<circle cx="14" cy="14" r="12" fill="#0d6efd" stroke="#ffffff" stroke-width="2"/>' +
@@ -1215,7 +1227,7 @@
      * priority's rate) so a subscriber with a problem stands out from
      * a healthy one without needing to open its popup. */
     function buildSubscriberIcon(priority) {
-        const s = Math.round(22 * getIconScale());
+        const s = Math.round(BADGE_ICON_BASE_SIZE * getIconScale());
 
         if (priority) {
             const color = PRIORITY_COLORS[priority] || NO_ISSUE_LINE_COLOR;
