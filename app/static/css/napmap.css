@@ -293,17 +293,15 @@
     50% { opacity: 0.55; }
 }
 
-/* Priority-pulse glow, used by reported-issue markers and by a
+/* Priority-pulse ring, used by reported-issue markers and by a
    subscriber marker once that subscriber has an open issue (see
-   buildIssueIcon()/buildSubscriberIcon() in napmap.js). A soft glow
-   behind the badge breathes in and out via opacity only (no scale
-   transform), in the same color as the badge itself (`color` is set
-   inline per marker so `currentColor` picks it up) -- this keeps the
-   marker's on-screen footprint exactly the same size at every point
-   in the pulse, instead of an expanding ring that reads as the icon
-   growing bigger. `--pulse-duration` is set inline per marker from
-   PRIORITY_PULSE_SECONDS, so critical-priority markers visibly pulse
-   faster than low-priority ones. */
+   buildIssueIcon()/buildSubscriberIcon() in napmap.js). A soft ring
+   expands out from behind the badge and fades, in the same color as
+   the badge itself (`color` is set inline per marker so `currentColor`
+   picks it up) -- kept small and simple so it reads as "this needs
+   attention" without overwhelming the map. `--pulse-duration` is set
+   inline per marker from PRIORITY_PULSE_SECONDS, so critical-priority
+   markers visibly pulse faster than low-priority ones. */
 .priority-pulse-wrap {
     position: relative;
     width: 100%;
@@ -330,8 +328,8 @@
 }
 
 @keyframes napiq-priority-pulse {
-    0%, 100% { opacity: 0.85; }
-    50% { opacity: 0.25; }
+    0% { transform: scale(0.8); opacity: 0.75; }
+    75%, 100% { transform: scale(2.2); opacity: 0; }
 }
 
 /* Coverage-radius ring (napmap.js's buildCoverageRadiusCircle()): a
