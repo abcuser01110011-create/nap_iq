@@ -124,33 +124,56 @@
         return worstPriority ? (PRIORITY_COLORS[worstPriority] || NO_ISSUE_LINE_COLOR) : NO_ISSUE_LINE_COLOR;
     }
 
-    // Dark-mode basemap: swaps in a CARTO dark tile layer when the app's
-    // display theme (js/theme.js, Settings > Display Settings) is dark,
-    // matching the light OpenStreetMap tiles used otherwise. `tileLayer`
-    // is the currently-active Leaflet layer so it can be removed/replaced
-    // if the theme changes while this page is already open.
+    // Dark-mode basemap: originally this swapped in a CARTO "dark_all"
+    // raster tile layer (basemaps.cartocdn.com) whenever the app's display
+    // theme (js/theme.js, Settings > Display Settings) was dark. CARTO has
+    // since retired free/keyless access to that raster tile service --
+    // without an API key it now serves every tile back stamped with a
+    // diagonal "API KEY REQUIRED" watermark, which is what shows up on the
+    // GeoMap. Rather than requiring every deployment to sign up for a CARTO
+    // key, we now always load the free, keyless OpenStreetMap tile layer
+    // and fake the dark look with a CSS filter on Leaflet's tile pane
+    // instead of swapping to a different tile server. `tileLayer` is the
+    // currently-active Leaflet layer so it can be removed/replaced if the
+    // theme changes while this page is already open.
     let tileLayer;
 
     const LIGHT_TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
     const LIGHT_TILE_ATTRIBUTION = "&copy; OpenStreetMap contributors";
-    const DARK_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-    const DARK_TILE_ATTRIBUTION = "&copy; OpenStreetMap contributors &copy; CARTO";
+
+    // CSS filter applied to the tile pane to approximate a dark basemap
+    // using the same keyless OSM tiles (invert colors, then re-rotate hue
+    // so it doesn't look like a photo negative, and knock the brightness/
+    // contrast down a touch so it isn't blinding).
+    const DARK_TILE_FILTER = "invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9)";
+    const DARK_TILE_FILTER_STYLE_ID = "napiq-dark-tile-filter-style";
 
     function isDarkTheme() {
         return !!(window.NapIQTheme && window.NapIQTheme.get() === "dark");
     }
 
+    function ensureDarkTileFilterStyleInjected() {
+        if (document.getElementById(DARK_TILE_FILTER_STYLE_ID)) return;
+        const style = document.createElement("style");
+        style.id = DARK_TILE_FILTER_STYLE_ID;
+        style.textContent =
+            "#napMap.napiq-dark-tiles .leaflet-tile-pane { filter: " + DARK_TILE_FILTER + "; }";
+        document.head.appendChild(style);
+    }
+
     function applyBasemapForCurrentTheme() {
         if (!map) return;
-        if (tileLayer) {
-            map.removeLayer(tileLayer);
+        ensureDarkTileFilterStyleInjected();
+
+        // Tiles themselves never change -- only the CSS filter toggles.
+        if (!tileLayer) {
+            tileLayer = L.tileLayer(LIGHT_TILE_URL, { maxZoom: 19, attribution: LIGHT_TILE_ATTRIBUTION });
+            tileLayer.addTo(map);
+            tileLayer.bringToBack();
         }
-        tileLayer = isDarkTheme()
-            ? L.tileLayer(DARK_TILE_URL, { maxZoom: 19, attribution: DARK_TILE_ATTRIBUTION })
-            : L.tileLayer(LIGHT_TILE_URL, { maxZoom: 19, attribution: LIGHT_TILE_ATTRIBUTION });
-        // Add below every other layer so markers/panels stay on top.
-        tileLayer.addTo(map);
-        tileLayer.bringToBack();
+
+        const mapContainer = map.getContainer();
+        mapContainer.classList.toggle("napiq-dark-tiles", isDarkTheme());
     }
 
     // Live-swap the basemap if Dark Mode is toggled while this page is
@@ -344,10 +367,10 @@
                 title: nap.nap_code + " - " + nap.name,
             });
             // NAP markers no longer use a Leaflet popup (see
-            // openNapDetailPanel() below) -- clicking one opens/
-            // re-populates the right-side slide-in detail panel
-            // instead.
-            marker.on("click", () => openNapDetailPanel(nap));
+            // openNapDetailPanel() below) -- clicking one flies the
+            // map in to focus on it (see focusNapOnMap() below) and
+            // opens/re-populates the right-side slide-in detail panel.
+            marker.on("click", () => focusNapOnMap(nap));
             markerLayer.addLayer(marker);
             markersById[nap.id] = marker;
             shown += 1;
@@ -471,6 +494,35 @@
     // closed. Only used so re-clicking is harmless; open/close state
     // itself lives on the panel element's class (see below).
     let openNapDetailNapId = null;
+
+    // Zoom level a NAP marker click flies in to -- close enough to see
+    // the individual NAP clearly (matches the zoom search results and
+    // "navigate here" links already fly to, e.g. selectNap() further
+    // down) without feeling like a jarring jump-cut.
+    const NAP_FOCUS_ZOOM = 18;
+    // How long (seconds) the fly animation takes. Leaflet's flyTo()
+    // eases both the pan and the zoom together over this duration
+    // rather than snapping straight there.
+    const NAP_FOCUS_FLY_DURATION = 1.1;
+
+    /**
+     * Handles a click on a NAP marker: flies the map in to center on
+     * that NAP (zooming in from a zoomed-out view, e.g. the province-
+     * level default) and opens its detail panel. Never zooms *out* --
+     * if the user is already closer than NAP_FOCUS_ZOOM (e.g. they
+     * clicked a neighboring NAP while already zoomed in), it keeps
+     * their current zoom level and just pans/eases over to the new
+     * NAP instead of pulling back out first.
+     */
+    function focusNapOnMap(nap) {
+        if (map) {
+            const targetZoom = Math.max(map.getZoom(), NAP_FOCUS_ZOOM);
+            map.flyTo([nap.latitude, nap.longitude], targetZoom, {
+                duration: NAP_FOCUS_FLY_DURATION,
+            });
+        }
+        openNapDetailPanel(nap);
+    }
 
     /**
      * Opens the right-side NAP detail slide-in panel (#napDetailPanel
@@ -770,6 +822,30 @@
     // same way a NAP or issue can. Existing NAP/issue marker code
     // above is completely untouched.
 
+    // Zoom level a subscriber marker click flies in to, and how long
+    // the animation takes -- same values as NAP_FOCUS_ZOOM /
+    // NAP_FOCUS_FLY_DURATION above so NAP and subscriber clicks feel
+    // consistent with each other.
+    const SUBSCRIBER_FOCUS_ZOOM = NAP_FOCUS_ZOOM;
+    const SUBSCRIBER_FOCUS_FLY_DURATION = NAP_FOCUS_FLY_DURATION;
+
+    /**
+     * Handles a click on a subscriber marker: flies the map in to
+     * center on that subscriber (same never-zoom-out behavior as
+     * focusNapOnMap() above) and opens its popup. Shared by both a
+     * direct marker click (see renderSubscriberMarkers() below) and
+     * focusSubscriber() (search-result / "navigate here" flow).
+     */
+    function focusSubscriberOnMap(subscriber, marker) {
+        if (map) {
+            const targetZoom = Math.max(map.getZoom(), SUBSCRIBER_FOCUS_ZOOM);
+            map.flyTo([subscriber.latitude, subscriber.longitude], targetZoom, {
+                duration: SUBSCRIBER_FOCUS_FLY_DURATION,
+            });
+        }
+        if (marker) marker.openPopup();
+    }
+
     /** Rebuilds the subscriber marker layer from allSubscribers. Only
      * subscribers with known coordinates can be plotted — same
      * skip-if-unplottable rule /api/naps and /api/issues already use
@@ -800,6 +876,15 @@
                 title: subscriber.subscriber_code + " - " + subscriber.full_name,
             });
             marker.bindPopup(buildSubscriberPopupHtml(subscriber));
+            // Leaflet's bindPopup() adds its own "click marker -> open
+            // popup instantly" handler. We strip that (nothing else is
+            // listening for "click" on a freshly-created marker yet,
+            // so this is safe) and replace it with focusSubscriberOnMap()
+            // so the map flies/zooms in first instead of the popup
+            // snapping open at whatever zoom level the user was
+            // already at.
+            marker.off("click");
+            marker.on("click", () => focusSubscriberOnMap(subscriber, marker));
             subscriberMarkerLayer.addLayer(marker);
             subscriberMarkersById[subscriber.id] = marker;
 
@@ -1303,10 +1388,7 @@
         renderSubscriberMarkers();
 
         const marker = subscriberMarkersById[subscriber.id];
-        map.flyTo([subscriber.latitude, subscriber.longitude], 18);
-        if (marker) {
-            marker.openPopup();
-        }
+        focusSubscriberOnMap(subscriber, marker);
     }
 
     /**
