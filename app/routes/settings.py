@@ -80,31 +80,6 @@ def index():
         settings.default_nap_total_ports = form.default_nap_total_ports.data
         settings.nap_connection_radius_meters = form.nap_connection_radius_meters.data
 
-        # GeoMap default filters — only the *starting* state of each
-        # naps/map.html control; the controls themselves stay fully
-        # interactive for every role on every visit (see AppSettings'
-        # docstring in app/models.py).
-        settings.geomap_default_show_naps = form.geomap_default_show_naps.data
-        settings.geomap_default_show_issues = form.geomap_default_show_issues.data
-        settings.geomap_default_show_subscribers = form.geomap_default_show_subscribers.data
-
-        settings.geomap_default_status_active = form.geomap_default_status_active.data
-        settings.geomap_default_status_inactive = form.geomap_default_status_inactive.data
-        settings.geomap_default_status_maintenance = form.geomap_default_status_maintenance.data
-        settings.geomap_default_status_full = form.geomap_default_status_full.data
-        settings.geomap_default_ports_filter = form.geomap_default_ports_filter.data
-
-        settings.geomap_default_issue_status_pending = form.geomap_default_issue_status_pending.data
-        settings.geomap_default_issue_status_assigned = form.geomap_default_issue_status_assigned.data
-        settings.geomap_default_issue_status_in_progress = form.geomap_default_issue_status_in_progress.data
-        settings.geomap_default_issue_status_resolved = form.geomap_default_issue_status_resolved.data
-        settings.geomap_default_issue_status_closed = form.geomap_default_issue_status_closed.data
-
-        settings.geomap_default_issue_priority_low = form.geomap_default_issue_priority_low.data
-        settings.geomap_default_issue_priority_medium = form.geomap_default_issue_priority_medium.data
-        settings.geomap_default_issue_priority_high = form.geomap_default_issue_priority_high.data
-        settings.geomap_default_issue_priority_critical = form.geomap_default_issue_priority_critical.data
-
         settings.updated_by_id = g.user.id
         db.session.commit()
         flash("Settings updated successfully.", "success")

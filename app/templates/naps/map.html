@@ -133,26 +133,23 @@
                 </button>
                 <div class="dropdown-menu napmap-dropdown-menu p-2">
                     <div class="form-check">
-                        <input class="form-check-input layer-toggle" type="checkbox" id="showNapsToggle" {{ 'checked' if geomap_settings.geomap_default_show_naps else '' }}>
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showNapsToggle" checked>
                         <label class="form-check-label fw-semibold" for="showNapsToggle">
                             <i class="bi bi-hdd-network me-1"></i>Show NAPs
                         </label>
                     </div>
                     <div class="form-check">
-                        <input class="form-check-input layer-toggle" type="checkbox" id="showIssuesToggle" {{ 'checked' if geomap_settings.geomap_default_show_issues else '' }}>
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showIssuesToggle" checked>
                         <label class="form-check-label fw-semibold" for="showIssuesToggle">
                             <i class="bi bi-exclamation-triangle me-1"></i>Show Issues
                         </label>
                     </div>
                     <div class="form-check mb-0">
-                        <!-- Defaults to Settings > App Settings > Default GeoMap
-                             Filters (Show Subscribers is off by default there,
-                             matching this control's original always-off
-                             default) -- an administrator can change the
-                             starting state for everyone from Settings; this
-                             checkbox itself stays just as toggleable per-visit
-                             as it always was. -->
-                        <input class="form-check-input layer-toggle" type="checkbox" id="showSubscribersToggle" {{ 'checked' if geomap_settings.geomap_default_show_subscribers else '' }}>
+                        <!-- Off by default (matches this control's original
+                             always-off default). Per-browser state is
+                             remembered via localStorage once toggled — see
+                             static/js/napmap.js's GeoMap filter persistence. -->
+                        <input class="form-check-input layer-toggle" type="checkbox" id="showSubscribersToggle">
                         <label class="form-check-label fw-semibold" for="showSubscribersToggle">
                             <i class="bi bi-person-fill me-1"></i>Show Subscribers
                         </label>
@@ -183,35 +180,33 @@
                     <i class="bi bi-funnel me-1"></i>Filters
                 </button>
                 <div class="dropdown-menu napmap-dropdown-menu napmap-dropdown-menu-wide p-2">
-                    {# Initial checked/selected state for every control in this
-                       dropdown comes from Settings > App Settings > Default
-                       GeoMap Filters (geomap_settings, AppSettings.get_current()
-                       — see app/routes/naps.py's geomap()). That only decides
-                       where each control STARTS; nothing below is disabled or
-                       removed, so anyone can still tick/untick or reselect any
-                       of it for as long as they're on this page. #}
+                    {# Initial checked/selected state below is just a
+                       reasonable one-time default. Once a person changes any
+                       control here, their choice is remembered per-browser
+                       via localStorage and restored on the next visit/reload
+                       — see static/js/napmap.js's GeoMap filter persistence. #}
                     <label class="form-label small text-muted mb-1">NAP Status</label>
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         <div class="form-check">
-                            <input class="form-check-input status-filter" type="checkbox" value="active" id="filterActive" {{ 'checked' if geomap_settings.geomap_default_status_active else '' }}>
+                            <input class="form-check-input status-filter" type="checkbox" value="active" id="filterActive" checked>
                             <label class="form-check-label" for="filterActive">
                                 <span class="legend-dot" style="background:#198754"></span> Active
                             </label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input status-filter" type="checkbox" value="inactive" id="filterInactive" {{ 'checked' if geomap_settings.geomap_default_status_inactive else '' }}>
+                            <input class="form-check-input status-filter" type="checkbox" value="inactive" id="filterInactive">
                             <label class="form-check-label" for="filterInactive">
                                 <span class="legend-dot" style="background:#6c757d"></span> Inactive
                             </label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input status-filter" type="checkbox" value="maintenance" id="filterMaintenance" {{ 'checked' if geomap_settings.geomap_default_status_maintenance else '' }}>
+                            <input class="form-check-input status-filter" type="checkbox" value="maintenance" id="filterMaintenance">
                             <label class="form-check-label" for="filterMaintenance">
                                 <span class="legend-dot" style="background:#dc3545"></span> Maintenance
                             </label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input status-filter" type="checkbox" value="full" id="filterFullStatus" {{ 'checked' if geomap_settings.geomap_default_status_full else '' }}>
+                            <input class="form-check-input status-filter" type="checkbox" value="full" id="filterFullStatus">
                             <label class="form-check-label" for="filterFullStatus">
                                 <span class="legend-dot" style="background:#fd7e14"></span> Full
                             </label>
@@ -220,9 +215,9 @@
 
                     <label class="form-label small text-muted mb-1" for="portsFilter">Port Availability</label>
                     <select id="portsFilter" class="form-select form-select-sm mb-3">
-                        <option value="all" {{ 'selected' if geomap_settings.geomap_default_ports_filter == 'all' else '' }}>All NAPs</option>
-                        <option value="available" {{ 'selected' if geomap_settings.geomap_default_ports_filter == 'available' else '' }}>Has Available Ports</option>
-                        <option value="full" {{ 'selected' if geomap_settings.geomap_default_ports_filter == 'full' else '' }}>No Available Ports (Full)</option>
+                        <option value="all" selected>All NAPs</option>
+                        <option value="available">Has Available Ports</option>
+                        <option value="full">No Available Ports (Full)</option>
                     </select>
 
                     <hr class="my-2">
@@ -230,23 +225,23 @@
                     <label class="form-label small text-muted mb-1">Issue Status</label>
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         <div class="form-check">
-                            <input class="form-check-input issue-status-filter" type="checkbox" value="pending" id="issueFilterPending" {{ 'checked' if geomap_settings.geomap_default_issue_status_pending else '' }}>
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="pending" id="issueFilterPending" checked>
                             <label class="form-check-label" for="issueFilterPending">Pending</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input issue-status-filter" type="checkbox" value="assigned" id="issueFilterAssigned" {{ 'checked' if geomap_settings.geomap_default_issue_status_assigned else '' }}>
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="assigned" id="issueFilterAssigned" checked>
                             <label class="form-check-label" for="issueFilterAssigned">Assigned</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input issue-status-filter" type="checkbox" value="in_progress" id="issueFilterInProgress" {{ 'checked' if geomap_settings.geomap_default_issue_status_in_progress else '' }}>
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="in_progress" id="issueFilterInProgress" checked>
                             <label class="form-check-label" for="issueFilterInProgress">In Progress</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input issue-status-filter" type="checkbox" value="resolved" id="issueFilterResolved" {{ 'checked' if geomap_settings.geomap_default_issue_status_resolved else '' }}>
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="resolved" id="issueFilterResolved">
                             <label class="form-check-label" for="issueFilterResolved">Resolved</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input issue-status-filter" type="checkbox" value="closed" id="issueFilterClosed" {{ 'checked' if geomap_settings.geomap_default_issue_status_closed else '' }}>
+                            <input class="form-check-input issue-status-filter" type="checkbox" value="closed" id="issueFilterClosed">
                             <label class="form-check-label" for="issueFilterClosed">Closed</label>
                         </div>
                     </div>
@@ -254,25 +249,25 @@
                     <label class="form-label small text-muted mb-1">Issue Priority</label>
                     <div class="d-flex flex-wrap gap-2">
                         <div class="form-check">
-                            <input class="form-check-input issue-priority-filter" type="checkbox" value="low" id="issuePriorityLow" {{ 'checked' if geomap_settings.geomap_default_issue_priority_low else '' }}>
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="low" id="issuePriorityLow" checked>
                             <label class="form-check-label" for="issuePriorityLow">
                                 <span class="legend-dot" style="background:#6c757d"></span> Low
                             </label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input issue-priority-filter" type="checkbox" value="medium" id="issuePriorityMedium" {{ 'checked' if geomap_settings.geomap_default_issue_priority_medium else '' }}>
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="medium" id="issuePriorityMedium" checked>
                             <label class="form-check-label" for="issuePriorityMedium">
                                 <span class="legend-dot" style="background:#0d6efd"></span> Medium
                             </label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input issue-priority-filter" type="checkbox" value="high" id="issuePriorityHigh" {{ 'checked' if geomap_settings.geomap_default_issue_priority_high else '' }}>
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="high" id="issuePriorityHigh" checked>
                             <label class="form-check-label" for="issuePriorityHigh">
                                 <span class="legend-dot" style="background:#fd7e14"></span> High
                             </label>
                         </div>
                         <div class="form-check mb-0">
-                            <input class="form-check-input issue-priority-filter" type="checkbox" value="critical" id="issuePriorityCritical" {{ 'checked' if geomap_settings.geomap_default_issue_priority_critical else '' }}>
+                            <input class="form-check-input issue-priority-filter" type="checkbox" value="critical" id="issuePriorityCritical" checked>
                             <label class="form-check-label" for="issuePriorityCritical">
                                 <span class="legend-dot" style="background:#dc3545"></span> Critical
                             </label>

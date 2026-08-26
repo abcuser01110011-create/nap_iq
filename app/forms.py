@@ -1053,37 +1053,11 @@ class SettingsForm(FlaskForm):
         ],
     )
 
-    # --- GeoMap default filters: Layers -------------------------------
-    geomap_default_show_naps = BooleanField("Show NAPs")
-    geomap_default_show_issues = BooleanField("Show Issues")
-    geomap_default_show_subscribers = BooleanField("Show Subscribers")
-
-    # --- GeoMap default filters: NAP Status + Port Availability -------
-    geomap_default_status_active = BooleanField("Active")
-    geomap_default_status_inactive = BooleanField("Inactive")
-    geomap_default_status_maintenance = BooleanField("Maintenance")
-    geomap_default_status_full = BooleanField("Full")
-    geomap_default_ports_filter = SelectField(
-        "Port Availability",
-        choices=[
-            ("all", "All NAPs"),
-            ("available", "Has Available Ports"),
-            ("full", "No Available Ports (Full)"),
-        ],
-    )
-
-    # --- GeoMap default filters: Issue Status --------------------------
-    geomap_default_issue_status_pending = BooleanField("Pending")
-    geomap_default_issue_status_assigned = BooleanField("Assigned")
-    geomap_default_issue_status_in_progress = BooleanField("In Progress")
-    geomap_default_issue_status_resolved = BooleanField("Resolved")
-    geomap_default_issue_status_closed = BooleanField("Closed")
-
-    # --- GeoMap default filters: Issue Priority ------------------------
-    geomap_default_issue_priority_low = BooleanField("Low")
-    geomap_default_issue_priority_medium = BooleanField("Medium")
-    geomap_default_issue_priority_high = BooleanField("High")
-    geomap_default_issue_priority_critical = BooleanField("Critical")
+    # NOTE: the GeoMap's Layers/Filters starting state used to be
+    # admin-configurable here ("Default GeoMap Filters"). That section
+    # has been removed — each control on naps/map.html now remembers
+    # its own last-used state per browser (via localStorage; see
+    # static/js/napmap.js), so there's nothing left to configure here.
 
 
 # ---------------------------------------------------------------------

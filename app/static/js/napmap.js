@@ -193,6 +193,90 @@
         renderNapMarkers();
     });
 
+    // ------------------------------------------------------------------
+    // GeoMap Layers/Filters persistence (per-browser, via localStorage)
+    // ------------------------------------------------------------------
+    // Previously the Layers/Filters dropdowns' *starting* state was set
+    // from Settings > App Settings > Default GeoMap Filters, but nothing
+    // a person actually changed on the map itself was ever saved -- every
+    // reload reset back to that admin-configured default. That settings
+    // section has been removed; instead, every control listed below now
+    // remembers whatever it was last set to on THIS browser and restores
+    // it automatically on the next load, with the checked/selected
+    // attributes already in the markup only acting as the very first
+    // (pre-any-save) starting point.
+    const GEOMAP_FILTER_STORAGE_KEY = "napiq:geomapFilters";
+
+    // Checkbox control ids (Layers + Filters dropdowns). Every one of
+    // these already has a unique id in naps/map.html.
+    const GEOMAP_FILTER_CHECKBOX_IDS = [
+        "showNapsToggle",
+        "showIssuesToggle",
+        "showSubscribersToggle",
+        "showCoverageRadiusToggle",
+        "filterActive",
+        "filterInactive",
+        "filterMaintenance",
+        "filterFullStatus",
+        "issueFilterPending",
+        "issueFilterAssigned",
+        "issueFilterInProgress",
+        "issueFilterResolved",
+        "issueFilterClosed",
+        "issuePriorityLow",
+        "issuePriorityMedium",
+        "issuePriorityHigh",
+        "issuePriorityCritical",
+    ];
+    // Select control ids (currently just Port Availability).
+    const GEOMAP_FILTER_SELECT_IDS = ["portsFilter"];
+
+    // Reads every control's *current* state and writes it to
+    // localStorage. Wrapped in try/catch since localStorage can throw
+    // (private browsing, disabled storage, quota, etc.) -- if that
+    // happens the map still works, it just won't remember choices
+    // across reloads.
+    function saveGeoMapFilterPrefs() {
+        try {
+            const state = {};
+            GEOMAP_FILTER_CHECKBOX_IDS.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) state[id] = el.checked;
+            });
+            GEOMAP_FILTER_SELECT_IDS.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) state[id] = el.value;
+            });
+            localStorage.setItem(GEOMAP_FILTER_STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+            // Ignore -- see comment above.
+        }
+    }
+
+    // Applies any previously-saved state to the controls, before the
+    // first render. Controls with no saved value yet (first-ever visit,
+    // or a brand-new control added later) simply keep whatever
+    // checked/selected value is already in the markup.
+    function restoreGeoMapFilterPrefs() {
+        let saved = null;
+        try {
+            const raw = localStorage.getItem(GEOMAP_FILTER_STORAGE_KEY);
+            saved = raw ? JSON.parse(raw) : null;
+        } catch (err) {
+            saved = null;
+        }
+        if (!saved || typeof saved !== "object") return;
+
+        GEOMAP_FILTER_CHECKBOX_IDS.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el && typeof saved[id] === "boolean") el.checked = saved[id];
+        });
+        GEOMAP_FILTER_SELECT_IDS.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el && typeof saved[id] === "string") el.value = saved[id];
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", init);
 
     async function init() {
@@ -243,6 +327,12 @@
         populateNapSelectForIssue();
         populateSubscriberSelect();
 
+        // Apply whatever Layers/Filters state was saved on a previous
+        // visit (if any) before the very first render, so the map draws
+        // correctly the first time instead of flashing the markup
+        // defaults and then re-rendering.
+        restoreGeoMapFilterPrefs();
+
         renderAll();
         // Delegated click handling for every "Set as destination"
         // button, in any popup (NAP/issue/subscriber). One listener
@@ -264,23 +354,41 @@
         // this point, same precondition the two calls above rely on.
         focusNavigationFromQueryParam();
 
-        // Re-render whenever a NAP filter control changes.
+        // Re-render whenever a NAP filter control changes, and remember
+        // the new state for next time (see GeoMap filter persistence
+        // helpers above).
         document.querySelectorAll(".status-filter").forEach((el) => {
-            el.addEventListener("change", renderAll);
+            el.addEventListener("change", () => {
+                saveGeoMapFilterPrefs();
+                renderAll();
+            });
         });
-        document.getElementById("portsFilter").addEventListener("change", renderAll);
+        document.getElementById("portsFilter").addEventListener("change", () => {
+            saveGeoMapFilterPrefs();
+            renderAll();
+        });
 
-        // Re-render whenever an issue filter control changes.
+        // Re-render whenever an issue filter control changes, and save it.
         document.querySelectorAll(".issue-status-filter").forEach((el) => {
-            el.addEventListener("change", renderAll);
+            el.addEventListener("change", () => {
+                saveGeoMapFilterPrefs();
+                renderAll();
+            });
         });
         document.querySelectorAll(".issue-priority-filter").forEach((el) => {
-            el.addEventListener("change", renderAll);
+            el.addEventListener("change", () => {
+                saveGeoMapFilterPrefs();
+                renderAll();
+            });
         });
 
-        // Show/Hide NAPs and Show/Hide Issues layer toggles.
+        // Show/Hide NAPs, Issues, Subscribers, and Coverage Radius layer
+        // toggles -- save on every change so the choice survives a reload.
         document.querySelectorAll(".layer-toggle").forEach((el) => {
-            el.addEventListener("change", renderAll);
+            el.addEventListener("change", () => {
+                saveGeoMapFilterPrefs();
+                renderAll();
+            });
         });
 
         // Search interactions.
