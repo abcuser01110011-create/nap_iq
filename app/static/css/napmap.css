@@ -792,8 +792,14 @@
    other .napmap-float element on this page already uses. Hidden by
    default via a translateX(100%) transform; napmap.js adds
    .napmap-detail-panel-open to slide it into view and removes it to
-   slide back out. Matches the app's existing light theme (--napiq-*
-   tokens from dashboard.css), not a separate dark treatment. */
+   slide back out -- and, when switching from one NAP's details to
+   another while already open, briefly removes then re-adds that
+   class so the panel visibly slides out and back in instead of the
+   content just changing in place (see openNapDetailPanel() /
+   NAP_DETAIL_PANEL_SWITCH_MS in napmap.js, kept in sync with the
+   0.2s duration below). Matches the app's existing light theme
+   (--napiq-* tokens from dashboard.css), not a separate dark
+   treatment. */
 .napmap-detail-panel {
     position: absolute;
     top: 0;
@@ -808,7 +814,10 @@
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
-    transition: transform 0.28s ease-out;
+    /* Snappier than the old 0.28s ease-out, and a symmetric
+       cubic-bezier so the slide-out (switching NAPs) feels just as
+       quick and smooth as the slide-in. */
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
 }
 

@@ -500,44 +500,116 @@
     // "navigate here" links already fly to, e.g. selectNap() further
     // down) without feeling like a jarring jump-cut.
     const NAP_FOCUS_ZOOM = 18;
-    // How long (seconds) the fly animation takes. Leaflet's flyTo()
-    // eases both the pan and the zoom together over this duration
-    // rather than snapping straight there.
-    const NAP_FOCUS_FLY_DURATION = 1.1;
+    // How long (seconds) the fly-in animation takes when the map
+    // actually needs to zoom in (e.g. from the province-level
+    // default). Kept snappy rather than the old 1.1s.
+    const NAP_FOCUS_FLY_DURATION = 0.6;
+    // How long (seconds) a plain pan takes when the map is already at
+    // (or past) NAP_FOCUS_ZOOM and is just recentering on a different
+    // marker -- see focusMapOn() below for why this is a pan instead
+    // of a flyTo in that case.
+    const NAP_FOCUS_PAN_DURATION = 0.35;
 
     /**
-     * Handles a click on a NAP marker: flies the map in to center on
+     * Moves the map to `latlng`, zooming in to at least `minZoom`
+     * without ever zooming back out. Leaflet's flyTo() always eases
+     * the zoom through a slight swoop -- even for a short hop where
+     * the zoom level doesn't actually need to change -- which reads
+     * as an unwanted "shake" when clicking between two nearby
+     * markers that are already at/above the target zoom. So: only
+     * use flyTo() when a real zoom change is needed; otherwise do a
+     * plain animated pan, which moves in a straight line with no
+     * swoop.
+     */
+    function focusMapOn(latlng, minZoom, flyDuration, panDuration) {
+        if (!map) return;
+        const currentZoom = map.getZoom();
+        if (currentZoom >= minZoom) {
+            map.panTo(latlng, {
+                animate: true,
+                duration: panDuration,
+            });
+        } else {
+            map.flyTo(latlng, minZoom, {
+                duration: flyDuration,
+                // Closer to 1 = straighter/faster-feeling path with
+                // less of the curved "fly" swoop than the default
+                // 0.25, while still easing in/out.
+                easeLinearity: 0.5,
+            });
+        }
+    }
+
+    /**
+     * Handles a click on a NAP marker: moves the map to center on
      * that NAP (zooming in from a zoomed-out view, e.g. the province-
      * level default) and opens its detail panel. Never zooms *out* --
      * if the user is already closer than NAP_FOCUS_ZOOM (e.g. they
      * clicked a neighboring NAP while already zoomed in), it keeps
-     * their current zoom level and just pans/eases over to the new
-     * NAP instead of pulling back out first.
+     * their current zoom level and just pans over to the new NAP
+     * instead of pulling back out first (see focusMapOn() above).
      */
     function focusNapOnMap(nap) {
-        if (map) {
-            const targetZoom = Math.max(map.getZoom(), NAP_FOCUS_ZOOM);
-            map.flyTo([nap.latitude, nap.longitude], targetZoom, {
-                duration: NAP_FOCUS_FLY_DURATION,
-            });
-        }
+        focusMapOn(
+            [nap.latitude, nap.longitude],
+            NAP_FOCUS_ZOOM,
+            NAP_FOCUS_FLY_DURATION,
+            NAP_FOCUS_PAN_DURATION
+        );
         openNapDetailPanel(nap);
     }
+
+    // How long (ms) the panel's slide out/in swap takes when switching
+    // from one NAP's details to another -- kept in sync with the
+    // .napmap-detail-panel transition duration in napmap.css (see
+    // NAP_DETAIL_PANEL_TRANSITION_MS note there). A few ms of buffer
+    // on top of the CSS duration makes sure the slide-out has visibly
+    // finished before the new content pops in and slides back.
+    const NAP_DETAIL_PANEL_SWITCH_MS = 200;
 
     /**
      * Opens the right-side NAP detail slide-in panel (#napDetailPanel
      * in naps/map.html) populated with `nap`'s data -- replaces the
-     * old marker popup (see renderNapMarkers() above). If the panel
-     * is already open (for this NAP or a different one), this just
-     * re-populates the fields in place rather than closing/reopening,
-     * so switching between NAP markers while the panel is open has no
-     * close/reopen flicker.
+     * old marker popup (see renderNapMarkers() above).
+     *
+     * - Panel closed -> just populate and slide in.
+     * - Panel already open showing this same NAP -> re-populate in
+     *   place (no animation needed, nothing actually changed).
+     * - Panel already open showing a *different* NAP -> slide out,
+     *   swap the content, then slide back in, so switching between
+     *   markers reads as a deliberate swap instead of the text
+     *   flickering in place.
      */
     function openNapDetailPanel(nap) {
         const panel = document.getElementById("napDetailPanel");
         if (!panel) return;
 
+        const isOpen = panel.classList.contains("napmap-detail-panel-open");
+        const isSwitchingToDifferentNap = isOpen && openNapDetailNapId !== nap.id;
+
+        if (isSwitchingToDifferentNap) {
+            panel.classList.remove("napmap-detail-panel-open");
+            window.setTimeout(() => {
+                populateNapDetailPanel(nap);
+                panel.classList.add("napmap-detail-panel-open");
+            }, NAP_DETAIL_PANEL_SWITCH_MS);
+            openNapDetailNapId = nap.id;
+            return;
+        }
+
         openNapDetailNapId = nap.id;
+        populateNapDetailPanel(nap);
+        panel.classList.add("napmap-detail-panel-open");
+    }
+
+    /**
+     * Fills #napDetailPanel's fields in from `nap`'s data. Split out
+     * of openNapDetailPanel() so the slide-out/slide-in swap above can
+     * call this once the old content has finished sliding away.
+     */
+    function populateNapDetailPanel(nap) {
+        const panel = document.getElementById("napDetailPanel");
+        if (!panel) return;
 
         const usagePct = nap.total_ports > 0
             ? Math.round((nap.used_ports / nap.total_ports) * 100)
@@ -602,7 +674,6 @@
             });
         }
 
-        panel.classList.add("napmap-detail-panel-open");
         panel.setAttribute("aria-hidden", "false");
     }
 
@@ -828,21 +899,23 @@
     // consistent with each other.
     const SUBSCRIBER_FOCUS_ZOOM = NAP_FOCUS_ZOOM;
     const SUBSCRIBER_FOCUS_FLY_DURATION = NAP_FOCUS_FLY_DURATION;
+    const SUBSCRIBER_FOCUS_PAN_DURATION = NAP_FOCUS_PAN_DURATION;
 
     /**
-     * Handles a click on a subscriber marker: flies the map in to
-     * center on that subscriber (same never-zoom-out behavior as
-     * focusNapOnMap() above) and opens its popup. Shared by both a
-     * direct marker click (see renderSubscriberMarkers() below) and
-     * focusSubscriber() (search-result / "navigate here" flow).
+     * Handles a click on a subscriber marker: moves the map to center
+     * on that subscriber (same never-zoom-out, shake-free behavior as
+     * focusNapOnMap()/focusMapOn() above) and opens its popup. Shared
+     * by both a direct marker click (see renderSubscriberMarkers()
+     * below) and focusSubscriber() (search-result / "navigate here"
+     * flow).
      */
     function focusSubscriberOnMap(subscriber, marker) {
-        if (map) {
-            const targetZoom = Math.max(map.getZoom(), SUBSCRIBER_FOCUS_ZOOM);
-            map.flyTo([subscriber.latitude, subscriber.longitude], targetZoom, {
-                duration: SUBSCRIBER_FOCUS_FLY_DURATION,
-            });
-        }
+        focusMapOn(
+            [subscriber.latitude, subscriber.longitude],
+            SUBSCRIBER_FOCUS_ZOOM,
+            SUBSCRIBER_FOCUS_FLY_DURATION,
+            SUBSCRIBER_FOCUS_PAN_DURATION
+        );
         if (marker) marker.openPopup();
     }
 
@@ -1317,7 +1390,12 @@
 
         renderNapMarkers();
 
-        map.flyTo([nap.latitude, nap.longitude], 18);
+        focusMapOn(
+            [nap.latitude, nap.longitude],
+            NAP_FOCUS_ZOOM,
+            NAP_FOCUS_FLY_DURATION,
+            NAP_FOCUS_PAN_DURATION
+        );
         openNapDetailPanel(nap);
     }
 
