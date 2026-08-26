@@ -1010,11 +1010,11 @@
     function buildIssueIcon(priority) {
         const color = PRIORITY_COLORS[priority] || "#0d6efd";
         const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
-        const s = Math.round(28 * getIconScale());
+        const s = Math.round(22 * getIconScale());
         const svg =
-            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
-            '<circle cx="14" cy="14" r="12" fill="' + color + '" stroke="#ffffff" stroke-width="2"/>' +
-            '<text x="14" y="19" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
+            '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
         const html =
@@ -1034,11 +1034,11 @@
     /** Builds a "pending" (not-yet-saved) issue marker icon — same
      * shape, distinct pulsing blue color, at the "medium" pulse rate. */
     function buildPendingIssueIcon() {
-        const s = Math.round(28 * getIconScale());
+        const s = Math.round(22 * getIconScale());
         const svg =
-            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">' +
-            '<circle cx="14" cy="14" r="12" fill="#0d6efd" stroke="#ffffff" stroke-width="2"/>' +
-            '<text x="14" y="19" font-size="15" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="11" cy="11" r="7" fill="#0d6efd"/>' +
+            '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
         const html =
