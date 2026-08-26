@@ -251,7 +251,7 @@
         window.L.polyline(latlngs, {
             pane: ROUTE_PANE_NAME,
             color: "#0b2540",
-            weight: 13,
+            weight: 9,
             opacity: 0.55,
             lineCap: "round",
             lineJoin: "round",
@@ -262,7 +262,7 @@
         window.L.polyline(latlngs, {
             pane: ROUTE_PANE_NAME,
             color: "#39ff14", // neon green, solid — no dashArray
-            weight: 7,
+            weight: 4.5,
             opacity: 1,
             lineCap: "round",
             lineJoin: "round",

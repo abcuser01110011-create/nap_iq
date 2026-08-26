@@ -24,8 +24,8 @@
     const PRIORITY_COLORS = {
         low: "#6c757d",
         medium: "#0d6efd",
-        high: "#fd7e14",
-        critical: "#dc3545",
+        high: "#f0a52a",
+        critical: "#782a31",
     };
 
     // Responsive icon sizing: Leaflet divIcons are plain HTML/CSS, so
@@ -64,7 +64,7 @@
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
     // "healthy" at a glance, same green as an Active NAP.
-    const NO_ISSUE_LINE_COLOR = "#198754";
+    const NO_ISSUE_LINE_COLOR = "#2fbf71";
 
     const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
         ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
@@ -541,16 +541,17 @@
      * visual boundary only, never something you click on.
      */
     function buildCoverageRadiusCircle(nap) {
-        const color = "#39ff14"; // neon green, solid ring on both themes
+        const dark = isDarkTheme();
+        const color = dark ? "#38bdf8" : "#0f5fa6"; // --napiq-info / --napiq-primary
         return L.circle([nap.latitude, nap.longitude], {
             radius: napConnectionRadiusMeters,
             interactive: false,
             color: color,
-            weight: 4,
-            opacity: 1,
+            weight: 1.5,
+            opacity: dark ? 0.8 : 0.65,
             fillColor: color,
-            fillOpacity: 0.12,
-            className: "napiq-coverage-ring napiq-coverage-ring-neon",
+            fillOpacity: dark ? 0.09 : 0.06,
+            className: "napiq-coverage-ring",
         });
     }
 
@@ -962,9 +963,9 @@
                         [nap.latitude, nap.longitude],
                     ],
                     {
-                        color: PRIORITY_COLORS[issue.priority] || "#dc3545",
-                        weight: 5,
-                        opacity: 1,
+                        color: PRIORITY_COLORS[issue.priority] || "#782a31",
+                        weight: 3,
+                        opacity: 0.95,
                         interactive: false,
                     }
                 );
@@ -1152,8 +1153,8 @@
                     ],
                     {
                         color: getSubscriberConnectionColor(subscriber.id),
-                        weight: 5,
-                        opacity: 1,
+                        weight: 3,
+                        opacity: 0.95,
                         interactive: false,
                     }
                 );
