@@ -97,6 +97,41 @@ def _populate_choices(form):
     ]
 
 
+def _sync_subscriber_nap(service_request):
+    """Keeps `Subscriber.nap_id` (what the GeoMap actually reads —
+    both the subscriber↔NAP connector line and, via `nap.subscribers`,
+    the NAP detail panel's slot-capacity count) in step with whatever
+    NAP this service request has on file.
+
+    Every write path below (`add_request`, `edit_request`,
+    `approve_request`, `assign_nap`) sets `requested_nap_id` on the
+    *ServiceRequest*, but historically none of them touched the
+    linked *Subscriber* row at all. That's invisible for the
+    Administrator "Add Subscriber"/"Plan Installation" flows, which
+    stamp `Subscriber.nap_id` directly at creation time — but a
+    self-registered mobile account (app/routes/api_v1/auth.py's
+    `register()`) is created with `nap_id=None` by design, on the
+    understanding that "assigning a NAP" happens later through this
+    exact service-request review flow. Since nothing here ever wrote
+    that assignment back onto the Subscriber, a mobile-registered
+    account's marker never gained a connector line to its NAP no
+    matter how the admin approved/assigned its request — not a
+    display bug, but a missing write.
+
+    Only runs forward (clearing `requested_nap_id` back out, e.g. via
+    the edit form, deliberately leaves the subscriber's existing
+    connection alone rather than un-linking a line that may already
+    represent a completed installation), and only when there's an
+    actual linked Subscriber to update — a walk-in request with no
+    subscriber record yet has nothing to sync.
+    """
+    if not service_request.requested_nap_id or not service_request.subscriber_id:
+        return
+    subscriber = Subscriber.query.get(service_request.subscriber_id)
+    if subscriber is not None and subscriber.nap_id != service_request.requested_nap_id:
+        subscriber.nap_id = service_request.requested_nap_id
+
+
 def _notify_status_change(service_request):
     """Records a Phase 17 notification for a service request's status
     change — called from every route below that actually changes
@@ -251,6 +286,7 @@ def add_request():
             notes=(form.notes.data or "").strip() or None,
         )
         db.session.add(service_request)
+        _sync_subscriber_nap(service_request)
         db.session.commit()
         flash("Service request was created successfully.", "success")
         return redirect(url_for("service_requests.list_requests"))
@@ -312,6 +348,7 @@ def edit_request(request_id):
         if status_changed:
             _notify_status_change(service_request)
 
+        _sync_subscriber_nap(service_request)
         db.session.commit()
         flash("Service request was updated successfully.", "success")
         return redirect(url_for("service_requests.list_requests"))
@@ -372,6 +409,7 @@ def approve_request(request_id):
         service_request.status = "scheduled"
 
     _notify_status_change(service_request)
+    _sync_subscriber_nap(service_request)
     db.session.commit()
 
     if assigned_nap is not None:
@@ -490,6 +528,7 @@ def assign_nap(request_id):
     if service_request.status == "approved":
         service_request.status = "scheduled"
 
+    _sync_subscriber_nap(service_request)
     db.session.commit()
 
     flash(f"NAP '{nap.nap_code}' was assigned to this service request.", "success")
