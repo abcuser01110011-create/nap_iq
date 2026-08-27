@@ -258,10 +258,25 @@
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">{{ form.address.label }}</label>
-                                    <div class="position-relative" id="addressAutocompleteWrapper">
-                                        {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), placeholder="House No., Street, Barangay, City", autocomplete="off") }}
-                                        <div id="addressSuggestions" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1050; max-height: 220px; overflow-y: auto; display: none; top: 100%; left: 0;"></div>
+                                    <div class="row g-2">
+                                        <div class="col-md-4">
+                                            <select class="form-select{{ ' is-invalid' if form.address.errors else '' }}" id="addressProvince">
+                                                <option value="">Loading provinces…</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <select class="form-select{{ ' is-invalid' if form.address.errors else '' }}" id="addressCity" disabled>
+                                                <option value="">Select province first</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <input type="text" class="form-control{{ ' is-invalid' if form.address.errors else '' }}" id="addressStreetBarangay" placeholder="House No., Street, Barangay" maxlength="180">
+                                        </div>
                                     </div>
+                                    {# The real field WTForms/the route validates and saves. Kept in the
+                                       DOM (hidden) and populated by JS from the three inputs above, so
+                                       app/forms.py's ServiceRequestForm.address needs no backend changes. #}
+                                    {{ form.address(style="display:none;") }}
                                     {% for error in form.address.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
                                     {% endfor %}
@@ -402,123 +417,137 @@
     toggleApplicantFields();
 })();
 
-// Address autocomplete (city/municipality) via the public PSGC
-// (Philippine Standard Geographic Code) API. Degrades silently to a
-// plain text field if the API is unreachable or its response shape
-// differs — this never blocks form submission either way.
+// Address (Province -> City/Municipality cascading dropdowns) via the
+// public PSGC (Philippine Standard Geographic Code) API, plus a plain
+// text box for house no./street/barangay. The three visible inputs
+// are combined into the real, hidden `address` field that actually
+// gets submitted and validated (app/forms.py's ServiceRequestForm).
+// Degrades gracefully — never blocks form submission — if the API is
+// unreachable or its response shape differs: the dropdowns just show
+// an "Unavailable" placeholder and the applicant can still type
+// everything into the street/barangay box.
 (function () {
-    var addressInput = document.getElementById('address');
-    var suggestionsBox = document.getElementById('addressSuggestions');
-    if (!addressInput || !suggestionsBox) return;
+    var hiddenAddress = document.getElementById('address');
+    var provinceSelect = document.getElementById('addressProvince');
+    var citySelect = document.getElementById('addressCity');
+    var streetInput = document.getElementById('addressStreetBarangay');
+    if (!hiddenAddress || !provinceSelect || !citySelect || !streetInput) return;
 
-    var PSGC_CITIES_URL = 'https://psgc.gitlab.io/api/cities-municipalities/';
-    var CACHE_KEY = 'psgc_cities_cache_v1';
+    var PSGC_PROVINCES_URL = 'https://psgc.gitlab.io/api/provinces/';
+    var PROVINCES_CACHE_KEY = 'psgc_provinces_cache_v1';
 
-    var citiesCache = null;
-    var citiesPromise = null;
-
-    function getName(city) {
-        return city.name || city.cityName || city.municipalityName || city.city_name || '';
+    function getCode(item) {
+        return item.code || item.provinceCode || item.psgc10DigitCode || '';
     }
-    function getProvince(city) {
-        return city.provinceName || city.province || city.districtName || city.province_name || '';
+    function getName(item) {
+        return item.name || item.provinceName || item.cityName || item.municipalityName || '';
     }
 
-    function loadCities() {
-        if (citiesCache) return Promise.resolve(citiesCache);
-        if (citiesPromise) return citiesPromise;
+    function rebuildAddress() {
+        var parts = [];
+        if (streetInput.value.trim()) parts.push(streetInput.value.trim());
+        if (citySelect.value) parts.push(citySelect.value);
+        if (provinceSelect.value) parts.push(provinceSelect.value);
+        hiddenAddress.value = parts.join(', ');
+    }
 
+    function populateSelect(select, items, placeholder) {
+        select.innerHTML = '';
+        var placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholder;
+        select.appendChild(placeholderOpt);
+
+        items
+            .slice()
+            .sort(function (a, b) { return getName(a).localeCompare(getName(b)); })
+            .forEach(function (item) {
+                var name = getName(item);
+                if (!name) return;
+                var opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                opt.dataset.code = getCode(item);
+                select.appendChild(opt);
+            });
+    }
+
+    function cachedFetch(url, cacheKey) {
         try {
-            var cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || 'null');
-            if (Array.isArray(cached) && cached.length) {
-                citiesCache = cached;
-                return Promise.resolve(cached);
-            }
+            var cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+            if (Array.isArray(cached) && cached.length) return Promise.resolve(cached);
         } catch (e) { /* ignore bad cache */ }
 
-        citiesPromise = fetch(PSGC_CITIES_URL)
+        return fetch(url)
             .then(function (res) {
                 if (!res.ok) throw new Error('PSGC request failed: ' + res.status);
                 return res.json();
             })
             .then(function (data) {
-                citiesCache = Array.isArray(data) ? data : [];
-                try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(citiesCache)); } catch (e) { /* storage full/unavailable */ }
-                return citiesCache;
+                var list = Array.isArray(data) ? data : [];
+                try { sessionStorage.setItem(cacheKey, JSON.stringify(list)); } catch (e) { /* storage full/unavailable */ }
+                return list;
             })
             .catch(function (err) {
-                console.warn('Address autocomplete unavailable (PSGC API):', err);
-                citiesCache = [];
-                return citiesCache;
+                console.warn('Address dropdown unavailable (PSGC API):', err);
+                return [];
             });
-        return citiesPromise;
     }
 
-    function currentSegment() {
-        var parts = addressInput.value.split(',');
-        return parts[parts.length - 1].trim();
+    // Preserve whatever was previously in the real `address` field
+    // (e.g. after a validation-error round-trip) so the applicant
+    // doesn't lose it just because the dropdowns reset to blank.
+    if (hiddenAddress.value.trim()) {
+        streetInput.value = hiddenAddress.value.trim();
     }
 
-    function closeSuggestions() {
-        suggestionsBox.style.display = 'none';
-        suggestionsBox.innerHTML = '';
-    }
+    provinceSelect.disabled = true;
+    provinceSelect.innerHTML = '<option value="">Loading provinces…</option>';
 
-    function renderSuggestions(matches) {
-        suggestionsBox.innerHTML = '';
-        if (!matches.length) { closeSuggestions(); return; }
-
-        matches.slice(0, 8).forEach(function (city) {
-            var name = getName(city);
-            if (!name) return;
-            var province = getProvince(city);
-
-            var item = document.createElement('button');
-            item.type = 'button';
-            item.className = 'list-group-item list-group-item-action py-2';
-            item.innerHTML = '<span class="fw-semibold">' + name + '</span>' +
-                (province ? '<span class="text-muted small ms-1">' + province + '</span>' : '');
-
-            item.addEventListener('click', function () {
-                var parts = addressInput.value.split(',');
-                parts[parts.length - 1] = ' ' + name;
-                addressInput.value = parts.join(',').replace(/^\s+/, '');
-                closeSuggestions();
-                addressInput.focus();
-            });
-
-            suggestionsBox.appendChild(item);
-        });
-
-        suggestionsBox.style.display = suggestionsBox.children.length ? 'block' : 'none';
-    }
-
-    var debounceTimer = null;
-    addressInput.addEventListener('input', function () {
-        clearTimeout(debounceTimer);
-        var query = currentSegment();
-        if (query.length < 3) { closeSuggestions(); return; }
-
-        debounceTimer = setTimeout(function () {
-            loadCities().then(function (cities) {
-                var q = query.toLowerCase();
-                var matches = cities.filter(function (c) {
-                    var name = getName(c);
-                    return name && name.toLowerCase().indexOf(q) !== -1;
-                });
-                renderSuggestions(matches);
-            });
-        }, 300);
-    });
-
-    document.addEventListener('click', function (e) {
-        if (!addressInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
-            closeSuggestions();
+    cachedFetch(PSGC_PROVINCES_URL, PROVINCES_CACHE_KEY).then(function (provinces) {
+        if (!provinces.length) {
+            provinceSelect.innerHTML = '<option value="">Unavailable — type below</option>';
+            provinceSelect.disabled = true;
+            return;
         }
+        populateSelect(provinceSelect, provinces, 'Select province');
+        provinceSelect.disabled = false;
     });
-    addressInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') closeSuggestions();
+
+    provinceSelect.addEventListener('change', function () {
+        var selectedOption = provinceSelect.options[provinceSelect.selectedIndex];
+        var code = selectedOption ? selectedOption.dataset.code : '';
+
+        citySelect.disabled = true;
+        citySelect.innerHTML = '<option value="">Loading…</option>';
+
+        if (!provinceSelect.value || !code) {
+            citySelect.innerHTML = '<option value="">Select province first</option>';
+            rebuildAddress();
+            return;
+        }
+
+        var citiesUrl = 'https://psgc.gitlab.io/api/provinces/' + code + '/cities-municipalities/';
+        cachedFetch(citiesUrl, 'psgc_cities_cache_v1_' + code).then(function (cities) {
+            if (!cities.length) {
+                citySelect.innerHTML = '<option value="">Unavailable — type below</option>';
+                citySelect.disabled = true;
+                rebuildAddress();
+                return;
+            }
+            populateSelect(citySelect, cities, 'Select city/municipality');
+            citySelect.disabled = false;
+            rebuildAddress();
+        });
     });
+
+    citySelect.addEventListener('change', rebuildAddress);
+    streetInput.addEventListener('input', rebuildAddress);
+
+    // Belt-and-suspenders: make sure the hidden field reflects the
+    // three visible inputs even if a change event was somehow missed.
+    var formEl = hiddenAddress.closest('form');
+    if (formEl) formEl.addEventListener('submit', rebuildAddress);
 })();
 </script>
 {% endif %}
