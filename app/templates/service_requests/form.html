@@ -269,12 +269,40 @@
                             <div class="form-text">Needed to recommend the nearest available NAP for this request.</div>
                         </div>
 
+                        <div class="col-12" id="walkinApplicantFieldsWrapper" style="display:none;">
+                            <hr class="my-2">
+                            <h6 class="mb-3 text-muted">
+                                <i class="bi bi-person-lines-fill me-1"></i>Applicant Information
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.full_name.label }}</label>
+                                    {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else ""), placeholder="Juan Dela Cruz") }}
+                                    {% for error in form.full_name.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.contact_number.label }}</label>
+                                    {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else ""), placeholder="09XX XXX XXXX") }}
+                                    {% for error in form.contact_number.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.address.label }}</label>
+                                    {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), placeholder="House No., Street, Barangay, City") }}
+                                    {% for error in form.address.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-12">
-                            <label class="form-label">{{ form.notes.label }} <span class="text-muted small">(optional)</span></label>
-                            {{ form.notes(class="form-control" ~ (" is-invalid" if form.notes.errors else ""), rows=3) }}
-                            {% for error in form.notes.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
+                            <label class="form-label">{{ form.notes.label }}</label>
+                            <input type="text" class="form-control" value="Walk-in application" readonly disabled>
+                            <div class="form-text">This request is submitted as a walk-in application, so this note is set automatically.</div>
                         </div>
                     </div>
 
@@ -291,5 +319,33 @@
         </div>
     </div>
 </div>
+<script>
+(function () {
+    var typeSelect = document.getElementById('request_type');
+    var wrapper = document.getElementById('walkinApplicantFieldsWrapper');
+    if (!typeSelect || !wrapper) return;
+
+    var fullName = document.getElementById('full_name');
+    var address = document.getElementById('address');
+    var contactNumber = document.getElementById('contact_number');
+    var applicantInputs = [fullName, address, contactNumber];
+
+    function toggleApplicantFields() {
+        var isNewInstallation = typeSelect.value === 'new_installation';
+        wrapper.style.display = isNewInstallation ? '' : 'none';
+        applicantInputs.forEach(function (el) {
+            if (!el) return;
+            if (isNewInstallation) {
+                el.setAttribute('required', 'required');
+            } else {
+                el.removeAttribute('required');
+            }
+        });
+    }
+
+    typeSelect.addEventListener('change', toggleApplicantFields);
+    toggleApplicantFields();
+})();
+</script>
 {% endif %}
 {% endblock %}

@@ -97,6 +97,33 @@ def _populate_choices(form):
     ]
 
 
+def _build_walkin_notes(form):
+    """Builds the note every request created through the Add Service
+    Request form gets saved with. This form represents a walk-in
+    application taken at the office, so the note is fixed as such
+    automatically instead of relying on staff to type it every time —
+    same idea as how the mobile app would tag its own submissions.
+
+    New Installation walk-ins have no Subscriber record yet, so the
+    applicant's basic details collected on the form (full name,
+    address, contact number — see ServiceRequestForm) are folded into
+    this same note, since ServiceRequest has no dedicated columns for
+    them without a schema change.
+    """
+    parts = ["Walk-in application."]
+    if form.request_type.data == "new_installation":
+        full_name = (form.full_name.data or "").strip()
+        contact_number = (form.contact_number.data or "").strip()
+        address = (form.address.data or "").strip()
+        if full_name:
+            parts.append(f"Applicant: {full_name}")
+        if contact_number:
+            parts.append(f"Contact Number: {contact_number}")
+        if address:
+            parts.append(f"Address: {address}")
+    return "\n".join(parts)
+
+
 def _sync_subscriber_nap(service_request):
     """Keeps `Subscriber.nap_id` (what the GeoMap actually reads —
     both the subscriber↔NAP connector line and, via `nap.subscribers`,
@@ -271,7 +298,12 @@ def list_requests():
 @service_requests_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_request():
-    """Shows and processes the Add Service Request form."""
+    """Shows and processes the Add Service Request form. This form is
+    the walk-in application flow (see _build_walkin_notes() above) —
+    every request created here is tagged with a fixed "Walk-in
+    application" note automatically, and New Installation additionally
+    collects the applicant's full name/address/contact number since
+    there's no Subscriber record for them yet."""
     form = ServiceRequestForm()
     _populate_choices(form)
 
@@ -283,7 +315,7 @@ def add_request():
             status=form.status.data,
             latitude=form.latitude.data,
             longitude=form.longitude.data,
-            notes=(form.notes.data or "").strip() or None,
+            notes=_build_walkin_notes(form),
         )
         db.session.add(service_request)
         _sync_subscriber_nap(service_request)

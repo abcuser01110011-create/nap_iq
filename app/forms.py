@@ -1163,3 +1163,44 @@ class ServiceRequestForm(FlaskForm):
         "Notes",
         validators=[Optional(), Length(max=2000, message="Notes are too long.")],
     )
+    # Walk-in applicant details — only shown/required on the Add form
+    # when Request Type is "New Installation" (see form.html's JS
+    # toggle). A walk-in new-installation applicant has no Subscriber
+    # record yet, so these are collected here instead and folded into
+    # the request's auto-generated "Walk-in application" note (see
+    # app/routes/service_requests.py's _build_walkin_notes()) rather
+    # than requiring a schema change to ServiceRequest itself.
+    full_name = StringField(
+        "Full Name",
+        validators=[Optional(), Length(max=150, message="Full name is too long.")],
+    )
+    address = StringField(
+        "Address",
+        validators=[Optional(), Length(max=255, message="Address is too long.")],
+    )
+    contact_number = StringField(
+        "Contact Number",
+        validators=[Optional(), Length(max=20, message="Contact number is too long.")],
+    )
+
+    def validate(self, extra_validators=None):
+        """Beyond the per-field validators above: New Installation
+        walk-ins must include the applicant's basic details, since
+        that's the only place this information is captured (see the
+        three fields above)."""
+        if not super().validate(extra_validators=extra_validators):
+            return False
+        if self.request_type.data == "new_installation":
+            ok = True
+            if not (self.full_name.data or "").strip():
+                self.full_name.errors.append("Full name is required for a new installation request.")
+                ok = False
+            if not (self.address.data or "").strip():
+                self.address.errors.append("Address is required for a new installation request.")
+                ok = False
+            if not (self.contact_number.data or "").strip():
+                self.contact_number.errors.append("Contact number is required for a new installation request.")
+                ok = False
+            if not ok:
+                return False
+        return True
