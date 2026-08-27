@@ -37,3 +37,150 @@ body {
 .flash-stack .alert {
     border: none;
 }
+
+/* =====================================================================
+   Dark Mode icon toggle (Settings > Display Settings)
+   ---------------------------------------------------------------------
+   Square icon button that swaps between a moon icon (shown while the
+   app is light — click to go dark) and a sun icon (shown while the
+   app is dark — click to go light). The icon swap, the button's own
+   click pulse, and the page-wide color crossfade below are all pure
+   CSS transitions/animations driven by the `data-bs-theme` attribute
+   and the `.is-toggling` / `.napiq-theme-transition` classes that
+   static/js/theme.js toggles.
+   ===================================================================== */
+
+:root {
+    --napiq-theme-fade-duration: 0.35s;
+}
+
+.napiq-theme-toggle {
+    position: relative;
+    width: 60px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 19px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #eef1f6;
+    color: #495569;
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 0.3s ease, border-color 0.3s ease,
+        transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.napiq-theme-toggle:hover {
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+}
+
+.napiq-theme-toggle:active {
+    transform: scale(0.9);
+}
+
+.napiq-theme-toggle:focus-visible {
+    outline: 2px solid var(--napiq-primary);
+    outline-offset: 2px;
+}
+
+/* Both icons sit stacked in the same spot; only one is visible/active
+   at a time and the swap crossfades + rotates. */
+.napiq-theme-toggle__icon {
+    position: absolute;
+    font-size: 1.15rem;
+    line-height: 1;
+    transition: opacity 0.3s ease, transform 0.35s ease;
+}
+
+.napiq-theme-toggle__icon--sun {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.4);
+}
+
+.napiq-theme-toggle__icon--moon {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+}
+
+[data-bs-theme="dark"] .napiq-theme-toggle {
+    background: #11151f;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f4f6f9;
+}
+
+[data-bs-theme="dark"] .napiq-theme-toggle__icon--sun {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+}
+
+[data-bs-theme="dark"] .napiq-theme-toggle__icon--moon {
+    opacity: 0;
+    transform: rotate(90deg) scale(0.4);
+}
+
+/* Click animation: a quick pulse/wobble, replayed on every click via
+   theme.js re-adding this class. */
+@keyframes napiq-toggle-pulse {
+    0% {
+        transform: scale(1) rotate(0deg);
+    }
+    35% {
+        transform: scale(0.82) rotate(-12deg);
+    }
+    70% {
+        transform: scale(1.1) rotate(6deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+.napiq-theme-toggle.is-toggling {
+    animation: napiq-toggle-pulse 0.4s ease;
+}
+
+/* Page-wide fade: while `.napiq-theme-transition` is present on <html>
+   (briefly, right when the mode switches), colors crossfade instead of
+   snapping instantly to the new theme. */
+html.napiq-theme-transition,
+html.napiq-theme-transition body,
+html.napiq-theme-transition .card,
+html.napiq-theme-transition .dash-body,
+html.napiq-theme-transition .dash-sidebar,
+html.napiq-theme-transition .dash-topbar,
+html.napiq-theme-transition .dash-main,
+html.napiq-theme-transition .dash-icon-btn,
+html.napiq-theme-transition .app-navbar,
+html.napiq-theme-transition .btn,
+html.napiq-theme-transition .form-control,
+html.napiq-theme-transition .table,
+html.napiq-theme-transition .list-group-item,
+html.napiq-theme-transition .modal-content {
+    transition: background-color var(--napiq-theme-fade-duration) ease,
+        color var(--napiq-theme-fade-duration) ease,
+        border-color var(--napiq-theme-fade-duration) ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .napiq-theme-toggle,
+    .napiq-theme-toggle__icon,
+    .napiq-theme-toggle.is-toggling,
+    html.napiq-theme-transition,
+    html.napiq-theme-transition body,
+    html.napiq-theme-transition .card,
+    html.napiq-theme-transition .dash-body,
+    html.napiq-theme-transition .dash-sidebar,
+    html.napiq-theme-transition .dash-topbar,
+    html.napiq-theme-transition .dash-main,
+    html.napiq-theme-transition .dash-icon-btn,
+    html.napiq-theme-transition .app-navbar,
+    html.napiq-theme-transition .btn,
+    html.napiq-theme-transition .form-control,
+    html.napiq-theme-transition .table,
+    html.napiq-theme-transition .list-group-item,
+    html.napiq-theme-transition .modal-content {
+        animation: none !important;
+        transition: none !important;
+    }
+}

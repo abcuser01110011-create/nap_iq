@@ -265,14 +265,25 @@
                 {% block page_subtitle %}{% endblock %}
             </div>
 
-            {% block topbar_search %}
-            <form class="dash-topbar-search d-none d-md-flex" role="search" action="{{ url_for('naps.list_naps') }}" method="get">
-                <i class="bi bi-search"></i>
-                <input type="text" name="q" placeholder="Search NAPs, subscribers, issues…" aria-label="Search">
-            </form>
-            {% endblock %}
+            {% block topbar_search %}{% endblock %}
 
             <div class="dash-topbar-actions">
+                {# Dark Mode toggle — a per-account preference (users.theme_preference),
+                   visible to every signed-in role next to the notification bell.
+                   Handled entirely by static/js/theme.js, which posts to
+                   POST /settings/theme in the background. #}
+                {% if current_user %}
+                <button type="button"
+                        class="napiq-theme-toggle flex-shrink-0"
+                        id="darkModeToggle"
+                        data-theme-toggle-btn
+                        aria-pressed="{{ 'true' if current_user.theme_preference == 'dark' else 'false' }}"
+                        aria-label="Toggle dark mode">
+                    <i class="bi bi-moon-stars-fill napiq-theme-toggle__icon napiq-theme-toggle__icon--moon" aria-hidden="true"></i>
+                    <i class="bi bi-sun-fill napiq-theme-toggle__icon napiq-theme-toggle__icon--sun" aria-hidden="true"></i>
+                </button>
+                {% endif %}
+
                 {% if current_user and current_user.role in ('administrator', 'user') %}
                 {% set notif_category_icons = {
                     'service_request': 'bi-clipboard-check',

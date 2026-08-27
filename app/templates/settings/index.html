@@ -7,28 +7,20 @@
 <div class="row justify-content-center">
     <div class="col-lg-7">
 
-        {# Display Settings — visible to every role. Dark Mode is a
-           per-account preference (users.theme_preference), defaulting
-           to 'light' for every role. Saving is handled by
-           static/js/theme.js, which posts to POST /settings/theme in
-           the background — this form itself never submits the
-           checkbox. The sign-in screen always stays light regardless
-           of this setting. #}
-        <div class="card shadow-sm mb-4">
-            <div class="card-body p-4">
-                <h2 class="h6 mb-3">Display Settings</h2>
+        {# Dark Mode now lives in the header, next to the notification
+           bell (see dashboard_base.html) — it applies to every page,
+           not just Settings, so it moved out of this per-role card.
+           Everything below this point is administrator-only. #}
 
-                <div class="form-check form-switch d-flex align-items-center justify-content-between">
-                    <label class="form-check-label" for="darkModeToggle">
-                        <div class="fw-semibold">Dark Mode</div>
-                        <div class="form-text mb-0">Switches the app (including the sign-in screen) to a dark color theme on this browser.</div>
-                    </label>
-                    <input class="form-check-input flex-shrink-0 ms-3" type="checkbox" role="switch"
-                           id="darkModeToggle" data-theme-toggle
-                           {{ 'checked' if current_user.theme_preference == 'dark' else '' }}>
-                </div>
+        {% if current_user.role != 'administrator' %}
+        <div class="card shadow-sm">
+            <div class="card-body p-4 text-center text-muted">
+                <i class="bi bi-gear d-block mb-2" style="font-size: 1.5rem;"></i>
+                Nothing to configure here for your role.
+                <div class="small mt-1">Looking for Dark Mode? It's now next to the notification bell at the top of the page.</div>
             </div>
         </div>
+        {% endif %}
 
         {% if current_user.role == 'administrator' %}
         <div class="card shadow-sm">
