@@ -242,21 +242,21 @@
 
                         <div class="col-12" id="walkinApplicantFieldsWrapper" style="display:none;">
                             <div class="row g-3">
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label">{{ form.full_name.label }}</label>
                                     {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else ""), placeholder="Juan Dela Cruz") }}
                                     {% for error in form.full_name.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
                                     {% endfor %}
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label">{{ form.contact_number.label }}</label>
                                     {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else ""), placeholder="09XX XXX XXXX") }}
                                     {% for error in form.contact_number.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
                                     {% endfor %}
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-12">
                                     <label class="form-label">{{ form.address.label }}</label>
                                     {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), placeholder="House No., Street, Barangay, City") }}
                                     {% for error in form.address.errors %}
@@ -309,10 +309,15 @@
                             </div>
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-12" id="notesFieldWrapper">
                             <label class="form-label">{{ form.notes.label }}</label>
-                            <input type="text" class="form-control" value="Walk-in application" readonly disabled>
-                            <div class="form-text">This request is submitted as a walk-in application, so this note is set automatically.</div>
+                            <div class="d-flex align-items-start gap-2 px-3 py-2 rounded-3" style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25);">
+                                <i class="bi bi-info-circle-fill mt-1" style="color: #7c3aed;"></i>
+                                <div>
+                                    <div class="fw-semibold small" style="color: #7c3aed;">Walk-in Application</div>
+                                    <div class="text-muted small mb-0">This request will be logged automatically as a walk-in application submitted at the office. No manual note is required.</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -353,7 +358,10 @@
     // which "Add Service Request" dropdown item was used to get here,
     // so it's shown as a fixed value (not an editable dropdown) and
     // the fields that don't apply yet for a brand-new applicant
-    // (Status, Requested NAP, Latitude/Longitude) are hidden. Other
+    // (Status, Subscriber, Requested NAP, Latitude/Longitude) are
+    // hidden — there's no existing Subscriber record to pick for a
+    // walk-in applicant, so that dropdown is skipped entirely and the
+    // field just submits its default ("no subscriber") value. Other
     // request types keep the original editable layout.
     function toggleApplicantFields() {
         var isNewInstallation = typeSelect.value === 'new_installation';
@@ -362,13 +370,9 @@
         if (applicantHeading) applicantHeading.style.display = isNewInstallation ? '' : 'none';
         if (applicantDivider) applicantDivider.style.display = isNewInstallation ? '' : 'none';
 
-        [statusFieldWrapper, requestedNapFieldWrapper, latitudeFieldWrapper, longitudeFieldWrapper].forEach(function (el) {
+        [statusFieldWrapper, requestedNapFieldWrapper, latitudeFieldWrapper, longitudeFieldWrapper, subscriberFieldWrapper].forEach(function (el) {
             if (el) el.style.display = isNewInstallation ? 'none' : '';
         });
-        if (subscriberFieldWrapper) {
-            subscriberFieldWrapper.classList.toggle('col-md-6', !isNewInstallation);
-            subscriberFieldWrapper.classList.toggle('col-md-12', isNewInstallation);
-        }
 
         applicantInputs.forEach(function (el) {
             if (!el) return;
