@@ -270,11 +270,16 @@
                                             </select>
                                         </div>
                                         <div class="col-md-4">
-                                            <input type="text" class="form-control{{ ' is-invalid' if form.address.errors else '' }}" id="addressStreetBarangay" placeholder="House No., Street, Barangay" maxlength="180">
+                                            <select class="form-select{{ ' is-invalid' if form.address.errors else '' }}" id="addressBarangay" disabled>
+                                                <option value="">Select city first</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <input type="text" class="form-control{{ ' is-invalid' if form.address.errors else '' }}" id="addressStreetBarangay" placeholder="House No. / Street" maxlength="180">
                                         </div>
                                     </div>
                                     {# The real field WTForms/the route validates and saves. Kept in the
-                                       DOM (hidden) and populated by JS from the three inputs above, so
+                                       DOM (hidden) and populated by JS from the inputs above, so
                                        app/forms.py's ServiceRequestForm.address needs no backend changes. #}
                                     {{ form.address(style="display:none;") }}
                                     {% for error in form.address.errors %}
@@ -417,21 +422,22 @@
     toggleApplicantFields();
 })();
 
-// Address (Province -> City/Municipality cascading dropdowns) via the
-// public PSGC (Philippine Standard Geographic Code) API, plus a plain
-// text box for house no./street/barangay. The three visible inputs
-// are combined into the real, hidden `address` field that actually
-// gets submitted and validated (app/forms.py's ServiceRequestForm).
-// Degrades gracefully — never blocks form submission — if the API is
-// unreachable or its response shape differs: the dropdowns just show
-// an "Unavailable" placeholder and the applicant can still type
-// everything into the street/barangay box.
+// Address (Province -> City/Municipality -> Barangay cascading
+// dropdowns) via the public PSGC (Philippine Standard Geographic
+// Code) API, plus a plain text box for house no./street. The visible
+// inputs are combined into the real, hidden `address` field that
+// actually gets submitted and validated (app/forms.py's
+// ServiceRequestForm). Degrades gracefully — never blocks form
+// submission — if the API is unreachable or its response shape
+// differs: the dropdowns just show an "Unavailable" placeholder and
+// the applicant can still type everything into the street box.
 (function () {
     var hiddenAddress = document.getElementById('address');
     var provinceSelect = document.getElementById('addressProvince');
     var citySelect = document.getElementById('addressCity');
+    var barangaySelect = document.getElementById('addressBarangay');
     var streetInput = document.getElementById('addressStreetBarangay');
-    if (!hiddenAddress || !provinceSelect || !citySelect || !streetInput) return;
+    if (!hiddenAddress || !provinceSelect || !citySelect || !barangaySelect || !streetInput) return;
 
     var PSGC_PROVINCES_URL = 'https://psgc.gitlab.io/api/provinces/';
     var PROVINCES_CACHE_KEY = 'psgc_provinces_cache_v1';
@@ -446,6 +452,7 @@
     function rebuildAddress() {
         var parts = [];
         if (streetInput.value.trim()) parts.push(streetInput.value.trim());
+        if (barangaySelect.value) parts.push(barangaySelect.value);
         if (citySelect.value) parts.push(citySelect.value);
         if (provinceSelect.value) parts.push(provinceSelect.value);
         hiddenAddress.value = parts.join(', ');
@@ -514,12 +521,18 @@
         provinceSelect.disabled = false;
     });
 
+    function resetBarangay(placeholder) {
+        barangaySelect.innerHTML = '<option value="">' + placeholder + '</option>';
+        barangaySelect.disabled = true;
+    }
+
     provinceSelect.addEventListener('change', function () {
         var selectedOption = provinceSelect.options[provinceSelect.selectedIndex];
         var code = selectedOption ? selectedOption.dataset.code : '';
 
         citySelect.disabled = true;
         citySelect.innerHTML = '<option value="">Loading…</option>';
+        resetBarangay('Select city first');
 
         if (!provinceSelect.value || !code) {
             citySelect.innerHTML = '<option value="">Select province first</option>';
@@ -541,7 +554,34 @@
         });
     });
 
-    citySelect.addEventListener('change', rebuildAddress);
+    citySelect.addEventListener('change', function () {
+        var selectedOption = citySelect.options[citySelect.selectedIndex];
+        var code = selectedOption ? selectedOption.dataset.code : '';
+
+        resetBarangay('Loading…');
+
+        if (!citySelect.value || !code) {
+            resetBarangay('Select city first');
+            rebuildAddress();
+            return;
+        }
+
+        var barangaysUrl = 'https://psgc.gitlab.io/api/cities-municipalities/' + code + '/barangays/';
+        cachedFetch(barangaysUrl, 'psgc_barangays_cache_v1_' + code).then(function (barangays) {
+            if (!barangays.length) {
+                resetBarangay('Unavailable — type below');
+                rebuildAddress();
+                return;
+            }
+            populateSelect(barangaySelect, barangays, 'Select barangay');
+            barangaySelect.disabled = false;
+            rebuildAddress();
+        });
+
+        rebuildAddress();
+    });
+
+    barangaySelect.addEventListener('change', rebuildAddress);
     streetInput.addEventListener('input', rebuildAddress);
 
     // Belt-and-suspenders: make sure the hidden field reflects the
