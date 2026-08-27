@@ -5,9 +5,20 @@
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('service_requests.add_request') }}" class="btn btn-primary rounded-pill px-3">
-        <i class="bi bi-plus-lg me-1"></i>Add Service Request
-    </a>
+    <div class="dropdown">
+        <button type="button" class="btn btn-primary rounded-pill px-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-plus-lg me-1"></i>Add Service Request
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            {% for t in ['new_installation', 'relocation', 'upgrade', 'disconnection'] %}
+            <li>
+                <a class="dropdown-item" href="{{ url_for('service_requests.add_request', type=t) }}">
+                    {{ t|replace('_', ' ')|capitalize }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 </div>
 
 <div class="subs-table-card mb-3">

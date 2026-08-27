@@ -307,6 +307,12 @@ def add_request():
     form = ServiceRequestForm()
     _populate_choices(form)
 
+    if request.method == "GET":
+        requested_type = request.args.get("type")
+        valid_types = {choice[0] for choice in form.request_type.choices}
+        if requested_type in valid_types:
+            form.request_type.data = requested_type
+
     if form.validate_on_submit():
         service_request = ServiceRequest(
             request_type=form.request_type.data,
