@@ -13,8 +13,25 @@
     <div class="col-lg-8">
         <div class="card shadow-sm">
             <div class="card-body p-4">
+                {% if linked_service_request %}
+                <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
+                    <i class="bi bi-info-circle-fill mt-1"></i>
+                    <div>
+                        <div class="fw-semibold">Finishing installation request #{{ linked_service_request.id }}</div>
+                        <div class="small">
+                            This request was just marked completed with no subscriber account yet.
+                            The NAP and coordinates below are pre-filled from that request &mdash;
+                            fill in the rest and saving will link this subscriber back to it automatically.
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 <form method="post" novalidate>
                     {{ form.hidden_tag() }}
+                    {% if service_request_id %}
+                    <input type="hidden" name="service_request_id" value="{{ service_request_id }}">
+                    {% endif %}
 
                     <div class="row g-3">
                         <div class="col-md-6">

@@ -350,6 +350,40 @@ def edit_request(request_id):
 
         _sync_subscriber_nap(service_request)
         db.session.commit()
+
+        # Hand-off fix: a new_installation request can be marked
+        # 'completed' with no Subscriber ever attached to it -- nothing
+        # else in this app creates one automatically, so the "customer"
+        # silently never becomes a real, billable account unless
+        # whoever's on shift remembers the separate Add Subscriber step.
+        # Catching the transition right here, the one place status
+        # actually changes, sends the admin straight into Add
+        # Subscriber with what's already on file (the assigned NAP and
+        # the customer's coordinates, if set) pre-filled, and
+        # subscribers.add_subscriber() links the new row back onto this
+        # request once it's saved -- see that route's own comment.
+        needs_subscriber_handoff = (
+            status_changed
+            and service_request.status == "completed"
+            and service_request.request_type == "new_installation"
+            and not service_request.subscriber_id
+        )
+        if needs_subscriber_handoff:
+            flash(
+                "Service request was updated successfully. This installation has no "
+                "linked subscriber account yet -- create one now to finish activating it.",
+                "warning",
+            )
+            return redirect(
+                url_for(
+                    "subscribers.add_subscriber",
+                    service_request_id=service_request.id,
+                    nap_id=service_request.requested_nap_id or None,
+                    latitude=service_request.latitude,
+                    longitude=service_request.longitude,
+                )
+            )
+
         flash("Service request was updated successfully.", "success")
         return redirect(url_for("service_requests.list_requests"))
 

@@ -35,12 +35,13 @@ Routes:
 """
 
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Subscriber, Nap, Plan
+from app.models import Subscriber, Nap, Plan, ServiceRequest
 from app.forms import SubscriberForm, MapQuickInstallSubscriberForm
 
 subscribers_bp = Blueprint("subscribers", __name__, url_prefix="/subscribers")
@@ -109,14 +110,72 @@ def list_subscribers():
     )
 
 
+def _decimal_from_arg(value):
+    """Best-effort str->Decimal for a query-string coordinate, matching
+    the DecimalField(places=7) fields it's headed into. Returns None on
+    anything missing or unparseable rather than raising -- a bad/absent
+    query param should just mean "don't pre-fill this", never a 500."""
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(value)
+    except (InvalidOperation, ValueError):
+        return None
+
+
 @subscribers_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_subscriber():
-    """Shows and processes the Add Subscriber form."""
+    """Shows and processes the Add Subscriber form.
+
+    Also doubles as the landing page for the "completed new_installation
+    request has no subscriber yet" hand-off service_requests.edit_request()
+    redirects to (see that route's own comment) when it detects a
+    request being marked 'completed' with nothing linked to it yet.
+    ?nap_id=&latitude=&longitude= pre-fill what's already on file for
+    that request (the assigned NAP and the customer's coordinates) so
+    the admin isn't re-entering data that was already captured, and
+    ?service_request_id=, carried through the form as a plain hidden
+    input (it isn't a real Subscriber column, so it's not a SubscriberForm
+    field), links the new subscriber back onto that request once this
+    form is actually submitted -- closing the loop instead of leaving a
+    completed install with no linked, billable account.
+    """
     form = SubscriberForm()
     form.subscriber_id_value = None
     _populate_nap_choices(form)
     _populate_plan_choices(form)
+
+    # Re-looked-up (never trusted blindly from the query string/hidden
+    # field) and only honored if it's still exactly the case this
+    # hand-off is for -- a real new_installation request that still has
+    # no subscriber -- the same "re-validate anything client-supplied"
+    # rule every other route in this app already follows. A stale,
+    # bogus, or already-resolved id is silently ignored rather than
+    # blocked, so the form still works as a plain Add Subscriber page.
+    service_request_id = request.values.get("service_request_id", type=int)
+    linked_service_request = None
+    if service_request_id:
+        candidate = ServiceRequest.query.get(service_request_id)
+        if (
+            candidate is not None
+            and candidate.request_type == "new_installation"
+            and not candidate.subscriber_id
+        ):
+            linked_service_request = candidate
+        else:
+            service_request_id = None
+
+    if request.method == "GET":
+        prefill_nap_id = request.args.get("nap_id", type=int)
+        if prefill_nap_id:
+            form.nap_id.data = prefill_nap_id
+        prefill_lat = _decimal_from_arg(request.args.get("latitude"))
+        if prefill_lat is not None:
+            form.latitude.data = prefill_lat
+        prefill_lng = _decimal_from_arg(request.args.get("longitude"))
+        if prefill_lng is not None:
+            form.longitude.data = prefill_lng
 
     if form.validate_on_submit():
         installed_at = None
@@ -137,13 +196,30 @@ def add_subscriber():
             installed_at=installed_at,
         )
         db.session.add(subscriber)
+        db.session.flush()  # assigns subscriber.id, needed below before commit
+
+        if linked_service_request:
+            linked_service_request.subscriber_id = subscriber.id
+
         db.session.commit()
 
-        flash(f"Subscriber '{subscriber.subscriber_code}' was created successfully.", "success")
+        if linked_service_request:
+            flash(
+                f"Subscriber '{subscriber.subscriber_code}' was created and linked back to "
+                f"service request #{linked_service_request.id} -- the installation is now fully activated.",
+                "success",
+            )
+        else:
+            flash(f"Subscriber '{subscriber.subscriber_code}' was created successfully.", "success")
         return redirect(url_for("subscribers.list_subscribers"))
 
     return render_template(
-        "subscribers/form.html", form=form, mode="add", subscriber=None
+        "subscribers/form.html",
+        form=form,
+        mode="add",
+        subscriber=None,
+        linked_service_request=linked_service_request,
+        service_request_id=service_request_id,
     )
 
 
