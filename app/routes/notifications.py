@@ -34,34 +34,16 @@ Routes:
     POST /notifications/mark-all-read     -> mark_all_read     (mark every own one read)
 """
 
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, g
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, g, request
 
 from app.extensions import db
 from app.auth import role_required
 from app.models import Notification
+from app.notifications_utils import record_link
 
 notifications_bp = Blueprint("notifications", __name__, url_prefix="/notifications")
 
 _ROLES = ("administrator", "user")
-
-# Where a notification's "view record" link should point, keyed by
-# Notification.entity_type. Kept here (not on the model) since it's
-# presentation, not data. Administrator links go straight to the
-# specific record's edit/detail page; Customer links go to that
-# category's own read-only list page (customer.py has no
-# single-record detail route to link to — my_issues/my_service_requests/
-# my_payments are each a full list, so that's the closest "go see it"
-# destination for a Customer).
-_ADMIN_ENTITY_LINKS = {
-    "service_request": ("service_requests.edit_request", "request_id"),
-    "payment": ("payments.edit_payment", "payment_id"),
-    "issue": ("issues.view_issue", "issue_id"),
-}
-_CUSTOMER_ENTITY_LINKS = {
-    "service_request": "customer.my_service_requests",
-    "payment": "customer.my_payments",
-    "issue": "customer.my_issues",
-}
 
 
 def _own_query():
@@ -74,21 +56,6 @@ def _own_query():
     return Notification.query.filter_by(audience="customer", user_id=g.user.id)
 
 
-def _record_link(notification):
-    """Returns a URL to the record a notification is about, or None if
-    it doesn't point anywhere (no entity_type/id, or an entity_type
-    this role has no matching page for)."""
-    if g.user.role == "administrator":
-        entry = _ADMIN_ENTITY_LINKS.get(notification.entity_type)
-        if entry and notification.entity_id:
-            endpoint, id_kwarg = entry
-            return url_for(endpoint, **{id_kwarg: notification.entity_id})
-        return None
-
-    endpoint = _CUSTOMER_ENTITY_LINKS.get(notification.entity_type)
-    return url_for(endpoint) if endpoint else None
-
-
 @notifications_bp.route("/")
 @role_required(*_ROLES)
 def index():
@@ -96,7 +63,7 @@ def index():
     notifications, newest first."""
     notifications = _own_query().order_by(Notification.created_at.desc()).all()
     unread_count = sum(1 for n in notifications if not n.is_read)
-    links = {n.id: _record_link(n) for n in notifications}
+    links = {n.id: record_link(g.user, n) for n in notifications}
 
     return render_template(
         "notifications/list.html",
@@ -120,6 +87,16 @@ def mark_read(notification_id):
 
     notification.is_read = True
     db.session.commit()
+
+    # The topbar bell popover (see dashboard_base.html) marks a
+    # notification read via a background fetch() right before
+    # navigating the browser to its linked record itself — it never
+    # reads this response, so a redirect here would just be a wasted
+    # extra round-trip the fetch throws away. The full /notifications/
+    # page's "mark as read" button, on the other hand, is a plain form
+    # submit and does need the redirect back to the list.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return ("", 204)
     return redirect(url_for("notifications.index"))
 
 

@@ -275,6 +275,75 @@
     background: var(--napiq-bg);
 }
 
+/* ===================== Topbar notification popover ===================== */
+/* Bootstrap's own .dropdown/.dropdown-menu handle open/close, position,
+   and outside-click dismissal; everything below is just sizing this one
+   dropdown-menu into the small Facebook-style "peek" container the
+   bell opens, plus the read/unread item styling inside it. */
+
+.notif-dropdown {
+    width: 340px;
+    max-width: 92vw;
+    overflow: hidden;
+    border: 1px solid var(--napiq-border);
+    box-shadow: 0 0.75rem 2rem rgba(15, 23, 42, 0.12);
+}
+
+.notif-dropdown-header {
+    border-bottom: 1px solid var(--napiq-border);
+}
+
+.notif-dropdown-list {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.notif-dropdown-item {
+    color: inherit;
+    border-bottom: 1px solid var(--napiq-border);
+    transition: background-color 0.15s ease-in-out;
+}
+
+.notif-dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.notif-dropdown-item:hover {
+    background: var(--napiq-bg);
+    color: inherit;
+}
+
+.notif-dropdown-item.notif-unread {
+    background: rgba(13, 110, 253, 0.06);
+}
+
+.notif-dropdown-message {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.notif-dropdown-time {
+    font-size: 0.7rem;
+}
+
+.notif-dot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--napiq-primary);
+}
+
+.notif-dropdown-footer {
+    border-top: 1px solid var(--napiq-border);
+}
+
+.notif-dropdown-footer a {
+    color: var(--napiq-primary);
+}
+
 .dash-user {
     display: flex;
     align-items: center;

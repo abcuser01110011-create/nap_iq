@@ -156,6 +156,21 @@ def create_app(config_class: type = Config) -> Flask:
 
         return {"unread_notifications_count": unread_count_for(g.get("user"))}
 
+    @app.context_processor
+    def inject_recent_notifications():
+        """Makes `recent_notifications` available in every Jinja
+        template — the last handful of the signed-in account's own
+        notifications, used by dashboard_base.html's topbar bell
+        popover (a Facebook-style "peek" list) so it doesn't need its
+        own page load/route to populate. Returns [] for a logged-out
+        visitor or a role with no Notifications page, same as
+        `unread_notifications_count` above. Kept small (6) since this
+        is a quick glance, not the full history — that's what the
+        popover's "View all notifications" link goes to."""
+        from app.notifications_utils import recent_for
+
+        return {"recent_notifications": recent_for(g.get("user"), limit=6)}
+
     # ---- Register blueprints ----
     from app.routes.main import main_bp
     from app.routes.naps import naps_bp

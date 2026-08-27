@@ -125,6 +125,30 @@
     color: #f1f4f9;
 }
 
+[data-bs-theme="dark"] .notif-dropdown {
+    background: #1c2536;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .notif-dropdown-header,
+[data-bs-theme="dark"] .notif-dropdown-footer {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-bs-theme="dark"] .notif-dropdown-item {
+    border-color: rgba(255, 255, 255, 0.06);
+    color: #dfe3ee;
+}
+
+[data-bs-theme="dark"] .notif-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #dfe3ee;
+}
+
+[data-bs-theme="dark"] .notif-dropdown-item.notif-unread {
+    background: rgba(13, 110, 253, 0.15);
+}
+
 /* ---------------------------------------------------------------- */
 /* SUMMARY CARDS / PANELS (dashboard/index.html)                     */
 /* ---------------------------------------------------------------- */

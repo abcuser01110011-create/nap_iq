@@ -162,6 +162,75 @@ def notify_issue_status_change(issue):
     )
 
 
+# Where a notification's "view record" link should point, keyed by
+# Notification.entity_type. Lives here (not in app/routes/notifications.py)
+# so both the full /notifications page AND the topbar popover (rendered
+# from a context processor in app/__init__.py, with no blueprint of its
+# own) can resolve the same links from one place instead of two copies
+# drifting apart. Administrator links go straight to the specific
+# record's edit/detail page; Customer links go to that category's own
+# read-only list page (customer.py has no single-record detail route to
+# link to — my_issues/my_service_requests/my_payments are each a full
+# list, so that's the closest "go see it" destination for a Customer).
+_ADMIN_ENTITY_LINKS = {
+    "service_request": ("service_requests.edit_request", "request_id"),
+    "payment": ("payments.edit_payment", "payment_id"),
+    "issue": ("issues.view_issue", "issue_id"),
+}
+_CUSTOMER_ENTITY_LINKS = {
+    "service_request": "customer.my_service_requests",
+    "payment": "customer.my_payments",
+    "issue": "customer.my_issues",
+}
+
+
+def record_link(user, notification):
+    """Returns a URL to the record `notification` is about, or None if
+    it doesn't point anywhere (no entity_type/id, or an entity_type
+    this role has no matching page for). Shared by the full
+    notifications list and the topbar popover so both link the same
+    way for the same account."""
+    from flask import url_for
+
+    if user is None:
+        return None
+
+    if user.role == "administrator":
+        entry = _ADMIN_ENTITY_LINKS.get(notification.entity_type)
+        if entry and notification.entity_id:
+            endpoint, id_kwarg = entry
+            return url_for(endpoint, **{id_kwarg: notification.entity_id})
+        return None
+
+    endpoint = _CUSTOMER_ENTITY_LINKS.get(notification.entity_type)
+    return url_for(endpoint) if endpoint else None
+
+
+def recent_for(user, limit=6):
+    """Returns `user`'s `limit` most recent notifications (read or
+    unread, newest first) for the topbar bell popover — a quick
+    "what's new" glance, versus the full history on /notifications/.
+    Each item carries a pre-resolved `link` so the template doesn't
+    need to know about entity types. Returns [] for a logged-out
+    visitor or a role with no Notifications page, same as
+    `unread_count_for` above.
+    """
+    if user is None:
+        return []
+
+    if user.role == "administrator":
+        query = Notification.query.filter_by(audience="administrator")
+    elif user.role == "user":
+        query = Notification.query.filter_by(audience="customer", user_id=user.id)
+    else:
+        return []
+
+    notifications = query.order_by(Notification.created_at.desc()).limit(limit).all()
+    for n in notifications:
+        n.link = record_link(user, n)
+    return notifications
+
+
 def unread_count_for(user):
     """Returns how many unread notifications `user` currently has, for
     the sidebar/topbar badge. Returns 0 for a logged-out visitor or a
