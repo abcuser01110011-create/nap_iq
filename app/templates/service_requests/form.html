@@ -230,7 +230,7 @@
                                 </h6>
                                 <div style="min-width: 220px; max-width: 320px; flex: 1 1 260px;">
                                     <label class="form-label">{{ form.request_type.label }}</label>
-                                    {{ form.request_type(class="form-select" ~ (" is-invalid" if form.request_type.errors else ""), id="request_type") }}
+                                    {{ form.request_type(class="form-select" ~ (" is-invalid" if form.request_type.errors else ""), id="request_type", style="background-image: none; padding-right: 0.75rem;") }}
                                     <input type="hidden" id="request_type_locked_input">
                                     {% for error in form.request_type.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
@@ -258,7 +258,10 @@
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">{{ form.address.label }}</label>
-                                    {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), placeholder="House No., Street, Barangay, City") }}
+                                    <div class="position-relative" id="addressAutocompleteWrapper">
+                                        {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else ""), placeholder="House No., Street, Barangay, City", autocomplete="off") }}
+                                        <div id="addressSuggestions" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1050; max-height: 220px; overflow-y: auto; display: none; top: 100%; left: 0;"></div>
+                                    </div>
                                     {% for error in form.address.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
                                     {% endfor %}
@@ -397,6 +400,125 @@
 
     typeSelect.addEventListener('change', toggleApplicantFields);
     toggleApplicantFields();
+})();
+
+// Address autocomplete (city/municipality) via the public PSGC
+// (Philippine Standard Geographic Code) API. Degrades silently to a
+// plain text field if the API is unreachable or its response shape
+// differs — this never blocks form submission either way.
+(function () {
+    var addressInput = document.getElementById('address');
+    var suggestionsBox = document.getElementById('addressSuggestions');
+    if (!addressInput || !suggestionsBox) return;
+
+    var PSGC_CITIES_URL = 'https://psgc.gitlab.io/api/cities-municipalities/';
+    var CACHE_KEY = 'psgc_cities_cache_v1';
+
+    var citiesCache = null;
+    var citiesPromise = null;
+
+    function getName(city) {
+        return city.name || city.cityName || city.municipalityName || city.city_name || '';
+    }
+    function getProvince(city) {
+        return city.provinceName || city.province || city.districtName || city.province_name || '';
+    }
+
+    function loadCities() {
+        if (citiesCache) return Promise.resolve(citiesCache);
+        if (citiesPromise) return citiesPromise;
+
+        try {
+            var cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || 'null');
+            if (Array.isArray(cached) && cached.length) {
+                citiesCache = cached;
+                return Promise.resolve(cached);
+            }
+        } catch (e) { /* ignore bad cache */ }
+
+        citiesPromise = fetch(PSGC_CITIES_URL)
+            .then(function (res) {
+                if (!res.ok) throw new Error('PSGC request failed: ' + res.status);
+                return res.json();
+            })
+            .then(function (data) {
+                citiesCache = Array.isArray(data) ? data : [];
+                try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(citiesCache)); } catch (e) { /* storage full/unavailable */ }
+                return citiesCache;
+            })
+            .catch(function (err) {
+                console.warn('Address autocomplete unavailable (PSGC API):', err);
+                citiesCache = [];
+                return citiesCache;
+            });
+        return citiesPromise;
+    }
+
+    function currentSegment() {
+        var parts = addressInput.value.split(',');
+        return parts[parts.length - 1].trim();
+    }
+
+    function closeSuggestions() {
+        suggestionsBox.style.display = 'none';
+        suggestionsBox.innerHTML = '';
+    }
+
+    function renderSuggestions(matches) {
+        suggestionsBox.innerHTML = '';
+        if (!matches.length) { closeSuggestions(); return; }
+
+        matches.slice(0, 8).forEach(function (city) {
+            var name = getName(city);
+            if (!name) return;
+            var province = getProvince(city);
+
+            var item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action py-2';
+            item.innerHTML = '<span class="fw-semibold">' + name + '</span>' +
+                (province ? '<span class="text-muted small ms-1">' + province + '</span>' : '');
+
+            item.addEventListener('click', function () {
+                var parts = addressInput.value.split(',');
+                parts[parts.length - 1] = ' ' + name;
+                addressInput.value = parts.join(',').replace(/^\s+/, '');
+                closeSuggestions();
+                addressInput.focus();
+            });
+
+            suggestionsBox.appendChild(item);
+        });
+
+        suggestionsBox.style.display = suggestionsBox.children.length ? 'block' : 'none';
+    }
+
+    var debounceTimer = null;
+    addressInput.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        var query = currentSegment();
+        if (query.length < 3) { closeSuggestions(); return; }
+
+        debounceTimer = setTimeout(function () {
+            loadCities().then(function (cities) {
+                var q = query.toLowerCase();
+                var matches = cities.filter(function (c) {
+                    var name = getName(c);
+                    return name && name.toLowerCase().indexOf(q) !== -1;
+                });
+                renderSuggestions(matches);
+            });
+        }, 300);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!addressInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+            closeSuggestions();
+        }
+    });
+    addressInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeSuggestions();
+    });
 })();
 </script>
 {% endif %}
