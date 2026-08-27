@@ -34,7 +34,9 @@
     <aside class="dash-sidebar" id="dashSidebar">
         <div class="dash-sidebar-brand">
             <a href="{{ url_for('dashboard.index') }}" class="d-flex align-items-center gap-2 text-decoration-none">
-                <span class="dash-brand-icon"><i class="bi bi-diagram-3-fill"></i></span>
+                <span class="dash-brand-icon">
+                    <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" alt="PG Networks" class="dash-brand-logo">
+                </span>
                 <span class="dash-brand-text">
                     <span class="dash-brand-name">NAP-IQ</span>
                     <span class="dash-brand-sub">ISP Operations</span>

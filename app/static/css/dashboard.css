@@ -64,6 +64,22 @@
     justify-content: center;
     font-size: 1.15rem;
     color: #fff;
+    flex: none;
+    overflow: hidden;
+}
+
+/* PG Networks brand mark — same source file used for the browser-tab
+   favicon. The sidebar rail is a fixed dark-navy surface in both the
+   light and dark dashboard themes, so the mono artwork (solid navy on
+   transparent) is recolored to white via filter rather than swapping
+   image files. Sized relative to its .dash-brand-icon frame so it
+   scales cleanly at every breakpoint. */
+.dash-brand-logo {
+    width: 68%;
+    height: 68%;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+    display: block;
 }
 
 .dash-brand-text {
@@ -1141,5 +1157,18 @@
     .dash-user-avatar {
         width: 34px;
         height: 34px;
+    }
+
+    .dash-sidebar-brand {
+        padding: 1rem;
+    }
+
+    .dash-brand-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .dash-brand-name {
+        font-size: 0.95rem;
     }
 }
