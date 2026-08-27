@@ -171,6 +171,21 @@ def create_app(config_class: type = Config) -> Flask:
 
         return {"recent_notifications": recent_for(g.get("user"), limit=6)}
 
+    @app.context_processor
+    def inject_sidebar_badges():
+        """Makes `sidebar_badges` available in every Jinja template —
+        a dict of small "needs action" counts shown as a pill next to
+        a sidebar link (e.g. Subscribers, Dispatch Board), one key per
+        badge-worthy nav item. See app/sidebar_badges.py's module
+        docstring for what each count means and why it's computed
+        differently for an Administrator/Technician (live status
+        counts) than a Customer (unread notification counts).
+        Returns {} for a logged-out visitor or a role with nothing
+        badge-worthy (Payment Collector)."""
+        from app.sidebar_badges import sidebar_badge_counts
+
+        return {"sidebar_badges": sidebar_badge_counts(g.get("user"))}
+
     # ---- Register blueprints ----
     from app.routes.main import main_bp
     from app.routes.naps import naps_bp

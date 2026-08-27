@@ -56,6 +56,9 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint == role_home_endpoint else '' }}"
                        href="{{ url_for(role_home_endpoint) }}">
                         <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+                        {% if current_user and current_user.role == 'technician' and sidebar_badges.get('technician_dashboard') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.technician_dashboard }}</span>
+                        {% endif %}
                     </a>
                 </li>
                 {% if current_user and current_user.role in ('administrator', 'technician') %}
@@ -84,6 +87,9 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('issues.') else '' }}"
                        href="{{ url_for('issues.list_issues') }}">
                         <i class="bi bi-exclamation-triangle"></i><span>Issues</span>
+                        {% if sidebar_badges.get('issues') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.issues }}</span>
+                        {% endif %}
                     </a>
                 </li>
 
@@ -91,6 +97,9 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('dispatch.') else '' }}"
                        href="{{ url_for('dispatch.index') }}">
                         <i class="bi bi-signpost-split"></i><span>Dispatch Board</span>
+                        {% if sidebar_badges.get('dispatch') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.dispatch }}</span>
+                        {% endif %}
                     </a>
                 </li>
 
@@ -98,6 +107,9 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('subscribers.') else '' }}"
                        href="{{ url_for('subscribers.list_subscribers') }}">
                         <i class="bi bi-person-vcard"></i><span>Subscribers</span>
+                        {% if sidebar_badges.get('subscribers') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.subscribers }}</span>
+                        {% endif %}
                     </a>
                 </li>
 
@@ -119,6 +131,9 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('service_requests.') else '' }}"
                        href="{{ url_for('service_requests.list_requests') }}">
                         <i class="bi bi-clipboard-check"></i><span>Service Requests</span>
+                        {% if sidebar_badges.get('service_requests') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.service_requests }}</span>
+                        {% endif %}
                     </a>
                 </li>
 
@@ -126,6 +141,9 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('payments.') else '' }}"
                        href="{{ url_for('payments.list_payments') }}">
                         <i class="bi bi-cash-coin"></i><span>Payments</span>
+                        {% if sidebar_badges.get('payments') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.payments }}</span>
+                        {% endif %}
                     </a>
                 </li>
 
@@ -167,18 +185,27 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.my_service_requests' else '' }}"
                        href="{{ url_for('customer.my_service_requests') }}">
                         <i class="bi bi-clipboard-check"></i><span>My Service Requests</span>
+                        {% if sidebar_badges.get('customer_service_requests') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.customer_service_requests }}</span>
+                        {% endif %}
                     </a>
                 </li>
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.my_issues' else '' }}"
                        href="{{ url_for('customer.my_issues') }}">
                         <i class="bi bi-life-preserver"></i><span>My Issues</span>
+                        {% if sidebar_badges.get('customer_issues') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.customer_issues }}</span>
+                        {% endif %}
                     </a>
                 </li>
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.my_payments' else '' }}"
                        href="{{ url_for('customer.my_payments') }}">
                         <i class="bi bi-cash-coin"></i><span>Payments</span>
+                        {% if sidebar_badges.get('customer_payments') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.customer_payments }}</span>
+                        {% endif %}
                     </a>
                 </li>
                 {# Same redundancy removal as the administrator block above — see
