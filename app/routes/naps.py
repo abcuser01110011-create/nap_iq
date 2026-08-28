@@ -52,26 +52,37 @@ def _default_focus_nap_id():
     so opening or reloading the page always lands somewhere useful
     instead of the same fixed DEFAULT_CENTER/DEFAULT_ZOOM every time.
 
-    Rule: the NAP with the most 'critical' priority issues attached to
-    it — ranked purely by that count, regardless of each issue's own
-    status. Critical outranks every other priority level by
-    definition, so a NAP is never passed over in favor of one that
-    merely has more issues overall of a lower priority.
+    Rule: the NAP with the most currently-open ('pending', 'assigned',
+    or 'in_progress' — i.e. not yet 'resolved'/'closed') 'critical'
+    priority issues attached to it — ranked purely by that count,
+    regardless of how many issues of some *other* priority it has.
+    Critical outranks every other priority level by definition, so a
+    NAP is never passed over in favor of one that merely has more
+    issues overall of a lower priority. Resolved/closed critical
+    issues don't count toward this at all — a NAP whose critical
+    problems have already been fixed has nothing left that needs
+    attention, so it shouldn't keep winning the focus slot just
+    because of history; the map's own issue-priority/status filters
+    default to this same "open only" set for exactly this reason (see
+    map.html's issueFilterResolved/issueFilterClosed starting
+    unchecked), so the NAP this function picks is one that would
+    actually show a visible open-critical marker once it's centered.
 
-    Ties (more than one NAP sharing the same highest critical count —
-    e.g. NAP A had 2 critical issues and got them repaired down to 0
-    right as NAP B separately reached 2) are broken by whichever of
-    the tied NAPs logged its earliest critical issue first: the NAP
-    whose oldest 'critical' TechnicalIssue.created_at is furthest back
-    wins, on the reasoning that a site with a longer-standing critical
-    problem history has been waiting for attention longer. If that
-    still ties exactly (identical timestamps), the lowest NAP id
-    breaks it, purely for a stable, repeatable answer rather than one
-    that could flip on every reload.
+    Ties (more than one NAP sharing the same highest open-critical
+    count — e.g. NAP A had 2 open critical issues and got them
+    repaired down to 0 right as NAP B separately reached 2) are broken
+    by whichever of the tied NAPs logged its earliest still-open
+    critical issue first: the NAP whose oldest open 'critical'
+    TechnicalIssue.created_at is furthest back wins, on the reasoning
+    that a site with a longer-standing unresolved critical problem has
+    been waiting for attention longer. If that still ties exactly
+    (identical timestamps), the lowest NAP id breaks it, purely for a
+    stable, repeatable answer rather than one that could flip on every
+    reload.
 
     Returns None (no default focus; the map falls back to
     DEFAULT_CENTER/DEFAULT_ZOOM in napmap.js) only when no NAP has any
-    critical issues at all.
+    open critical issues at all.
     """
     counts = (
         db.session.query(
@@ -80,6 +91,7 @@ def _default_focus_nap_id():
         )
         .filter(
             TechnicalIssue.priority == "critical",
+            TechnicalIssue.status.notin_(("resolved", "closed")),
             TechnicalIssue.nap_id.isnot(None),
         )
         .group_by(TechnicalIssue.nap_id)
@@ -100,6 +112,7 @@ def _default_focus_nap_id():
         )
         .filter(
             TechnicalIssue.priority == "critical",
+            TechnicalIssue.status.notin_(("resolved", "closed")),
             TechnicalIssue.nap_id.in_(tied_nap_ids),
         )
         .group_by(TechnicalIssue.nap_id)
@@ -237,12 +250,13 @@ def geomap():
 
     Phase 33 (default GeoMap focus): when none of the explicit
     destination params above are present, the page also passes
-    `focus_nap_id` — the NAP with the most 'critical' priority issues
-    attached to it, ties broken by earliest-reported critical issue
-    (see `_default_focus_nap_id()`) — so a plain visit/reload/re-login
-    always opens already centered on whichever site has the most
-    critical-severity problems, instead of the same fixed city-wide
-    default view every time.
+    `focus_nap_id` — the NAP with the most currently-open 'critical'
+    priority issues attached to it, ties broken by earliest-reported
+    still-open critical issue (see `_default_focus_nap_id()`) — so a
+    plain visit/reload/re-login always opens already centered on
+    whichever site actually has the most unresolved critical-severity
+    problems right now, instead of the same fixed city-wide default
+    view every time.
     """
     issue_id = request.args.get("issue_id", type=int)
     recommend_request_id = request.args.get("recommend_request_id", type=int)
