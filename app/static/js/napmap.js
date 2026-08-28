@@ -2550,7 +2550,23 @@
             const payload = await response.json();
 
             if (response.ok && payload.status === "success") {
-                allIssues.push(payload.issue);
+                // The backend merges a new report into whichever open
+                // issue the subscriber already has (see issues.py's
+                // report_issue()) rather than always creating a new
+                // row, so `payload.issue` may be an update to an
+                // issue we're already holding in `allIssues` -- if we
+                // always pushed, that subscriber would end up with
+                // two entries pointing at the exact same coordinates
+                // and renderIssueMarkers() would draw two overlapping
+                // "!" badges on top of each other. Replace the
+                // existing entry by id when there is one; only push
+                // when this is a genuinely new issue.
+                const existingIndex = allIssues.findIndex((i) => i.id === payload.issue.id);
+                if (existingIndex !== -1) {
+                    allIssues[existingIndex] = payload.issue;
+                } else {
+                    allIssues.push(payload.issue);
+                }
                 renderAll();
                 showAlert("success", payload.message);
                 exitIssueMode();

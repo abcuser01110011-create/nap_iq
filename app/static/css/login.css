@@ -1,0 +1,310 @@
+/* =====================================================================
+   Login page — standalone premium theme
+   ---------------------------------------------------------------------
+   This page intentionally does NOT extend base.html (see auth/
+   login.html) so it renders with none of the app's chrome — no top
+   navbar, no role-based nav links, no logged-out "PGNetwork - Sta.
+   Cruz, Laguna" strip. That chrome makes sense once you're inside the
+   app; on the door into it, it's just noise above the one thing that
+   matters (the sign-in form).
+
+   The palette is pulled directly from pg-networks-logo.png's own
+   background — a deep navy vignette (~#02061c corners) blooming into
+   a brighter royal blue (~#13279e) toward the upper-left, behind the
+   white wifi-tower mark and gold "P". Recreating that here (plus a
+   couple of soft glow blooms) keeps the login screen visually
+   continuous with the brand mark that's about to appear centered in
+   the card, instead of the plain flat --napiq-primary blue the rest
+   of the app's navbar uses.
+   ===================================================================== */
+
+:root {
+    --login-navy-deep: #020617;
+    --login-navy: #060b2e;
+    --login-blue-mid: #0e1f6b;
+    --login-blue-bright: #1b3fd6;
+    --login-blue-accent: #3b6bff;
+    --login-gold: #f2a93b;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body.login-body {
+    height: 100%;
+}
+
+body.login-body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(120% 140% at 18% 8%, var(--login-blue-bright) 0%, var(--login-blue-mid) 32%, var(--login-navy) 62%, var(--login-navy-deep) 100%);
+    color: #eef2ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+}
+
+/* Full-viewport stage that holds the ambient glow blooms + the card,
+   so the gradient background above reads as one continuous scene
+   rather than a flat card floating on a flat page. */
+.login-scene {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+}
+
+.login-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.login-glow-a {
+    width: 32rem;
+    height: 32rem;
+    top: -10rem;
+    left: -8rem;
+    background: radial-gradient(circle, var(--login-blue-accent) 0%, transparent 70%);
+}
+
+.login-glow-b {
+    width: 26rem;
+    height: 26rem;
+    bottom: -10rem;
+    right: -6rem;
+    background: radial-gradient(circle, var(--login-gold) 0%, transparent 72%);
+    opacity: 0.18;
+}
+
+/* Frosted-glass card floating over the gradient scene. */
+.login-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 400px;
+    padding: 2.5rem 2.25rem 2.25rem;
+    border-radius: 1.25rem;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+        0 25px 60px -15px rgba(2, 6, 23, 0.65),
+        0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+        0 1px 0 rgba(255, 255, 255, 0.12) inset;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.login-brand {
+    text-align: center;
+    margin-bottom: 1.75rem;
+}
+
+.login-brand__mark {
+    height: 64px;
+    width: 64px;
+    object-fit: contain;
+    border-radius: 16px;
+    box-shadow: 0 10px 26px -8px rgba(27, 63, 214, 0.75);
+    margin-bottom: 0.85rem;
+}
+
+.login-brand__title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    background: linear-gradient(90deg, #ffffff 0%, #cdd8ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.login-brand__subtitle {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    color: rgba(226, 232, 255, 0.6);
+}
+
+/* Flash messages (invalid credentials, deactivated account, logged-out
+   confirmation, ...) restyled as small glass chips instead of
+   Bootstrap's default boxy alert -- the generic, always-fires
+   "Please log in to continue." notice is filtered out in the
+   template itself since it's not telling the person anything they
+   don't already know from looking at a login form. */
+.login-flash-stack {
+    margin-bottom: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.login-flash {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.6rem;
+    border: 1px solid transparent;
+    line-height: 1.3;
+}
+
+.login-flash--danger {
+    background: rgba(220, 53, 69, 0.14);
+    border-color: rgba(220, 53, 69, 0.35);
+    color: #ffc2c9;
+}
+
+.login-flash--success {
+    background: rgba(25, 135, 84, 0.14);
+    border-color: rgba(25, 135, 84, 0.35);
+    color: #a9f0cd;
+}
+
+.login-flash--warning {
+    background: rgba(255, 193, 7, 0.14);
+    border-color: rgba(255, 193, 7, 0.35);
+    color: #ffe29a;
+}
+
+.login-field {
+    margin-bottom: 1.15rem;
+}
+
+.login-field__label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(203, 213, 255, 0.75);
+    margin-bottom: 0.4rem;
+}
+
+.login-field__wrap {
+    position: relative;
+    display: flex;
+}
+
+.login-field__input {
+    width: 100%;
+    padding: 0.68rem 0.9rem;
+    font-size: 0.95rem;
+    color: #f4f6ff;
+    background: rgba(6, 12, 40, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.65rem;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.login-field__wrap .login-field__input {
+    padding-right: 2.7rem;
+}
+
+.login-field__input::placeholder {
+    color: rgba(203, 213, 255, 0.35);
+}
+
+.login-field__input:focus {
+    border-color: var(--login-blue-accent);
+    background: rgba(6, 12, 40, 0.65);
+    box-shadow: 0 0 0 3px rgba(59, 107, 255, 0.28);
+}
+
+.login-field__input.is-invalid {
+    border-color: #e35d6a;
+    box-shadow: 0 0 0 3px rgba(227, 93, 106, 0.22);
+}
+
+.login-field__error {
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    color: #ffb3bb;
+}
+
+/* Refined eye toggle: a quiet, circular ghost button sitting inside
+   the password field's own right edge (rather than Bootstrap's
+   default input-group, which welded a separate square button to the
+   input and broke the field's rounded corners). */
+.login-field__toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    width: 2.1rem;
+    height: 2.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: rgba(203, 213, 255, 0.55);
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.login-field__toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #eef2ff;
+}
+
+.login-field__toggle:focus-visible {
+    outline: 2px solid var(--login-blue-accent);
+    outline-offset: 2px;
+}
+
+.login-field__toggle i {
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.login-submit {
+    width: 100%;
+    margin-top: 0.4rem;
+    padding: 0.75rem 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ffffff;
+    border: none;
+    border-radius: 0.7rem;
+    background: linear-gradient(135deg, var(--login-blue-accent) 0%, var(--login-blue-bright) 55%, #0b1f73 100%);
+    box-shadow: 0 12px 24px -8px rgba(27, 63, 214, 0.65);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.login-submit:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 16px 30px -8px rgba(27, 63, 214, 0.8);
+}
+
+.login-submit:active {
+    transform: translateY(1px);
+}
+
+.login-submit:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+    .login-card {
+        padding: 2rem 1.5rem 1.75rem;
+    }
+}

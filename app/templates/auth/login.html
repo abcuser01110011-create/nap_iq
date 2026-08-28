@@ -1,52 +1,80 @@
-{% extends "base.html" %}
-{% block title %}Sign In{% endblock %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Sign In &middot; PG Networks</title>
 
-{% block content %}
-<div class="row justify-content-center">
-    <div class="col-12 col-sm-8 col-md-6 col-lg-4">
-        <div class="card shadow-sm mt-4">
-            <div class="card-body p-4">
-                <div class="text-center mb-4">
-                    <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" alt="PG Networks" style="height: 44px; width: auto;">
-                    <h1 class="h4 mt-2 mb-0">PG Networks</h1>
-                    <p class="text-muted small mb-0">Sign in to continue</p>
-                </div>
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='img/favicon-192.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
 
-                <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate>
-                    {{ form.hidden_tag() }}
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
+</head>
+<body class="login-body">
 
-                    <div class="mb-3">
-                        {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username") }}
-                        {% for error in form.username.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
-                        {% endfor %}
-                    </div>
+<div class="login-scene">
+    <div class="login-glow login-glow-a"></div>
+    <div class="login-glow login-glow-b"></div>
 
-                    <div class="mb-3">
-                        {{ form.password.label(class="form-label") }}
-                        <div class="input-group">
-                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password") }}
-                            <button class="btn btn-outline-secondary" type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false" tabindex="-1">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                        {% for error in form.password.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 mt-2">
-                        <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
-                    </button>
-                </form>
-            </div>
+    <div class="login-card">
+        <div class="login-brand">
+            <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="PG Networks" class="login-brand__mark">
+            <h1 class="login-brand__title">PG Networks</h1>
+            <p class="login-brand__subtitle">Sign in to continue</p>
         </div>
-        <p class="text-center text-muted small mt-3">
-            PG Networks &middot; Administrator, Technician &amp; Customer accounts use the same sign-in form.
-        </p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% set shown = messages | rejectattr("1", "equalto", "Please log in to continue.") | list %}
+            {% if shown %}
+                <div class="login-flash-stack">
+                    {% for category, message in shown %}
+                        <div class="login-flash login-flash--{{ 'danger' if category in ('danger', 'error') else category }}">
+                            {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% endif %}
+                            {% if category in ('danger', 'error') %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate>
+            {{ form.hidden_tag() }}
+
+            <div class="login-field">
+                {{ form.username.label(class="login-field__label") }}
+                {{ form.username(class="login-field__input" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username", placeholder="Enter your username") }}
+                {% for error in form.username.errors %}
+                    <div class="login-field__error">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="login-field">
+                {{ form.password.label(class="login-field__label") }}
+                <div class="login-field__wrap">
+                    {{ form.password(class="login-field__input" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password", placeholder="Enter your password") }}
+                    <button class="login-field__toggle" type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false" tabindex="-1">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                {% for error in form.password.errors %}
+                    <div class="login-field__error">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="login-submit">
+                <i class="bi bi-box-arrow-in-right"></i>Sign In
+            </button>
+        </form>
     </div>
 </div>
-{% endblock %}
 
-
+<script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
+</body>
+</html>

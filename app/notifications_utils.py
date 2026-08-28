@@ -110,6 +110,29 @@ def notify_new_issue_reported(issue):
     )
 
 
+def notify_issue_updated(issue):
+    """Records a "reported issue was updated" notification — fired
+    from app/routes/issues.py's `report_issue()` when a new report
+    comes in for a subscriber who already has an open (pending/
+    assigned/in_progress) technical issue on file. Rather than
+    creating a second, overlapping issue row/map marker for the same
+    subscriber, that route updates the existing issue in place and
+    calls this instead of `notify_new_issue_reported()`, so an
+    Administrator still hears about the new report -- just phrased as
+    an update to what's already being tracked, not a brand-new issue.
+    """
+    label = issue.issue_code or f"#{issue.id}"
+    subscriber_label = issue.subscriber.full_name if issue.subscriber else "an unlinked subscriber"
+    notify(
+        "issue",
+        f"Issue updated — {label}",
+        f"A new report for {subscriber_label} was merged into their existing "
+        f"{issue.issue_type.replace('_', ' ')} issue (now {issue.priority} priority).",
+        entity_type="issue",
+        entity_id=issue.id,
+    )
+
+
 def notify_payment_pending_confirmation(payment):
     """Records a Phase 23 (phase_12.pdf) "payment requiring
     confirmation" notification — fired whenever a payment is saved

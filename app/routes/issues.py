@@ -54,7 +54,7 @@ from app.extensions import db
 from app.auth import role_required
 from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician
 from app.forms import IssueReportForm
-from app.notifications_utils import notify_issue_status_change, notify_new_issue_reported
+from app.notifications_utils import notify_issue_status_change, notify_new_issue_reported, notify_issue_updated
 
 issues_bp = Blueprint("issues", __name__, url_prefix="/issues")
 
@@ -77,6 +77,15 @@ _STAFF_ROLES = ("administrator", "technician")
 # Kept in sync by hand with dispatch.py's OPEN_ASSIGNMENT_STATUSES —
 # same reasoning as that module's own comment on the duplication.
 _OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
+
+# Kept in sync by hand with dispatch.py's / dashboard.py's own
+# OPEN_ISSUE_STATUSES — same duplication tradeoff as
+# _OPEN_ASSIGNMENT_STATUSES above. Used by report_issue() below to
+# decide whether a new report should update an already-open issue
+# instead of creating a second, overlapping one for the same
+# subscriber (an issue is "open" and eligible to be merged into right
+# up until it's resolved/closed).
+_OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 
 
 def _populate_dynamic_choices(form):
@@ -215,6 +224,72 @@ def report_issue():
                 400,
             )
 
+        # Merge-into-existing-issue guard: a subscriber can only ever
+        # be pinned at their own exact registered location (enforced
+        # above), so a second report filed for a subscriber who
+        # already has an open issue would land its marker exactly on
+        # top of the first one on the GeoMap -- indistinguishable pins
+        # stacked at one point rather than two genuinely separate
+        # problems. Instead of inserting a second row here, fold the
+        # new report into whichever open (pending/assigned/
+        # in_progress) issue that subscriber already has, updating it
+        # in place -- one marker per subscriber on the map at any
+        # given time, and a technician working the existing ticket
+        # sees the latest details rather than a second one appearing
+        # underneath it. A subscriber whose only issue(s) are already
+        # resolved/closed is treated the same as one with no issue at
+        # all: this still creates a fresh row below.
+        existing_issue = (
+            TechnicalIssue.query.filter(
+                TechnicalIssue.subscriber_id == subscriber.id,
+                TechnicalIssue.status.in_(_OPEN_ISSUE_STATUSES),
+            )
+            .order_by(TechnicalIssue.created_at.desc())
+            .first()
+        )
+
+        if existing_issue is not None:
+            existing_issue.issue_type = form.issue_type.data
+            existing_issue.description = form.description.data.strip()
+            existing_issue.priority = form.priority.data
+            existing_issue.address = (form.address.data or "").strip() or None
+            existing_issue.latitude = form.latitude.data
+            existing_issue.longitude = form.longitude.data
+            existing_issue.nap_id = form.nap_id.data or None  # 0 sentinel -> NULL
+            # Status/issue_code are left untouched -- this is the same
+            # ticket, not a new one, so it keeps its place in the
+            # existing pending/assigned/in_progress workflow.
+            notify_issue_updated(existing_issue)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "status": "success",
+                        "updated": True,
+                        "message": f"Issue '{existing_issue.issue_code}' was updated with this report.",
+                        "issue": {
+                            "id": existing_issue.id,
+                            "issue_code": existing_issue.issue_code,
+                            "issue_type": existing_issue.issue_type,
+                            "description": existing_issue.description,
+                            "priority": existing_issue.priority,
+                            "status": existing_issue.status,
+                            "address": existing_issue.address,
+                            "latitude": float(existing_issue.latitude),
+                            "longitude": float(existing_issue.longitude),
+                            "subscriber_id": existing_issue.subscriber_id,
+                            "subscriber_name": existing_issue.subscriber.full_name,
+                            "subscriber_code": existing_issue.subscriber.subscriber_code,
+                            "nap_id": existing_issue.nap_id,
+                            "nap_code": existing_issue.nap.nap_code if existing_issue.nap else None,
+                            "created_at": existing_issue.created_at.isoformat(),
+                        },
+                    }
+                ),
+                200,
+            )
+
         issue = TechnicalIssue(
             issue_type=form.issue_type.data,
             description=form.description.data.strip(),
@@ -239,6 +314,7 @@ def report_issue():
             jsonify(
                 {
                     "status": "success",
+                    "updated": False,
                     "message": f"Issue '{issue.issue_code}' was reported successfully.",
                     "issue": {
                         "id": issue.id,

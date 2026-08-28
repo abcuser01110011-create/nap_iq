@@ -344,8 +344,15 @@
     z-index: 2;
     white-space: nowrap;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 9px;
-    font-weight: 900;
+    /* Deliberately smaller than .nap-marker-label's own (zoom-scaled,
+       up to 11px) text -- this badge sits right next to/inside NAP
+       labels on a busy map and, at the old 9px/900-weight, its heavy
+       stroke read as the same visual size as the NAP label despite
+       the smaller number. Dropping both the size and the weight a
+       notch keeps it legible while clearly reading as the smaller,
+       secondary label. */
+    font-size: 7px;
+    font-weight: 800;
     letter-spacing: 0.02em;
     line-height: 1;
     pointer-events: none;
