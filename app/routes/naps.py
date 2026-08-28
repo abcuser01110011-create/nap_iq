@@ -46,80 +46,102 @@ _VIEW_ROLES = ("administrator", "technician")
 _MANAGE_ROLES = ("administrator",)
 
 
+# Priority levels, most to least severe. Drives the cascade in
+# _default_focus_nap_id() below: a level is only consulted at all if
+# every *more* severe level has zero open issues NAP-wide (see that
+# function's docstring for the full rule).
+_FOCUS_PRIORITY_CASCADE = ("critical", "high", "medium", "low")
+
+
 def _default_focus_nap_id():
     """Picks which NAP the GeoMap should center on by default (no
     explicit ?issue_id=/?navigate_*=/?recommend_request_id= override),
     so opening or reloading the page always lands somewhere useful
     instead of the same fixed DEFAULT_CENTER/DEFAULT_ZOOM every time.
 
-    Rule: the NAP with the most currently-open ('pending', 'assigned',
-    or 'in_progress' — i.e. not yet 'resolved'/'closed') 'critical'
-    priority issues attached to it — ranked purely by that count,
-    regardless of how many issues of some *other* priority it has.
+    Rule: rank NAPs by their count of currently-open ('pending',
+    'assigned', or 'in_progress' — i.e. not yet 'resolved'/'closed')
+    'critical' priority issues, and focus whichever NAP has the most.
     Critical outranks every other priority level by definition, so a
     NAP is never passed over in favor of one that merely has more
-    issues overall of a lower priority. Resolved/closed critical
-    issues don't count toward this at all — a NAP whose critical
-    problems have already been fixed has nothing left that needs
-    attention, so it shouldn't keep winning the focus slot just
-    because of history; the map's own issue-priority/status filters
-    default to this same "open only" set for exactly this reason (see
-    map.html's issueFilterResolved/issueFilterClosed starting
-    unchecked), so the NAP this function picks is one that would
-    actually show a visible open-critical marker once it's centered.
+    issues overall of a lower priority. Resolved/closed issues don't
+    count toward this at all — a NAP whose problems have already been
+    fixed has nothing left that needs attention, so it shouldn't keep
+    winning the focus slot just because of history; the map's own
+    issue-priority/status filters default to this same "open only" set
+    for exactly this reason (see map.html's
+    issueFilterResolved/issueFilterClosed starting unchecked), so the
+    NAP this function picks is one that would actually show a visible
+    open marker of the winning priority once it's centered.
 
-    Ties (more than one NAP sharing the same highest open-critical
-    count — e.g. NAP A had 2 open critical issues and got them
-    repaired down to 0 right as NAP B separately reached 2) are broken
-    by whichever of the tied NAPs logged its earliest still-open
-    critical issue first: the NAP whose oldest open 'critical'
-    TechnicalIssue.created_at is furthest back wins, on the reasoning
-    that a site with a longer-standing unresolved critical problem has
-    been waiting for attention longer. If that still ties exactly
-    (identical timestamps), the lowest NAP id breaks it, purely for a
-    stable, repeatable answer rather than one that could flip on every
-    reload.
+    Ties (more than one NAP sharing the same highest open count at a
+    given priority level — e.g. NAP A had 2 open critical issues and
+    got them repaired down to 0 right as NAP B separately reached 2)
+    are broken by whichever of the tied NAPs logged its earliest
+    still-open issue *of that priority* first: the NAP whose oldest
+    open TechnicalIssue.created_at (at that priority) is furthest back
+    wins, on the reasoning that a site with a longer-standing
+    unresolved problem has been waiting for attention longer. If that
+    still ties exactly (identical timestamps), the lowest NAP id
+    breaks it, purely for a stable, repeatable answer rather than one
+    that could flip on every reload.
+
+    Cascade: if literally no NAP has any open critical issue right now
+    (every NAP is tied at a count of zero), critical has nothing to
+    rank by, so the same count-then-earliest-report logic is applied
+    to the next priority level down ('high') instead — and, in turn,
+    to 'medium' and then 'low' if those also come up empty. The first
+    priority level (in critical -> high -> medium -> low order) that
+    has *any* open issue anywhere decides the focus NAP; levels below
+    it are never consulted once a level has produced a winner.
 
     Returns None (no default focus; the map falls back to
     DEFAULT_CENTER/DEFAULT_ZOOM in napmap.js) only when no NAP has any
-    open critical issues at all.
+    open issue of any priority at all.
     """
-    counts = (
-        db.session.query(
-            TechnicalIssue.nap_id,
-            func.count(TechnicalIssue.id).label("critical_count"),
+    for priority in _FOCUS_PRIORITY_CASCADE:
+        counts = (
+            db.session.query(
+                TechnicalIssue.nap_id,
+                func.count(TechnicalIssue.id).label("open_count"),
+            )
+            .filter(
+                TechnicalIssue.priority == priority,
+                TechnicalIssue.status.notin_(("resolved", "closed")),
+                TechnicalIssue.nap_id.isnot(None),
+            )
+            .group_by(TechnicalIssue.nap_id)
+            .all()
         )
-        .filter(
-            TechnicalIssue.priority == "critical",
-            TechnicalIssue.status.notin_(("resolved", "closed")),
-            TechnicalIssue.nap_id.isnot(None),
-        )
-        .group_by(TechnicalIssue.nap_id)
-        .all()
-    )
-    if not counts:
-        return None
+        if not counts:
+            # No open issue at this priority anywhere -> fall through
+            # to the next (less severe) priority level.
+            continue
 
-    max_count = max(cnt for _nap_id, cnt in counts)
-    tied_nap_ids = [nap_id for nap_id, cnt in counts if cnt == max_count]
-    if len(tied_nap_ids) == 1:
-        return tied_nap_ids[0]
+        max_count = max(cnt for _nap_id, cnt in counts)
+        tied_nap_ids = [nap_id for nap_id, cnt in counts if cnt == max_count]
+        if len(tied_nap_ids) == 1:
+            return tied_nap_ids[0]
 
-    earliest = (
-        db.session.query(
-            TechnicalIssue.nap_id,
-            func.min(TechnicalIssue.created_at).label("earliest_critical"),
+        earliest = (
+            db.session.query(
+                TechnicalIssue.nap_id,
+                func.min(TechnicalIssue.created_at).label("earliest_at_priority"),
+            )
+            .filter(
+                TechnicalIssue.priority == priority,
+                TechnicalIssue.status.notin_(("resolved", "closed")),
+                TechnicalIssue.nap_id.in_(tied_nap_ids),
+            )
+            .group_by(TechnicalIssue.nap_id)
+            .order_by(
+                func.min(TechnicalIssue.created_at).asc(), TechnicalIssue.nap_id.asc()
+            )
+            .first()
         )
-        .filter(
-            TechnicalIssue.priority == "critical",
-            TechnicalIssue.status.notin_(("resolved", "closed")),
-            TechnicalIssue.nap_id.in_(tied_nap_ids),
-        )
-        .group_by(TechnicalIssue.nap_id)
-        .order_by(func.min(TechnicalIssue.created_at).asc(), TechnicalIssue.nap_id.asc())
-        .first()
-    )
-    return earliest[0] if earliest else tied_nap_ids[0]
+        return earliest[0] if earliest else tied_nap_ids[0]
+
+    return None
 
 
 def _own_nap_ids_for(g_user):
@@ -251,12 +273,13 @@ def geomap():
     Phase 33 (default GeoMap focus): when none of the explicit
     destination params above are present, the page also passes
     `focus_nap_id` — the NAP with the most currently-open 'critical'
-    priority issues attached to it, ties broken by earliest-reported
-    still-open critical issue (see `_default_focus_nap_id()`) — so a
+    priority issues attached to it (falling back to 'high', then
+    'medium', then 'low' if no NAP has any open critical issue at all
+    — see `_default_focus_nap_id()`), ties broken by earliest-reported
+    still-open issue at whichever priority level decided it — so a
     plain visit/reload/re-login always opens already centered on
-    whichever site actually has the most unresolved critical-severity
-    problems right now, instead of the same fixed city-wide default
-    view every time.
+    whichever site actually has the most unresolved problems right
+    now, instead of the same fixed city-wide default view every time.
     """
     issue_id = request.args.get("issue_id", type=int)
     recommend_request_id = request.args.get("recommend_request_id", type=int)
