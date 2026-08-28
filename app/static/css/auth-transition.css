@@ -1,0 +1,204 @@
+/* =====================================================================
+   Auth transition overlay — Sign in / Sign out loading screen
+   ---------------------------------------------------------------------
+   A full-screen overlay injected by static/js/auth-transition.js the
+   moment the login form (auth/login.html) or the logout form
+   (base.html's nav) is submitted. Shared by both pages (rather than
+   duplicated) since it's the exact same component either way — only
+   the title/step labels passed in differ.
+
+   Visually a continuation of the login page's own near-black theme:
+   same background, same accent blue, same rounded-square "brand tile"
+   shape as the login card's logo mark -- so submitting the form feels
+   like the page settling into its own loading state, not jumping to a
+   different screen.
+   ===================================================================== */
+
+.auth-transition-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #05091a;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.auth-transition-overlay.is-visible {
+    opacity: 1;
+}
+
+.auth-transition-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1rem;
+}
+
+/* Icon: a brand-tile square (same shape/tint as the login page's own
+   logo mark) sitting inside a faint ring, with two soft pulsing rings
+   expanding outward behind it on a loop -- a radar-ping read as
+   "actively working", not a static icon. */
+.auth-transition-icon-ring {
+    position: relative;
+    width: 6.5rem;
+    height: 6.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    border-radius: 50%;
+    border: 1px solid rgba(91, 140, 255, 0.25);
+}
+
+.auth-transition-ping {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(91, 140, 255, 0.55);
+    animation: authTransitionPing 2.2s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+.auth-transition-ping--delay {
+    animation-delay: 1.1s;
+}
+
+@keyframes authTransitionPing {
+    0% { transform: scale(0.55); opacity: 0.7; }
+    100% { transform: scale(1.35); opacity: 0; }
+}
+
+.auth-transition-icon-box {
+    position: relative;
+    z-index: 1;
+    width: 3.5rem;
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    background: rgba(59, 107, 255, 0.16);
+    border: 1px solid rgba(91, 140, 255, 0.4);
+    /* A slower, gentler breathing pulse on the tile itself, layered on
+       top of the expanding rings above, is what actually reads as
+       "this icon is pulsing" up close rather than just the rings
+       moving around it. */
+    animation: authTransitionBreathe 2.2s ease-in-out infinite;
+}
+
+@keyframes authTransitionBreathe {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 107, 255, 0.35); }
+    50% { transform: scale(1.06); box-shadow: 0 0 0 10px rgba(59, 107, 255, 0); }
+}
+
+.auth-transition-logo {
+    width: 1.85rem;
+    height: 1.85rem;
+    object-fit: contain;
+}
+
+.auth-transition-title {
+    margin: 0 0 1.1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.auth-transition-steps {
+    list-style: none;
+    margin: 0 0 1.35rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    align-items: flex-start;
+}
+
+.auth-transition-step {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    opacity: 0.55;
+    transition: opacity 0.2s ease;
+}
+
+.auth-transition-step[data-state="active"],
+.auth-transition-step[data-state="done"] {
+    opacity: 1;
+}
+
+.auth-transition-step-icon {
+    position: relative;
+    flex: 0 0 auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid rgba(91, 140, 255, 0.35);
+    background: transparent;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.auth-transition-step[data-state="active"] .auth-transition-step-icon {
+    border-color: var(--login-accent-bright, #3b6bff);
+}
+
+.auth-transition-step[data-state="done"] .auth-transition-step-icon {
+    background: var(--login-accent-bright, #3b6bff);
+    border-color: var(--login-accent-bright, #3b6bff);
+}
+
+.auth-transition-step-icon i {
+    display: none;
+    font-size: 0.7rem;
+    color: #ffffff;
+}
+
+.auth-transition-step[data-state="done"] .auth-transition-step-icon i {
+    display: inline-block;
+}
+
+.auth-transition-step-dot {
+    display: none;
+    width: 0.35rem;
+    height: 0.35rem;
+    border-radius: 50%;
+    background: var(--login-accent-bright, #3b6bff);
+}
+
+.auth-transition-step[data-state="active"] .auth-transition-step-icon .auth-transition-step-dot {
+    display: block;
+    animation: authTransitionDot 1s ease-in-out infinite;
+}
+
+@keyframes authTransitionDot {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+.auth-transition-step-label {
+    font-size: 0.85rem;
+    color: rgba(226, 232, 255, 0.85);
+}
+
+.auth-transition-progress {
+    width: 16rem;
+    max-width: 60vw;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.auth-transition-progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #2258e6, #6a8dff);
+    transition: width linear;
+}

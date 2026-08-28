@@ -15,13 +15,11 @@
 
     <link href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/auth-transition.css') }}" rel="stylesheet">
 </head>
 <body class="login-body">
 
 <div class="login-scene">
-    <div class="login-glow login-glow-a"></div>
-    <div class="login-glow login-glow-b"></div>
-
     <div class="login-card">
         <div class="login-brand">
             <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="PG Networks" class="login-brand__mark">
@@ -44,21 +42,28 @@
             {% endif %}
         {% endwith %}
 
-        <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate>
+        <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin">
             {{ form.hidden_tag() }}
 
             <div class="login-field">
                 {{ form.username.label(class="login-field__label") }}
-                {{ form.username(class="login-field__input" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username", placeholder="Enter your username") }}
+                <div class="login-field__wrap">
+                    <i class="bi bi-person login-field__icon"></i>
+                    {{ form.username(class="login-field__input login-field__input--icon" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username", placeholder="Enter your username") }}
+                </div>
                 {% for error in form.username.errors %}
                     <div class="login-field__error">{{ error }}</div>
                 {% endfor %}
             </div>
 
             <div class="login-field">
-                {{ form.password.label(class="login-field__label") }}
+                <div class="login-field__label-row">
+                    {{ form.password.label(class="login-field__label") }}
+                    <button type="button" class="login-forgot" title="Contact an administrator to reset your password.">Forgot?</button>
+                </div>
                 <div class="login-field__wrap">
-                    {{ form.password(class="login-field__input" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password", placeholder="Enter your password") }}
+                    <i class="bi bi-lock login-field__icon"></i>
+                    {{ form.password(class="login-field__input login-field__input--icon" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password", placeholder="Enter your password") }}
                     <button class="login-field__toggle" type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false" tabindex="-1">
                         <i class="bi bi-eye"></i>
                     </button>
@@ -68,13 +73,23 @@
                 {% endfor %}
             </div>
 
+            <label class="login-remember">
+                <input type="checkbox" class="login-remember__input" checked>
+                <span class="login-remember__box"><i class="bi bi-check-lg"></i></span>
+                <span class="login-remember__label">Keep me signed in on this device</span>
+            </label>
+
             <button type="submit" class="login-submit">
-                <i class="bi bi-box-arrow-in-right"></i>Sign In
+                Sign in<i class="bi bi-arrow-right"></i>
             </button>
+
+            <p class="login-footnote"><i class="bi bi-shield-lock"></i>Access is logged and restricted to authorized operators.</p>
         </form>
     </div>
 </div>
 
+<script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
 </body>
 </html>

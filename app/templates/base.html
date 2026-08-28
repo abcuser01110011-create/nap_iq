@@ -22,6 +22,7 @@
         rel="stylesheet"
     >
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/auth-transition.css') }}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -123,7 +124,7 @@
                     <i class="bi bi-person-circle me-1"></i>{{ current_user.full_name }}
                     <span class="badge bg-light text-dark ms-1">{{ current_user.role|replace('_', ' ')|title }}</span>
                 </span>
-                <form method="post" action="{{ url_for('auth.logout') }}" class="d-inline">
+                <form method="post" action="{{ url_for('auth.logout') }}" class="d-inline" data-auth-transition="signout">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-sm btn-outline-light">
                         <i class="bi bi-box-arrow-right me-1"></i>Logout
@@ -155,9 +156,11 @@
     {% block content %}{% endblock %}
 </main>
 
+<script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
 <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/naps.js') }}"></script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

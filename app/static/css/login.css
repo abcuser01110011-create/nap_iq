@@ -1,30 +1,28 @@
 /* =====================================================================
-   Login page — standalone premium theme
+   Login page — dark "operations console" theme
    ---------------------------------------------------------------------
-   This page intentionally does NOT extend base.html (see auth/
-   login.html) so it renders with none of the app's chrome — no top
-   navbar, no role-based nav links, no logged-out "PGNetwork - Sta.
-   Cruz, Laguna" strip. That chrome makes sense once you're inside the
-   app; on the door into it, it's just noise above the one thing that
-   matters (the sign-in form).
+   This page does NOT extend base.html (see auth/login.html) so it
+   renders with none of the app's chrome — no top navbar, no
+   role-based nav links, no logged-out "PGNetwork - Sta. Cruz, Laguna"
+   strip.
 
-   The palette is pulled directly from pg-networks-logo.png's own
-   background — a deep navy vignette (~#02061c corners) blooming into
-   a brighter royal blue (~#13279e) toward the upper-left, behind the
-   white wifi-tower mark and gold "P". Recreating that here (plus a
-   couple of soft glow blooms) keeps the login screen visually
-   continuous with the brand mark that's about to appear centered in
-   the card, instead of the plain flat --napiq-primary blue the rest
-   of the app's navbar uses.
+   Palette matches the sign-in/sign-out loading transition
+   (auth-transition.css) so the login card and the full-screen loader
+   that appears the moment you submit it read as one continuous
+   surface rather than two different apps: near-black background,
+   a slightly-lighter navy panel/field color, and the same vivid
+   accent blue for the primary action.
    ===================================================================== */
 
 :root {
-    --login-navy-deep: #020617;
-    --login-navy: #060b2e;
-    --login-blue-mid: #0e1f6b;
-    --login-blue-bright: #1b3fd6;
-    --login-blue-accent: #3b6bff;
-    --login-gold: #f2a93b;
+    --login-bg: #05091a;
+    --login-panel: #0b1330;
+    --login-panel-border: rgba(255, 255, 255, 0.08);
+    --login-field-bg: #0b1330;
+    --login-field-border: rgba(255, 255, 255, 0.1);
+    --login-accent: #2258e6;
+    --login-accent-bright: #3b6bff;
+    --login-text-muted: #8b96b8;
 }
 
 * {
@@ -38,7 +36,7 @@ html, body.login-body {
 body.login-body {
     margin: 0;
     font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-    background: radial-gradient(120% 140% at 18% 8%, var(--login-blue-bright) 0%, var(--login-blue-mid) 32%, var(--login-navy) 62%, var(--login-navy-deep) 100%);
+    background: var(--login-bg);
     color: #eef2ff;
     display: flex;
     align-items: center;
@@ -46,11 +44,7 @@ body.login-body {
     overflow-x: hidden;
 }
 
-/* Full-viewport stage that holds the ambient glow blooms + the card,
-   so the gradient background above reads as one continuous scene
-   rather than a flat card floating on a flat page. */
 .login-scene {
-    position: relative;
     width: 100%;
     min-height: 100vh;
     display: flex;
@@ -59,48 +53,14 @@ body.login-body {
     padding: 2rem 1.25rem;
 }
 
-.login-glow {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(70px);
-    opacity: 0.55;
-    pointer-events: none;
-    z-index: 0;
-}
-
-.login-glow-a {
-    width: 32rem;
-    height: 32rem;
-    top: -10rem;
-    left: -8rem;
-    background: radial-gradient(circle, var(--login-blue-accent) 0%, transparent 70%);
-}
-
-.login-glow-b {
-    width: 26rem;
-    height: 26rem;
-    bottom: -10rem;
-    right: -6rem;
-    background: radial-gradient(circle, var(--login-gold) 0%, transparent 72%);
-    opacity: 0.18;
-}
-
-/* Frosted-glass card floating over the gradient scene. */
 .login-card {
-    position: relative;
-    z-index: 1;
     width: 100%;
     max-width: 400px;
-    padding: 2.5rem 2.25rem 2.25rem;
-    border-radius: 1.25rem;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.04) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow:
-        0 25px 60px -15px rgba(2, 6, 23, 0.65),
-        0 0 0 1px rgba(255, 255, 255, 0.02) inset,
-        0 1px 0 rgba(255, 255, 255, 0.12) inset;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    padding: 2.25rem 2rem 2rem;
+    border-radius: 1rem;
+    background: var(--login-panel);
+    border: 1px solid var(--login-panel-border);
+    box-shadow: 0 25px 60px -20px rgba(0, 0, 0, 0.6);
 }
 
 .login-brand {
@@ -109,37 +69,31 @@ body.login-body {
 }
 
 .login-brand__mark {
-    height: 64px;
-    width: 64px;
+    height: 60px;
+    width: 60px;
     object-fit: contain;
-    border-radius: 16px;
-    box-shadow: 0 10px 26px -8px rgba(27, 63, 214, 0.75);
+    border-radius: 14px;
     margin-bottom: 0.85rem;
 }
 
 .login-brand__title {
     margin: 0;
-    font-size: 1.4rem;
+    font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: 0.01em;
-    background: linear-gradient(90deg, #ffffff 0%, #cdd8ff 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: #ffffff;
 }
 
 .login-brand__subtitle {
     margin: 0.2rem 0 0;
     font-size: 0.85rem;
-    color: rgba(226, 232, 255, 0.6);
+    color: var(--login-text-muted);
 }
 
 /* Flash messages (invalid credentials, deactivated account, logged-out
-   confirmation, ...) restyled as small glass chips instead of
-   Bootstrap's default boxy alert -- the generic, always-fires
-   "Please log in to continue." notice is filtered out in the
-   template itself since it's not telling the person anything they
-   don't already know from looking at a login form. */
+   confirmation, ...) restyled as small chips instead of Bootstrap's
+   default boxy alert. The generic, always-fires "Please log in to
+   continue." notice is filtered out in the template itself. */
 .login-flash-stack {
     margin-bottom: 1.25rem;
     display: flex;
@@ -177,17 +131,36 @@ body.login-body {
 }
 
 .login-field {
-    margin-bottom: 1.15rem;
+    margin-bottom: 1.1rem;
+}
+
+.login-field__label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .login-field__label {
     display: block;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: rgba(203, 213, 255, 0.75);
+    color: rgba(226, 232, 255, 0.85);
     margin-bottom: 0.4rem;
+}
+
+.login-forgot {
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--login-accent-bright);
+    cursor: help;
+}
+
+.login-forgot:hover {
+    text-decoration: underline;
 }
 
 .login-field__wrap {
@@ -195,16 +168,30 @@ body.login-body {
     display: flex;
 }
 
+.login-field__icon {
+    position: absolute;
+    top: 50%;
+    left: 0.85rem;
+    transform: translateY(-50%);
+    color: rgba(226, 232, 255, 0.4);
+    font-size: 0.95rem;
+    pointer-events: none;
+}
+
 .login-field__input {
     width: 100%;
     padding: 0.68rem 0.9rem;
     font-size: 0.95rem;
     color: #f4f6ff;
-    background: rgba(6, 12, 40, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 0.65rem;
+    background: var(--login-field-bg);
+    border: 1px solid var(--login-field-border);
+    border-radius: 0.6rem;
     outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login-field__input--icon {
+    padding-left: 2.5rem;
 }
 
 .login-field__wrap .login-field__input {
@@ -212,18 +199,17 @@ body.login-body {
 }
 
 .login-field__input::placeholder {
-    color: rgba(203, 213, 255, 0.35);
+    color: rgba(203, 213, 255, 0.32);
 }
 
 .login-field__input:focus {
-    border-color: var(--login-blue-accent);
-    background: rgba(6, 12, 40, 0.65);
-    box-shadow: 0 0 0 3px rgba(59, 107, 255, 0.28);
+    border-color: var(--login-accent-bright);
+    box-shadow: 0 0 0 3px rgba(59, 107, 255, 0.25);
 }
 
 .login-field__input.is-invalid {
     border-color: #e35d6a;
-    box-shadow: 0 0 0 3px rgba(227, 93, 106, 0.22);
+    box-shadow: 0 0 0 3px rgba(227, 93, 106, 0.2);
 }
 
 .login-field__error {
@@ -232,10 +218,8 @@ body.login-body {
     color: #ffb3bb;
 }
 
-/* Refined eye toggle: a quiet, circular ghost button sitting inside
-   the password field's own right edge (rather than Bootstrap's
-   default input-group, which welded a separate square button to the
-   input and broke the field's rounded corners). */
+/* Refined eye toggle: a quiet circular ghost button sitting inside
+   the password field's own right edge. */
 .login-field__toggle {
     position: absolute;
     top: 50%;
@@ -249,7 +233,7 @@ body.login-body {
     border: none;
     border-radius: 50%;
     background: transparent;
-    color: rgba(203, 213, 255, 0.55);
+    color: rgba(203, 213, 255, 0.5);
     cursor: pointer;
     padding: 0;
     transition: background-color 0.15s ease, color 0.15s ease;
@@ -261,7 +245,7 @@ body.login-body {
 }
 
 .login-field__toggle:focus-visible {
-    outline: 2px solid var(--login-blue-accent);
+    outline: 2px solid var(--login-accent-bright);
     outline-offset: 2px;
 }
 
@@ -270,9 +254,65 @@ body.login-body {
     line-height: 1;
 }
 
+/* "Keep me signed in" — a custom checkbox (the real <input> is
+   visually hidden but stays in the tab order / stays the thing
+   that's actually checked; a sibling span is painted as the box) so
+   it matches the flat, minimal look of the rest of the form instead
+   of the browser's default checkbox.
+   Note: this box is currently a UI-only preference (NAP-IQ's session
+   is always persistent regardless of this checkbox — there's no
+   separate "short session" mode on the backend to opt out of), kept
+   checked by default so it doesn't claim to turn anything off. */
+.login-remember {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0.35rem 0 1.35rem;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.login-remember__input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.login-remember__box {
+    flex: 0 0 auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.03);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    font-size: 0.7rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.login-remember__input:checked + .login-remember__box {
+    background: var(--login-accent);
+    border-color: var(--login-accent);
+    color: #ffffff;
+}
+
+.login-remember__input:focus-visible + .login-remember__box {
+    outline: 2px solid var(--login-accent-bright);
+    outline-offset: 2px;
+}
+
+.login-remember__label {
+    font-size: 0.85rem;
+    color: rgba(226, 232, 255, 0.75);
+}
+
 .login-submit {
     width: 100%;
-    margin-top: 0.4rem;
     padding: 0.75rem 1rem;
     display: inline-flex;
     align-items: center;
@@ -282,16 +322,16 @@ body.login-body {
     font-weight: 600;
     color: #ffffff;
     border: none;
-    border-radius: 0.7rem;
-    background: linear-gradient(135deg, var(--login-blue-accent) 0%, var(--login-blue-bright) 55%, #0b1f73 100%);
-    box-shadow: 0 12px 24px -8px rgba(27, 63, 214, 0.65);
+    border-radius: 0.65rem;
+    background: linear-gradient(180deg, var(--login-accent-bright) 0%, var(--login-accent) 100%);
+    box-shadow: 0 10px 22px -8px rgba(34, 88, 230, 0.55);
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .login-submit:hover {
     filter: brightness(1.08);
-    box-shadow: 0 16px 30px -8px rgba(27, 63, 214, 0.8);
+    box-shadow: 0 14px 26px -8px rgba(34, 88, 230, 0.7);
 }
 
 .login-submit:active {
@@ -303,8 +343,18 @@ body.login-body {
     outline-offset: 2px;
 }
 
+.login-footnote {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 1.1rem 0 0;
+    font-size: 0.76rem;
+    color: var(--login-text-muted);
+}
+
 @media (max-width: 420px) {
     .login-card {
-        padding: 2rem 1.5rem 1.75rem;
+        padding: 1.9rem 1.4rem 1.75rem;
     }
 }
