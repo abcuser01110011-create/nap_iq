@@ -364,6 +364,7 @@
         // instead of staying pinned at whatever size they were built
         // at on the last render.
         map.on("zoomend", renderAll);
+        focusDefaultCriticalNap();
         focusIssueFromQueryParam();
         await focusNapRecommendationFromQueryParam();
         // Phase 13 (65%): runs after the other two focus helpers so a
@@ -1688,6 +1689,38 @@
             NAP_FOCUS_PAN_DURATION
         );
         openNapDetailPanel(nap);
+    }
+
+    /**
+     * Phase 33 (default GeoMap focus): reads the `focus_nap_id`
+     * naps.geomap() computed server-side — the NAP currently carrying
+     * the most open critical-priority issues (see
+     * `_default_focus_nap_id()` in app/routes/naps.py) — off #napMap's
+     * data attribute and, if present, centers the map on it via the
+     * same selectNap() a marker click already uses (so the very first
+     * thing an administrator sees on a fresh visit/reload/re-login is
+     * whichever site most needs attention, not the fixed city-wide
+     * DEFAULT_CENTER/DEFAULT_ZOOM).
+     *
+     * Deliberately runs *before* focusIssueFromQueryParam()/
+     * focusNapRecommendationFromQueryParam()/
+     * focusNavigationFromQueryParam() below, so a link that already
+     * asks for a specific issue/subscriber/recommendation/nav
+     * destination still wins — this is only the *default* landing
+     * spot, not an override.
+     */
+    function focusDefaultCriticalNap() {
+        const mapEl = document.getElementById("napMap");
+        const raw = mapEl ? mapEl.getAttribute("data-focus-nap-id") : "";
+        if (!raw) return;
+
+        const napId = Number(raw);
+        if (!Number.isInteger(napId)) return;
+
+        const nap = allNaps.find((n) => n.id === napId);
+        if (!nap) return; // unknown/foreign id — map just loads normally
+
+        selectNap(nap);
     }
 
     /**

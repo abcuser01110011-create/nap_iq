@@ -30,6 +30,7 @@ Routes:
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, g, abort
 
 from app.extensions import db
+from sqlalchemy import func
 from app.auth import role_required
 from app.models import Nap, AppSettings, Plan, Technician, Assignment, TechnicalIssue, Subscriber
 from app.forms import NapForm, MapQuickAddNapForm
@@ -43,6 +44,40 @@ naps_bp = Blueprint("naps", __name__, url_prefix="/naps")
 # Administrator-only.
 _VIEW_ROLES = ("administrator", "technician")
 _MANAGE_ROLES = ("administrator",)
+
+
+def _default_focus_nap_id():
+    """Picks which NAP the GeoMap should center on by default (no
+    explicit ?issue_id=/?navigate_*=/?recommend_request_id= override),
+    so opening or reloading the page always lands somewhere useful
+    instead of the same fixed DEFAULT_CENTER/DEFAULT_ZOOM every time.
+
+    Rule: the NAP with the most currently-open ('pending', 'assigned',
+    or 'in_progress' — i.e. not yet 'resolved'/'closed') 'critical'
+    priority issues attached to it, since that's the site most likely
+    to need attention right now. A tie (including "nobody has any
+    critical issues") is broken by picking the lowest NAP id among the
+    tied candidates — arbitrary but stable, so the same NAP keeps
+    winning on every reload rather than jumping around. Returns None
+    (no default focus; the map falls back to DEFAULT_CENTER/
+    DEFAULT_ZOOM in napmap.js) only when no NAP has any critical
+    issues at all.
+    """
+    top = (
+        db.session.query(
+            TechnicalIssue.nap_id,
+            func.count(TechnicalIssue.id).label("critical_count"),
+        )
+        .filter(
+            TechnicalIssue.priority == "critical",
+            TechnicalIssue.status.notin_(("resolved", "closed")),
+            TechnicalIssue.nap_id.isnot(None),
+        )
+        .group_by(TechnicalIssue.nap_id)
+        .order_by(func.count(TechnicalIssue.id).desc(), TechnicalIssue.nap_id.asc())
+        .first()
+    )
+    return top[0] if top else None
 
 
 def _own_nap_ids_for(g_user):
@@ -170,6 +205,14 @@ def geomap():
     simply gets `None` and the control doesn't render at all, exactly
     like `/api/technicians/<id>/location` already restricts a
     Technician to their own id.
+
+    Phase 33 (default GeoMap focus): when none of the explicit
+    destination params above are present, the page also passes
+    `focus_nap_id` — the NAP currently carrying the most open
+    critical-priority issues (see `_default_focus_nap_id()`) — so a
+    plain visit/reload/re-login always opens already centered on
+    whichever site most needs attention, instead of the same fixed
+    city-wide default view every time.
     """
     issue_id = request.args.get("issue_id", type=int)
     recommend_request_id = request.args.get("recommend_request_id", type=int)
@@ -217,9 +260,20 @@ def geomap():
     # never overrides what a person picks for themselves this visit.
     geomap_settings = AppSettings.get_current()
 
+    # Default GeoMap focus: land on the NAP with the most open critical
+    # issues on every fresh visit/reload (see _default_focus_nap_id()
+    # above), unless this visit already has a more specific explicit
+    # destination requested via one of the query params above — those
+    # always take priority since they're a deliberate "take me to X"
+    # link, not just a default landing spot.
+    focus_nap_id = None
+    if not issue_id and not recommend_request_id and not (navigate_type and navigate_id):
+        focus_nap_id = _default_focus_nap_id()
+
     return render_template(
         "naps/map.html",
         focus_issue_id=issue_id,
+        focus_nap_id=focus_nap_id,
         recommend_request_id=recommend_request_id,
         navigate_type=navigate_type,
         navigate_id=navigate_id,
