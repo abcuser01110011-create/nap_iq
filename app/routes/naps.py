@@ -52,32 +52,61 @@ def _default_focus_nap_id():
     so opening or reloading the page always lands somewhere useful
     instead of the same fixed DEFAULT_CENTER/DEFAULT_ZOOM every time.
 
-    Rule: the NAP with the most currently-open ('pending', 'assigned',
-    or 'in_progress' — i.e. not yet 'resolved'/'closed') 'critical'
-    priority issues attached to it, since that's the site most likely
-    to need attention right now. A tie (including "nobody has any
-    critical issues") is broken by picking the lowest NAP id among the
-    tied candidates — arbitrary but stable, so the same NAP keeps
-    winning on every reload rather than jumping around. Returns None
-    (no default focus; the map falls back to DEFAULT_CENTER/
-    DEFAULT_ZOOM in napmap.js) only when no NAP has any critical
-    issues at all.
+    Rule: the NAP with the most 'critical' priority issues attached to
+    it — ranked purely by that count, regardless of each issue's own
+    status. Critical outranks every other priority level by
+    definition, so a NAP is never passed over in favor of one that
+    merely has more issues overall of a lower priority.
+
+    Ties (more than one NAP sharing the same highest critical count —
+    e.g. NAP A had 2 critical issues and got them repaired down to 0
+    right as NAP B separately reached 2) are broken by whichever of
+    the tied NAPs logged its earliest critical issue first: the NAP
+    whose oldest 'critical' TechnicalIssue.created_at is furthest back
+    wins, on the reasoning that a site with a longer-standing critical
+    problem history has been waiting for attention longer. If that
+    still ties exactly (identical timestamps), the lowest NAP id
+    breaks it, purely for a stable, repeatable answer rather than one
+    that could flip on every reload.
+
+    Returns None (no default focus; the map falls back to
+    DEFAULT_CENTER/DEFAULT_ZOOM in napmap.js) only when no NAP has any
+    critical issues at all.
     """
-    top = (
+    counts = (
         db.session.query(
             TechnicalIssue.nap_id,
             func.count(TechnicalIssue.id).label("critical_count"),
         )
         .filter(
             TechnicalIssue.priority == "critical",
-            TechnicalIssue.status.notin_(("resolved", "closed")),
             TechnicalIssue.nap_id.isnot(None),
         )
         .group_by(TechnicalIssue.nap_id)
-        .order_by(func.count(TechnicalIssue.id).desc(), TechnicalIssue.nap_id.asc())
+        .all()
+    )
+    if not counts:
+        return None
+
+    max_count = max(cnt for _nap_id, cnt in counts)
+    tied_nap_ids = [nap_id for nap_id, cnt in counts if cnt == max_count]
+    if len(tied_nap_ids) == 1:
+        return tied_nap_ids[0]
+
+    earliest = (
+        db.session.query(
+            TechnicalIssue.nap_id,
+            func.min(TechnicalIssue.created_at).label("earliest_critical"),
+        )
+        .filter(
+            TechnicalIssue.priority == "critical",
+            TechnicalIssue.nap_id.in_(tied_nap_ids),
+        )
+        .group_by(TechnicalIssue.nap_id)
+        .order_by(func.min(TechnicalIssue.created_at).asc(), TechnicalIssue.nap_id.asc())
         .first()
     )
-    return top[0] if top else None
+    return earliest[0] if earliest else tied_nap_ids[0]
 
 
 def _own_nap_ids_for(g_user):
@@ -208,11 +237,12 @@ def geomap():
 
     Phase 33 (default GeoMap focus): when none of the explicit
     destination params above are present, the page also passes
-    `focus_nap_id` — the NAP currently carrying the most open
-    critical-priority issues (see `_default_focus_nap_id()`) — so a
-    plain visit/reload/re-login always opens already centered on
-    whichever site most needs attention, instead of the same fixed
-    city-wide default view every time.
+    `focus_nap_id` — the NAP with the most 'critical' priority issues
+    attached to it, ties broken by earliest-reported critical issue
+    (see `_default_focus_nap_id()`) — so a plain visit/reload/re-login
+    always opens already centered on whichever site has the most
+    critical-severity problems, instead of the same fixed city-wide
+    default view every time.
     """
     issue_id = request.args.get("issue_id", type=int)
     recommend_request_id = request.args.get("recommend_request_id", type=int)
@@ -260,20 +290,40 @@ def geomap():
     # never overrides what a person picks for themselves this visit.
     geomap_settings = AppSettings.get_current()
 
-    # Default GeoMap focus: land on the NAP with the most open critical
+    # Default GeoMap focus: land on the NAP with the most critical
     # issues on every fresh visit/reload (see _default_focus_nap_id()
     # above), unless this visit already has a more specific explicit
     # destination requested via one of the query params above — those
     # always take priority since they're a deliberate "take me to X"
     # link, not just a default landing spot.
+    #
+    # The NAP's own latitude/longitude are looked up and passed
+    # through too (as focus_nap_lat/focus_nap_lng) so napmap.js can set
+    # the map's *initial* L.map(...).setView() straight to this NAP's
+    # location/zoom before any marker data has even loaded, instead of
+    # opening at DEFAULT_CENTER/DEFAULT_ZOOM first and only then
+    # flying to the focus NAP once the API response comes back — the
+    # visible "zooms out to the whole city, then flies back in" flash
+    # that caused.
     focus_nap_id = None
+    focus_nap_lat = None
+    focus_nap_lng = None
     if not issue_id and not recommend_request_id and not (navigate_type and navigate_id):
         focus_nap_id = _default_focus_nap_id()
+        if focus_nap_id is not None:
+            focus_nap = Nap.query.get(focus_nap_id)
+            if focus_nap is not None:
+                focus_nap_lat = focus_nap.latitude
+                focus_nap_lng = focus_nap.longitude
+            else:
+                focus_nap_id = None
 
     return render_template(
         "naps/map.html",
         focus_issue_id=issue_id,
         focus_nap_id=focus_nap_id,
+        focus_nap_lat=focus_nap_lat,
+        focus_nap_lng=focus_nap_lng,
         recommend_request_id=recommend_request_id,
         navigate_type=navigate_type,
         navigate_id=navigate_id,

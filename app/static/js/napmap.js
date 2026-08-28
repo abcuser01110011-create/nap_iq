@@ -300,7 +300,33 @@
     document.addEventListener("DOMContentLoaded", init);
 
     async function init() {
-        map = L.map("napMap").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        // Phase 33 (default GeoMap focus, instant version): if
+        // naps.geomap() already resolved a default-focus NAP
+        // server-side, its lat/lng were rendered straight onto
+        // #napMap's data attributes (see map.html) — read them here,
+        // *before* the map is even created, and use them as the
+        // initial setView() target instead of DEFAULT_CENTER/
+        // DEFAULT_ZOOM. Marker data (allNaps etc.) hasn't loaded yet
+        // at this point, but it doesn't need to have: the coordinates
+        // came from the server, not from the client-side dataset.
+        // This is what avoids the old "map opens zoomed out at the
+        // whole city, then flies over to the focus NAP a moment
+        // later" flash — the very first frame the map ever renders is
+        // already the correct one. focusDefaultCriticalNap() below
+        // (called once allNaps has loaded) only opens that NAP's
+        // detail panel; it deliberately does NOT move the map again.
+        const mapElForInitialView = document.getElementById("napMap");
+        const initialFocusLat = mapElForInitialView
+            ? parseFloat(mapElForInitialView.getAttribute("data-focus-nap-lat"))
+            : NaN;
+        const initialFocusLng = mapElForInitialView
+            ? parseFloat(mapElForInitialView.getAttribute("data-focus-nap-lng"))
+            : NaN;
+        const hasServerFocus = Number.isFinite(initialFocusLat) && Number.isFinite(initialFocusLng);
+        const initialCenter = hasServerFocus ? [initialFocusLat, initialFocusLng] : DEFAULT_CENTER;
+        const initialZoom = hasServerFocus ? NAP_FOCUS_ZOOM : DEFAULT_ZOOM;
+
+        map = L.map("napMap").setView(initialCenter, initialZoom);
 
         // Phase 8 (adapted): the manual origin picker (nav-origin-picker.js)
         // needs the live Leaflet map instance to draw its marker and listen
@@ -1693,14 +1719,24 @@
 
     /**
      * Phase 33 (default GeoMap focus): reads the `focus_nap_id`
-     * naps.geomap() computed server-side — the NAP currently carrying
-     * the most open critical-priority issues (see
-     * `_default_focus_nap_id()` in app/routes/naps.py) — off #napMap's
-     * data attribute and, if present, centers the map on it via the
-     * same selectNap() a marker click already uses (so the very first
-     * thing an administrator sees on a fresh visit/reload/re-login is
-     * whichever site most needs attention, not the fixed city-wide
-     * DEFAULT_CENTER/DEFAULT_ZOOM).
+     * naps.geomap() computed server-side — the NAP with the most
+     * critical-priority issues, ties broken by earliest-reported
+     * critical issue (see `_default_focus_nap_id()` in
+     * app/routes/naps.py) — off #napMap's data attribute and, if
+     * present, forces its status filter on, re-renders, and opens its
+     * detail panel, exactly like selectNap() does for a marker click —
+     * so the very first thing an administrator sees on a fresh visit/
+     * reload/re-login is whichever site has the most critical
+     * problems, not the fixed city-wide DEFAULT_CENTER/DEFAULT_ZOOM.
+     *
+     * Unlike selectNap(), this deliberately does NOT call
+     * focusMapOn()/flyTo the map to this NAP: init() above already
+     * set the map's *initial* view straight to this same NAP's
+     * location/zoom (from the data-focus-nap-lat/lng attributes,
+     * known before this function even runs), so panning again here
+     * would just be a second, redundant animation on top of a view
+     * that's already correct — the exact "zooms out, then flies back
+     * in" flash this whole approach exists to avoid.
      *
      * Deliberately runs *before* focusIssueFromQueryParam()/
      * focusNapRecommendationFromQueryParam()/
@@ -1720,7 +1756,14 @@
         const nap = allNaps.find((n) => n.id === napId);
         if (!nap) return; // unknown/foreign id — map just loads normally
 
-        selectNap(nap);
+        const statusCheckbox = document.querySelector(
+            '.status-filter[value="' + nap.status + '"]'
+        );
+        if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
+        document.getElementById("portsFilter").value = "all";
+
+        renderNapMarkers();
+        openNapDetailPanel(nap);
     }
 
     /**
