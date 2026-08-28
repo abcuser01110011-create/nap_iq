@@ -1063,16 +1063,28 @@
     function buildIssueIcon(priority) {
         const color = PRIORITY_COLORS[priority] || "#0d6efd";
         const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
-        const s = Math.round(22 * getIconScale());
+        const scale = getIconScale();
+        const s = Math.round(22 * scale);
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
             '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
             '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
+        // Small priority label ("CRITICAL", "HIGH", ...) shown above the
+        // badge, colored to match its priority so the marker's urgency
+        // reads at a glance without opening the popup.
+        const labelText = priority ? String(priority).toUpperCase() : "";
+        const labelFontSize = Math.max(8, Math.round(9 * scale));
+        const label = labelText
+            ? '<div class="issue-marker-label" style="color:' + color + ';font-size:' + labelFontSize + 'px;">' +
+              labelText +
+              "</div>"
+            : "";
         const html =
             '<div class="priority-pulse-wrap" style="color:' + color + ';--pulse-duration:' + pulseSeconds + 's;">' +
             svg +
+            label +
             "</div>";
 
         return L.divIcon({
@@ -1087,18 +1099,25 @@
     /** Builds a "pending" (not-yet-saved) issue marker icon — same
      * shape, distinct pulsing blue color, at the "medium" pulse rate. */
     function buildPendingIssueIcon() {
-        const s = Math.round(22 * getIconScale());
+        const scale = getIconScale();
+        const s = Math.round(22 * scale);
         const svg =
             '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
             '<circle cx="11" cy="11" r="7" fill="#0d6efd"/>' +
             '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
+        const labelFontSize = Math.max(8, Math.round(9 * scale));
+        const label =
+            '<div class="issue-marker-label" style="color:#0d6efd;font-size:' + labelFontSize + 'px;">' +
+            "NEW" +
+            "</div>";
         const html =
             '<div class="priority-pulse-wrap" style="color:#0d6efd;--pulse-duration:' +
             PRIORITY_PULSE_SECONDS.medium +
             's;">' +
             svg +
+            label +
             "</div>";
 
         return L.divIcon({
