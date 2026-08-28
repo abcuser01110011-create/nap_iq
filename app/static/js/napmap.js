@@ -1073,13 +1073,13 @@
             "</svg>";
         // Small priority label ("CRITICAL", "HIGH", ...) shown above the
         // badge, colored to match its priority so the marker's urgency
-        // reads at a glance without opening the popup.
+        // reads at a glance without opening the popup. Font size is
+        // deliberately fixed (not multiplied by the zoom-based icon
+        // `scale`) so labels stay a constant, small on-screen size and
+        // don't grow/overlap each other when zoomed in.
         const labelText = priority ? String(priority).toUpperCase() : "";
-        const labelFontSize = Math.max(8, Math.round(9 * scale));
         const label = labelText
-            ? '<div class="issue-marker-label" style="color:' + color + ';font-size:' + labelFontSize + 'px;">' +
-              labelText +
-              "</div>"
+            ? '<div class="issue-marker-label" style="color:' + color + ';">' + labelText + "</div>"
             : "";
         const html =
             '<div class="priority-pulse-wrap" style="color:' + color + ';--pulse-duration:' + pulseSeconds + 's;">' +
@@ -1107,11 +1107,7 @@
             '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
             'font-family="Arial, sans-serif">!</text>' +
             "</svg>";
-        const labelFontSize = Math.max(8, Math.round(9 * scale));
-        const label =
-            '<div class="issue-marker-label" style="color:#0d6efd;font-size:' + labelFontSize + 'px;">' +
-            "NEW" +
-            "</div>";
+        const label = '<div class="issue-marker-label" style="color:#0d6efd;">NEW</div>';
         const html =
             '<div class="priority-pulse-wrap" style="color:#0d6efd;--pulse-duration:' +
             PRIORITY_PULSE_SECONDS.medium +

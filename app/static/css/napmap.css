@@ -331,26 +331,23 @@
    issue/alert badge -- see buildIssueIcon()/buildPendingIssueIcon() in
    napmap.js. Color comes from the inline style set per marker (same
    color as the badge itself), so the label always matches the alert
-   it identifies. A white halo (via text-shadow, since background
-   would clip to a box) keeps it legible over any basemap tile. */
+   it identifies. Font size is a fixed pixel value (deliberately NOT
+   scaled with the marker's zoom-based icon size) so labels stay a
+   small, constant size on screen and don't balloon/overlap as more
+   markers get packed together while zooming. */
 .issue-marker-label {
     position: absolute;
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
-    margin-bottom: 2px;
+    margin-bottom: 1px;
     z-index: 2;
     white-space: nowrap;
     font-family: Arial, Helvetica, sans-serif;
+    font-size: 7px;
     font-weight: 700;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     line-height: 1;
-    text-shadow:
-        -1px -1px 0 #fff,
-        1px -1px 0 #fff,
-        -1px 1px 0 #fff,
-        1px 1px 0 #fff,
-        0 0 3px #fff;
     pointer-events: none;
 }
 
