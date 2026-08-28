@@ -676,10 +676,9 @@
             labelHtml =
                 '<div class="nap-marker-label" style="position:absolute;bottom:100%;left:50%;' +
                 'transform:translateX(-50%);margin-bottom:3px;white-space:nowrap;display:flex;' +
-                'align-items:center;gap:4px;background:rgba(255,255,255,.95);' +
-                'border:1px solid rgba(0,0,0,.15);border-radius:4px;padding:1px 5px;' +
+                'align-items:center;gap:4px;background:transparent;border:none;padding:0;' +
                 'font-size:' + fontSize + 'px;line-height:1.4;color:#212529;' +
-                'box-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;">' +
+                'text-shadow:0 0 3px #fff,0 0 3px #fff,0 1px 2px rgba(0,0,0,.5);pointer-events:none;">' +
                 '<span class="fw-semibold">' + escapeHtml(nap.name || "") + "</span>" +
                 '<span style="color:' + usageColor + ';font-weight:700;">' + usagePct + "%</span>" +
                 "</div>";
