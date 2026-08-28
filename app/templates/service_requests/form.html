@@ -175,6 +175,29 @@
                     <div class="fvalue">{{ service_request.subscriber.address or "—" }}</div>
                 </div>
             </div>
+            {% elif service_request.full_name or service_request.address or service_request.contact_number %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Full Name</div>
+                    <div class="fvalue">{{ service_request.full_name or "—" }}</div>
+                </div>
+            </div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Contact Number</div>
+                    <div class="fvalue">{{ service_request.contact_number or "—" }}</div>
+                </div>
+                <div class="sr-doc-field">
+                    <div class="flabel">Applicant Type</div>
+                    <div class="fvalue">Walk-in (no subscriber record yet)</div>
+                </div>
+            </div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Address</div>
+                    <div class="fvalue">{{ service_request.address or "—" }}</div>
+                </div>
+            </div>
             {% else %}
             <p class="text-muted mb-0">No subscriber record linked to this request.</p>
             {% endif %}

@@ -1166,10 +1166,12 @@ class ServiceRequestForm(FlaskForm):
     # Walk-in applicant details — only shown/required on the Add form
     # when Request Type is "New Installation" (see form.html's JS
     # toggle). A walk-in new-installation applicant has no Subscriber
-    # record yet, so these are collected here instead and folded into
-    # the request's auto-generated "Walk-in application" note (see
-    # app/routes/service_requests.py's _build_walkin_notes()) rather
-    # than requiring a schema change to ServiceRequest itself.
+    # record yet, so these are collected here and saved onto the
+    # request's own full_name/address/contact_number columns (see
+    # ServiceRequest in app/models.py) rather than folded into the
+    # free-text Notes field, which now just holds the auto-generated
+    # "Walk-in application" description (see app/routes/
+    # service_requests.py's _build_walkin_note()).
     full_name = StringField(
         "Full Name",
         validators=[Optional(), Length(max=150, message="Full name is too long.")],

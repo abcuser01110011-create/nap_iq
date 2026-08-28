@@ -167,6 +167,12 @@ CREATE TABLE IF NOT EXISTS service_requests (
     -- for why no existing column already covered it.
     latitude          DECIMAL(10,7),
     longitude         DECIMAL(10,7),
+    -- Walk-in applicant details — see the matching comment on
+    -- app/models.py's ServiceRequest. Only populated for a
+    -- new_installation request with no subscriber_id yet.
+    full_name         VARCHAR(150),
+    address           VARCHAR(255),
+    contact_number    VARCHAR(20),
     notes             TEXT,
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

@@ -97,31 +97,30 @@ def _populate_choices(form):
     ]
 
 
-def _build_walkin_notes(form):
+def _build_walkin_note(form):
     """Builds the note every request created through the Add Service
     Request form gets saved with. This form represents a walk-in
     application taken at the office, so the note is fixed as such
     automatically instead of relying on staff to type it every time —
     same idea as how the mobile app would tag its own submissions.
 
-    New Installation walk-ins have no Subscriber record yet, so the
-    applicant's basic details collected on the form (full name,
-    address, contact number — see ServiceRequestForm) are folded into
-    this same note, since ServiceRequest has no dedicated columns for
-    them without a schema change.
+    The applicant's basic details (full name, address, contact number)
+    are no longer folded into this text — they're saved as their own
+    columns on the request (see the caller) and shown under "Customer
+    Information" on the document view instead. This function now only
+    produces the short, professional description that goes in the
+    Notes section itself.
     """
-    parts = ["Walk-in application."]
     if form.request_type.data == "new_installation":
-        full_name = (form.full_name.data or "").strip()
-        contact_number = (form.contact_number.data or "").strip()
-        address = (form.address.data or "").strip()
-        if full_name:
-            parts.append(f"Applicant: {full_name}")
-        if contact_number:
-            parts.append(f"Contact Number: {contact_number}")
-        if address:
-            parts.append(f"Address: {address}")
-    return "\n".join(parts)
+        return (
+            "Walk-in application submitted in person at the PG Networks "
+            "office. Applicant details are on file under Customer "
+            "Information."
+        )
+    return (
+        "Walk-in request processed at the PG Networks office on behalf "
+        "of the subscriber on file."
+    )
 
 
 def _sync_subscriber_nap(service_request):
@@ -299,11 +298,12 @@ def list_requests():
 @role_required("administrator")
 def add_request():
     """Shows and processes the Add Service Request form. This form is
-    the walk-in application flow (see _build_walkin_notes() above) —
-    every request created here is tagged with a fixed "Walk-in
-    application" note automatically, and New Installation additionally
-    collects the applicant's full name/address/contact number since
-    there's no Subscriber record for them yet."""
+    the walk-in application flow (see _build_walkin_note() above) —
+    every request created here is tagged with a fixed, professional
+    "walk-in" note automatically, and New Installation additionally
+    collects the applicant's full name/address/contact number (saved
+    on the request itself — see ServiceRequest.full_name/address/
+    contact_number) since there's no Subscriber record for them yet."""
     form = ServiceRequestForm()
     _populate_choices(form)
 
@@ -321,7 +321,10 @@ def add_request():
             status=form.status.data,
             latitude=form.latitude.data,
             longitude=form.longitude.data,
-            notes=_build_walkin_notes(form),
+            full_name=(form.full_name.data or "").strip() or None,
+            address=(form.address.data or "").strip() or None,
+            contact_number=(form.contact_number.data or "").strip() or None,
+            notes=_build_walkin_note(form),
         )
         db.session.add(service_request)
         _sync_subscriber_nap(service_request)

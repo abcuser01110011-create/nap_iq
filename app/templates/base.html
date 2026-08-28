@@ -28,8 +28,9 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar">
     <div class="container-fluid px-4">
-        <a class="navbar-brand fw-semibold" href="{{ url_for('auth.home') if current_user else url_for('auth.login') }}">
-            <i class="bi bi-diagram-3-fill me-1"></i> NAP-IQ
+        <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{{ url_for('auth.home') if current_user else url_for('auth.login') }}">
+            <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" alt="PG Networks" style="height: 26px; width: auto; filter: brightness(0) invert(1);">
+            PG Networks
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
             <span class="navbar-toggler-icon"></span>

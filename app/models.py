@@ -327,6 +327,20 @@ class ServiceRequest(db.Model):
     # app/nap_recommendation.py yet.
     latitude = db.Column(db.Numeric(10, 7), nullable=True)
     longitude = db.Column(db.Numeric(10, 7), nullable=True)
+    # Walk-in applicant details (New Installation requests with no
+    # Subscriber record yet — see app/forms.py's ServiceRequestForm
+    # docstring). Previously folded as free text into `notes` since
+    # this table had no dedicated columns for them; that made `notes`
+    # unreadable and mixed structured data into a free-text field. Now
+    # captured as their own columns so the read-only document view
+    # (service_requests/form.html, "Customer Information" section) can
+    # display them the same way it displays a linked Subscriber's
+    # details, and `notes` is free to hold an actual note again.
+    # Nullable — only ever set for a walk-in new_installation request;
+    # a request tied to an existing Subscriber has no need for these.
+    full_name = db.Column(db.String(150), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    contact_number = db.Column(db.String(20), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
