@@ -459,13 +459,14 @@ def approve_request(request_id):
     with free ports, so whatever it picks is always a safe candidate)
     and assigns the top match immediately, rather than making the
     administrator open "Recommend NAP" as a separate manual step.
-    Same auto-advance rule assign_nap()/edit_request() already use
-    then applies: 'approved' + a requested_nap_id -> 'scheduled', so
-    an approval with a location on file goes straight to the Dispatch
-    Board in one click. A request with no location (nothing to
-    recommend from) still just lands on 'approved', same as before —
-    an administrator can assign a NAP for it manually via the edit
-    form or "Recommend NAP" whenever a location becomes available.
+    Approving always advances the request straight to 'scheduled',
+    so it lands on the Dispatch Board in one click regardless of
+    whether a NAP could be auto-assigned above. A request with no
+    location on file just skips the auto-assign step and reaches the
+    Dispatch Board with its NAP "Not assigned" — same as any other
+    scheduled installation — and an administrator can still attach
+    one later via the edit form or "Recommend NAP" once a location is
+    available.
     """
     service_request = ServiceRequest.query.get_or_404(request_id)
     if service_request.status != "pending":
@@ -488,10 +489,18 @@ def approve_request(request_id):
             assigned_nap = top[0]["nap"]
             service_request.requested_nap_id = assigned_nap.id
 
-    # Same auto-advance rule assign_nap()/edit_request() use elsewhere:
-    # 'approved' + a NAP attached is ready for dispatch.
-    if service_request.status == "approved" and service_request.requested_nap_id:
-        service_request.status = "scheduled"
+    # Approving is the "ready to be installed" decision, so it always
+    # advances straight to 'scheduled' -- that's the only status
+    # DISPATCHABLE_REQUEST_STATUSES (app/routes/dispatch.py) looks
+    # for, so this is what actually makes the request show up on the
+    # Dispatch Board. This no longer waits on requested_nap_id: a NAP
+    # is a nice-to-have at this point, not a requirement -- the
+    # Dispatch Board already shows installations with NAP "Not
+    # assigned" (an administrator can attach one later via
+    # "Recommend NAP"), so a request without a location on file
+    # shouldn't be stuck on 'approved' forever just because there was
+    # nothing to auto-recommend from above.
+    service_request.status = "scheduled"
 
     _notify_status_change(service_request)
     _sync_subscriber_nap(service_request)
