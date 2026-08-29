@@ -731,7 +731,7 @@
     stroke-width: 14;
     stroke-dasharray: 100 100;
     stroke-dashoffset: 100;
-    animation: napGaugeSweep 1.4s ease-in-out forwards;
+    animation: napGaugeSweep 3s ease-in-out forwards;
 }
 
 @keyframes napGaugeSweep {
