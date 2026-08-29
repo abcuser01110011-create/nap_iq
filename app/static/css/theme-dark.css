@@ -216,6 +216,16 @@
     color: #a78bfa;
 }
 
+/* Professional-polish card elevation (dashboard.css) needs a darker,
+   tighter shadow in dark mode -- the light-mode shadow value just
+   disappears against the near-black page background. */
+[data-bs-theme="dark"] .disp-table-card,
+[data-bs-theme="dark"] .subs-table-card,
+[data-bs-theme="dark"] .subs-filterbar .subs-search-form,
+[data-bs-theme="dark"] .subs-filterbar .subs-pill-group {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -14px rgba(0, 0, 0, 0.6);
+}
+
 /* ---------------------------------------------------------------- */
 /* GEOMAP (naps/map.html, napmap.css)                                */
 /* ---------------------------------------------------------------- */

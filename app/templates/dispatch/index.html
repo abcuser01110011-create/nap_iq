@@ -11,8 +11,11 @@
 
 {% block content %}
 
+<div class="disp-board-columns">
+
 <div class="disp-section">
     <h6 class="text-muted text-uppercase small fw-bold mb-2 disp-section-title">
+        <i class="bi bi-tools"></i>
         Repairs
         <span class="disp-section-count">{{ issues|length }}</span>
     </h6>
@@ -136,6 +139,7 @@
    it. #}
 <div class="disp-section">
     <h6 class="text-muted text-uppercase small fw-bold mb-2 disp-section-title">
+        <i class="bi bi-hdd-network"></i>
         Installations
         <span class="disp-section-count">{{ requests|length }}</span>
     </h6>
@@ -235,4 +239,6 @@
         </div>
     </div>
 </div>
+
+</div><!-- /.disp-board-columns -->
 {% endblock %}
