@@ -33,8 +33,8 @@ USE nap_iq;
 -- ---------------------------------------------------------------------
 INSERT INTO users (username, password_hash, full_name, role, email, phone_number, status) VALUES
 ('admin1',    'pbkdf2:sha256:1000000$3Rr8CEHSh8bQmUSv$c6903bfc58bc0a263dd6df5e8b5a1a6ad1b9b1fb15e80541c977a1cfac0afe83', 'Juana Dela Cruz',   'administrator',      'juana.delacruz@example.com', '09170000001', 'active'),
-('tech1',     'pbkdf2:sha256:1000000$1juq9BKWzYkyYKCS$d3d239b61c93707ea9cab4e53c5a415152007688f867ac54a08d993cf028d2b6', 'Marco Reyes',       'technician',         'marco.reyes@example.com',    '09170000002', 'active'),
-('tech2',     'pbkdf2:sha256:1000000$1gNzA7t1BDj164SQ$64d656ca2b533fdc0fa37619339c03147e9ee757f1c5a10e05d221fe3d4c196e', 'Liza Fernandez',    'technician',         'liza.fernandez@example.com', '09170000003', 'active'),
+('tech1',     'pbkdf2:sha256:1000000$1juq9BKWzYkyYKCS$d3d239b61c93707ea9cab4e53c5a415152007688f867ac54a08d993cf028d2b6', 'Marco Reyes',       'field_assistant',         'marco.reyes@example.com',    '09170000002', 'active'),
+('tech2',     'pbkdf2:sha256:1000000$1gNzA7t1BDj164SQ$64d656ca2b533fdc0fa37619339c03147e9ee757f1c5a10e05d221fe3d4c196e', 'Liza Fernandez',    'field_assistant',         'liza.fernandez@example.com', '09170000003', 'active'),
 ('collector1','pbkdf2:sha256:1000000$tOJDSeW1HAQ0NrUi$87fbdf4768721993e54ec39bdda17c8e4c352724a9d7dbb0eadbec36e8f874cc', 'Paolo Santos',      'payment_collector',  'paolo.santos@example.com',   '09170000004', 'active'),
 ('customer1', 'pbkdf2:sha256:1000000$OxBMrI4FkyzFasJp$a36bad799898939ff80efb51036fa5cc0354183328aa2bcac90bb6ea357358b9', 'Ana Villanueva',    'user',               'ana.villanueva@example.com', '09171111111', 'active');
 
@@ -132,9 +132,9 @@ INSERT INTO subscribers (subscriber_code, full_name, address, latitude, longitud
 -- ---------------------------------------------------------------------
 -- technicians (linked to the technician user accounts above)
 -- ---------------------------------------------------------------------
-INSERT INTO technicians (user_id, full_name, contact_number, current_latitude, current_longitude, status, resolved_issues_count) VALUES
-(2, 'Marco Reyes',    '09170000002', 14.2800000, 121.4140000, 'available', 14),
-(3, 'Liza Fernandez',  '09170000003', 14.2750000, 121.4060000, 'busy',      9);
+INSERT INTO technicians (user_id, full_name, contact_number, personnel_type, current_latitude, current_longitude, status, resolved_issues_count) VALUES
+(2, 'Marco Reyes',    '09170000002', 'field_assistant', 14.2800000, 121.4140000, 'available', 14),
+(3, 'Liza Fernandez',  '09170000003', 'field_assistant', 14.2750000, 121.4060000, 'busy',      9);
 
 -- ---------------------------------------------------------------------
 -- technical_issues -- 0-2 randomly generated reported issues per NAP,

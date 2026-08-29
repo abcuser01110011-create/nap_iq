@@ -17,7 +17,7 @@ How a mobile request becomes "logged in":
        registered in app/__init__.py turns that into `current_user`
        (a real User row), the same way `flask.g.user` works for the
        session-cookie side.
-    3. Routes are protected with `@jwt_role_required("technician")` /
+    3. Routes are protected with `@jwt_role_required("field_assistant")` /
        `@jwt_role_required("user")` — the JWT analogue of
        `role_required()`. An expired/invalid/missing token, a
        deactivated account, or a disallowed role all get a JSON 401/403
@@ -41,13 +41,13 @@ from flask_jwt_extended import jwt_required, current_user
 # first place (app/routes/api_v1/auth.py's login() enforces this too),
 # but this tuple is also what every jwt_role_required() call below
 # checks against, so it's the single place that scope is defined.
-MOBILE_API_ROLES = ("technician", "user")
+MOBILE_API_ROLES = ("field_assistant", "user")
 
 
 def jwt_role_required(*roles):
     """Requires a valid access-token JWT whose account is active and
     whose role is one of `roles`. Use like
-    `@jwt_role_required("technician")`.
+    `@jwt_role_required("field_assistant")`.
 
     Mirrors app/auth.py's role_required(), but for JSON API responses
     instead of redirects:

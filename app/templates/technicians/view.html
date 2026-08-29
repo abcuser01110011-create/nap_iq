@@ -37,13 +37,13 @@
                     <dt class="col-sm-4 text-muted fw-normal">Resolved Issues</dt>
                     <dd class="col-sm-8">{{ technician.resolved_issues_count }}</dd>
 
-                    {% if technician.personnel_type != 'field_assistant' %}
-                    <dt class="col-sm-4 text-muted fw-normal">Linked Login</dt>
+                    {% if technician.personnel_type == 'field_assistant' %}
+                    <dt class="col-sm-4 text-muted fw-normal">Mobile Login</dt>
                     <dd class="col-sm-8">
                         {% if technician.user %}
                             <span class="badge text-bg-light border">{{ technician.user.username }}</span>
                         {% else %}
-                            <span class="text-muted">Not linked</span>
+                            <span class="text-muted">Not set up</span>
                         {% endif %}
                     </dd>
                     {% endif %}

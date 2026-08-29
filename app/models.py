@@ -36,7 +36,7 @@ from app.extensions import db
 # (Administrator / Technician / User), so any account still carrying
 # that role should be migrated to one of the three, or the RBAC rules
 # in app/auth.py extended for it, in a future phase.
-USER_ROLES = ("administrator", "technician", "payment_collector", "user")
+USER_ROLES = ("administrator", "field_assistant", "payment_collector", "user")
 
 # ---------------------------------------------------------------------
 # Phase 17 — users.status (replaces users.is_active)
@@ -226,8 +226,11 @@ class Subscriber(db.Model):
 
 
 class Technician(db.Model):
-    """Technician profile used by the (future) dispatch module. Linked
-    one-to-one with a `users` account with role='technician'."""
+    """Technician profile used by the (future) dispatch module. When
+    personnel_type == 'field_assistant', linked one-to-one with a
+    `users` account with role='field_assistant' (that login is what
+    lets them use the mobile app); plain 'technician' profiles never
+    have a linked account."""
 
     __tablename__ = "technicians"
 

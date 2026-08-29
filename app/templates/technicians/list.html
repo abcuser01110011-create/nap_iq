@@ -69,7 +69,7 @@
                     <th>Full Name</th>
                     <th>Type</th>
                     <th>Contact</th>
-                    <th>Linked Login</th>
+                    <th>Mobile Login</th>
                     <th>Status</th>
                     <th>Resolved Issues</th>
                     <th class="text-end">Actions</th>
@@ -84,12 +84,12 @@
                     </td>
                     <td class="disp-subtext">{{ technician.contact_number or "—" }}</td>
                     <td>
-                        {% if technician.personnel_type == 'field_assistant' %}
+                        {% if technician.personnel_type != 'field_assistant' %}
                             <span class="disp-subtext">—</span>
                         {% elif technician.user %}
                             <span class="disp-code-pill">{{ technician.user.username }}</span>
                         {% else %}
-                            <span class="disp-subtext">Not linked</span>
+                            <span class="disp-subtext">Not set up</span>
                         {% endif %}
                     </td>
                     <td>

@@ -72,7 +72,7 @@ _PIN_LOCATION_TOLERANCE = Decimal("0.00005")
 # GeoMap, not a public form — keep both routes staff-only. (Note: if a
 # future phase adds customer self-service issue reporting, that should
 # be a separate route restricted to "user" rather than opening these.)
-_STAFF_ROLES = ("administrator", "technician")
+_STAFF_ROLES = ("administrator", "field_assistant")
 
 # Kept in sync by hand with dispatch.py's OPEN_ASSIGNMENT_STATUSES —
 # same reasoning as that module's own comment on the duplication.
@@ -356,7 +356,7 @@ def view_issue(issue_id):
     """
     issue = TechnicalIssue.query.get_or_404(issue_id)
 
-    if g.user.role == "technician":
+    if g.user.role == "field_assistant":
         profile = Technician.query.filter_by(user_id=g.user.id).first()
         has_assignment = profile is not None and Assignment.query.filter_by(
             technical_issue_id=issue.id, technician_id=profile.id

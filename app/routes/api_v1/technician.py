@@ -225,7 +225,7 @@ def _serialize_assignment(assignment: Assignment) -> dict:
 
 
 @api_v1_technician_bp.route("/assignments", methods=["GET"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def list_assignments():
     """The signed-in technician's current (open) workload."""
     profile = _get_own_profile_or_404()
@@ -244,7 +244,7 @@ def list_assignments():
 
 
 @api_v1_technician_bp.route("/assignments/history", methods=["GET"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def assignment_history():
     """The signed-in technician's past (completed/cancelled) assignments."""
     profile = _get_own_profile_or_404()
@@ -263,7 +263,7 @@ def assignment_history():
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/accept", methods=["POST"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def accept_assignment(assignment_id):
     """assigned -> accepted. See technician.py's version for the same
     status-machine rule this mirrors."""
@@ -285,7 +285,7 @@ def accept_assignment(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def start_assignment(assignment_id):
     """accepted -> in_progress. Marks the technician 'busy' either
     way; mirrors the status onto the linked issue only for a repair,
@@ -324,7 +324,7 @@ def start_assignment(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def save_notes(assignment_id):
     """Saves/updates resolution notes without changing status. Valid
     from 'accepted' or 'in_progress' — same rule as technician.py's
@@ -352,7 +352,7 @@ def save_notes(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/photo", methods=["POST"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def upload_assignment_photo(assignment_id):
     """Uploads (or replaces) the required completion photo for an
     assignment. Valid from the same statuses as save_notes() —
@@ -492,7 +492,7 @@ def _scan_signature_image(file_storage):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/signature", methods=["POST"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def upload_assignment_signature(assignment_id):
     """Phase 28: uploads (or replaces) the customer's sign-off for an
     *installation* assignment — the install-only counterpart to
@@ -586,7 +586,7 @@ def upload_assignment_signature(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
-@jwt_role_required("technician")
+@jwt_role_required("field_assistant")
 def complete_assignment(assignment_id):
     """in_progress -> completed (a repair's issue -> resolved).
     Requires resolution notes, exactly as technician.py's

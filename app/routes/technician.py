@@ -86,7 +86,7 @@ def _get_own_assignment_or_403(profile, assignment_id):
 
 
 @technician_bp.route("/")
-@role_required("technician")
+@role_required("field_assistant")
 def index():
     """Shows the signed-in technician's profile + current assignments.
 
@@ -118,7 +118,7 @@ def index():
 
 
 @technician_bp.route("/history")
-@role_required("technician")
+@role_required("field_assistant")
 def history():
     """View assignment history (phase_8.pdf technician item #10): every
     past assignment for the signed-in technician that's no longer
@@ -148,7 +148,7 @@ def history():
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/accept", methods=["POST"])
-@role_required("technician")
+@role_required("field_assistant")
 def accept_assignment(assignment_id):
     """Acknowledges a newly dispatched assignment. Only valid from
     'assigned' — this is the technician's first action on it, before
@@ -169,7 +169,7 @@ def accept_assignment(assignment_id):
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
-@role_required("technician")
+@role_required("field_assistant")
 def start_assignment(assignment_id):
     """Marks work as actually underway. Only valid from 'accepted'.
     Mirrors the status onto the linked technical_issue (so it shows as
@@ -194,7 +194,7 @@ def start_assignment(assignment_id):
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
-@role_required("technician")
+@role_required("field_assistant")
 def save_notes(assignment_id):
     """Saves (or updates) resolution notes on an assignment without
     changing its status — phase_8.pdf technician item #8, kept as its
@@ -224,7 +224,7 @@ def save_notes(assignment_id):
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
-@role_required("technician")
+@role_required("field_assistant")
 def complete_assignment(assignment_id):
     """Marks an assignment (and its linked issue) resolved. Only valid
     from 'in_progress'. Requires resolution notes (phase_8.pdf's

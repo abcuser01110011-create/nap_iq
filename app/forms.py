@@ -911,15 +911,16 @@ class MapQuickInstallSubscriberForm(FlaskForm):
 
 
 class TechnicianForm(FlaskForm):
-    """Form used for both creating and editing a technician profile
-    (the dispatch-facing record in the `technicians` table). Kept
-    separate from the technician's `users` login account — creating a
-    technician profile here does not also create a login (same
-    boundary PHASE8_NOTES.md drew the other way: creating a
-    technician-role account there doesn't create a profile here
-    either). Linking the two remains a manual pairing via the
-    `user_id` dropdown below, populated with technician-role accounts
-    that don't already have a linked profile.
+    """Form used for both creating and editing a personnel profile (the
+    dispatch-facing record in the `technicians` table).
+
+    Only Field Assistants get mobile-app access. A Technician profile
+    never has a linked login at all. When adding a Field Assistant,
+    `username`/`password`/`confirm_password` create that login account
+    inline (see `validate_credentials_if_needed` below, called
+    manually by the route since these fields are only required
+    conditionally — a plain `DataRequired()` here would also block
+    Technician submissions, which never fill them in).
     """
 
     technician_id_value = None  # set manually by the route; not a real form field
@@ -954,27 +955,58 @@ class TechnicianForm(FlaskForm):
         default="available",
         validators=[DataRequired()],
     )
-    # `choices` populated dynamically by the route: technician-role
-    # `users` accounts with no linked profile yet, plus whichever
-    # account this profile is already linked to (if editing). 0 = "not
-    # linked to a login account".
-    user_id = SelectField(
-        "Linked Login Account",
-        coerce=int,
+    # Only used (and only required) when personnel_type == 'field_assistant'
+    # and there's no login account linked yet -- enforced manually by the
+    # route via validate_credentials_if_needed(), not by field validators,
+    # since a Technician submission legitimately leaves these blank.
+    username = StringField(
+        "Username",
+        validators=[Optional(), Length(min=3, max=50, message="Username must be between 3 and 50 characters.")],
+    )
+    password = PasswordField(
+        "Password",
+        validators=[Optional(), Length(min=8, message="Password must be at least 8 characters.")],
+    )
+    confirm_password = PasswordField(
+        "Confirm Password",
         validators=[Optional()],
     )
 
-    def validate_user_id(self, field):
-        """Defense against a stale page / tampered POST offering an
-        account that's since been linked to a *different* technician
-        profile, mirroring UserForm.validate_subscriber_id."""
-        if not field.data:
-            return
-        existing = Technician.query.filter(Technician.user_id == field.data)
-        if self.technician_id_value is not None:
-            existing = existing.filter(Technician.id != self.technician_id_value)
-        if existing.first() is not None:
-            raise ValidationError("That login account is already linked to a different technician profile.")
+    def validate_credentials_if_needed(self, *, needs_credentials):
+        """Manually invoked by the route (not a `validate_<field>`
+        auto-hook) once it already knows whether a new login account
+        needs to be created for this submission. Appends field-level
+        errors the same way WTForms validators do, so the template's
+        existing `field.errors` rendering picks them up unchanged.
+        Returns True if everything needed is present and valid.
+        """
+        if not needs_credentials:
+            return True
+
+        ok = True
+        username = (self.username.data or "").strip()
+        password = self.password.data or ""
+        confirm = self.confirm_password.data or ""
+
+        if not username:
+            self.username.errors.append("Username is required for a field assistant login.")
+            ok = False
+        elif User.query.filter_by(username=username).first() is not None:
+            self.username.errors.append("This username is already taken. Choose a different one.")
+            ok = False
+
+        if not password:
+            self.password.errors.append("Password is required for a field assistant login.")
+            ok = False
+        elif len(password) < 8:
+            self.password.errors.append("Password must be at least 8 characters.")
+            ok = False
+        elif password != confirm:
+            self.confirm_password.errors.append("Passwords do not match.")
+            ok = False
+
+        return ok
+
 
 
 # ---------------------------------------------------------------------

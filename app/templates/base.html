@@ -54,7 +54,7 @@
                     </a>
                 </li>
                 {% endif %}
-                {% if current_user and current_user.role in ('administrator', 'technician') %}
+                {% if current_user and current_user.role in ('administrator', 'field_assistant') %}
                 <li class="nav-item">
                     <a class="nav-link {{ 'active' if request.endpoint == 'naps.list_naps' else '' }}"
                        href="{{ url_for('naps.list_naps') }}">
@@ -82,7 +82,7 @@
                     </a>
                 </li>
                 {% endif %}
-                {% if current_user and current_user.role == 'technician' %}
+                {% if current_user and current_user.role == 'field_assistant' %}
                 <li class="nav-item">
                     <a class="nav-link {{ 'active' if request.endpoint == 'technician.index' else '' }}"
                        href="{{ url_for('technician.index') }}">

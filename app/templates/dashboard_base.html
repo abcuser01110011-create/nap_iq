@@ -66,12 +66,12 @@
                     <a class="dash-nav-link {{ 'active' if request.endpoint == role_home_endpoint else '' }}"
                        href="{{ url_for(role_home_endpoint) }}">
                         <i class="bi bi-speedometer2"></i><span>Dashboard</span>
-                        {% if current_user and current_user.role == 'technician' and sidebar_badges.get('technician_dashboard') %}
+                        {% if current_user and current_user.role == 'field_assistant' and sidebar_badges.get('technician_dashboard') %}
                             <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.technician_dashboard }}</span>
                         {% endif %}
                     </a>
                 </li>
-                {% if current_user and current_user.role in ('administrator', 'technician') %}
+                {% if current_user and current_user.role in ('administrator', 'field_assistant') %}
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == 'naps.geomap' else '' }}"
                        href="{{ url_for('naps.geomap') }}">
@@ -164,7 +164,7 @@
                    "View all notifications" link straight to notifications.index,
                    a second sidebar entry to the exact same page would just be a
                    redundant path to the same place, not a new capability. #}
-                {% elif current_user and current_user.role == 'technician' %}
+                {% elif current_user and current_user.role == 'field_assistant' %}
                 {# Phase 15: the disabled "Assigned Issues" placeholder that used to
                    sit here has been removed rather than turned into a real link —
                    the "Dashboard" item above already points at technician.index,

@@ -148,7 +148,7 @@ def sidebar_badge_counts(user):
         return {}
     if user.role == "administrator":
         return _admin_badges()
-    if user.role == "technician":
+    if user.role == "field_assistant":
         return _technician_badges(user)
     if user.role == "user":
         return _customer_badges(user)

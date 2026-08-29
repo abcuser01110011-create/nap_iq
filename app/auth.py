@@ -32,7 +32,7 @@ from app.models import User
 # always agree on the same mapping.
 ROLE_HOME_ENDPOINT = {
     "administrator": "dashboard.index",
-    "technician": "technician.index",
+    "field_assistant": "technician.index",
     "user": "customer.index",
     # Phase 10: payment_collector now has its own real landing page
     # (see app/routes/collector.py) instead of the "no dashboard yet"
@@ -89,7 +89,7 @@ def login_required(view):
 def role_required(*roles):
     """Requires an authenticated, active account whose role is one of
     `roles`. Use like `@role_required("administrator")` or
-    `@role_required("administrator", "technician")`.
+    `@role_required("administrator", "field_assistant")`.
 
     Unauthenticated visitors are sent to /login (with `next` set so
     they land back here after logging in). Authenticated users whose

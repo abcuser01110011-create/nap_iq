@@ -42,7 +42,7 @@ naps_bp = Blueprint("naps", __name__, url_prefix="/naps")
 # checking port availability at a site). Creating, editing, and
 # (de)activating NAPs is infrastructure-changing and stays
 # Administrator-only.
-_VIEW_ROLES = ("administrator", "technician")
+_VIEW_ROLES = ("administrator", "field_assistant")
 _MANAGE_ROLES = ("administrator",)
 
 
@@ -193,7 +193,7 @@ def list_naps():
 
     query = Nap.query
 
-    if g.user.role == "technician":
+    if g.user.role == "field_assistant":
         query = query.filter(Nap.id.in_(_own_nap_ids_for(g.user)))
 
     if search_term:
@@ -289,7 +289,7 @@ def geomap():
         navigate_type = ""
 
     own_technician_id = None
-    if g.user.role == "technician":
+    if g.user.role == "field_assistant":
         own_profile = Technician.query.filter_by(user_id=g.user.id).first()
         if own_profile is not None:
             own_technician_id = own_profile.id
@@ -475,7 +475,7 @@ def view_nap(nap_id):
     """
     nap = Nap.query.get_or_404(nap_id)
 
-    if g.user.role == "technician" and nap.id not in _own_nap_ids_for(g.user):
+    if g.user.role == "field_assistant" and nap.id not in _own_nap_ids_for(g.user):
         abort(403)
 
     return render_template("naps/view.html", nap=nap)

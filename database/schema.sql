@@ -15,14 +15,14 @@ CREATE DATABASE IF NOT EXISTS nap_iq
 USE nap_iq;
 
 -- ---------------------------------------------------------------------
--- users: system accounts (administrator, technician, payment collector)
+-- users: system accounts (administrator, field assistant, payment collector)
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     username        VARCHAR(50)  NOT NULL UNIQUE,
     password_hash   VARCHAR(255) NOT NULL,
     full_name       VARCHAR(100) NOT NULL,
-    role            ENUM('administrator', 'technician', 'payment_collector', 'user') NOT NULL,
+    role            ENUM('administrator', 'field_assistant', 'payment_collector', 'user') NOT NULL,
     email           VARCHAR(100) UNIQUE,
     phone_number    VARCHAR(20),
     status          ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
