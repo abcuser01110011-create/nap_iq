@@ -3,6 +3,9 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { ApiError, type Subscriber } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme/customer";
+import AuthTransitionOverlay from "../../components/AuthTransitionOverlay";
+
+const AUTH_TRANSITION_MS = 3000;
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -17,6 +20,7 @@ export default function ProfileScreen() {
   const { client, user, logout } = useAuth();
   const [subscriber, setSubscriber] = useState<Subscriber | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -32,40 +36,54 @@ export default function ProfileScreen() {
     load();
   }, [load]);
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    const minShowtime = new Promise((resolve) => setTimeout(resolve, AUTH_TRANSITION_MS));
+    try {
+      await Promise.all([logout(), minShowtime]);
+    } catch {
+      setLoggingOut(false);
+    }
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Profile</Text>
-      {error && <Text style={styles.error}>{error}</Text>}
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Profile</Text>
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Account</Text>
-        <Row label="Name" value={user?.full_name ?? "—"} />
-        <Row label="Username" value={user?.username ?? "—"} />
-        <Row label="Email" value={user?.email ?? "—"} />
-      </View>
-
-      {subscriber && (
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Subscriber</Text>
-          <Row label="Subscriber code" value={subscriber.subscriber_code} />
-          <Row label="Address" value={subscriber.address ?? "—"} />
-          <Row label="Contact number" value={subscriber.contact_number ?? "—"} />
-          <Row label="Plan" value={subscriber.plan_type ?? "—"} />
-          <Row label="Status" value={subscriber.status} />
-          <Row
-            label="Installed"
-            value={
-              subscriber.installed_at ? new Date(subscriber.installed_at).toLocaleDateString() : "—"
-            }
-          />
-          {subscriber.nap && <Row label="NAP" value={`${subscriber.nap.nap_code} — ${subscriber.nap.name}`} />}
+          <Text style={styles.cardLabel}>Account</Text>
+          <Row label="Name" value={user?.full_name ?? "—"} />
+          <Row label="Username" value={user?.username ?? "—"} />
+          <Row label="Email" value={user?.email ?? "—"} />
         </View>
-      )}
 
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>Log out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {subscriber && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Subscriber</Text>
+            <Row label="Subscriber code" value={subscriber.subscriber_code} />
+            <Row label="Address" value={subscriber.address ?? "—"} />
+            <Row label="Contact number" value={subscriber.contact_number ?? "—"} />
+            <Row label="Plan" value={subscriber.plan_type ?? "—"} />
+            <Row label="Status" value={subscriber.status} />
+            <Row
+              label="Installed"
+              value={
+                subscriber.installed_at ? new Date(subscriber.installed_at).toLocaleDateString() : "—"
+              }
+            />
+            {subscriber.nap && <Row label="NAP" value={`${subscriber.nap.nap_code} — ${subscriber.nap.name}`} />}
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loggingOut}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <AuthTransitionOverlay visible={loggingOut} kind="signout" durationMs={AUTH_TRANSITION_MS} />
+    </View>
   );
 }
 

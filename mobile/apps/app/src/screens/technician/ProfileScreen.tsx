@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import { colors } from "../../theme/technician";
+import AuthTransitionOverlay from "../../components/AuthTransitionOverlay";
+
+const AUTH_TRANSITION_MS = 3000;
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -16,46 +19,65 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { isOnline, pendingCount, syncNow } = useOffline();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    const minShowtime = new Promise((resolve) => setTimeout(resolve, AUTH_TRANSITION_MS));
+    // No need to reset loggingOut back to false on success — once
+    // logout() resolves, RootNavigator swaps this screen out for the
+    // signed-out stack and this component unmounts. It only matters
+    // if logout() throws, so this screen stays usable.
+    try {
+      await Promise.all([logout(), minShowtime]);
+    } catch {
+      setLoggingOut(false);
+    }
+  };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Profile</Text>
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Profile</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Account</Text>
-        <Row label="Name" value={user?.full_name ?? "—"} />
-        <Row label="Username" value={user?.username ?? "—"} />
-        <Row label="Email" value={user?.email ?? "—"} />
-      </View>
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Account</Text>
+          <Row label="Name" value={user?.full_name ?? "—"} />
+          <Row label="Username" value={user?.username ?? "—"} />
+          <Row label="Email" value={user?.email ?? "—"} />
+        </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Sync</Text>
-        <Row label="Connection" value={isOnline ? "Online" : "Offline"} />
-        <Row label="Waiting to sync" value={String(pendingCount)} />
-        {pendingCount > 0 && (
-          <TouchableOpacity
-            style={styles.syncButton}
-            onPress={syncNow}
-            disabled={!isOnline}
-          >
-            <Text style={[styles.syncButtonText, !isOnline && styles.syncButtonTextDisabled]}>
-              {isOnline ? "Sync now" : "Will sync when back online"}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Sync</Text>
+          <Row label="Connection" value={isOnline ? "Online" : "Offline"} />
+          <Row label="Waiting to sync" value={String(pendingCount)} />
+          {pendingCount > 0 && (
+            <TouchableOpacity
+              style={styles.syncButton}
+              onPress={syncNow}
+              disabled={!isOnline}
+            >
+              <Text style={[styles.syncButtonText, !isOnline && styles.syncButtonTextDisabled]}>
+                {isOnline ? "Sync now" : "Will sync when back online"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-      {/* There's no GET /api/v1/technician/me on the backend yet —
-          only the assignments endpoints exist in api_v1/technician.py
-          — so technician-specific fields (status, resolved job count,
-          contact number, live location) aren't shown here. Add a
-          backend "me" endpoint mirroring api_v1/customer.py's before
-          building this section out further. */}
+        {/* There's no GET /api/v1/technician/me on the backend yet —
+            only the assignments endpoints exist in api_v1/technician.py
+            — so technician-specific fields (status, resolved job count,
+            contact number, live location) aren't shown here. Add a
+            backend "me" endpoint mirroring api_v1/customer.py's before
+            building this section out further. */}
 
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>Log out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loggingOut}>
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <AuthTransitionOverlay visible={loggingOut} kind="signout" durationMs={AUTH_TRANSITION_MS} />
+    </View>
   );
 }
 

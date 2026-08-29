@@ -13,7 +13,13 @@ import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
 import FloatingLabelInput from "../components/FloatingLabelInput";
 import PasswordInput from "../components/PasswordInput";
+import AuthTransitionOverlay from "../components/AuthTransitionOverlay";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
+
+/** Matches AuthTransitionOverlay's default — kept as a constant here
+ * too since the screen needs the same number to race against the
+ * real login() call. */
+const AUTH_TRANSITION_MS = 3000;
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -28,16 +34,23 @@ export default function LoginScreen({ navigation }: Props) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
 
   const canSubmit = username.trim().length > 0 && password.length > 0 && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
+    setTransitioning(true);
+    // Run the real request alongside a minimum-showtime timer, same
+    // idea as the website's fixed-delay overlay — a fast response
+    // still gets the full animation, a slow one isn't cut short.
+    const minShowtime = new Promise((resolve) => setTimeout(resolve, AUTH_TRANSITION_MS));
     try {
-      await login(username.trim(), password);
+      await Promise.all([login(username.trim(), password), minShowtime]);
     } finally {
       setSubmitting(false);
+      setTransitioning(false);
     }
   };
 
@@ -88,6 +101,8 @@ export default function LoginScreen({ navigation }: Props) {
           <Text style={styles.link}>New customer? Apply for service</Text>
         </TouchableOpacity>
       </View>
+
+      <AuthTransitionOverlay visible={transitioning} kind="signin" durationMs={AUTH_TRANSITION_MS} />
     </KeyboardAvoidingView>
   );
 }
