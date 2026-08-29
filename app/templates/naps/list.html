@@ -4,7 +4,13 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ naps|length }} record{{ '' if naps|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end mb-3">
+<div class="d-flex justify-content-end gap-2 mb-3">
+    <form method="post" action="{{ url_for('naps.resync_status') }}" class="d-inline">
+        <button type="submit" class="btn btn-outline-secondary rounded-pill px-3"
+                title="Recompute each NAP's Active/Full status from its actual connected subscribers">
+            <i class="bi bi-arrow-repeat me-1"></i>Resync Status
+        </button>
+    </form>
     <a href="{{ url_for('naps.add_nap') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-plus-lg me-1"></i>Add NAP
     </a>

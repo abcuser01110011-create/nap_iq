@@ -43,6 +43,7 @@ from app.extensions import db
 from app.auth import role_required
 from app.models import Subscriber, Nap, Plan, ServiceRequest
 from app.forms import SubscriberForm, MapQuickInstallSubscriberForm
+from app.nap_status import sync_nap_status, slot_usage
 
 subscribers_bp = Blueprint("subscribers", __name__, url_prefix="/subscribers")
 
@@ -201,6 +202,9 @@ def add_subscriber():
         if linked_service_request:
             linked_service_request.subscriber_id = subscriber.id
 
+        if subscriber.nap_id:
+            sync_nap_status(subscriber.nap)
+
         db.session.commit()
 
         if linked_service_request:
@@ -266,7 +270,12 @@ def quick_add_subscriber():
     nap = Nap.query.get(form.nap_id.data)
     if nap is None:
         return jsonify({"status": "error", "errors": {"nap_id": ["Selected NAP no longer exists."]}}), 400
-    if nap.status != "active" or (nap.available_ports or 0) <= 0:
+    # Real remaining capacity, not the `available_ports` column -- that
+    # counter is only ever written by the NAP add/edit forms (see
+    # app/nap_status.py) and never reflects subscribers linked through
+    # this route or add_subscriber(), so it can't be trusted here.
+    _used, live_available = slot_usage(nap)
+    if nap.status != "active" or live_available <= 0:
         return (
             jsonify(
                 {
@@ -304,6 +313,8 @@ def quick_add_subscriber():
         status="active",
     )
     db.session.add(subscriber)
+    db.session.flush()
+    sync_nap_status(nap)
     db.session.commit()
 
     return (
@@ -361,6 +372,13 @@ def edit_subscriber(subscriber_id):
         if form.installed_at.data:
             installed_at = datetime.strptime(form.installed_at.data.strip(), "%Y-%m-%d").date()
 
+        # A slot can free up or fill up here in two ways: the
+        # subscriber's status changing (e.g. -> "disconnected" frees
+        # their slot) or their nap_id being reassigned to a different
+        # NAP -- so both the old and new NAP need re-syncing below,
+        # not just whichever one they end up on.
+        previous_nap = subscriber.nap
+
         subscriber.subscriber_code = form.subscriber_code.data.strip()
         subscriber.full_name = form.full_name.data.strip()
         subscriber.address = (form.address.data or "").strip() or None
@@ -372,6 +390,12 @@ def edit_subscriber(subscriber_id):
         subscriber.nap_id = form.nap_id.data or None
         subscriber.status = form.status.data
         subscriber.installed_at = installed_at
+
+        db.session.flush()
+        if previous_nap is not None:
+            sync_nap_status(previous_nap)
+        if subscriber.nap is not None and subscriber.nap is not previous_nap:
+            sync_nap_status(subscriber.nap)
 
         db.session.commit()
         flash(f"Subscriber '{subscriber.subscriber_code}' was updated successfully.", "success")

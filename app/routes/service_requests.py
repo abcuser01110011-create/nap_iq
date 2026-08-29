@@ -74,6 +74,7 @@ from app.forms import ServiceRequestForm
 from app.notifications_utils import notify
 from app.nap_recommendation import recommend_naps
 from app.email_utils import send_status_email
+from app.nap_status import sync_nap_status, slot_usage
 
 service_requests_bp = Blueprint("service_requests", __name__, url_prefix="/service-requests")
 
@@ -155,7 +156,16 @@ def _sync_subscriber_nap(service_request):
         return
     subscriber = Subscriber.query.get(service_request.subscriber_id)
     if subscriber is not None and subscriber.nap_id != service_request.requested_nap_id:
+        previous_nap = subscriber.nap
         subscriber.nap_id = service_request.requested_nap_id
+        db.session.flush()
+        # This just occupied a slot on the newly-assigned NAP (and, if
+        # the subscriber was already linked elsewhere, freed one on
+        # its previous NAP) -- see app/nap_status.py for why that has
+        # to be recomputed explicitly rather than happening on its own.
+        if previous_nap is not None:
+            sync_nap_status(previous_nap)
+        sync_nap_status(subscriber.nap)
 
 
 def _notify_status_change(service_request):
@@ -575,7 +585,10 @@ def assign_nap(request_id):
         flash("No NAP was selected.", "danger")
         return redirect(request.referrer or url_for("service_requests.list_requests"))
 
-    if nap.status != "active" or (nap.available_ports or 0) <= 0:
+    # Real remaining capacity, not the `available_ports` column -- see
+    # app/nap_status.py for why that stored counter can't be trusted.
+    _used, live_available = slot_usage(nap)
+    if nap.status != "active" or live_available <= 0:
         # Re-checked here, not just trusted from the page that posted
         # this — the same "never trust a browser-supplied value just
         # because it looks like it came from our own recommendation

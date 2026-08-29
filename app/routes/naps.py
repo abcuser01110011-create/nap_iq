@@ -34,6 +34,7 @@ from sqlalchemy import func
 from app.auth import role_required
 from app.models import Nap, AppSettings, Plan, Technician, Assignment, TechnicalIssue, Subscriber
 from app.forms import NapForm, MapQuickAddNapForm
+from app.nap_status import sync_nap_status
 
 naps_bp = Blueprint("naps", __name__, url_prefix="/naps")
 
@@ -510,6 +511,33 @@ def edit_nap(nap_id):
     return render_template("naps/form.html", form=form, mode="edit", nap=nap)
 
 
+@naps_bp.route("/resync-status", methods=["POST"])
+@role_required(*_MANAGE_ROLES)
+def resync_status():
+    """One-off backfill for NAPs that existed before `nap.status` was
+    wired up to auto-follow real slot occupancy (see
+    app/nap_status.py) -- those rows can still show "active" while
+    actually full, because nothing recalculated them retroactively
+    when this fix shipped. Re-syncing every NAP once here catches
+    those up; every write path going forward keeps itself in sync on
+    its own, so this button is safe to click as often as needed but
+    shouldn't normally need clicking more than once."""
+    naps = Nap.query.all()
+    changed = 0
+    for nap in naps:
+        before = nap.status
+        sync_nap_status(nap)
+        if nap.status != before:
+            changed += 1
+    db.session.commit()
+
+    if changed:
+        flash(f"Re-synced NAP status: {changed} NAP(s) updated to match actual slot occupancy.", "success")
+    else:
+        flash("Re-synced NAP status: everything already matched actual slot occupancy.", "info")
+    return redirect(request.referrer or url_for("naps.list_naps"))
+
+
 @naps_bp.route("/<int:nap_id>/deactivate", methods=["POST"])
 @role_required(*_MANAGE_ROLES)
 def deactivate_nap(nap_id):
@@ -529,6 +557,10 @@ def activate_nap(nap_id):
     back to 'active'."""
     nap = Nap.query.get_or_404(nap_id)
     nap.status = "active"
+    # Re-derive rather than trust "active" outright -- a NAP taken
+    # down for maintenance may have been (and still be) fully occupied
+    # by its real, linked subscribers the whole time.
+    sync_nap_status(nap)
     db.session.commit()
     flash(f"NAP '{nap.nap_code}' has been reactivated.", "success")
     return redirect(request.referrer or url_for("naps.list_naps"))
