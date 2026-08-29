@@ -79,7 +79,7 @@
                     </a>
                 </li>
                 <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint in ['naps.list_naps', 'naps.view_nap', 'naps.add_nap', 'naps.edit_nap'] else '' }}"
+                    <a class="dash-nav-link {{ 'active' if request.endpoint in ['naps.list_naps', 'naps.view_nap', 'naps.add_nap'] else '' }}"
                        href="{{ url_for('naps.list_naps') }}">
                         <i class="bi bi-hdd-network"></i><span>NAP Management</span>
                     </a>

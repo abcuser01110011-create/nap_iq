@@ -21,8 +21,6 @@ Routes:
     POST /naps/add                 -> add_nap         (process add form)
     POST /naps/quick-add           -> quick_add_nap   (create NAP from a map click, JSON)
     GET  /naps/<id>                -> view_nap        (view NAP details)
-    GET  /naps/<id>/edit           -> edit_nap        (show edit form)
-    POST /naps/<id>/edit           -> edit_nap        (process edit form)
     POST /naps/<id>/deactivate     -> deactivate_nap  (soft-deactivate)
     POST /naps/<id>/activate       -> activate_nap    (reactivate)
 """
@@ -480,35 +478,6 @@ def view_nap(nap_id):
         abort(403)
 
     return render_template("naps/view.html", nap=nap)
-
-
-@naps_bp.route("/<int:nap_id>/edit", methods=["GET", "POST"])
-@role_required(*_MANAGE_ROLES)
-def edit_nap(nap_id):
-    """Shows and processes the Edit NAP form."""
-    nap = Nap.query.get_or_404(nap_id)
-
-    # On GET, `obj=nap` pre-fills the form with the NAP's current values.
-    # On POST, submitted form data automatically takes precedence.
-    form = NapForm(obj=nap)
-    form.nap_id = nap.id  # excludes this record from the uniqueness check
-
-    if form.validate_on_submit():
-        nap.nap_code = form.nap_code.data.strip()
-        nap.name = form.name.data.strip()
-        nap.address = (form.address.data or "").strip() or None
-        nap.latitude = form.latitude.data
-        nap.longitude = form.longitude.data
-        nap.total_ports = form.total_ports.data
-        nap.used_ports = form.used_ports.data
-        nap.available_ports = form.total_ports.data - form.used_ports.data
-        nap.status = form.status.data
-
-        db.session.commit()
-        flash(f"NAP '{nap.nap_code}' was updated successfully.", "success")
-        return redirect(url_for("naps.view_nap", nap_id=nap.id))
-
-    return render_template("naps/form.html", form=form, mode="edit", nap=nap)
 
 
 @naps_bp.route("/resync-status", methods=["POST"])

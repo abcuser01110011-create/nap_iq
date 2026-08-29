@@ -27,6 +27,7 @@ from app.models import (
     TechnicalIssue,
     Assignment,
 )
+from app.nap_status import slot_usage
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -64,8 +65,6 @@ def index():
     # NAP STATUS SUMMARY (+ overall port utilization)
     # ---------------------------------------------------------------
 
-    total_naps = db.session.scalar(db.select(func.count(Nap.id))) or 0
-
     nap_status_rows = db.session.execute(
         db.select(Nap.status, func.count(Nap.id)).group_by(Nap.status)
     ).all()
@@ -75,13 +74,26 @@ def index():
         for status in NAP_STATUS_ORDER
     ]
 
-    port_totals = db.session.execute(
-        db.select(
-            func.coalesce(func.sum(Nap.total_ports), 0),
-            func.coalesce(func.sum(Nap.used_ports), 0),
-        )
-    ).first()
-    total_ports, used_ports = port_totals if port_totals else (0, 0)
+    # Port totals are derived live from each NAP's actual connected
+    # subscribers via `slot_usage()` (app/nap_status.py) — the same
+    # source of truth the GeoMap feed's `/api/naps` uses — rather than
+    # the stored `used_ports`/`available_ports` columns. Those columns
+    # are only ever written when a NAP is created and drift out of
+    # sync as soon as subscribers are actually connected/disconnected,
+    # which was previously most visible after using NAP Management's
+    # Edit NAP form (now removed) to hand-type a "Used Ports" value
+    # that had nothing to do with real occupancy. Keeping this in sync
+    # with the GeoMap is what keeps the Dashboard's numbers accurate.
+    all_naps = Nap.query.all()
+    total_naps = len(all_naps)
+    live_used_ports_by_nap_id = {}
+    total_ports = 0
+    used_ports = 0
+    for nap in all_naps:
+        nap_used, _nap_available = slot_usage(nap)
+        live_used_ports_by_nap_id[nap.id] = nap_used
+        total_ports += nap.total_ports or 0
+        used_ports += nap_used
     port_utilization_pct = round((used_ports / total_ports) * 100, 1) if total_ports else 0
     ports_available = total_ports - used_ports
 
@@ -137,7 +149,18 @@ def index():
     # added NAPs and NAPs whose status/ports were recently edited)
     # ---------------------------------------------------------------
 
-    recent_naps = Nap.query.order_by(Nap.updated_at.desc()).limit(5).all()
+    recent_naps_records = Nap.query.order_by(Nap.updated_at.desc()).limit(5).all()
+    recent_naps = [
+        {
+            "nap": nap,
+            # Fall back to a fresh slot_usage() call for the rare case
+            # a recent NAP isn't already in live_used_ports_by_nap_id
+            # (can't normally happen since all_naps is every NAP, but
+            # keeps this block correct on its own if that ever changes).
+            "used_ports": live_used_ports_by_nap_id.get(nap.id, slot_usage(nap)[0]),
+        }
+        for nap in recent_naps_records
+    ]
 
     # ---------------------------------------------------------------
     # TECHNICIAN WORKLOAD SUMMARY

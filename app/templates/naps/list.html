@@ -96,10 +96,6 @@
                                class="subs-edit-btn" title="View details" onclick="event.stopPropagation();">
                                 <i class="bi bi-eye"></i>
                             </a>
-                            <a href="{{ url_for('naps.edit_nap', nap_id=nap.id) }}"
-                               class="subs-edit-btn" title="Edit" onclick="event.stopPropagation();">
-                                <i class="bi bi-pencil"></i>
-                            </a>
                             {% if nap.status == 'inactive' %}
                                 <button type="button" class="subs-edit-btn" title="Activate"
                                         data-bs-toggle="modal" data-bs-target="#statusModal"

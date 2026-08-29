@@ -155,7 +155,8 @@
                     </div>
                 {% else %}
                     {% set nap_status_bg = {'active': 'bg-icon-success', 'full': 'bg-icon-warning', 'maintenance': 'bg-icon-danger', 'inactive': 'bg-icon-primary'} %}
-                    {% for nap in recent_naps %}
+                    {% for entry in recent_naps %}
+                        {% set nap = entry.nap %}
                         <div class="recent-row">
                             <span class="recent-row-icon {{ nap_status_bg.get(nap.status, 'bg-icon-primary') }}"><i class="bi bi-hdd-network"></i></span>
                             <div class="flex-grow-1">
@@ -164,7 +165,7 @@
                                     <span class="badge text-bg-light text-capitalize">{{ nap.status }}</span>
                                 </div>
                                 <div class="recent-row-meta">
-                                    {{ nap.used_ports }}/{{ nap.total_ports }} ports used
+                                    {{ entry.used_ports }}/{{ nap.total_ports }} ports used
                                     &middot; updated {{ nap.updated_at.strftime('%b %d, %Y %I:%M %p') }}
                                 </div>
                             </div>
