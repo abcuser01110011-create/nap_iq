@@ -12,12 +12,6 @@
     ('disconnected', 'Disconnected'),
 ] %}
 
-<div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('subscribers.add_subscriber') }}" class="btn btn-primary rounded-pill px-3">
-        <i class="bi bi-person-plus me-1"></i>Add Subscriber
-    </a>
-</div>
-
 <div class="subs-filterbar">
     <form method="get" action="{{ url_for('subscribers.list_subscribers') }}" class="subs-search-form" id="subsSearchForm">
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
