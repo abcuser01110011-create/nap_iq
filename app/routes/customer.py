@@ -110,7 +110,7 @@ def report_issue():
     if subscriber is None:
         flash(
             "Your login isn't linked to a subscriber record yet, so you can't "
-            "report an issue here. Please contact NAP-IQ support.",
+            "report an issue here. Please contact PG Networks support.",
             "warning",
         )
         return redirect(url_for("customer.index"))
@@ -150,7 +150,7 @@ def _no_subscriber_redirect():
     identically for a customer with no linked subscriber record."""
     flash(
         "Your login isn't linked to a subscriber record yet, so there's nothing "
-        "to show here. Please contact NAP-IQ support.",
+        "to show here. Please contact PG Networks support.",
         "warning",
     )
     return redirect(url_for("customer.index"))

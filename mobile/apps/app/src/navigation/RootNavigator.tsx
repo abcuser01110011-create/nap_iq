@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, useFocusEffect } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import type { Assignment } from "@nap-iq/api-client";
+import { ApiError, type Assignment } from "@nap-iq/api-client";
 import { useAuth } from "../auth/AuthContext";
 import { OfflineProvider } from "../offline/OfflineContext";
 import NotificationRouter from "../notifications/NotificationRouter";
@@ -89,7 +89,54 @@ const CUSTOMER_TAB_ICONS: Record<keyof CustomerTabParamList, keyof typeof Ionico
   Profile: "person-outline",
 };
 
+// Phase 31: a signed-in account with no subscriber record yet (see
+// HomeScreen's NoSubscriberCard/"Apply for service") hasn't been
+// linked to real service — Issues, Requests, and Payments all 404 for
+// it server-side (app/routes/api_v1/customer.py), and Report Issue
+// (reached from the Issues tab) would just dead-end the same way. So
+// those tabs — and the Report Issue screen they're the only way to
+// reach — stay hidden until the account has a subscriber on file.
+// Re-checked every time this screen regains focus (e.g. coming back
+// from Apply for service) so the extra tabs appear the moment an
+// application is submitted, without waiting for a full app restart.
 function CustomerTabs() {
+  const { client } = useAuth();
+  const [status, setStatus] = useState<"loading" | "linked" | "unlinked">("loading");
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      client.customer
+        .me()
+        .then(() => {
+          if (!cancelled) setStatus("linked");
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (err instanceof ApiError && err.status === 404) {
+            setStatus("unlinked");
+          } else {
+            // Network hiccup or unexpected error — don't guess at
+            // linked status from this; keep whatever we last knew
+            // instead of flashing tabs away, only defaulting to
+            // "unlinked" on the very first check.
+            setStatus((prev) => (prev === "loading" ? "unlinked" : prev));
+          }
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, [client])
+  );
+
+  if (status === "loading") {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: customerColors.bg }}>
+        <ActivityIndicator color={customerColors.primary} size="large" />
+      </View>
+    );
+  }
+
   return (
     <CustomerTab.Navigator
       screenOptions={({ route }) => ({
@@ -103,9 +150,13 @@ function CustomerTabs() {
       })}
     >
       <CustomerTab.Screen name="Home" component={HomeScreen} />
-      <CustomerTab.Screen name="Issues" component={CustomerIssuesScreen} />
-      <CustomerTab.Screen name="Requests" component={ServiceRequestsScreen} options={{ title: "Requests" }} />
-      <CustomerTab.Screen name="Payments" component={PaymentsScreen} />
+      {status === "linked" && (
+        <>
+          <CustomerTab.Screen name="Issues" component={CustomerIssuesScreen} />
+          <CustomerTab.Screen name="Requests" component={ServiceRequestsScreen} options={{ title: "Requests" }} />
+          <CustomerTab.Screen name="Payments" component={PaymentsScreen} />
+        </>
+      )}
       <CustomerTab.Screen name="Profile" component={CustomerProfileScreen} />
     </CustomerTab.Navigator>
   );

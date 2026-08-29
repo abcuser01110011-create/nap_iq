@@ -212,7 +212,7 @@ def _notify_status_change(service_request):
         }[service_request.status]
         send_status_email(
             subscriber_email,
-            subject=f"NAP-IQ — {status_copy[0]}",
+            subject=f"PG Networks — {status_copy[0]}",
             heading=status_copy[0],
             body_text=status_copy[1],
         )

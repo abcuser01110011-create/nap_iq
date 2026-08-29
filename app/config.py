@@ -148,9 +148,9 @@ class Config:
     # only lets you send FROM this address (their shared sandbox
     # sender) and only TO the email you signed up to Resend with.
     # Once a domain is verified there, set this to something like
-    # "NAP-IQ <no-reply@yourdomain.com>" to send from it and to anyone.
+    # "PG Networks <no-reply@yourdomain.com>" to send from it and to anyone.
     RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
-    MAIL_DEFAULT_SENDER_NAME = os.environ.get("MAIL_DEFAULT_SENDER_NAME", "NAP-IQ")
+    MAIL_DEFAULT_SENDER_NAME = os.environ.get("MAIL_DEFAULT_SENDER_NAME", "PG Networks")
 
     # How long a sent verification code stays valid, and how many wrong
     # attempts are tolerated before the applicant has to request a new

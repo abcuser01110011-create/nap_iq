@@ -149,7 +149,7 @@ def _own_subscriber_or_none():
 def _no_subscriber_response():
     """The JSON equivalent of customer.py's _no_subscriber_redirect."""
     return jsonify(
-        error="Your login isn't linked to a subscriber record yet. Please contact NAP-IQ support."
+        error="Your login isn't linked to a subscriber record yet. Please contact PG Networks support."
     ), 404
 
 

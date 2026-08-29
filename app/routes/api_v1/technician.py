@@ -658,7 +658,7 @@ def complete_assignment(assignment_id):
                 "service_request",
                 "You're connected!",
                 f"Your installation is complete — {subscriber.subscriber_code} is now active. "
-                "Welcome to NAP-IQ!",
+                "Welcome to PG Networks!",
                 customer_user_id=subscriber.user_id,
                 entity_type="service_request",
                 entity_id=service_request.id,

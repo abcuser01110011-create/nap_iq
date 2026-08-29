@@ -27,7 +27,7 @@ Setup required (see .env.example):
        your own domain in the Resend dashboard (Domains -> Add Domain
        -> add the SPF/DKIM DNS records they give you), then set
        RESEND_FROM_EMAIL to an address on that domain, e.g.
-       "NAP-IQ <no-reply@yourdomain.com>".
+       "PG Networks <no-reply@yourdomain.com>".
 
 Only the `requests` library is used to call Resend's API — no Resend-
 specific SDK dependency needed.
@@ -68,7 +68,7 @@ def _send_email(to_address: str, subject: str, html_body: str, text_body: str | 
         )
         return False
 
-    sender_name = current_app.config.get("MAIL_DEFAULT_SENDER_NAME", "NAP-IQ")
+    sender_name = current_app.config.get("MAIL_DEFAULT_SENDER_NAME", "PG Networks")
     from_email = current_app.config.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
     # Only prefix a display name if the config value is a bare address
     # (Resend also accepts "Name <email>" directly in RESEND_FROM_EMAIL
@@ -146,12 +146,12 @@ def send_verification_code(email: str, purpose: str = "registration") -> bool:
     db.session.add(record)
     db.session.commit()
 
-    subject = "Your NAP-IQ verification code"
+    subject = "Your PG Networks verification code"
     html_body = f"""
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #0B1F3A;">Verify your email</h2>
           <p>Use the code below to verify your email address and continue your
-          NAP-IQ service application.</p>
+          PG Networks service application.</p>
           <p style="font-size: 32px; font-weight: bold; letter-spacing: 6px;
                     background: #F1F5F9; padding: 16px 24px; border-radius: 8px;
                     text-align: center; color: #0B1F3A;">{code}</p>
@@ -160,7 +160,7 @@ def send_verification_code(email: str, purpose: str = "registration") -> bool:
         </div>
     """
     text_body = (
-        f"Your NAP-IQ verification code is {code}. "
+        f"Your PG Networks verification code is {code}. "
         f"It expires in {ttl_minutes} minutes."
     )
     return _send_email(email, subject, html_body, text_body)
@@ -245,7 +245,7 @@ def send_status_email(to_address: str, subject: str, heading: str, body_text: st
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #0B1F3A;">{heading}</h2>
           <p>{body_text}</p>
-          <p style="color: #64748B; font-size: 12px;">This is an automated message from NAP-IQ.</p>
+          <p style="color: #64748B; font-size: 12px;">This is an automated message from PG Networks.</p>
         </div>
     """
     return _send_email(to_address, subject, html_body, body_text)
