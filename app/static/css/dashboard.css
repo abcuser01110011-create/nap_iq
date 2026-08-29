@@ -400,51 +400,14 @@
 }
 
 /* ---------------------------------------------------------------- */
-/* SUMMARY CARDS                                                     */
+/* RECENT-ROW ICON COLORS (used by .recent-row-icon further below)   */
 /* ---------------------------------------------------------------- */
-
-.summary-card {
-    background: var(--napiq-surface);
-    border: 1px solid var(--napiq-border);
-    border-radius: 0.75rem;
-    padding: 1.1rem 1.2rem;
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    height: 100%;
-}
-
-.summary-card-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 0.65rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.35rem;
-    flex-shrink: 0;
-    color: #fff;
-}
-
-.summary-card-value {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #1f2937;
-    line-height: 1.1;
-}
-
-.summary-card-label {
-    font-size: 0.78rem;
-    color: var(--napiq-text-muted);
-    font-weight: 500;
-}
 
 .bg-icon-primary { background: var(--napiq-primary); }
 .bg-icon-success { background: var(--napiq-success); }
 .bg-icon-info     { background: #0aa5c2; }
 .bg-icon-warning { background: var(--napiq-warning); }
 .bg-icon-danger  { background: var(--napiq-danger); }
-.bg-icon-purple  { background: #7c4fd1; }
 
 /* ---------------------------------------------------------------- */
 /* CONTENT PANELS                                                    */
@@ -478,51 +441,6 @@
 
 .dash-panel-body {
     padding: 1.1rem 1.25rem;
-}
-
-/* Status breakdown bars (NAP status / issue status) */
-.status-bar-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.65rem;
-}
-
-.status-bar-row:last-child {
-    margin-bottom: 0;
-}
-
-.status-bar-label {
-    width: 108px;
-    flex-shrink: 0;
-    font-size: 0.82rem;
-    color: #374151;
-    text-transform: capitalize;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.status-bar-track {
-    flex: 1;
-    background: var(--napiq-bg);
-    border-radius: 1rem;
-    height: 9px;
-    overflow: hidden;
-}
-
-.status-bar-fill {
-    height: 100%;
-    border-radius: 1rem;
-}
-
-.status-bar-count {
-    width: 32px;
-    text-align: right;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #1f2937;
-    flex-shrink: 0;
 }
 
 .legend-dot {

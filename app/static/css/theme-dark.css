@@ -150,18 +150,12 @@
 }
 
 /* ---------------------------------------------------------------- */
-/* SUMMARY CARDS / PANELS (dashboard/index.html)                     */
+/* CONTENT PANELS (dashboard/index.html)                             */
 /* ---------------------------------------------------------------- */
 
-[data-bs-theme="dark"] .summary-card-value,
 [data-bs-theme="dark"] .dash-panel-header h5,
-[data-bs-theme="dark"] .recent-row-title,
-[data-bs-theme="dark"] .status-bar-count {
+[data-bs-theme="dark"] .recent-row-title {
     color: #f1f4f9;
-}
-
-[data-bs-theme="dark"] .status-bar-label {
-    color: #c3cadb;
 }
 
 [data-bs-theme="dark"] .dash-skeleton {

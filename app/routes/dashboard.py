@@ -23,20 +23,15 @@ from app.extensions import db
 from app.auth import role_required
 from app.models import (
     Nap,
-    Subscriber,
     Technician,
     TechnicalIssue,
-    ServiceRequest,
     Assignment,
 )
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
-# Issue statuses that count as "still open" / unresolved work for a
-# technician or the ops team. Defined once here so the summary card,
-# the status breakdown, and the technician workload count all agree on
-# exactly the same definition of "open".
-OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
+# Assignment statuses that count as a technician's "current" workload,
+# used by the Technician Workload Summary table below.
 OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
 
 # Fixed display order for status/priority breakdown bars, so the UI
@@ -66,57 +61,10 @@ def index():
     """
 
     # ---------------------------------------------------------------
-    # SUMMARY CARDS
+    # NAP STATUS SUMMARY (+ overall port utilization)
     # ---------------------------------------------------------------
 
     total_naps = db.session.scalar(db.select(func.count(Nap.id))) or 0
-
-    total_available_ports = (
-        db.session.scalar(db.select(func.coalesce(func.sum(Nap.available_ports), 0))) or 0
-    )
-
-    active_subscribers = (
-        db.session.scalar(
-            db.select(func.count(Subscriber.id)).where(Subscriber.status == "active")
-        )
-        or 0
-    )
-
-    open_technical_issues = (
-        db.session.scalar(
-            db.select(func.count(TechnicalIssue.id)).where(
-                TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES)
-            )
-        )
-        or 0
-    )
-
-    available_technicians = (
-        db.session.scalar(
-            db.select(func.count(Technician.id)).where(Technician.status == "available")
-        )
-        or 0
-    )
-
-    pending_service_requests = (
-        db.session.scalar(
-            db.select(func.count(ServiceRequest.id)).where(ServiceRequest.status == "pending")
-        )
-        or 0
-    )
-
-    summary_cards = {
-        "total_naps": total_naps,
-        "available_ports": total_available_ports,
-        "active_subscribers": active_subscribers,
-        "open_technical_issues": open_technical_issues,
-        "available_technicians": available_technicians,
-        "pending_service_requests": pending_service_requests,
-    }
-
-    # ---------------------------------------------------------------
-    # NAP STATUS SUMMARY (+ overall port utilization)
-    # ---------------------------------------------------------------
 
     nap_status_rows = db.session.execute(
         db.select(Nap.status, func.count(Nap.id)).group_by(Nap.status)
@@ -239,7 +187,6 @@ def index():
 
     return render_template(
         "dashboard/index.html",
-        summary_cards=summary_cards,
         nap_status_summary=nap_status_summary,
         nap_status_segments=nap_status_segments,
         nap_status_conic_gradient=nap_status_conic_gradient,

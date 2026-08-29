@@ -12,66 +12,6 @@
 {% block content %}
 
 {# ------------------------------------------------------------------ #}
-{# SUMMARY CARDS                                                       #}
-{# ------------------------------------------------------------------ #}
-<div class="row g-3 mb-4">
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="summary-card">
-            <span class="summary-card-icon bg-icon-primary"><i class="bi bi-hdd-network"></i></span>
-            <div>
-                <div class="summary-card-value">{{ summary_cards.total_naps }}</div>
-                <div class="summary-card-label">Total NAPs</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="summary-card">
-            <span class="summary-card-icon bg-icon-info"><i class="bi bi-ethernet"></i></span>
-            <div>
-                <div class="summary-card-value">{{ summary_cards.available_ports }}</div>
-                <div class="summary-card-label">Available Ports</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="summary-card">
-            <span class="summary-card-icon bg-icon-success"><i class="bi bi-people"></i></span>
-            <div>
-                <div class="summary-card-value">{{ summary_cards.active_subscribers }}</div>
-                <div class="summary-card-label">Active Subscribers</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="summary-card">
-            <span class="summary-card-icon bg-icon-danger"><i class="bi bi-exclamation-triangle"></i></span>
-            <div>
-                <div class="summary-card-value">{{ summary_cards.open_technical_issues }}</div>
-                <div class="summary-card-label">Open Technical Issues</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="summary-card">
-            <span class="summary-card-icon bg-icon-purple"><i class="bi bi-person-badge"></i></span>
-            <div>
-                <div class="summary-card-value">{{ summary_cards.available_technicians }}</div>
-                <div class="summary-card-label">Available Technicians</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-2">
-        <div class="summary-card">
-            <span class="summary-card-icon bg-icon-warning"><i class="bi bi-clipboard-check"></i></span>
-            <div>
-                <div class="summary-card-value">{{ summary_cards.pending_service_requests }}</div>
-                <div class="summary-card-label">Pending Service Requests</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# ------------------------------------------------------------------ #}
 {# ROW: NAP STATUS SUMMARY (full-width status distribution + gauge)    #}
 {# ------------------------------------------------------------------ #}
 <div class="row g-3 mb-3">
