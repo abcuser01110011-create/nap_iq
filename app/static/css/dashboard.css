@@ -707,21 +707,46 @@
     overflow: visible;
 }
 
-.nap-gauge-track,
-.nap-gauge-value {
-    fill: none;
-    stroke-linecap: round;
-}
-
 .nap-gauge-track {
+    fill: none;
+    stroke-linecap: butt;
     stroke: #232c47;
     stroke-width: 14;
 }
 
+/* Value arc "sweeps" clockwise into place on load: pathLength="100"
+   normalizes the arc to a 0-100 scale, so a fixed 100/100 dasharray
+   (a single dash covering the whole arc) combined with an animated
+   dashoffset reveals the arc from its start (left) to its filled
+   percentage, left-to-right -- i.e. clockwise, matching the gauge's
+   own left-to-right sweep direction. --gauge-final-offset is set
+   inline per-request (100 - port_utilization_pct); the keyframes
+   below animate toward it. stroke-linecap is flat (butt), not
+   rounded, per request -- no glossy rounded tip. */
 .nap-gauge-value {
+    fill: none;
+    stroke-linecap: butt;
     stroke: var(--nsp-accent);
     stroke-width: 14;
-    transition: stroke-dasharray 0.3s ease;
+    stroke-dasharray: 100 100;
+    stroke-dashoffset: 100;
+    animation: napGaugeSweep 1s ease-out forwards;
+}
+
+@keyframes napGaugeSweep {
+    from {
+        stroke-dashoffset: 100;
+    }
+    to {
+        stroke-dashoffset: var(--gauge-final-offset);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nap-gauge-value {
+        animation: none;
+        stroke-dashoffset: var(--gauge-final-offset);
+    }
 }
 
 .nap-gauge-tick {

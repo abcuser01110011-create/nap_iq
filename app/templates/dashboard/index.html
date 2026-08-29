@@ -63,7 +63,7 @@
                             <svg viewBox="0 0 200 118" class="nap-gauge-svg">
                                 <path class="nap-gauge-track" d="M14,104 A86,86 0 0 1 186,104" />
                                 <path class="nap-gauge-value" pathLength="100"
-                                      style="stroke-dasharray:{{ port_utilization_pct }} 100;"
+                                      style="--gauge-final-offset:{{ (100 - port_utilization_pct) | round(2) }};"
                                       d="M14,104 A86,86 0 0 1 186,104" />
                                 <text x="8" y="116" class="nap-gauge-tick">0%</text>
                                 <text x="28" y="30" class="nap-gauge-tick">25%</text>
