@@ -72,86 +72,90 @@
 </div>
 
 {# ------------------------------------------------------------------ #}
-{# ROW: NAP STATUS SUMMARY  /  TECHNICAL ISSUE STATUS SUMMARY           #}
+{# ROW: NAP STATUS SUMMARY (full-width status distribution + gauge)    #}
 {# ------------------------------------------------------------------ #}
-<div class="row g-3 mb-3 align-items-stretch">
-
-    <div class="col-lg-6">
-        <div class="dash-panel">
-            <div class="dash-panel-header">
-                <h5><i class="bi bi-hdd-network me-1 text-muted"></i>NAP Status Summary</h5>
-                <span class="text-muted">{{ total_naps }} total</span>
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="nap-status-panel">
+            <div class="nap-status-panel-header">
+                <h5><i class="bi bi-diagram-3"></i>NAP Status Summary</h5>
+                <span class="nap-status-panel-total"><strong>{{ total_naps }}</strong> Total NAPs</span>
             </div>
-            <div class="dash-panel-body">
-                {% if total_naps == 0 %}
+
+            {% if total_naps == 0 %}
+                <div class="nap-status-panel-body">
                     <div class="dash-empty">
                         <i class="bi bi-hdd-network"></i>
                         <p>No NAPs in the database yet.</p>
                     </div>
-                {% else %}
-                    {% set status_colors = {'active': 'var(--napiq-success)', 'full': 'var(--napiq-warning)', 'maintenance': 'var(--napiq-danger)', 'inactive': '#9aa2ad'} %}
-                    {% for row in nap_status_summary %}
-                        <div class="status-bar-row">
-                            <span class="status-bar-label">
-                                <span class="legend-dot" style="background:{{ status_colors[row.status] }}"></span>
-                                {{ row.status }}
-                            </span>
-                            <div class="status-bar-track">
-                                <div class="status-bar-fill" style="width:{{ (row.count / total_naps * 100) if total_naps else 0 }}%; background:{{ status_colors[row.status] }}"></div>
-                            </div>
-                            <span class="status-bar-count">{{ row.count }}</span>
-                        </div>
-                    {% endfor %}
-                    <hr class="my-3">
-                    <div class="d-flex justify-content-between small text-muted mb-1">
-                        <span>Port utilization</span>
-                        <span class="fw-semibold text-dark">{{ used_ports }} / {{ total_ports }} used ({{ port_utilization_pct }}%)</span>
-                    </div>
-                    <div class="status-bar-track">
-                        <div class="status-bar-fill" style="width:{{ port_utilization_pct }}%; background:var(--napiq-primary)"></div>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+                </div>
+            {% else %}
+                <div class="nap-status-panel-body">
 
-    <div class="col-lg-6">
-        <div class="dash-panel">
-            <div class="dash-panel-header">
-                <h5><i class="bi bi-exclamation-triangle me-1 text-muted"></i>Technical Issue Status Summary</h5>
-                <span class="text-muted">{{ total_issues }} total</span>
-            </div>
-            <div class="dash-panel-body">
-                {% if total_issues == 0 %}
-                    <div class="dash-empty">
-                        <i class="bi bi-check2-circle"></i>
-                        <p>No technical issues have been reported yet.</p>
-                    </div>
-                {% else %}
-                    {% set issue_status_colors = {'pending': '#9aa2ad', 'assigned': '#0aa5c2', 'in_progress': 'var(--napiq-primary)', 'resolved': 'var(--napiq-success)', 'closed': '#495057'} %}
-                    {% for row in issue_status_summary %}
-                        <div class="status-bar-row">
-                            <span class="status-bar-label">
-                                <span class="legend-dot" style="background:{{ issue_status_colors[row.status] }}"></span>
-                                {{ row.status.replace('_', ' ') }}
-                            </span>
-                            <div class="status-bar-track">
-                                <div class="status-bar-fill" style="width:{{ row.pct }}%; background:{{ issue_status_colors[row.status] }}"></div>
+                    {# ---------------- Status Distribution (donut) ---------------- #}
+                    <div class="nap-status-section">
+                        <h6 class="nap-status-section-title">Status Distribution</h6>
+                        <div class="nap-donut-wrap">
+                            <div class="nap-donut" style="background: conic-gradient({{ nap_status_conic_gradient }});"></div>
+                            <div class="nap-donut-center">
+                                <span class="nap-donut-value">{{ total_naps }}</span>
+                                <span class="nap-donut-label">TOTAL NAPs</span>
                             </div>
-                            <span class="status-bar-count">{{ row.count }}</span>
                         </div>
-                    {% endfor %}
-                    <hr class="my-3">
-                    <div class="small text-muted mb-2">Open issues by priority</div>
-                    <div class="d-flex flex-wrap gap-2">
-                        {% set priority_colors = {'critical': 'danger', 'high': 'warning', 'medium': 'primary', 'low': 'secondary'} %}
-                        {% for row in issue_priority_summary %}
-                            <span class="badge text-bg-{{ priority_colors[row.priority] }} text-capitalize">
-                                {{ row.priority }}: {{ row.count }}
-                            </span>
-                        {% endfor %}
+                        <div class="nap-status-legend">
+                            {% for row in nap_status_segments %}
+                                <div class="nap-legend-row">
+                                    <span class="legend-dot" style="background:{{ row.color }}"></span>
+                                    <span class="nap-legend-label">{{ row.status }}</span>
+                                    <span class="nap-legend-count">{{ row.count }}</span>
+                                    <span class="nap-legend-pct" style="color:{{ row.color }}">{{ row.pct | round | int }}%</span>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                {% endif %}
+
+                    <div class="nap-status-divider"></div>
+
+                    {# ---------------- Port Utilization (gauge) ---------------- #}
+                    <div class="nap-status-section">
+                        <h6 class="nap-status-section-title">Port Utilization</h6>
+                        <div class="nap-gauge-wrap">
+                            <svg viewBox="0 0 200 118" class="nap-gauge-svg">
+                                <path class="nap-gauge-track" d="M14,104 A86,86 0 0 1 186,104" />
+                                <path class="nap-gauge-value" pathLength="100"
+                                      style="stroke-dasharray:{{ port_utilization_pct }} 100;"
+                                      d="M14,104 A86,86 0 0 1 186,104" />
+                                <text x="8" y="116" class="nap-gauge-tick">0%</text>
+                                <text x="28" y="30" class="nap-gauge-tick">25%</text>
+                                <text x="100" y="14" class="nap-gauge-tick" text-anchor="middle">50%</text>
+                                <text x="172" y="30" class="nap-gauge-tick" text-anchor="end">75%</text>
+                                <text x="192" y="116" class="nap-gauge-tick" text-anchor="end">100%</text>
+                            </svg>
+                            <div class="nap-gauge-center">
+                                <span class="nap-gauge-value-num">{{ port_utilization_pct }}%</span>
+                                <span class="nap-gauge-value-sub">{{ used_ports }} / {{ total_ports }} ports used</span>
+                                <span class="nap-health-badge {{ port_health_class }}">
+                                    <span class="nap-health-dot"></span>{{ port_health_label }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="nap-ports-used-box">
+                            <div class="nap-ports-used-row">
+                                <span>Ports Used</span>
+                                <span class="nap-ports-used-count">{{ used_ports }} of {{ total_ports }}</span>
+                            </div>
+                            <div class="nap-ports-track">
+                                <div class="nap-ports-fill" style="width:{{ port_utilization_pct }}%"></div>
+                            </div>
+                            <div class="nap-ports-available">{{ ports_available }} ports available</div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="nap-status-panel-footer">
+                <span><i class="bi bi-info-circle"></i>NAP status updates every 5 minutes</span>
+                <a href="{{ url_for('naps.list_naps') }}">View NAP Management <i class="bi bi-chevron-right"></i></a>
             </div>
         </div>
     </div>

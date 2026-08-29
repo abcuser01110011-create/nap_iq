@@ -608,6 +608,368 @@
     font-size: 0.85rem;
 }
 
+/* ---------------------------------------------------------------- */
+/* NAP STATUS SUMMARY PANEL (dashboard/index.html)                   */
+/* Always-dark "NOC glass panel" treatment, independent of the       */
+/* light/dark page theme toggle -- same idea as .dash-sidebar, which */
+/* also stays a fixed dark surface in both themes. Colors are        */
+/* hardcoded (not --napiq-* tokens) so this panel keeps its designed */
+/* look regardless of theme.                                         */
+/* ---------------------------------------------------------------- */
+
+.nap-status-panel {
+    --nsp-bg: #0f1526;
+    --nsp-surface: #141b2d;
+    --nsp-border: rgba(255, 255, 255, 0.08);
+    --nsp-text: #f1f4f9;
+    --nsp-text-muted: #93a0b8;
+    --nsp-accent: #8b5cf6;
+    background: var(--nsp-bg);
+    border: 1px solid var(--nsp-border);
+    border-radius: 0.9rem;
+    color: var(--nsp-text);
+    overflow: hidden;
+}
+
+.nap-status-panel-header {
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--nsp-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.nap-status-panel-header h5 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--nsp-text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nap-status-panel-header h5 i {
+    color: var(--nsp-text-muted);
+}
+
+.nap-status-panel-total {
+    font-size: 0.85rem;
+    color: var(--nsp-text-muted);
+}
+
+.nap-status-panel-total strong {
+    color: var(--nsp-accent);
+    font-size: 1.05rem;
+}
+
+.nap-status-panel-body {
+    display: flex;
+    align-items: stretch;
+    padding: 1.6rem 1.4rem;
+    gap: 1.6rem;
+}
+
+.nap-status-section {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.nap-status-section-title {
+    align-self: flex-start;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--nsp-text);
+    margin-bottom: 1.25rem;
+}
+
+.nap-status-divider {
+    width: 1px;
+    align-self: stretch;
+    background: var(--nsp-border);
+}
+
+/* -------------------- Status Distribution donut -------------------- */
+
+.nap-donut-wrap {
+    position: relative;
+    width: 190px;
+    height: 190px;
+    margin-bottom: 1.4rem;
+}
+
+.nap-donut {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+.nap-donut-center {
+    position: absolute;
+    inset: 26px;
+    border-radius: 50%;
+    background: var(--nsp-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.nap-donut-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--nsp-text);
+}
+
+.nap-donut-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--nsp-text-muted);
+}
+
+.nap-status-legend {
+    width: 100%;
+    max-width: 260px;
+    text-align: left;
+}
+
+.nap-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--nsp-border);
+}
+
+.nap-legend-row:last-child {
+    border-bottom: none;
+}
+
+.nap-legend-label {
+    flex: 1;
+    font-size: 0.85rem;
+    text-transform: capitalize;
+    color: #dfe3ee;
+}
+
+.nap-legend-count {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--nsp-text);
+    min-width: 1.5rem;
+    text-align: right;
+}
+
+.nap-legend-pct {
+    font-size: 0.8rem;
+    font-weight: 700;
+    min-width: 2.6rem;
+    text-align: right;
+}
+
+/* -------------------- Port Utilization gauge -------------------- */
+
+.nap-gauge-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 1.4rem;
+}
+
+.nap-gauge-svg {
+    width: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.nap-gauge-track,
+.nap-gauge-value {
+    fill: none;
+    stroke-linecap: round;
+}
+
+.nap-gauge-track {
+    stroke: #232c47;
+    stroke-width: 14;
+}
+
+.nap-gauge-value {
+    stroke: var(--nsp-accent);
+    stroke-width: 14;
+    transition: stroke-dasharray 0.3s ease;
+}
+
+.nap-gauge-tick {
+    font-size: 8px;
+    fill: var(--nsp-text-muted);
+}
+
+.nap-gauge-center {
+    position: absolute;
+    left: 50%;
+    bottom: 6%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    text-align: center;
+    width: 100%;
+}
+
+.nap-gauge-value-num {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--nsp-accent);
+    line-height: 1.1;
+}
+
+.nap-gauge-value-sub {
+    font-size: 0.78rem;
+    color: var(--nsp-text-muted);
+}
+
+.nap-health-badge {
+    margin-top: 0.3rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 2rem;
+}
+
+.nap-health-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.nap-health-good {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.nap-health-good .nap-health-dot { background: #4ade80; }
+
+.nap-health-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.nap-health-warning .nap-health-dot { background: #fbbf24; }
+
+.nap-health-critical {
+    background: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+}
+
+.nap-health-critical .nap-health-dot { background: #f87171; }
+
+.nap-health-neutral {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
+
+.nap-health-neutral .nap-health-dot { background: #94a3b8; }
+
+.nap-ports-used-box {
+    width: 100%;
+    max-width: 300px;
+    background: var(--nsp-surface);
+    border: 1px solid var(--nsp-border);
+    border-radius: 0.7rem;
+    padding: 0.9rem 1rem;
+    text-align: left;
+}
+
+.nap-ports-used-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--nsp-text);
+    margin-bottom: 0.55rem;
+}
+
+.nap-ports-used-row .nap-ports-used-count {
+    color: var(--nsp-accent);
+}
+
+.nap-ports-track {
+    height: 8px;
+    border-radius: 1rem;
+    background: #232c47;
+    overflow: hidden;
+}
+
+.nap-ports-fill {
+    height: 100%;
+    border-radius: 1rem;
+    background: var(--nsp-accent);
+}
+
+.nap-ports-available {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--nsp-text-muted);
+}
+
+.nap-status-panel-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1.4rem;
+    border-top: 1px solid var(--nsp-border);
+    font-size: 0.78rem;
+    color: var(--nsp-text-muted);
+}
+
+.nap-status-panel-footer i {
+    margin-right: 0.35rem;
+    color: var(--nsp-accent);
+}
+
+.nap-status-panel-footer a {
+    color: var(--nsp-accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.nap-status-panel-footer a:hover {
+    text-decoration: underline;
+}
+
+.nap-status-panel .dash-empty {
+    padding: 2.5rem 1rem;
+}
+
+.nap-status-panel .dash-empty i {
+    color: #3c445c;
+}
+
+@media (max-width: 767.98px) {
+    .nap-status-panel-body {
+        flex-direction: column;
+    }
+
+    .nap-status-divider {
+        width: 100%;
+        height: 1px;
+        margin: 0.5rem 0;
+    }
+}
+
 /* GeoMap preview */
 .dash-map-preview-wrap {
     position: relative;

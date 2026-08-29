@@ -43,8 +43,15 @@ OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
 # doesn't reshuffle itself based on whatever order MySQL happens to
 # GROUP BY results in.
 NAP_STATUS_ORDER = ["active", "full", "maintenance", "inactive"]
-ISSUE_STATUS_ORDER = ["pending", "assigned", "in_progress", "resolved", "closed"]
-ISSUE_PRIORITY_ORDER = ["critical", "high", "medium", "low"]
+
+# Fixed colors for each NAP status, shared by the status-distribution
+# donut and its legend on the dashboard's NAP Status Summary panel.
+NAP_STATUS_COLORS = {
+    "active": "#22c55e",
+    "full": "#f59e0b",
+    "maintenance": "#f87171",
+    "inactive": "#9aa2ad",
+}
 
 
 @dashboard_bp.route("/")
@@ -128,39 +135,46 @@ def index():
     ).first()
     total_ports, used_ports = port_totals if port_totals else (0, 0)
     port_utilization_pct = round((used_ports / total_ports) * 100, 1) if total_ports else 0
+    ports_available = total_ports - used_ports
 
-    # ---------------------------------------------------------------
-    # TECHNICAL ISSUE STATUS SUMMARY (+ priority breakdown)
-    # ---------------------------------------------------------------
-
-    issue_status_rows = db.session.execute(
-        db.select(TechnicalIssue.status, func.count(TechnicalIssue.id)).group_by(
-            TechnicalIssue.status
+    # Donut-chart segments for the NAP status ring on the redesigned
+    # "NAP Status Summary" panel: each status's share of the ring
+    # (start/end expressed as a cumulative % of the full circle) plus
+    # the color it should render in, so the template can build a
+    # single CSS conic-gradient() without doing any math itself.
+    cumulative_pct = 0.0
+    nap_status_segments = []
+    for row in nap_status_summary:
+        pct = (row["count"] / total_naps * 100) if total_naps else 0
+        nap_status_segments.append(
+            {
+                "status": row["status"],
+                "count": row["count"],
+                "pct": round(pct, 1),
+                "color": NAP_STATUS_COLORS[row["status"]],
+                "start": round(cumulative_pct, 4),
+                "end": round(cumulative_pct + pct, 4),
+            }
         )
-    ).all()
-    issue_status_counts = {status: count for status, count in issue_status_rows}
-    total_issues = sum(issue_status_counts.values())
-    issue_status_summary = [
-        {
-            "status": status,
-            "count": issue_status_counts.get(status, 0),
-            "pct": round((issue_status_counts.get(status, 0) / total_issues) * 100)
-            if total_issues
-            else 0,
-        }
-        for status in ISSUE_STATUS_ORDER
-    ]
+        cumulative_pct += pct
 
-    issue_priority_rows = db.session.execute(
-        db.select(TechnicalIssue.priority, func.count(TechnicalIssue.id))
-        .where(TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES))
-        .group_by(TechnicalIssue.priority)
-    ).all()
-    issue_priority_counts = {priority: count for priority, count in issue_priority_rows}
-    issue_priority_summary = [
-        {"priority": priority, "count": issue_priority_counts.get(priority, 0)}
-        for priority in ISSUE_PRIORITY_ORDER
+    conic_stops = [
+        f"{segment['color']} {segment['start']}% {segment['end']}%"
+        for segment in nap_status_segments
+        if segment["pct"] > 0
     ]
+    nap_status_conic_gradient = ", ".join(conic_stops) if conic_stops else "#232c47 0% 100%"
+
+    # Simple health read on overall port utilization, shown as a badge
+    # next to the port-utilization gauge.
+    if total_naps == 0:
+        port_health_label, port_health_class = "No Data", "nap-health-neutral"
+    elif port_utilization_pct >= 90:
+        port_health_label, port_health_class = "Critical", "nap-health-critical"
+    elif port_utilization_pct >= 75:
+        port_health_label, port_health_class = "Near Full", "nap-health-warning"
+    else:
+        port_health_label, port_health_class = "Healthy", "nap-health-good"
 
     # ---------------------------------------------------------------
     # RECENT REPORTED ISSUES (latest 5)
@@ -227,13 +241,15 @@ def index():
         "dashboard/index.html",
         summary_cards=summary_cards,
         nap_status_summary=nap_status_summary,
+        nap_status_segments=nap_status_segments,
+        nap_status_conic_gradient=nap_status_conic_gradient,
         total_naps=total_naps,
         total_ports=total_ports,
         used_ports=used_ports,
+        ports_available=ports_available,
         port_utilization_pct=port_utilization_pct,
-        issue_status_summary=issue_status_summary,
-        issue_priority_summary=issue_priority_summary,
-        total_issues=total_issues,
+        port_health_label=port_health_label,
+        port_health_class=port_health_class,
         recent_issues=recent_issues,
         recent_naps=recent_naps,
         technician_workload=technician_workload,
