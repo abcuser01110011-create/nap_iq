@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ApiError, type CustomerIssue, type Payment, type ServiceRequest, type Subscriber } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme/customer";
+import type { CustomerStackParamList } from "../../navigation/RootNavigator";
 
 const OPEN_ISSUE_STATUSES = new Set(["pending", "assigned", "accepted", "in_progress"]);
 const PENDING_REQUEST_STATUSES = new Set(["pending", "approved", "scheduled"]);
@@ -82,30 +85,65 @@ function PendingApplicationCard({
   );
 }
 
+// Phase 30: shown instead of an error whenever the signed-in account
+// has no subscriber yet — a perfectly normal state now that
+// registration no longer requires applying for service up front,
+// not a failure to recover from.
+function NoSubscriberCard({ onApply }: { onApply: () => void }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardLabel}>Service</Text>
+      <Text style={styles.cardValue}>You're not subscribed yet</Text>
+      <Text style={styles.trackerMessage}>
+        Your account is all set. Apply for service whenever you're ready to get connected.
+      </Text>
+      <TouchableOpacity style={styles.applyButton} onPress={onApply}>
+        <Text style={styles.applyButtonText}>Apply for service</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { client, user } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<CustomerStackParamList>>();
   const [subscriber, setSubscriber] = useState<Subscriber | null>(null);
   const [issues, setIssues] = useState<CustomerIssue[]>([]);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Distinct from `error`: a 404 from client.customer.me() just means
+  // "no subscriber on file yet", which is an expected state for a
+  // freshly-registered account now, not something to show as an error.
+  const [noSubscriber, setNoSubscriber] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
+    setNoSubscriber(false);
     try {
-      const [{ subscriber }, { issues }, { service_requests }, { payments }] = await Promise.all([
-        client.customer.me(),
+      const { subscriber } = await client.customer.me();
+      setSubscriber(subscriber);
+
+      // Only fetch the rest of the dashboard once we know there's a
+      // subscriber to fetch it for — these all 404 the same way me()
+      // does otherwise.
+      const [{ issues }, { service_requests }, { payments }] = await Promise.all([
         client.customer.listIssues(),
         client.customer.listServiceRequests(),
         client.customer.listPayments(),
       ]);
-      setSubscriber(subscriber);
       setIssues(issues);
       setRequests(service_requests);
       setPayments(payments);
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 404) {
+        setSubscriber(null);
+        setIssues([]);
+        setRequests([]);
+        setPayments([]);
+        setNoSubscriber(true);
+      } else if (err instanceof ApiError) {
         setError(err.body.error ?? "Couldn't load your account.");
       }
     }
@@ -114,6 +152,15 @@ export default function HomeScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Re-check whenever the Apply for service screen closes (whether it
+  // just created the application or the person backed out) so a
+  // freshly-submitted application shows up without a manual pull-to-
+  // refresh.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", load);
+    return unsubscribe;
+  }, [navigation, load]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -128,7 +175,7 @@ export default function HomeScreen() {
   const isPendingReview = subscriber?.status === "pending_review";
   // Phase 29: `requests` comes back newest-first (Subscriber.service_
   // requests' own ordering — see app/models.py), so the *last*
-  // 'new_installation' entry is the original one Phase 26's register()
+  // 'new_installation' entry is the original one register()/apply()
   // created — the one whose lifecycle the tracker follows, even if the
   // customer has since filed other request types.
   const installRequests = requests.filter((r) => r.request_type === "new_installation");
@@ -143,7 +190,9 @@ export default function HomeScreen() {
       <Text style={styles.greeting}>Hi, {user?.full_name ?? "there"}</Text>
       {error && <Text style={styles.error}>{error}</Text>}
 
-      {isPendingReview && subscriber ? (
+      {noSubscriber ? (
+        <NoSubscriberCard onApply={() => navigation.navigate("ApplyForService")} />
+      ) : isPendingReview && subscriber ? (
         <PendingApplicationCard subscriber={subscriber} installRequest={installRequest} />
       ) : (
         <>
@@ -241,4 +290,12 @@ const styles = StyleSheet.create({
   trackerLabel: { color: colors.textFaint, fontSize: 11, marginTop: 6, fontWeight: "600" },
   trackerLabelActive: { color: colors.primary },
   trackerMessage: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 12 },
+  applyButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  applyButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
 });

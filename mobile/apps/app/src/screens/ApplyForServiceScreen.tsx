@@ -13,14 +13,15 @@ import {
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { ApiError } from "@nap-iq/api-client";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
 import FloatingLabelInput from "../components/FloatingLabelInput";
-import type { AuthStackParamList } from "../navigation/RootNavigator";
+import type { CustomerStackParamList } from "../navigation/RootNavigator";
 
 type LatLng = { latitude: number; longitude: number };
 
-type Props = NativeStackScreenProps<AuthStackParamList, "ApplyForService">;
+type Props = NativeStackScreenProps<CustomerStackParamList, "ApplyForService">;
 
 type Step = "location" | "plan" | "details";
 
@@ -110,12 +111,13 @@ function buildMapHtml(center: LatLng) {
   `;
 }
 
-export default function ApplyForServiceScreen({ navigation, route }: Props) {
-  const { register, lastError } = useAuth();
-  // Username/password were already collected on RegisterScreen — this
-  // screen only ever gets reached with them in the route params, and
-  // just carries them forward to the final register() call below.
-  const { username, password } = route.params;
+export default function ApplyForServiceScreen({ navigation }: Props) {
+  // Phase 30: reached only from a signed-in account's dashboard (see
+  // HomeScreen's "Apply for service" prompt) — there's no
+  // username/password to carry through anymore, since register()
+  // already created and signed in the account before this screen was
+  // ever reachable.
+  const { client } = useAuth();
 
   const [step, setStep] = useState<Step>("location");
   const [pin, setPin] = useState<LatLng | null>(null);
@@ -161,10 +163,6 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
   const [localError, setLocalError] = useState<string | null>(null);
 
   const webviewRef = useRef<WebView>(null);
-
-  // Same client instance AuthContext already built, reached through
-  // useAuth so this screen doesn't construct a second one.
-  const { client } = useAuth();
 
   const focusMapOnFix = (lat: number, lng: number, acc: number | null) => {
     webviewRef.current?.injectJavaScript(
@@ -323,9 +321,7 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
     }
     setSubmitting(true);
     try {
-      await register({
-        username: username.trim(),
-        password,
+      await client.customer.apply({
         full_name: fullName.trim(),
         email: email.trim() || undefined,
         phone_number: phone.trim() || undefined,
@@ -334,6 +330,17 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
         address: address.trim() || undefined,
         plan_name: selectedPlan ?? undefined,
       });
+      // Application's on file — head back to the dashboard, which
+      // will now load the subscriber it just created instead of
+      // showing the "Apply for service" prompt.
+      navigation.goBack();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const firstFieldError = err.body.errors ? Object.values(err.body.errors)[0] : undefined;
+        setLocalError(err.body.error ?? firstFieldError ?? "Couldn't submit your application. Please try again.");
+      } else {
+        setLocalError("Couldn't reach the server. Check your connection.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -376,7 +383,7 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
           )}
 
           {geoState === "error" && geoError && <Text style={styles.error}>{geoError}</Text>}
-          {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
+          {localError && <Text style={styles.error}>{localError}</Text>}
 
           <TouchableOpacity
             style={[styles.button, geoState === "requesting" && styles.buttonDisabled]}
@@ -408,8 +415,8 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.navigate("Login")}>
-            <Text style={styles.link}>Already have an account? Sign in</Text>
+          <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.goBack()}>
+            <Text style={styles.link}>Not now — back to dashboard</Text>
           </TouchableOpacity>
 
           <Modal
@@ -544,7 +551,7 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
 
               <FloatingLabelInput label="Phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
 
-              {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
+              {localError && <Text style={styles.error}>{localError}</Text>}
 
               <TouchableOpacity
                 style={[
@@ -559,8 +566,8 @@ export default function ApplyForServiceScreen({ navigation, route }: Props) {
             </>
           )}
 
-          <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.navigate("Login")}>
-            <Text style={styles.link}>Already have an account? Sign in</Text>
+          <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.goBack()}>
+            <Text style={styles.link}>Not now — back to dashboard</Text>
           </TouchableOpacity>
         </ScrollView>
       )}

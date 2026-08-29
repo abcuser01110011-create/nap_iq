@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   View,
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
 import FloatingLabelInput from "../components/FloatingLabelInput";
 import PasswordInput from "../components/PasswordInput";
@@ -16,34 +18,40 @@ import type { AuthStackParamList } from "../navigation/RootNavigator";
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 
 /**
- * First step of self-service sign-up — just enough to identify the
- * new account (username + password). There's no "confirm password"
- * field here on purpose: this screen doesn't create the account by
- * itself, it just captures credentials and hands them to
- * ApplyForServiceScreen, which is where they're actually submitted
- * to the backend together with the rest of the application (name,
- * install address, plan, etc.) since register() requires all of
- * that in one call. A brand-new account has no subscription yet, so
- * "Apply for service" is the only next step worth offering here.
+ * Pure self-service sign-up (Phase 30) — just enough to create an
+ * account (username + password). There's no "confirm password" field
+ * here on purpose, same as before. Unlike the pre-Phase-30 version,
+ * this screen creates the account itself by calling register()
+ * directly: a successful register() signs the new account straight
+ * in, and RootNavigator then drops it onto the dashboard, where
+ * "Apply for service" is offered as an optional next step (see
+ * HomeScreen) rather than being required before the account exists.
+ * The account is saved server-side either way, so this same
+ * username/password can log back in later even if the person never
+ * applies for service.
  */
 export default function RegisterScreen({ navigation }: Props) {
+  const { register, lastError } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const canContinue = username.trim().length > 0 && password.length > 0;
 
-  const handleApplyForService = () => {
+  const handleRegister = async () => {
     if (!canContinue) return;
     if (password.length < 8) {
       setLocalError("Password must be at least 8 characters.");
       return;
     }
     setLocalError(null);
-    navigation.navigate("ApplyForService", {
-      username: username.trim(),
-      password,
-    });
+    setSubmitting(true);
+    try {
+      await register({ username: username.trim(), password });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -70,19 +78,19 @@ export default function RegisterScreen({ navigation }: Props) {
           value={password}
           onChangeText={setPassword}
           returnKeyType="done"
-          onSubmitEditing={handleApplyForService}
+          onSubmitEditing={handleRegister}
         />
 
-        {localError && <Text style={styles.error}>{localError}</Text>}
+        {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
 
-        <Text style={styles.hint}>You don't have an active subscription yet — apply for service to get connected.</Text>
+        <Text style={styles.hint}>You don't have an active subscription yet — you can apply for service from your dashboard after creating your account.</Text>
 
         <TouchableOpacity
-          style={[styles.button, !canContinue && styles.buttonDisabled]}
-          onPress={handleApplyForService}
-          disabled={!canContinue}
+          style={[styles.button, (!canContinue || submitting) && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={!canContinue || submitting}
         >
-          <Text style={styles.buttonText}>Apply for service</Text>
+          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create account</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.navigate("Login")}>

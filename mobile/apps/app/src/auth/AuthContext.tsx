@@ -29,10 +29,12 @@ interface AuthContextValue {
   role: AppRole | null;
   client: ApiClient;
   login: (username: string, password: string) => Promise<void>;
-  /** Phase 26 — self-service registration. On success behaves exactly
-   * like login(): stores the returned tokens/user and flips status to
-   * signedIn, landing a brand-new (pending_review) customer straight
-   * on their status screen instead of back at the login form. */
+  /** Phase 30 — pure self-service registration (username + password
+   * only). On success behaves exactly like login(): stores the
+   * returned tokens/user and flips status to signedIn, landing a
+   * brand-new account straight on the dashboard, where "Apply for
+   * service" is offered as a next step rather than required up
+   * front. */
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   /** Surfaced so the login/register screens can show a friendly
