@@ -323,3 +323,51 @@
 [data-bs-theme="dark"] .leaflet-control-attribution a {
     color: #c3b8fb;
 }
+
+/* =====================================================================
+   Post-login toasts (.flash-stack, style.css) -- dark mode
+   ---------------------------------------------------------------------
+   The glassy, translucent, light-colored-text treatment these toasts
+   used to always have (matching the login page's own always-dark
+   .login-flash toasts) -- kept here for dark mode only, since it
+   reads fine against this theme's near-black surfaces. Light mode
+   uses its own solid, dark-text version defined in style.css.
+   ===================================================================== */
+[data-bs-theme="dark"] .flash-stack .alert {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.45);
+}
+
+[data-bs-theme="dark"] .flash-stack .alert-success {
+    background: rgba(25, 135, 84, 0.16);
+    border-color: rgba(25, 135, 84, 0.4);
+    color: #a9f0cd;
+}
+
+[data-bs-theme="dark"] .flash-stack .alert-danger {
+    background: rgba(220, 53, 69, 0.16);
+    border-color: rgba(220, 53, 69, 0.4);
+    color: #ffc2c9;
+}
+
+[data-bs-theme="dark"] .flash-stack .alert-warning {
+    background: rgba(255, 193, 7, 0.16);
+    border-color: rgba(255, 193, 7, 0.4);
+    color: #ffe29a;
+}
+
+[data-bs-theme="dark"] .flash-stack .alert-info {
+    background: rgba(13, 202, 240, 0.16);
+    border-color: rgba(13, 202, 240, 0.4);
+    color: #9eeaf9;
+}
+
+/* Bootstrap's default .btn-close is a dark glyph, made for light
+   backgrounds -- invisible against these dark, translucent toasts.
+   Same fix Bootstrap's own .btn-close-white utility uses. Only needed
+   in dark mode -- light mode's solid, pale alert backgrounds show the
+   default dark glyph just fine. */
+[data-bs-theme="dark"] .flash-stack .btn-close {
+    filter: invert(1) grayscale(1) brightness(200%);
+}

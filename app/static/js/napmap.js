@@ -2198,7 +2198,7 @@
         setTimeout(() => {
             const el = document.getElementById(alertId);
             if (el) bootstrap.Alert.getOrCreateInstance(el).close();
-        }, 6000);
+        }, 3000);
     }
 
     // ---------------- Report an Issue from map click ----------------
