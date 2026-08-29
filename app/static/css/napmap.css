@@ -1098,3 +1098,15 @@
     font-size: 0.85rem;
     padding: 0.5rem 0;
 }
+
+/* Spins the "Refresh" button's icon while a manual refresh is in
+   flight (see setupManualRefresh() in napmap.js). */
+@keyframes napmap-refresh-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.napmap-refresh-spinning {
+    animation: napmap-refresh-spin 0.6s linear infinite;
+    display: inline-block;
+}

@@ -57,6 +57,16 @@
     const ICON_MIN_SCALE_ZOOM = 8;
     const ICON_MIN_SCALE = 0.35;
 
+    // Live refresh: how often the map silently re-fetches /api/naps,
+    // /api/issues, and /api/subscribers and re-renders, so a NAP or
+    // subscriber added elsewhere shows up here without a manual
+    // reload. This timer is only a background safety net -- the
+    // instant paths are the "Refresh" button and the tab-focus
+    // listener set up in init(), both of which call refreshLiveData()
+    // immediately instead of waiting for this interval to elapse. See
+    // refreshLiveData()'s docstring below for the full rationale.
+    const LIVE_REFRESH_INTERVAL_MS = 15000;
+
     /** Current icon scale factor (0 < scale <= 1) for the live map zoom. */
     function getIconScale() {
         if (!map) return 1;
@@ -452,6 +462,19 @@
         setupQuickAdd();
         setupReportIssue();
         setupNapDetailPanel();
+        setupManualRefresh();
+
+        // Background safety net -- see refreshLiveData()'s docstring.
+        setInterval(refreshLiveData, LIVE_REFRESH_INTERVAL_MS);
+
+        // Instant catch-up the moment this tab becomes the active one
+        // again (e.g. added a subscriber on another page/tab, then
+        // switched back here) instead of waiting for the interval
+        // above to eventually get to it.
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) refreshLiveData();
+        });
+        window.addEventListener("focus", () => refreshLiveData());
     }
 
     /** Rebuilds the NAP, issue, and subscriber marker layers. */
@@ -459,6 +482,82 @@
         renderNapMarkers();
         renderIssueMarkers();
         renderSubscriberMarkers();
+    }
+
+    /**
+     * Keeps the GeoMap current without requiring a manual browser
+     * reload. Data can change out from under this page in ways it has
+     * no other way of knowing about -- a subscriber added on the
+     * Subscribers page, a NAP added from another session, an issue
+     * reported, a payment flipping a connected line's status, etc. --
+     * since loadNaps()/loadIssues()/loadSubscribers() previously only
+     * ever ran once, in init(). This re-runs all three and
+     * re-renders every marker layer, the two <datalist>-backing
+     * selects, and -- if a NAP's detail panel is currently open --
+     * that panel's own numbers (slot usage, connected lines), so it
+     * never sits frozen at whatever it showed the moment it was
+     * opened.
+     *
+     * Called from three places, in increasing order of "how fast does
+     * this need to feel":
+     *   - LIVE_REFRESH_INTERVAL_MS timer (init()) -- a background
+     *     safety net for a tab that's just been sitting open;
+     *   - the tab regaining focus/visibility (init()) -- covers the
+     *     common "added something on another page/tab, switched back
+     *     here" case within a moment of switching, not up to 15s later;
+     *   - the "Refresh" button (setupManualRefresh()) -- immediate, on
+     *     demand, for "I just added this, show it to me now".
+     *
+     * `force` (true only for the button) skips the "don't interrupt
+     * an in-progress form" guards below, since a person who explicitly
+     * clicked Refresh is not mid-interaction with the Quick Add/Report
+     * Issue modals by definition -- those guards exist for the timer
+     * and focus paths, which fire without the person asking for them.
+     */
+    async function refreshLiveData(force) {
+        if (!force) {
+            if (document.hidden) return;
+            if (addModeActive || issueModeActive) return;
+            const quickAddModalEl = document.getElementById("quickAddModal");
+            const reportIssueModalEl = document.getElementById("reportIssueModal");
+            if (quickAddModalEl && quickAddModalEl.classList.contains("show")) return;
+            if (reportIssueModalEl && reportIssueModalEl.classList.contains("show")) return;
+        }
+
+        const previouslyOpenNapId = openNapDetailNapId;
+
+        await Promise.all([loadNaps(), loadIssues(), loadSubscribers()]);
+
+        renderAll();
+        populateNapSelectForIssue();
+        populateSubscriberSelect();
+
+        if (previouslyOpenNapId !== null) {
+            const updatedNap = findNapById(previouslyOpenNapId);
+            if (updatedNap) {
+                populateNapDetailPanel(updatedNap);
+            } else {
+                closeNapDetailPanel();
+            }
+        }
+    }
+
+    /** Wires up the floating "Refresh" button for an immediate,
+     * on-demand data refresh -- see refreshLiveData()'s docstring. */
+    function setupManualRefresh() {
+        const btn = document.getElementById("mapRefreshBtn");
+        if (!btn) return;
+        const icon = btn.querySelector("i");
+        btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            if (icon) icon.classList.add("napmap-refresh-spinning");
+            try {
+                await refreshLiveData(true);
+            } finally {
+                btn.disabled = false;
+                if (icon) icon.classList.remove("napmap-refresh-spinning");
+            }
+        });
     }
 
     /**
