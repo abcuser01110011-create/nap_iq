@@ -6,16 +6,17 @@ import { colors } from "../theme/shared";
  * Sign-in / sign-out loading overlay — a mobile port of the website's
  * static/css/auth-transition.css + static/js/auth-transition.js.
  *
- * Same idea as the web version: a full-screen branded overlay with a
- * pulsing logo, a step list that advances on a timer, and a progress
- * bar that fills over a fixed minimum duration. Unlike the website
- * (which delays a real <form> submit behind the animation), this
- * component doesn't own the network call — the screen that renders it
- * is expected to run the real request and the minimum-duration timer
- * side by side (e.g. via Promise.all) and stop passing `visible` once
- * both are done. That way a slow request never gets cut off early,
- * and a fast one still gets the full minimum "showtime" instead of a
- * jarring flash.
+ * A full-screen branded overlay that fades in, shows a gently
+ * pulsing logo and a progress bar that fills over `durationMs`, then
+ * fades back out. This component doesn't own the network call — the
+ * screen that renders it is expected to run the real request and a
+ * matching minimum-duration timer side by side (e.g. via
+ * Promise.all) and stop passing `visible` once both are done. That
+ * way a slow request never gets cut off early, and a fast one still
+ * gets the full minimum "showtime" instead of a jarring flash.
+ * `durationMs` is expected to come from the caller's own
+ * network-quality check (see utils/networkQuality.ts) so the bar's
+ * pace roughly matches how long the real request is likely to take.
  *
  * Rendered with shared/brand colors (not the signed-in role's theme)
  * since it's shown both before login (no role known yet) and during
@@ -24,146 +25,81 @@ import { colors } from "../theme/shared";
 
 export type AuthTransitionKind = "signin" | "signout";
 
-const CONFIGS: Record<AuthTransitionKind, { title: string; steps: string[] }> = {
-  signin: {
-    title: "Signing you in",
-    steps: ["Verifying credentials", "Establishing secure tunnel", "Syncing topology"],
-  },
-  signout: {
-    title: "Signing out",
-    steps: ["Closing active session", "Clearing local cache"],
-  },
+const TITLES: Record<AuthTransitionKind, string> = {
+  signin: "Signing you in",
+  signout: "Signing out",
 };
 
 const ACCENT = "#5B8CFF";
-const RING_SIZE = 128;
-
-interface PingRingProps {
-  delayMs: number;
-}
-
-function PingRing({ delayMs }: PingRingProps) {
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    anim.setValue(0);
-    const loop = Animated.loop(
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 600,
-        delay: delayMs,
-        easing: Easing.bezier(0.2, 0.6, 0.4, 1),
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [anim, delayMs]);
-
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1.35] });
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
-
-  return <Animated.View pointerEvents="none" style={[styles.ping, { transform: [{ scale }], opacity }]} />;
-}
 
 export interface AuthTransitionOverlayProps {
   visible: boolean;
   kind: AuthTransitionKind;
   /** Should match the minimum-duration timer the caller races the
-   * real request against, so the step list finishes right as the
-   * overlay is about to be dismissed. Defaults to 3000ms — same as
-   * the website's DURATION_MS. */
+   * real request against, so the progress bar finishes right as the
+   * overlay is about to be dismissed. Pass a value from
+   * utils/networkQuality.ts to size this to the current connection;
+   * defaults to 3000ms if the caller doesn't have one to hand. */
   durationMs?: number;
 }
 
 export default function AuthTransitionOverlay({ visible, kind, durationMs = 3000 }: AuthTransitionOverlayProps) {
-  const config = CONFIGS[kind];
+  const title = TITLES[kind];
   const fade = useRef(new Animated.Value(0)).current;
-  const breathe = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
   const progress = useRef(new Animated.Value(0)).current;
-  const [activeStep, setActiveStep] = useState(0);
+  // Kept mounted for the ~250ms fade-out, then removed — rather than
+  // vanishing the instant `visible` flips false.
+  const [rendered, setRendered] = useState(visible);
 
-  // Breathing icon loop — runs continuously regardless of visibility
-  // so it's never mid-flicker when the overlay fades in.
+  // Logo fade pulse loop — runs continuously regardless of overlay
+  // visibility so it's never mid-flicker when the overlay fades in.
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.45, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [breathe]);
+  }, [pulse]);
 
   useEffect(() => {
-    if (!visible) {
-      fade.setValue(0);
+    if (visible) {
+      setRendered(true);
       progress.setValue(0);
-      setActiveStep(0);
+      Animated.timing(fade, { toValue: 1, duration: 250, easing: Easing.ease, useNativeDriver: true }).start();
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: durationMs,
+        easing: Easing.linear,
+        useNativeDriver: false, // width can't use the native driver
+      }).start();
       return;
     }
 
-    Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: durationMs,
-      easing: Easing.linear,
-      useNativeDriver: false, // width can't use the native driver
-    }).start();
-
-    const stepCount = config.steps.length;
-    const timers = Array.from({ length: stepCount }, (_, index) => {
-      const atTime = Math.round((durationMs * (index + 1)) / (stepCount + 1));
-      return setTimeout(() => setActiveStep(index + 1), atTime);
+    Animated.timing(fade, { toValue: 0, duration: 250, easing: Easing.ease, useNativeDriver: true }).start(() => {
+      setRendered(false);
     });
+  }, [visible, durationMs, fade, progress]);
 
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, durationMs, kind]);
+  if (!rendered) return null;
 
-  if (!visible) return null;
-
-  const iconScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] });
   const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
 
   return (
     <Animated.View style={[styles.overlay, { opacity: fade }]}>
       <View style={styles.panel}>
-        <View style={styles.ringWrap}>
-          <PingRing delayMs={0} />
-          <PingRing delayMs={300} />
-          <Animated.View style={[styles.iconBox, { transform: [{ scale: iconScale }] }]}>
-            <Image
-              source={require("../../assets/auth-transition-logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
-        </View>
+        <Animated.View style={[styles.iconBox, { opacity: pulse }]}>
+          <Image
+            source={require("../../assets/auth-transition-logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </Animated.View>
 
-        <Text style={styles.title}>{config.title}</Text>
-
-        <View style={styles.steps}>
-          {config.steps.map((label, index) => {
-            const state = index < activeStep ? "done" : index === activeStep ? "active" : "pending";
-            return (
-              <View key={label} style={styles.step}>
-                <View
-                  style={[
-                    styles.stepIcon,
-                    state === "active" && styles.stepIconActive,
-                    state === "done" && styles.stepIconDone,
-                  ]}
-                >
-                  {state === "done" && <Text style={styles.stepCheck}>{"\u2713"}</Text>}
-                  {state === "active" && <View style={styles.stepDot} />}
-                </View>
-                <Text style={[styles.stepLabel, state !== "pending" && styles.stepLabelActive]}>{label}</Text>
-              </View>
-            );
-          })}
-        </View>
+        <Text style={styles.title}>{title}</Text>
 
         <View style={styles.progressTrack}>
           <Animated.View style={[styles.progressBar, { width: barWidth }]} />
@@ -186,26 +122,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
   },
-  ringWrap: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 24,
-  },
-  ping: {
-    position: "absolute",
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
-    borderWidth: 2.5,
-    borderColor: "rgba(91, 140, 255, 0.55)",
-  },
   iconBox: {
     width: 90,
     height: 100,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 24,
   },
   logo: {
     width: "100%",
@@ -215,51 +137,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "700",
-    marginBottom: 18,
-  },
-  steps: {
-    alignSelf: "flex-start",
     marginBottom: 22,
-  },
-  step: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 9,
-  },
-  stepIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: "rgba(91, 140, 255, 0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-  stepIconActive: {
-    borderColor: ACCENT,
-  },
-  stepIconDone: {
-    backgroundColor: ACCENT,
-    borderColor: ACCENT,
-  },
-  stepCheck: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  stepDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: ACCENT,
-  },
-  stepLabel: {
-    color: "rgba(226, 232, 255, 0.55)",
-    fontSize: 13.5,
-  },
-  stepLabelActive: {
-    color: "rgba(226, 232, 255, 0.9)",
   },
   progressTrack: {
     width: 220,

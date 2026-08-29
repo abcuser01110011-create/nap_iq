@@ -1,51 +1,85 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
-import { colors } from "../theme/shared";
-import FloatingLabelInput from "../components/FloatingLabelInput";
-import PasswordInput from "../components/PasswordInput";
 import AuthTransitionOverlay from "../components/AuthTransitionOverlay";
+import { AUTH_COLORS, authScreenStyles as styles } from "../theme/authScreen";
+import { getNetworkQualityDuration } from "../utils/networkQuality";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
 
-/** Matches AuthTransitionOverlay's default — kept as a constant here
- * too since the screen needs the same number to race against the
- * real login() call. */
-const AUTH_TRANSITION_MS = 3000;
+/** Fallback if the network-quality check hasn't resolved yet by the
+ * time the overlay needs a number (see handleSubmit) — matches
+ * AuthTransitionOverlay's own default. */
+const FALLBACK_TRANSITION_MS = 3000;
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 /**
- * One login screen for both technician and customer accounts — this
- * app no longer needs to ask which you are, or reject an otherwise-
- * valid account for being the "wrong" one. AuthContext derives the
- * role from the login response and RootNavigator routes accordingly.
+ * Mobile port of the website's dark "operations console" sign-in
+ * page (see app/templates/auth/login.html + static/css/login.css) —
+ * same near-black background, icon-prefixed fields, "Keep me signed
+ * in" checkbox and arrow submit button. Styles/colors live in
+ * theme/authScreen.ts, shared with RegisterScreen, so both cards are
+ * always exactly the same size and treatment.
+ *
+ * One difference from the website on purpose: the website's footer
+ * line ("Access is logged and restricted to authorized operators.")
+ * doesn't apply here, since this screen is also how new customers
+ * get in — so that slot is used for the existing "Don't have an
+ * account? Register now" link instead. Tapping it, and Register's
+ * "Already have an account?" link back, animate via the AuthStack's
+ * navigator-level slide transition (see RootNavigator.tsx) rather
+ * than anything owned by this screen.
+ *
+ * Still one login screen for both technician and customer accounts —
+ * this app doesn't ask which you are, or reject an otherwise-valid
+ * account for being the "wrong" one. AuthContext derives the role
+ * from the login response and RootNavigator routes accordingly.
  */
 export default function LoginScreen({ navigation }: Props) {
   const { login, lastError } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordHidden, setPasswordHidden] = useState(true);
+  // Cosmetic only, matching the website's checkbox: NAP-IQ's session
+  // is always persistent regardless of this toggle — there's no
+  // separate "short session" mode on the backend to opt out of, so
+  // this is kept checked by default and never sent anywhere.
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  // How long the overlay's progress bar takes to fill, sized to the
+  // device's current connection so a fast Wi-Fi/5G bar moves quickly
+  // and a slow/2G one gets more realistic showtime. Refreshed right
+  // before each submit rather than kept constantly in sync, since
+  // it's only ever read at that moment.
+  const [transitionMs, setTransitionMs] = useState(FALLBACK_TRANSITION_MS);
 
   const canSubmit = username.trim().length > 0 && password.length > 0 && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    const { durationMs } = await getNetworkQualityDuration().catch(() => ({
+      durationMs: FALLBACK_TRANSITION_MS,
+    }));
+    setTransitionMs(durationMs);
     setSubmitting(true);
     setTransitioning(true);
     // Run the real request alongside a minimum-showtime timer, same
     // idea as the website's fixed-delay overlay — a fast response
     // still gets the full animation, a slow one isn't cut short.
-    const minShowtime = new Promise((resolve) => setTimeout(resolve, AUTH_TRANSITION_MS));
+    const minShowtime = new Promise((resolve) => setTimeout(resolve, durationMs));
     try {
       await Promise.all([login(username.trim(), password), minShowtime]);
     } finally {
@@ -54,46 +88,112 @@ export default function LoginScreen({ navigation }: Props) {
     }
   };
 
+  const handleForgotPress = () => {
+    Alert.alert("Forgot password?", "Contact an administrator to reset your password.");
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>PG Networks</Text>
-        <Text style={styles.subtitle}>Sign in with your technician or customer account</Text>
+        <View style={styles.brand}>
+          <Image
+            source={require("../../assets/auth-transition-logo.png")}
+            style={styles.brandMark}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>PG Networks</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
+        </View>
 
-        <FloatingLabelInput
-          containerStyle={styles.input}
-          label="Username"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={username}
-          onChangeText={setUsername}
-          editable={!submitting}
-          returnKeyType="next"
-        />
-        <PasswordInput
-          containerStyle={styles.passwordWrap}
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          editable={!submitting}
-          returnKeyType="done"
-          onSubmitEditing={handleSubmit}
-        />
+        {lastError && (
+          <View style={styles.flash}>
+            <Ionicons name="alert-circle" size={16} color={AUTH_COLORS.dangerText} />
+            <Text style={styles.flashText}>{lastError}</Text>
+          </View>
+        )}
 
-        {lastError && <Text style={styles.error}>{lastError}</Text>}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Username</Text>
+          <View style={styles.fieldWrap}>
+            <Ionicons name="person-outline" size={17} color={AUTH_COLORS.icon} style={styles.fieldIcon} />
+            <TextInput
+              style={styles.fieldInput}
+              placeholder="Enter your username"
+              placeholderTextColor={AUTH_COLORS.placeholder}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              value={username}
+              onChangeText={setUsername}
+              editable={!submitting}
+              returnKeyType="next"
+            />
+          </View>
+        </View>
+
+        <View style={styles.field}>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>Password</Text>
+            <TouchableOpacity onPress={handleForgotPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.forgotLink}>Forgot?</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.fieldWrap}>
+            <Ionicons name="lock-closed-outline" size={17} color={AUTH_COLORS.icon} style={styles.fieldIcon} />
+            <TextInput
+              style={[styles.fieldInput, styles.fieldInputPassword]}
+              placeholder="Enter your password"
+              placeholderTextColor={AUTH_COLORS.placeholder}
+              secureTextEntry={passwordHidden}
+              autoComplete="password"
+              value={password}
+              onChangeText={setPassword}
+              editable={!submitting}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
+            />
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() => setPasswordHidden((prev) => !prev)}
+              accessibilityRole="button"
+              accessibilityLabel={passwordHidden ? "Show password" : "Hide password"}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={passwordHidden ? "eye-outline" : "eye-off-outline"}
+                size={18}
+                color={AUTH_COLORS.icon}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <TouchableOpacity
-          style={[styles.button, !canSubmit && styles.buttonDisabled]}
+          style={styles.remember}
+          onPress={() => setKeepSignedIn((prev) => !prev)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.rememberBox, keepSignedIn && styles.rememberBoxChecked]}>
+            {keepSignedIn && <Ionicons name="checkmark" size={12} color="#ffffff" />}
+          </View>
+          <Text style={styles.rememberLabel}>Keep me signed in on this device</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.submit, !canSubmit && styles.submitDisabled]}
           onPress={handleSubmit}
           disabled={!canSubmit}
         >
           {submitting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.buttonText}>Sign in</Text>
+            <>
+              <Text style={styles.submitText}>Sign in</Text>
+              <Ionicons name="arrow-forward" size={16} color="#ffffff" />
+            </>
           )}
         </TouchableOpacity>
 
@@ -102,68 +202,7 @@ export default function LoginScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
-      <AuthTransitionOverlay visible={transitioning} kind="signin" durationMs={AUTH_TRANSITION_MS} />
+      <AuthTransitionOverlay visible={transitioning} kind="signin" durationMs={transitionMs} />
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    justifyContent: "center",
-    padding: 24,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 24,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 26,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: colors.textFaint,
-    fontSize: 14,
-    marginBottom: 24,
-  },
-  input: {
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-  },
-  passwordWrap: {
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-  },
-  error: {
-    color: colors.danger,
-    marginBottom: 12,
-    fontSize: 13,
-  },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  linkWrap: {
-    marginTop: 18,
-    alignItems: "center",
-  },
-  link: {
-    color: colors.primary,
-    fontSize: 13,
-  },
-});

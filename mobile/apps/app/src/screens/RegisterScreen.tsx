@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
-import { colors } from "../theme/shared";
-import FloatingLabelInput from "../components/FloatingLabelInput";
-import PasswordInput from "../components/PasswordInput";
+import { AUTH_COLORS, authScreenStyles as styles } from "../theme/authScreen";
 import type { AuthStackParamList } from "../navigation/RootNavigator";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
@@ -29,15 +29,21 @@ type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
  * The account is saved server-side either way, so this same
  * username/password can log back in later even if the person never
  * applies for service.
+ *
+ * Styled to match LoginScreen — same card size, same icon fields,
+ * same brand mark — via the shared theme/authScreen.ts module so the
+ * two never drift apart. No "Forgot?" link or "Keep me signed in"
+ * checkbox here since neither applies to a brand-new account.
  */
 export default function RegisterScreen({ navigation }: Props) {
   const { register, lastError } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordHidden, setPasswordHidden] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const canContinue = username.trim().length > 0 && password.length > 0;
+  const canContinue = username.trim().length > 0 && password.length > 0 && !submitting;
 
   const handleRegister = async () => {
     if (!canContinue) return;
@@ -54,43 +60,100 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   };
 
+  const errorMessage = localError ?? lastError;
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>Choose a username and password to get started</Text>
+        <View style={styles.brand}>
+          <Image
+            source={require("../../assets/auth-transition-logo.png")}
+            style={styles.brandMark}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.subtitle}>Choose a username and password to get started</Text>
+        </View>
 
-        <FloatingLabelInput
-          containerStyle={styles.input}
-          label="Username"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={username}
-          onChangeText={setUsername}
-          returnKeyType="next"
-        />
-        <PasswordInput
-          containerStyle={styles.passwordWrap}
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          returnKeyType="done"
-          onSubmitEditing={handleRegister}
-        />
+        {errorMessage && (
+          <View style={styles.flash}>
+            <Ionicons name="alert-circle" size={16} color={AUTH_COLORS.dangerText} />
+            <Text style={styles.flashText}>{errorMessage}</Text>
+          </View>
+        )}
 
-        {(localError || lastError) && <Text style={styles.error}>{localError ?? lastError}</Text>}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Username</Text>
+          <View style={styles.fieldWrap}>
+            <Ionicons name="person-outline" size={17} color={AUTH_COLORS.icon} style={styles.fieldIcon} />
+            <TextInput
+              style={styles.fieldInput}
+              placeholder="Choose a username"
+              placeholderTextColor={AUTH_COLORS.placeholder}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              value={username}
+              onChangeText={setUsername}
+              editable={!submitting}
+              returnKeyType="next"
+            />
+          </View>
+        </View>
 
-        <Text style={styles.hint}>You don't have an active subscription yet — you can apply for service from your dashboard after creating your account.</Text>
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Password</Text>
+          <View style={styles.fieldWrap}>
+            <Ionicons name="lock-closed-outline" size={17} color={AUTH_COLORS.icon} style={styles.fieldIcon} />
+            <TextInput
+              style={[styles.fieldInput, styles.fieldInputPassword]}
+              placeholder="Choose a password"
+              placeholderTextColor={AUTH_COLORS.placeholder}
+              secureTextEntry={passwordHidden}
+              autoComplete="password"
+              value={password}
+              onChangeText={setPassword}
+              editable={!submitting}
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
+            />
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() => setPasswordHidden((prev) => !prev)}
+              accessibilityRole="button"
+              accessibilityLabel={passwordHidden ? "Show password" : "Hide password"}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={passwordHidden ? "eye-outline" : "eye-off-outline"}
+                size={18}
+                color={AUTH_COLORS.icon}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <Text style={styles.hint}>
+          You don't have an active subscription yet — you can apply for service from your dashboard after
+          creating your account.
+        </Text>
 
         <TouchableOpacity
-          style={[styles.button, (!canContinue || submitting) && styles.buttonDisabled]}
+          style={[styles.submit, !canContinue && styles.submitDisabled]}
           onPress={handleRegister}
-          disabled={!canContinue || submitting}
+          disabled={!canContinue}
         >
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create account</Text>}
+          {submitting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <>
+              <Text style={styles.submitText}>Create account</Text>
+              <Ionicons name="arrow-forward" size={16} color="#ffffff" />
+            </>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.linkWrap} onPress={() => navigation.navigate("Login")}>
@@ -100,70 +163,3 @@ export default function RegisterScreen({ navigation }: Props) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    justifyContent: "center",
-    padding: 24,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 24,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 26,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: colors.textFaint,
-    fontSize: 14,
-    marginBottom: 24,
-  },
-  input: {
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-  },
-  passwordWrap: {
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-  },
-  hint: {
-    color: colors.textFaint,
-    fontSize: 12,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  error: {
-    color: colors.danger,
-    marginBottom: 12,
-    fontSize: 13,
-  },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  linkWrap: {
-    marginTop: 18,
-    alignItems: "center",
-  },
-  link: {
-    color: colors.primary,
-    fontSize: 13,
-  },
-});

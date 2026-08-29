@@ -50,7 +50,16 @@ function AuthFlow() {
   return (
     <NavigationContainer>
       <StatusBar style="light" />
-      <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      {/* animation: "slide_from_right" makes pushing Register slide
+          the new screen in from the right (Login appears to slide
+          left underneath it), and — since native-stack automatically
+          reverses a screen's own transition on the way back out —
+          popping back to Login via "Already have an account?" slides
+          Register back out to the right. Set once here rather than
+          per-screen so both directions always stay in sync, and so
+          it's consistent across iOS/Android instead of relying on
+          each platform's differing default. */}
+      <AuthStack.Navigator screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
         <AuthStack.Screen name="Login" component={LoginScreen} />
         <AuthStack.Screen name="Register" component={RegisterScreen} />
       </AuthStack.Navigator>
