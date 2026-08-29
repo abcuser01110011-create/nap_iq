@@ -70,12 +70,25 @@ export default function LoginScreen({ navigation }: Props) {
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    const { durationMs } = await getNetworkQualityDuration().catch(() => ({
-      durationMs: FALLBACK_TRANSITION_MS,
-    }));
-    setTransitionMs(durationMs);
+    // Show the overlay the instant the button is pressed, using the
+    // fallback duration as a placeholder — *before* touching
+    // getNetworkQualityDuration(). That call goes through NetInfo's
+    // native module, and if it's ever slow, hangs, or throws before
+    // its own .catch can run (e.g. the native module not being
+    // linked in a given build), it must never be able to block the
+    // overlay from appearing at all. transitionMs is refined a
+    // moment later, in place, once/if the real reading comes back.
     setSubmitting(true);
     setTransitioning(true);
+    setTransitionMs(FALLBACK_TRANSITION_MS);
+
+    const durationMs = await getNetworkQualityDuration()
+      .then(({ durationMs }) => {
+        setTransitionMs(durationMs);
+        return durationMs;
+      })
+      .catch(() => FALLBACK_TRANSITION_MS);
+
     // Run the real request alongside a minimum-showtime timer, same
     // idea as the website's fixed-delay overlay — a fast response
     // still gets the full animation, a slow one isn't cut short.

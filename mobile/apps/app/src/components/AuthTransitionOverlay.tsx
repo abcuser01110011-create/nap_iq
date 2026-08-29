@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme/shared";
+import { Animated, Easing, Image, Modal, StyleSheet, Text, View } from "react-native";
+
+// Matches auth-transition.css's `.auth-transition-overlay { background:
+// #05091a; }` on the website exactly. Deliberately its own constant
+// rather than theme/shared.ts's colors.bg (#0B1F3A) -- that shared
+// color is a lighter navy used for the cold-start spinner screen, not
+// this overlay, and using it here made the overlay visibly diverge
+// from the website's near-black sign-in/sign-out transition.
+const OVERLAY_BG = "#05091a";
 
 /**
  * Sign-in / sign-out loading overlay — a mobile port of the website's
@@ -28,6 +35,19 @@ import { colors } from "../theme/shared";
  * and the connection tier already drives `durationMs` itself via
  * getNetworkQualityDuration()), so this intentionally leaves that one
  * row out rather than faking a number.
+ *
+ * Rendered inside a transparent, native <Modal> rather than as a
+ * plain sibling View. The website's overlay is appended straight to
+ * document.body (position: fixed; inset: 0), so it always covers the
+ * whole viewport no matter where in the page it was triggered from —
+ * including, on the logout side, over any nav chrome. A plain View
+ * can't reproduce that here: LoginScreen's call site sits outside any
+ * tab layout so it happened to look right, but the sign-out call
+ * sites (customer/technician ProfileScreen) live *inside* a bottom
+ * tab screen, so a plain View only ever covered that tab's content
+ * area and left the tab bar visible underneath. Modal renders as its
+ * own top-level native layer above the whole screen, tab bar and all
+ * -- the mobile equivalent of the website's document.body mount.
  *
  * Rendered with shared/brand colors (not the signed-in role's theme)
  * since it's shown both before login (no role known yet) and during
@@ -173,29 +193,43 @@ export default function AuthTransitionOverlay({ visible, kind, durationMs = 3000
   const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
 
   return (
-    <Animated.View style={[styles.overlay, { opacity: fade }]}>
-      <View style={styles.panel}>
-        <View style={styles.iconRing}>
-          <PingRing delayMs={0} />
-          <PingRing delayMs={PING_DELAY_MS} />
-          <Animated.View style={[styles.iconBox, { opacity: pulse }]}>
-            <Image
-              source={require("../../assets/auth-transition-logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </Animated.View>
+    <Modal
+      visible={rendered}
+      transparent
+      animationType="none"
+      // We drive the fade ourselves (via `fade` below) so the modal's
+      // own animation stays off. statusBarTranslucent + the
+      // navigationBarTranslucent-equivalent (Android draws the modal
+      // above both bars by default once translucent) is what gets
+      // this to actually cover the status bar too, matching the
+      // website overlay covering the browser chrome-adjacent area.
+      statusBarTranslucent
+      onRequestClose={() => {}}
+    >
+      <Animated.View style={[styles.overlay, { opacity: fade }]}>
+        <View style={styles.panel}>
+          <View style={styles.iconRing}>
+            <PingRing delayMs={0} />
+            <PingRing delayMs={PING_DELAY_MS} />
+            <Animated.View style={[styles.iconBox, { opacity: pulse }]}>
+              <Image
+                source={require("../../assets/auth-transition-logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          </View>
+
+          <Text style={styles.title}>{title}</Text>
+
+          <StepList steps={steps} durationMs={durationMs} active={visible} />
+
+          <View style={styles.progressTrack}>
+            <Animated.View style={[styles.progressBar, { width: barWidth }]} />
+          </View>
         </View>
-
-        <Text style={styles.title}>{title}</Text>
-
-        <StepList steps={steps} durationMs={durationMs} active={visible} />
-
-        <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressBar, { width: barWidth }]} />
-        </View>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </Modal>
   );
 }
 
@@ -204,7 +238,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
     elevation: 20,
-    backgroundColor: colors.bg,
+    backgroundColor: OVERLAY_BG,
     alignItems: "center",
     justifyContent: "center",
   },

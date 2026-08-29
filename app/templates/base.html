@@ -46,14 +46,6 @@
                     </a>
                 </li>
                 {% endif %}
-                {% if current_user and current_user.role == 'administrator' %}
-                <li class="nav-item">
-                    <a class="nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('users.') else '' }}"
-                       href="{{ url_for('users.list_users') }}">
-                        <i class="bi bi-people me-1"></i>Manage Users
-                    </a>
-                </li>
-                {% endif %}
                 {% if current_user and current_user.role in ('administrator', 'field_assistant') %}
                 <li class="nav-item">
                     <a class="nav-link {{ 'active' if request.endpoint == 'naps.list_naps' else '' }}"

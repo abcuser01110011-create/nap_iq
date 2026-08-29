@@ -87,13 +87,6 @@
                 {% endif %}
                 {% if current_user and current_user.role == 'administrator' %}
                 <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('users.') else '' }}"
-                       href="{{ url_for('users.list_users') }}">
-                        <i class="bi bi-people"></i><span>Manage Users</span>
-                    </a>
-                </li>
-
-                <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('issues.') else '' }}"
                        href="{{ url_for('issues.list_issues') }}">
                         <i class="bi bi-exclamation-triangle"></i><span>Issues</span>
