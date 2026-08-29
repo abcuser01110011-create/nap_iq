@@ -11,23 +11,38 @@ own record this way, same as the HTML portal.
 Routes:
     GET  /api/v1/customer/me                -> me
                                                 (own subscriber record + linked NAP)
+    POST /api/v1/customer/apply              -> apply
+                                                (Phase 30: apply for service —
+                                                 for an already-registered,
+                                                 signed-in account with no
+                                                 subscriber yet)
     GET  /api/v1/customer/issues             -> list_issues
     POST /api/v1/customer/issues             -> report_issue
     GET  /api/v1/customer/service-requests   -> list_service_requests
     GET  /api/v1/customer/payments           -> list_payments
 """
+import re
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import current_user
 
-from app.extensions import db
+from app.extensions import db, limiter
+from app.email_utils import consume_verification, is_email_verified
 from app.forms import ISSUE_TYPE_CHOICES
 from app.jwt_auth import jwt_role_required
-from app.models import Plan, Subscriber, TechnicalIssue
+from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue, User
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
 
 api_v1_customer_bp = Blueprint("api_v1_customer", __name__, url_prefix="/api/v1/customer")
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Same purpose string app/routes/api_v1/auth.py's send-verification-code
+# / verify-email-code endpoints already use — apply() is just the step
+# that used to be the second half of register() before Phase 30 split
+# them, so it reads/consumes verification records under that same
+# purpose rather than introducing a second one.
+_APPLICATION_EMAIL_PURPOSE = "registration"
 
 # Kept in sync by hand with app/forms.py's CustomerIssueReportForm —
 # same validation rule, just enforced here instead of by WTForms since
@@ -73,6 +88,56 @@ def list_plans():
     dropdowns already read from — see Plan's docstring in app/models.py."""
     plans = Plan.query.order_by(Plan.name).all()
     return jsonify(plans=[p.name for p in plans]), 200
+
+
+def _validate_application(data: dict) -> dict:
+    """Returns a field -> message dict of validation errors, empty if
+    the payload is clean. Same rules POST /api/v1/auth/register used
+    to enforce pre-Phase-30 for everything past username/password —
+    moved here as-is since applying for service, not creating the
+    login, is what these fields actually belong to.
+    """
+    errors = {}
+
+    full_name = str(data.get("full_name") or "").strip()
+    if not full_name or len(full_name) > 100:
+        errors["full_name"] = "Full name is required (max 100 characters)."
+
+    email = str(data.get("email") or "").strip() or None
+    if email:
+        if len(email) > 100 or not _EMAIL_RE.match(email):
+            errors["email"] = "Enter a valid email address."
+        elif current_user.email != email and User.query.filter_by(email=email).first() is not None:
+            errors["email"] = "This email is already registered."
+        elif not is_email_verified(email, purpose=_APPLICATION_EMAIL_PURPOSE):
+            # Applicant must have completed the send-code / verify-code
+            # exchange (POST /api/v1/auth/send-verification-code and
+            # /verify-email-code) for this exact email before the
+            # application can be submitted — see
+            # app/email_utils.py's is_email_verified().
+            errors["email"] = "Please verify this email address before submitting."
+    else:
+        errors["email"] = "Email is required so we can verify it and send you updates."
+
+    phone_number = str(data.get("phone_number") or "").strip() or None
+    if phone_number and len(phone_number) > 20:
+        errors["phone_number"] = "Phone number is too long."
+
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        errors["location"] = "A valid installation location (latitude/longitude) is required."
+
+    plan_name = str(data.get("plan_name") or "").strip() or None
+    if plan_name and Plan.query.filter_by(name=plan_name).first() is None:
+        errors["plan_name"] = "Selected plan is no longer available."
+
+    address = str(data.get("address") or "").strip() or None
+    if address and len(address) > 255:
+        errors["address"] = "Address is too long."
+
+    return errors
 
 
 def _own_subscriber_or_none():
@@ -155,6 +220,108 @@ def me():
     if subscriber is None:
         return _no_subscriber_response()
     return jsonify(subscriber=_serialize_subscriber(subscriber)), 200
+
+
+@api_v1_customer_bp.route("/apply", methods=["POST"])
+@jwt_role_required("user")
+# Same per-IP ceiling register() used pre-Phase-30 — applying for
+# service is still the spam/fake-application-prone step, even though
+# the account itself now exists beforehand.
+@limiter.limit(lambda: current_app.config["REGISTER_RATE_LIMIT_PER_IP"])
+def apply():
+    """Apply for service (Phase 30). Splits what POST /api/v1/auth/register
+    used to do in one step into its own call: this one runs for an
+    *already signed-in* account and creates the Subscriber (status
+    'pending_review' — see app/models.py's Subscriber.status comment)
+    and the ServiceRequest(request_type='new_installation') that puts
+    the application in front of staff, via the same
+    service_requests review queue (app/routes/service_requests.py)
+    staff-created requests already land in.
+
+    Refuses if the signed-in account already has a subscriber on file
+    — one application per account, same as before; a customer who
+    wants to change details on an existing application does that
+    through the existing service-request/profile flows, not a second
+    apply() call.
+
+    Re-checks coverage at submit time via app.nap_recommendation (not
+    just trusting whatever the app's earlier coverage-check call
+    said), same reasoning register() used to apply here.
+
+    Also fills in full_name/email/phone_number on the signed-in User
+    row itself, since the pure-registration step (POST
+    /api/v1/auth/register) never collected them — so applying for
+    service is also what completes the account's profile.
+    """
+    if _own_subscriber_or_none() is not None:
+        return jsonify(error="You already have an application on file."), 409
+
+    data = request.get_json(silent=True) or {}
+    errors = _validate_application(data)
+    if errors:
+        return jsonify(errors=errors), 400
+
+    latitude = float(data["latitude"])
+    longitude = float(data["longitude"])
+
+    if not recommend_naps(latitude, longitude, limit=1):
+        return (
+            jsonify(
+                error="Sorry, we don't currently have coverage at this location. "
+                "We'll notify you when service becomes available."
+            ),
+            422,
+        )
+
+    full_name = str(data.get("full_name")).strip()
+    email = str(data.get("email") or "").strip() or None
+    phone_number = str(data.get("phone_number") or "").strip() or None
+    plan_name = str(data.get("plan_name") or "").strip() or None
+    address = str(data.get("address") or "").strip() or None
+
+    current_user.full_name = full_name
+    current_user.email = email
+    current_user.phone_number = phone_number
+
+    subscriber = Subscriber(
+        # Temporary unique placeholder — current_user.id is already
+        # unique at this point, so this can never collide with a
+        # concurrent application the way a shared constant like
+        # "PENDING" could. Overwritten with the real SUB-#### code
+        # right after this row gets its own id.
+        subscriber_code=f"PENDING-{current_user.id}",
+        full_name=full_name,
+        address=address,
+        latitude=latitude,
+        longitude=longitude,
+        contact_number=phone_number,
+        email=email,
+        plan_type=plan_name,
+        nap_id=None,  # set later by admin via the existing assign-nap flow
+        user_id=current_user.id,
+        status="pending_review",
+    )
+    db.session.add(subscriber)
+    db.session.flush()  # assigns subscriber.id
+    subscriber.subscriber_code = f"SUB-{subscriber.id:04d}"
+
+    service_request = ServiceRequest(
+        request_type="new_installation",
+        subscriber_id=subscriber.id,
+        latitude=latitude,
+        longitude=longitude,
+        status="pending",
+        notes=f"Self-registered via mobile app. Plan requested: {plan_name or 'not specified'}.",
+    )
+    db.session.add(service_request)
+    db.session.commit()
+
+    # The email's verification record has now done its job — remove it
+    # so it can't be replayed against a second application.
+    if email:
+        consume_verification(email, purpose=_APPLICATION_EMAIL_PURPOSE)
+
+    return jsonify(subscriber=_serialize_subscriber(subscriber)), 201
 
 
 @api_v1_customer_bp.route("/issues", methods=["GET"])

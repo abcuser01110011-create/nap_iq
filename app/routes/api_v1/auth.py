@@ -8,14 +8,14 @@ in" under this scheme.
 
 Routes:
     POST /api/v1/auth/login    -> login    (credentials -> token pair)
-    POST /api/v1/auth/register -> register (Phase 26: new customer
-                                  self-registration -> auto-login)
+    POST /api/v1/auth/register -> register (Phase 30: pure username +
+                                  password account creation -> auto-login;
+                                  see app/routes/api_v1/customer.py's
+                                  apply() for the "apply for service"
+                                  step this used to include)
     POST /api/v1/auth/refresh  -> refresh  (refresh token -> new access token)
     POST /api/v1/auth/logout   -> logout   (revokes the presented token)
 """
-from app.extensions import db, limiter
-from app.jwt_auth import MOBILE_API_ROLES
-from app.models import RevokedToken, User, Subscriber
 import re
 
 from flask import Blueprint, current_app, jsonify, request
@@ -28,14 +28,8 @@ from flask_jwt_extended import (
 
 from app.extensions import db, limiter
 from app.jwt_auth import MOBILE_API_ROLES
-from app.models import Plan, RevokedToken, ServiceRequest, Subscriber, User
-from app.nap_recommendation import recommend_naps
-from app.email_utils import (
-    consume_verification,
-    is_email_verified,
-    send_verification_code,
-    verify_code,
-)
+from app.models import RevokedToken, User
+from app.email_utils import send_verification_code, verify_code
 
 api_v1_auth_bp = Blueprint("api_v1_auth", __name__, url_prefix="/api/v1/auth")
 
@@ -82,11 +76,17 @@ def _user_payload(user: User) -> dict:
 
 def _validate_registration(data: dict) -> dict:
     """Returns a field -> message dict of validation errors, empty if
-    the payload is clean. Mirrors the rules UserForm/AddUserForm
-    already enforce on the web side (app/forms.py) so an account
-    created here follows the exact same constraints as one an
-    administrator creates — just enforced by hand since this endpoint
-    takes JSON, not a WTForm post.
+    the payload is clean.
+
+    Phase 30 (pure registration): register() now only ever creates the
+    login itself — username + password. Everything else that used to
+    live here (full name, email + verification, phone, install
+    location, plan) moved to POST /api/v1/customer/apply
+    (app/routes/api_v1/customer.py's _validate_application()), which
+    runs *after* the account already exists and the applicant is
+    signed in. This keeps username/password validation identical to
+    before (still mirrors UserForm/AddUserForm in app/forms.py), it
+    just no longer requires the rest of an application to exist first.
     """
     errors = {}
 
@@ -99,45 +99,6 @@ def _validate_registration(data: dict) -> dict:
     password = str(data.get("password") or "")
     if len(password) < 8:
         errors["password"] = "Password must be at least 8 characters."
-
-    full_name = str(data.get("full_name") or "").strip()
-    if not full_name or len(full_name) > 100:
-        errors["full_name"] = "Full name is required (max 100 characters)."
-
-    email = str(data.get("email") or "").strip() or None
-    if email:
-        if len(email) > 100 or not _EMAIL_RE.match(email):
-            errors["email"] = "Enter a valid email address."
-        elif User.query.filter_by(email=email).first() is not None:
-            errors["email"] = "This email is already registered."
-        elif not is_email_verified(email, purpose=_REGISTRATION_EMAIL_PURPOSE):
-            # Applicant must have completed the send-code / verify-code
-            # exchange below for this exact email before the account
-            # can be created — see app/email_utils.py's is_email_verified().
-            errors["email"] = "Please verify this email address before submitting."
-    else:
-        # Email verification is the whole point of this phase, so an
-        # applicant can no longer skip providing one the way the
-        # earlier optional-email registration allowed.
-        errors["email"] = "Email is required so we can verify it and send you updates."
-
-    phone_number = str(data.get("phone_number") or "").strip() or None
-    if phone_number and len(phone_number) > 20:
-        errors["phone_number"] = "Phone number is too long."
-
-    try:
-        latitude = float(data.get("latitude"))
-        longitude = float(data.get("longitude"))
-    except (TypeError, ValueError):
-        errors["location"] = "A valid installation location (latitude/longitude) is required."
-
-    plan_name = str(data.get("plan_name") or "").strip() or None
-    if plan_name and Plan.query.filter_by(name=plan_name).first() is None:
-        errors["plan_name"] = "Selected plan is no longer available."
-
-    address = str(data.get("address") or "").strip() or None
-    if address and len(address) > 255:
-        errors["address"] = "Address is too long."
 
     return errors
 
@@ -196,102 +157,44 @@ def login():
 # credential-guessing target the same way), but still capped per-IP
 # — an uncapped register endpoint is a spam/fake-account vector.
 @limiter.limit(lambda: current_app.config["REGISTER_RATE_LIMIT_PER_IP"])
-
 def register():
-    """Self-service customer registration (Phase 26). Creates a User
-    (role='user'), a linked Subscriber in 'pending_review' status
-    (NOT 'active' — see app/models.py's Subscriber.status comment),
-    and a ServiceRequest(request_type='new_installation') so the
-    application immediately shows up in the admin's existing
-    service_requests review queue (app/routes/service_requests.py) —
-    no new admin-side workflow needed, it's the same queue staff-
-    created requests already land in.
+    """Pure self-service account creation (Phase 30). Creates only a
+    User (role='user', status='active') from a username + password —
+    no Subscriber, no ServiceRequest, no email/location/plan required.
 
-    Re-checks coverage at submit time via app.nap_recommendation
-    (not just trusting whatever the app's earlier coverage-check call
-    said) for the same reason quick_add_subscriber() re-validates NAP
-    capacity — the frontend's earlier check can go stale between
-    screens.
+    This intentionally does NOT apply for service. A brand-new account
+    has nothing pending review yet; it can log back in at any time
+    with nothing else on file, and apply for service later (any
+    number of sessions later) via POST /api/v1/customer/apply once
+    signed in. See that endpoint (app/routes/api_v1/customer.py) for
+    the flow this used to do in one step.
 
     On success, logs the new account straight in (returns a token
     pair, same shape as /login) so the mobile app can drop the person
-    directly onto their pending-application status screen without a
-    separate login step.
+    directly onto their dashboard without a separate login step.
     """
     data = request.get_json(silent=True) or {}
     errors = _validate_registration(data)
     if errors:
         return jsonify(errors=errors), 400
 
-    latitude = float(data["latitude"])
-    longitude = float(data["longitude"])
-
-    if not recommend_naps(latitude, longitude, limit=1):
-        return (
-            jsonify(
-                error="Sorry, we don't currently have coverage at this location. "
-                "We'll notify you when service becomes available."
-            ),
-            422,
-        )
-
     username = str(data.get("username")).strip()
     password = str(data.get("password"))
-    full_name = str(data.get("full_name")).strip()
-    email = str(data.get("email") or "").strip() or None
-    phone_number = str(data.get("phone_number") or "").strip() or None
-    plan_name = str(data.get("plan_name") or "").strip() or None
-    address = str(data.get("address") or "").strip() or None
 
     user = User(
+        # full_name has no separate field on this screen (see
+        # RegisterScreen) — defaulted to the username for now and
+        # editable later from the profile screen or when applying for
+        # service, rather than adding a nullable-full-name migration
+        # just for this gap.
         username=username,
-        full_name=full_name,
-        email=email,
-        phone_number=phone_number,
+        full_name=username,
         role="user",
         status="active",
     )
     user.set_password(password)
     db.session.add(user)
-    db.session.flush()  # assigns user.id, needed below
-
-    subscriber = Subscriber(
-        # Temporary unique placeholder — user.id is already unique at
-        # this point, so this can never collide with a concurrent
-        # registration the way a shared constant like "PENDING" could.
-        # Overwritten with the real SUB-#### code right after this
-        # row gets its own id.
-        subscriber_code=f"PENDING-{user.id}",
-        full_name=full_name,
-        address=address,
-        latitude=latitude,
-        longitude=longitude,
-        contact_number=phone_number,
-        email=email,
-        plan_type=plan_name,
-        nap_id=None,  # set later by admin via the existing assign-nap flow
-        user_id=user.id,
-        status="pending_review",
-    )
-    db.session.add(subscriber)
-    db.session.flush()  # assigns subscriber.id
-    subscriber.subscriber_code = f"SUB-{subscriber.id:04d}"
-
-    service_request = ServiceRequest(
-        request_type="new_installation",
-        subscriber_id=subscriber.id,
-        latitude=latitude,
-        longitude=longitude,
-        status="pending",
-        notes=f"Self-registered via mobile app. Plan requested: {plan_name or 'not specified'}.",
-    )
-    db.session.add(service_request)
     db.session.commit()
-
-    # The email's verification record has now done its job — remove it
-    # so it can't be replayed against a second registration attempt.
-    if email:
-        consume_verification(email, purpose=_REGISTRATION_EMAIL_PURPOSE)
 
     identity = str(user.id)
     access_token = create_access_token(identity=identity)
@@ -313,8 +216,8 @@ def send_verification_code_route():
     regardless of whether the address is already registered or the
     send actually succeeded server-side — this endpoint intentionally
     never confirms/denies "is this email already in our system" (that
-    check happens later, at register()) and never reveals SMTP
-    delivery failures to the client, only logs them.
+    check happens later, at POST /api/v1/customer/apply) and never
+    reveals SMTP delivery failures to the client, only logs them.
     """
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip()
@@ -331,9 +234,9 @@ def send_verification_code_route():
 def verify_email_code_route():
     """Checks the code the applicant typed in against the one most
     recently sent to that email (app/email_utils.py's verify_code()).
-    On success, the email is marked verified so register() above will
-    accept it; on failure, returns the specific reason (expired, wrong,
-    too many attempts, none requested) so the mobile UI can show it.
+    On success, the email is marked verified so POST /api/v1/customer/apply
+    will accept it; on failure, returns the specific reason (expired,
+    wrong, too many attempts, none requested) so the mobile UI can show it.
     """
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip()
