@@ -11,7 +11,7 @@ export type AppRole = "technician" | "customer";
 
 /** Maps the backend's `user.role` value to which half of this app to show. */
 function toAppRole(backendRole: string): AppRole | null {
-  if (backendRole === "technician") return "technician";
+  if (backendRole === "field_assistant") return "technician";
   if (backendRole === "user") return "customer";
   return null;
 }
