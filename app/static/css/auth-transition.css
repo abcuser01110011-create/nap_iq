@@ -38,12 +38,12 @@
     padding: 1rem;
 }
 
-/* Icon: the PG Networks mark drawn as pure line art (no filled tile,
-   no background box -- see pg-networks-logo-outline.png) sitting
-   inside a ring of two outlined "ping" rings that expand outward and
-   fade on a loop. Sized to match the enlarged tile from the previous
-   pass (8rem ring) and timed to the same speed as a critical-priority
-   alert marker on the map (PRIORITY_PULSE_SECONDS.critical = 0.6s in
+/* Icon: the full PG Networks lockup (mark + "NETWORKS" wordmark --
+   see pg-networks-logo-mono.png) sitting inside a ring of two
+   outlined "ping" rings that expand outward and fade on a loop.
+   Sized to match the enlarged tile from the previous pass (8rem
+   ring) and timed to the same speed as a critical-priority alert
+   marker on the map (PRIORITY_PULSE_SECONDS.critical = 0.6s in
    napmap.js), rather than the map's default 1.6s pulse. There's no
    static border on the ring container itself -- only the animated
    ping rings, which do fully fade to opacity 0 -- so nothing lingers
@@ -80,8 +80,12 @@
 .auth-transition-icon-box {
     position: relative;
     z-index: 1;
-    width: 4.75rem;
-    height: 4.75rem;
+    /* Taller than the old icon-only box since the full lockup carries
+       the "NETWORKS" wordmark underneath the mark -- width/height keep
+       the 640:710 aspect ratio of pg-networks-logo-mono.png so the
+       wordmark isn't squeezed. */
+    width: 5.6rem;
+    height: 6.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -95,13 +99,17 @@
     50% { transform: scale(1.045); }
 }
 
-/* Pure outline mark -- no fill, no background tile -- sized to sit
-   comfortably inside the ping rings. */
+/* pg-networks-logo-mono.png is solid navy on a transparent background,
+   made for use on *light* surfaces (it's the same file the navbar and
+   document watermark use). On this overlay's near-black background
+   navy would all but disappear, so it's flattened to pure white the
+   same way base.html's navbar does for this file. */
 .auth-transition-logo {
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
+    filter: brightness(0) invert(1);
 }
 
 .auth-transition-title {
