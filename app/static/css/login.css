@@ -59,7 +59,6 @@ body.login-body {
    page, with just a thin outline to mark its edges instead of a
    heavy shadowed panel. */
 .login-card {
-    position: relative;
     width: 100%;
     max-width: 400px;
     padding: 2.25rem 2rem 2rem;
@@ -70,8 +69,13 @@ body.login-body {
 }
 
 .login-brand {
+    position: relative;
     text-align: center;
-    margin-bottom: 1.75rem;
+    /* A little taller than before (was 1.75rem) -- this gap is always
+       reserved, whether or not a toast is showing, so the toast below
+       has a slot to sit in without ever pushing the Username field
+       down when it appears/disappears. */
+    margin-bottom: 2.5rem;
 }
 
 .login-brand__mark {
@@ -97,26 +101,21 @@ body.login-body {
 }
 
 /* Flash messages (invalid credentials, deactivated account, logged-out
-   confirmation, ...) shown as auto-dismissing toasts. Positioned to
-   overlap the top edge of the login card (anchored to .login-card,
-   which is now the positioning context) rather than sitting inline
-   above the form fields -- an inline toast used to push the whole
-   card taller/shorter every time one appeared or auto-dismissed.
-   Only about half of the toast's own height dips inside the card's
-   top padding, so it floats mostly above the border instead of
-   sitting on top of the page -- and it's sized down from the original
-   inline version so that inside portion stays within the empty
-   padding above the brand mark instead of covering the logo/title.
-   Still animates in/out and is removed automatically after ~3s by
+   confirmation, ...) shown as auto-dismissing toasts. Anchored to the
+   bottom edge of .login-brand (its new positioning context) so the
+   toast sits right above the Username field, inside the fixed gap
+   .login-brand now always reserves there -- rather than being inline
+   above the form fields, which used to push the whole card taller or
+   shorter every time a toast appeared or auto-dismissed. Still
+   animates in/out and is removed automatically after ~3s by
    login-toast.js (each toast opts in via [data-toast-autohide]). The
    generic, always-fires "Please log in to continue." notice is
    filtered out in the template itself. */
 .login-toast-stack {
     position: absolute;
-    top: 0;
-    left: 50%;
-    width: calc(100% - 2.5rem);
-    transform: translate(-50%, -55%);
+    top: 100%;
+    left: 0;
+    right: 0;
     margin: 0;
     display: flex;
     flex-direction: column;

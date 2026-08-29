@@ -34,8 +34,34 @@ body {
     color: #6c757d;
 }
 
+/* Post-login flash messages (e.g. the "Welcome back, ..." banner) used
+   to be the first element inside <main> on every dashboard/base page,
+   so it pushed the summary cards / page content down whenever it
+   appeared and back up the moment it was dismissed. Floating it as a
+   fixed toast below the topbar/navbar means it now sits on top of the
+   page instead of taking up space in it -- showing or dismissing it
+   never shifts anything else. Bootstrap's own alert-dismissible
+   ("fade show" + the .btn-close button) still handles the actual
+   fade-in/dismiss behavior; this just changes where it sits. */
+.flash-stack {
+    position: fixed;
+    top: 5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1080;
+    width: min(92vw, 420px);
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
 .flash-stack .alert {
     border: none;
+    margin-bottom: 0;
+    box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
 }
 
 /* =====================================================================
