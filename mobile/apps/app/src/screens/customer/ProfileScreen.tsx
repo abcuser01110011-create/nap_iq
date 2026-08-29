@@ -40,7 +40,7 @@ export default function ProfileScreen() {
     setLoggingOut(true);
     const minShowtime = new Promise((resolve) => setTimeout(resolve, AUTH_TRANSITION_MS));
     try {
-      await Promise.all([logout(), minShowtime]);
+      await Promise.all([logout(AUTH_TRANSITION_MS), minShowtime]);
     } catch {
       setLoggingOut(false);
     }

@@ -1,6 +1,8 @@
 import type { TokenStorage } from "./tokenStorage";
 import type {
   ApiErrorBody,
+  ApplyInput,
+  ApplyResponse,
   Assignment,
   CoverageCheckResult,
   CustomerIssue,
@@ -344,6 +346,18 @@ export class ApiClient {
 
   readonly customer = {
     me: () => this.request<{ subscriber: Subscriber }>("/api/v1/customer/me"),
+
+    /** Applies for service on behalf of the signed-in account -- the
+     * mobile equivalent of the Apply for Service screen's Step 3
+     * submit. Creates the Subscriber + ServiceRequest server-side
+     * (see app/routes/api_v1/customer.py's apply()); 409s if this
+     * account already has a subscriber on file, 422s if the location
+     * turns out to be outside coverage. */
+    apply: (input: ApplyInput) =>
+      this.request<ApplyResponse>("/api/v1/customer/apply", {
+        method: "POST",
+        body: input,
+      }),
 
     listIssues: () => this.request<{ issues: CustomerIssue[] }>("/api/v1/customer/issues"),
 

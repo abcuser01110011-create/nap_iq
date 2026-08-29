@@ -29,7 +29,7 @@ export default function ProfileScreen() {
     // signed-out stack and this component unmounts. It only matters
     // if logout() throws, so this screen stays usable.
     try {
-      await Promise.all([logout(), minShowtime]);
+      await Promise.all([logout(AUTH_TRANSITION_MS), minShowtime]);
     } catch {
       setLoggingOut(false);
     }

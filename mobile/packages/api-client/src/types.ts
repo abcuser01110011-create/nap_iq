@@ -156,6 +156,23 @@ export interface RegisterInput {
   plan_name?: string;
 }
 
+/** Body for ApiClient.customer.apply() -- POST /api/v1/customer/apply.
+ * Runs for an already signed-in account (unlike RegisterInput, which
+ * creates the account itself), so there's no username/password here. */
+export interface ApplyInput {
+  full_name: string;
+  email?: string;
+  phone_number?: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  plan_name?: string;
+}
+
+export interface ApplyResponse {
+  subscriber: Subscriber;
+}
+
 export interface SendVerificationCodeResponse {
   message: string;
 }

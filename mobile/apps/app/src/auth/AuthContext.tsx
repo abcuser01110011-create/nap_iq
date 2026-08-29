@@ -7,6 +7,24 @@ import { registerPushToken, unregisterPushToken } from "../notifications/registe
 
 const USER_KEY = "user_profile";
 
+/** Waits out whatever's left of `minShowtimeMs` after `startedAt`, or
+ * resolves immediately if that time has already passed. Used by
+ * login()/logout() below so the status flip that drives
+ * RootNavigator's stack swap (see navigation/RootNavigator.tsx) never
+ * lands before AuthTransitionOverlay's own minimum on-screen time —
+ * without this, a fast response (a quick login on Wi-Fi, in
+ * particular) flips `status` and unmounts the Auth stack, overlay and
+ * all, almost as soon as the request resolves, well before the
+ * overlay the caller asked to show for `minShowtimeMs` has had a
+ * chance to actually play. `minShowtimeMs` defaults to 0 (no wait)
+ * for any caller that doesn't pass one, so this is a no-op unless a
+ * screen actually opts in. */
+function waitOutRemainder(startedAt: number, minShowtimeMs: number): Promise<void> {
+  const remaining = minShowtimeMs - (Date.now() - startedAt);
+  if (remaining <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, remaining));
+}
+
 export type AppRole = "technician" | "customer";
 
 /** Maps the backend's `user.role` value to which half of this app to show. */
@@ -28,7 +46,7 @@ interface AuthContextValue {
    * account for being the "wrong" role — it just routes it. */
   role: AppRole | null;
   client: ApiClient;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, minShowtimeMs?: number) => Promise<void>;
   /** Phase 30 — pure self-service registration (username + password
    * only). On success behaves exactly like login(): stores the
    * returned tokens/user and flips status to signedIn, landing a
@@ -36,7 +54,7 @@ interface AuthContextValue {
    * service" is offered as a next step rather than required up
    * front. */
   register: (input: RegisterInput) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (minShowtimeMs?: number) => Promise<void>;
   /** Surfaced so the login/register screens can show a friendly
    * message without every screen re-deriving it from ApiError itself. */
   lastError: string | null;
@@ -100,8 +118,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [client]);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, minShowtimeMs = 0) => {
     setLastError(null);
+    const startedAt = Date.now();
     try {
       const result = await client.auth.login(username, password);
       const appRole = toAppRole(result.user.role);
@@ -115,6 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(result.user));
+      // See waitOutRemainder()'s docstring — this is what keeps a
+      // fast login from cutting AuthTransitionOverlay's animation
+      // short by flipping `status` (and swapping the navigation
+      // stack out from under it) before the overlay's own minimum
+      // showtime has elapsed.
+      await waitOutRemainder(startedAt, minShowtimeMs);
       setUser(result.user);
       setRole(appRole);
       setStatus("signedIn");
@@ -158,10 +183,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async () => {
+  const logout = async (minShowtimeMs = 0) => {
+    const startedAt = Date.now();
     await unregisterPushToken(client, role); // best-effort — see registerPushToken.ts
     await client.auth.logout();
     await SecureStore.deleteItemAsync(USER_KEY);
+    // Same reasoning as login()'s waitOutRemainder call above.
+    await waitOutRemainder(startedAt, minShowtimeMs);
     setUser(null);
     setRole(null);
     setStatus("signedOut");

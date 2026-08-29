@@ -81,7 +81,7 @@ export default function LoginScreen({ navigation }: Props) {
     // still gets the full animation, a slow one isn't cut short.
     const minShowtime = new Promise((resolve) => setTimeout(resolve, durationMs));
     try {
-      await Promise.all([login(username.trim(), password), minShowtime]);
+      await Promise.all([login(username.trim(), password, durationMs), minShowtime]);
     } finally {
       setSubmitting(false);
       setTransitioning(false);
