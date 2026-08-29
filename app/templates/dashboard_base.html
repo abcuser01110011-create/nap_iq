@@ -24,6 +24,7 @@
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/theme-dark.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/auth-transition.css') }}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="dash-body">
@@ -240,7 +241,7 @@
                     </a>
                 </li>
                 <li>
-                    <form method="post" action="{{ url_for('auth.logout') }}">
+                    <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="dash-nav-link w-100 text-start border-0 bg-transparent">
                             <i class="bi bi-box-arrow-right"></i><span>Logout</span>
@@ -383,6 +384,8 @@
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/notifications-popover.js') }}"></script>
+<script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-outline.svg') }}";</script>
+<script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
 <script>
     // Sidebar toggle for mobile/tablet widths.
     (function () {

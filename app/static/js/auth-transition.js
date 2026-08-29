@@ -15,7 +15,7 @@
 // error) both come back through completely unchanged -- this file
 // never has to know or guess which one happened.
 (function () {
-    var DURATION_MS = 3000;
+    var DURATION_MS = 5000;
 
     var CONFIGS = {
         signin: {

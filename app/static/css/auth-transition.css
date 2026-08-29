@@ -38,32 +38,38 @@
     padding: 1rem;
 }
 
-/* Icon: a brand-tile square (same shape/tint as the login page's own
-   logo mark) sitting inside a faint ring, with two soft pulsing rings
-   expanding outward behind it on a loop -- a radar-ping read as
-   "actively working", not a static icon. */
+/* Icon: the PG Networks mark drawn as pure line art (no filled tile,
+   no background box -- see pg-networks-logo-outline.svg) sitting
+   inside a ring of two outlined "ping" rings that expand outward and
+   fade on a loop. Sized to match the enlarged tile from the previous
+   pass (8rem ring) and timed to the same speed as a critical-priority
+   alert marker on the map (PRIORITY_PULSE_SECONDS.critical = 0.6s in
+   napmap.js), rather than the map's default 1.6s pulse. There's no
+   static border on the ring container itself -- only the animated
+   ping rings, which do fully fade to opacity 0 -- so nothing lingers
+   on screen between pulses. */
 .auth-transition-icon-ring {
     position: relative;
-    width: 6.5rem;
-    height: 6.5rem;
+    width: 8rem;
+    height: 8rem;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 1.5rem;
-    border-radius: 50%;
-    border: 1px solid rgba(91, 140, 255, 0.25);
 }
 
 .auth-transition-ping {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    border: 1px solid rgba(91, 140, 255, 0.55);
-    animation: authTransitionPing 2.2s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+    /* A touch thicker than the original 1px so the ring reads clearly
+       against the dark background without turning into a heavy band. */
+    border: 1.75px solid rgba(91, 140, 255, 0.55);
+    animation: authTransitionPing 0.6s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
 }
 
 .auth-transition-ping--delay {
-    animation-delay: 1.1s;
+    animation-delay: 0.3s;
 }
 
 @keyframes authTransitionPing {
@@ -74,30 +80,28 @@
 .auth-transition-icon-box {
     position: relative;
     z-index: 1;
-    width: 3.5rem;
-    height: 3.5rem;
+    width: 4.75rem;
+    height: 4.75rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 1rem;
-    background: rgba(59, 107, 255, 0.16);
-    border: 1px solid rgba(91, 140, 255, 0.4);
-    /* A slower, gentler breathing pulse on the tile itself, layered on
-       top of the expanding rings above, is what actually reads as
-       "this icon is pulsing" up close rather than just the rings
-       moving around it. */
-    animation: authTransitionBreathe 2.2s ease-in-out infinite;
+    /* Same gentle breathing scale as before, now applied to the line
+       icon itself rather than a background tile. */
+    animation: authTransitionBreathe 2s ease-in-out infinite;
 }
 
 @keyframes authTransitionBreathe {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 107, 255, 0.35); }
-    50% { transform: scale(1.06); box-shadow: 0 0 0 10px rgba(59, 107, 255, 0); }
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.045); }
 }
 
+/* Pure outline mark -- no fill, no background tile -- sized to sit
+   comfortably inside the ping rings. */
 .auth-transition-logo {
-    width: 1.85rem;
-    height: 1.85rem;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
+    display: block;
 }
 
 .auth-transition-title {

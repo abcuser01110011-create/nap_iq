@@ -30,9 +30,9 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% set shown = messages | rejectattr("1", "equalto", "Please log in to continue.") | list %}
             {% if shown %}
-                <div class="login-flash-stack">
+                <div class="login-toast-stack">
                     {% for category, message in shown %}
-                        <div class="login-flash login-flash--{{ 'danger' if category in ('danger', 'error') else category }}">
+                        <div class="login-flash login-flash--{{ 'danger' if category in ('danger', 'error') else category }}" data-toast-autohide>
                             {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% endif %}
                             {% if category in ('danger', 'error') %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
                             <span>{{ message }}</span>
@@ -88,8 +88,9 @@
     </div>
 </div>
 
-<script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
+<script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-outline.svg') }}";</script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
+<script src="{{ url_for('static', filename='js/login-toast.js') }}"></script>
 </body>
 </html>

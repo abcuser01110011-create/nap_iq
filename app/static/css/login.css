@@ -16,8 +16,8 @@
 
 :root {
     --login-bg: #05091a;
-    --login-panel: #0b1330;
-    --login-panel-border: rgba(255, 255, 255, 0.08);
+    --login-panel: transparent;
+    --login-panel-border: rgba(255, 255, 255, 0.14);
     --login-field-bg: #0b1330;
     --login-field-border: rgba(255, 255, 255, 0.1);
     --login-accent: #2258e6;
@@ -53,6 +53,11 @@ body.login-body {
     padding: 2rem 1.25rem;
 }
 
+/* Deliberately blended into the page background rather than a boxy
+   panel: background matches --login-bg (transparent lets it show
+   through) so the card reads as part of the same surface as the
+   page, with just a thin outline to mark its edges instead of a
+   heavy shadowed panel. */
 .login-card {
     width: 100%;
     max-width: 400px;
@@ -60,7 +65,7 @@ body.login-body {
     border-radius: 1rem;
     background: var(--login-panel);
     border: 1px solid var(--login-panel-border);
-    box-shadow: 0 25px 60px -20px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 30px 70px -40px rgba(0, 0, 0, 0.55);
 }
 
 .login-brand {
@@ -91,11 +96,15 @@ body.login-body {
 }
 
 /* Flash messages (invalid credentials, deactivated account, logged-out
-   confirmation, ...) restyled as small chips instead of Bootstrap's
-   default boxy alert. The generic, always-fires "Please log in to
-   continue." notice is filtered out in the template itself. */
-.login-flash-stack {
-    margin-bottom: 1.25rem;
+   confirmation, ...) shown as auto-dismissing toasts inside the login
+   card itself, above the form fields -- not floating over the whole
+   page. Still animates in/out and is removed automatically after ~3s
+   by login-toast.js (each toast opts in via [data-toast-autohide]).
+   The generic, always-fires "Please log in to continue." notice is
+   filtered out in the template itself. */
+.login-toast-stack {
+    width: 100%;
+    margin: 0 0 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -106,27 +115,43 @@ body.login-body {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.85rem;
-    padding: 0.6rem 0.85rem;
+    padding: 0.65rem 0.95rem;
     border-radius: 0.6rem;
     border: 1px solid transparent;
     line-height: 1.3;
+    background: var(--login-field-bg);
+    opacity: 0;
+    transform: translateY(-10px);
+    animation: loginToastIn 0.25s ease forwards;
+}
+
+.login-flash.is-hiding {
+    animation: loginToastOut 0.25s ease forwards;
+}
+
+@keyframes loginToastIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes loginToastOut {
+    to { opacity: 0; transform: translateY(-10px); }
 }
 
 .login-flash--danger {
-    background: rgba(220, 53, 69, 0.14);
-    border-color: rgba(220, 53, 69, 0.35);
+    background: rgba(220, 53, 69, 0.16);
+    border-color: rgba(220, 53, 69, 0.4);
     color: #ffc2c9;
 }
 
 .login-flash--success {
-    background: rgba(25, 135, 84, 0.14);
-    border-color: rgba(25, 135, 84, 0.35);
+    background: rgba(25, 135, 84, 0.16);
+    border-color: rgba(25, 135, 84, 0.4);
     color: #a9f0cd;
 }
 
 .login-flash--warning {
-    background: rgba(255, 193, 7, 0.14);
-    border-color: rgba(255, 193, 7, 0.35);
+    background: rgba(255, 193, 7, 0.16);
+    border-color: rgba(255, 193, 7, 0.4);
     color: #ffe29a;
 }
 
