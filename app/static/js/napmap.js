@@ -462,7 +462,6 @@
         setupQuickAdd();
         setupReportIssue();
         setupNapDetailPanel();
-        setupManualRefresh();
 
         // Background safety net -- see refreshLiveData()'s docstring.
         setInterval(refreshLiveData, LIVE_REFRESH_INTERVAL_MS);
@@ -498,21 +497,19 @@
      * never sits frozen at whatever it showed the moment it was
      * opened.
      *
-     * Called from three places, in increasing order of "how fast does
+     * Called from two places, in increasing order of "how fast does
      * this need to feel":
      *   - LIVE_REFRESH_INTERVAL_MS timer (init()) -- a background
      *     safety net for a tab that's just been sitting open;
      *   - the tab regaining focus/visibility (init()) -- covers the
      *     common "added something on another page/tab, switched back
-     *     here" case within a moment of switching, not up to 15s later;
-     *   - the "Refresh" button (setupManualRefresh()) -- immediate, on
-     *     demand, for "I just added this, show it to me now".
+     *     here" case within a moment of switching, not up to 15s later.
      *
-     * `force` (true only for the button) skips the "don't interrupt
-     * an in-progress form" guards below, since a person who explicitly
-     * clicked Refresh is not mid-interaction with the Quick Add/Report
-     * Issue modals by definition -- those guards exist for the timer
-     * and focus paths, which fire without the person asking for them.
+     * `force` skips the "don't interrupt an in-progress form" guards
+     * below; nothing currently calls refreshLiveData(true), but the
+     * guards stay opt-out-able for any future caller that fires
+     * outside the timer/focus paths (which fire without the person
+     * asking for them, so they need to stay interruption-safe).
      */
     async function refreshLiveData(force) {
         if (!force) {
@@ -540,24 +537,6 @@
                 closeNapDetailPanel();
             }
         }
-    }
-
-    /** Wires up the floating "Refresh" button for an immediate,
-     * on-demand data refresh -- see refreshLiveData()'s docstring. */
-    function setupManualRefresh() {
-        const btn = document.getElementById("mapRefreshBtn");
-        if (!btn) return;
-        const icon = btn.querySelector("i");
-        btn.addEventListener("click", async () => {
-            btn.disabled = true;
-            if (icon) icon.classList.add("napmap-refresh-spinning");
-            try {
-                await refreshLiveData(true);
-            } finally {
-                btn.disabled = false;
-                if (icon) icon.classList.remove("napmap-refresh-spinning");
-            }
-        });
     }
 
     /**

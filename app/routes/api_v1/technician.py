@@ -79,6 +79,7 @@ except ImportError:  # pragma: no cover - exercised only if the dep is missing
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
 from app.models import Assignment, Technician
+from app.nap_status import sync_nap_status
 from app.notifications_utils import notify, notify_issue_status_change
 
 api_v1_technician_bp = Blueprint(
@@ -654,6 +655,16 @@ def complete_assignment(assignment_id):
         if subscriber is not None:
             subscriber.status = "active"
             subscriber.installed_at = date.today()
+            # This is the same "a subscriber just occupied a slot"
+            # case every other write path in the app already re-syncs
+            # for (see app/nap_status.py) -- without it, a NAP whose
+            # last open slot gets filled by a completed installation
+            # stays stored as "active" instead of flipping to "full",
+            # even though the GeoMap's live usage badge (computed
+            # straight from used/total ports) correctly shows 100%.
+            db.session.flush()
+            if subscriber.nap is not None:
+                sync_nap_status(subscriber.nap)
             notify(
                 "service_request",
                 "You're connected!",
