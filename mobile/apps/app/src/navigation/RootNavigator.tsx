@@ -15,6 +15,7 @@ import { colors as customerColors } from "../theme/customer";
 import { colors as technicianColors } from "../theme/technician";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
+import ApplyForServiceScreen from "../screens/ApplyForServiceScreen";
 
 // Customer screens
 import HomeScreen from "../screens/customer/HomeScreen";
@@ -34,7 +35,14 @@ import TechnicianProfileScreen from "../screens/technician/ProfileScreen";
 
 export type AuthStackParamList = {
   Login: undefined;
+  // Step 1 — just username + password (see RegisterScreen).
   Register: undefined;
+  // Step 2 — the rest of the application (name, install address,
+  // plan, etc.), reached only from RegisterScreen with the
+  // credentials it collected. register() needs all of it in one
+  // call, so it's carried through via route params rather than
+  // re-asked for here.
+  ApplyForService: { username: string; password: string };
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -46,6 +54,7 @@ function AuthFlow() {
       <AuthStack.Navigator screenOptions={{ headerShown: false }}>
         <AuthStack.Screen name="Login" component={LoginScreen} />
         <AuthStack.Screen name="Register" component={RegisterScreen} />
+        <AuthStack.Screen name="ApplyForService" component={ApplyForServiceScreen} />
       </AuthStack.Navigator>
     </NavigationContainer>
   );
