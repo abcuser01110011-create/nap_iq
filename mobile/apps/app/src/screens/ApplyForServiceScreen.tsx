@@ -143,20 +143,6 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
 
   const [address, setAddress] = useState("");
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-
-  // Email verification (Gmail-sent one-time code) — must complete
-  // before "Submit application" is enabled. Re-arms (emailVerified
-  // resets to false) any time the applicant edits the email after
-  // verifying, via handleEmailChange below, so a verified stamp can
-  // never silently carry over to a different address.
-  const [emailForVerification, setEmailForVerification] = useState<string | null>(null);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [verifyingCode, setVerifyingCode] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -252,78 +238,16 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
     }
   };
 
-  const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-  // Any edit to the email field after a previous verification
-  // succeeded un-verifies it — the code that was confirmed belongs to
-  // whatever address was in the field at that moment, not to whatever
-  // the applicant has since typed.
-  const handleEmailChange = (value: string) => {
-    setEmail(value);
-    if (emailVerified && value.trim() !== emailForVerification) {
-      setEmailVerified(false);
-      setCodeSent(false);
-      setVerificationCode("");
-    }
-    setVerifyError(null);
-  };
-
-  const handleSendCode = async () => {
-    const trimmed = email.trim();
-    setVerifyError(null);
-    if (!EMAIL_RE.test(trimmed)) {
-      setVerifyError("Enter a valid email address first.");
-      return;
-    }
-    setSendingCode(true);
-    try {
-      await client.public.sendVerificationCode(trimmed);
-      setEmailForVerification(trimmed);
-      setCodeSent(true);
-      setEmailVerified(false);
-      setVerificationCode("");
-    } catch {
-      setVerifyError("Couldn't send the code. Check your connection and try again.");
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    const trimmed = email.trim();
-    setVerifyError(null);
-    if (!verificationCode.trim()) {
-      setVerifyError("Enter the code we emailed you.");
-      return;
-    }
-    setVerifyingCode(true);
-    try {
-      await client.public.verifyEmailCode(trimmed, verificationCode.trim());
-      setEmailVerified(true);
-      setVerifyError(null);
-    } catch (err: any) {
-      setEmailVerified(false);
-      setVerifyError(err?.message || "That code didn't work. Please try again.");
-    } finally {
-      setVerifyingCode(false);
-    }
-  };
-
   const handleSubmit = async () => {
     setLocalError(null);
     if (!pin) {
       setLocalError("Please set your installation location first.");
       return;
     }
-    if (!emailVerified || email.trim() !== emailForVerification) {
-      setLocalError("Please verify your email address before submitting.");
-      return;
-    }
     setSubmitting(true);
     try {
       await client.customer.apply({
         full_name: fullName.trim(),
-        email: email.trim() || undefined,
         phone_number: phone.trim() || undefined,
         latitude: pin.latitude,
         longitude: pin.longitude,
@@ -497,68 +421,13 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
             <>
               <FloatingLabelInput label="Full name" value={fullName} onChangeText={setFullName} />
               <FloatingLabelInput label="Installation address" value={address} onChangeText={setAddress} />
-              <FloatingLabelInput
-                label="Email"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={handleEmailChange}
-              />
-
-              {emailVerified && email.trim() === emailForVerification ? (
-                <Text style={styles.success}>✓ Email verified</Text>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={[styles.buttonSecondary, sendingCode && styles.buttonDisabled]}
-                    disabled={sendingCode || !email.trim()}
-                    onPress={handleSendCode}
-                  >
-                    {sendingCode ? (
-                      <ActivityIndicator color={colors.primary} />
-                    ) : (
-                      <Text style={styles.buttonSecondaryText}>
-                        {codeSent ? "Resend code" : "Send verification code"}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-
-                  {codeSent && (
-                    <>
-                      <FloatingLabelInput
-                        label="Verification code"
-                        keyboardType="number-pad"
-                        value={verificationCode}
-                        onChangeText={setVerificationCode}
-                      />
-                      <TouchableOpacity
-                        style={[styles.button, verifyingCode && styles.buttonDisabled]}
-                        disabled={verifyingCode || !verificationCode.trim()}
-                        onPress={handleVerifyCode}
-                      >
-                        {verifyingCode ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text style={styles.buttonText}>Verify code</Text>
-                        )}
-                      </TouchableOpacity>
-                    </>
-                  )}
-
-                  {verifyError && <Text style={styles.error}>{verifyError}</Text>}
-                </>
-              )}
-
               <FloatingLabelInput label="Phone number" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
 
               {localError && <Text style={styles.error}>{localError}</Text>}
 
               <TouchableOpacity
-                style={[
-                  styles.button,
-                  (submitting || !emailVerified || email.trim() !== emailForVerification) && styles.buttonDisabled,
-                ]}
-                disabled={submitting || !emailVerified || email.trim() !== emailForVerification}
+                style={[styles.button, submitting && styles.buttonDisabled]}
+                disabled={submitting}
                 onPress={handleSubmit}
               >
                 {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Submit application</Text>}

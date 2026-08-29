@@ -103,6 +103,11 @@ def _validate_application(data: dict) -> dict:
     if not full_name or len(full_name) > 100:
         errors["full_name"] = "Full name is required (max 100 characters)."
 
+    # Email is currently not collected by the mobile app's Apply for
+    # Service form (email + its verification step were pulled "for
+    # now" — see ApplyForServiceScreen.tsx), so it's optional here too:
+    # still validated/verified if a caller does send one, but a missing
+    # email is no longer a submission blocker.
     email = str(data.get("email") or "").strip() or None
     if email:
         if len(email) > 100 or not _EMAIL_RE.match(email):
@@ -116,8 +121,6 @@ def _validate_application(data: dict) -> dict:
             # application can be submitted — see
             # app/email_utils.py's is_email_verified().
             errors["email"] = "Please verify this email address before submitting."
-    else:
-        errors["email"] = "Email is required so we can verify it and send you updates."
 
     phone_number = str(data.get("phone_number") or "").strip() or None
     if phone_number and len(phone_number) > 20:
