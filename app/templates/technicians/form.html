@@ -1,11 +1,13 @@
 {% extends "dashboard_base.html" %}
-{% block title %}{{ 'Edit Technician' if mode == 'edit' else 'Add Technician' }}{% endblock %}
-{% block page_title %}{{ 'Edit Technician' if mode == 'edit' else 'Add New Technician' }}{% endblock %}
+{% set is_field_assistant = form.personnel_type.data == 'field_assistant' %}
+{% set noun = 'Field Assistant' if is_field_assistant else 'Technician' %}
+{% block title %}{{ 'Edit ' ~ noun if mode == 'edit' else 'Add ' ~ noun }}{% endblock %}
+{% block page_title %}{{ 'Edit ' ~ noun if mode == 'edit' else 'Add New ' ~ noun }}{% endblock %}
 
 {% block content %}
 <div class="mb-3">
     <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Technicians
+        <i class="bi bi-arrow-left me-1"></i>Back to Personnel
     </a>
 </div>
 
@@ -33,6 +35,13 @@
                         </div>
 
                         <div class="col-md-6">
+                            <label class="form-label">{{ form.personnel_type.label }}</label>
+                            {{ form.personnel_type(class="form-select" ~ (" is-invalid" if form.personnel_type.errors else "")) }}
+                            {% for error in form.personnel_type.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label">{{ form.status.label }}</label>
                             {{ form.status(class="form-select" ~ (" is-invalid" if form.status.errors else "")) }}
                             {% for error in form.status.errors %}
@@ -57,7 +66,7 @@
                         <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-outline-secondary">Cancel</a>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i>
-                            {{ 'Save Changes' if mode == 'edit' else 'Add Technician' }}
+                            {{ 'Save Changes' if mode == 'edit' else 'Add ' ~ noun }}
                         </button>
                     </div>
                 </form>

@@ -935,6 +935,15 @@ class TechnicianForm(FlaskForm):
         "Contact Number",
         validators=[Optional(), Length(max=20, message="Contact number must be at most 20 characters.")],
     )
+    personnel_type = SelectField(
+        "Personnel Type",
+        choices=[
+            ("technician", "Technician"),
+            ("field_assistant", "Field Assistant"),
+        ],
+        default="technician",
+        validators=[DataRequired()],
+    )
     status = SelectField(
         "Status",
         choices=[

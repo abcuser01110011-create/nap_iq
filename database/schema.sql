@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS technicians (
     user_id              INT UNIQUE,
     full_name            VARCHAR(100) NOT NULL,
     contact_number       VARCHAR(20),
+    personnel_type       ENUM('technician', 'field_assistant') NOT NULL DEFAULT 'technician',
     current_latitude     DECIMAL(10,7),
     current_longitude    DECIMAL(10,7),
     status               ENUM('available', 'busy', 'offline') NOT NULL DEFAULT 'available',

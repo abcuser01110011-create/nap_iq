@@ -235,6 +235,11 @@ class Technician(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=True)
     full_name = db.Column(db.String(100), nullable=False)
     contact_number = db.Column(db.String(20), nullable=True)
+    personnel_type = db.Column(
+        db.Enum("technician", "field_assistant", name="technician_personnel_type"),
+        nullable=False,
+        default="technician",
+    )
     current_latitude = db.Column(db.Numeric(10, 7), nullable=True)
     current_longitude = db.Column(db.Numeric(10, 7), nullable=True)
     status = db.Column(

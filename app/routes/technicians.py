@@ -70,9 +70,9 @@ def _populate_user_link_choices(form, *, current_user_id=None):
 @technicians_bp.route("/")
 @role_required("administrator")
 def list_technicians():
-    """Displays all technician profiles, with optional search (by name
-    or contact number) and status filtering via query string
-    parameters (?q=...&status=...)."""
+    """Displays all personnel profiles (technicians and field
+    assistants), with optional search (by name or contact number) and
+    status filtering via query string parameters (?q=...&status=...)."""
     search_term = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
 
@@ -103,22 +103,32 @@ def list_technicians():
 @technicians_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_technician():
-    """Shows and processes the Add Technician form."""
+    """Shows and processes the Add Technician / Add Field Assistant
+    form. The "Add Personnel" split button on the list page links here
+    with ?type=technician or ?type=field_assistant to preselect which
+    kind of profile is being created; the type itself stays editable
+    on the form either way."""
     form = TechnicianForm()
     form.technician_id_value = None
     _populate_user_link_choices(form)
+
+    requested_type = request.args.get("type", "").strip()
+    if request.method == "GET" and requested_type in ("technician", "field_assistant"):
+        form.personnel_type.data = requested_type
 
     if form.validate_on_submit():
         technician = Technician(
             full_name=form.full_name.data.strip(),
             contact_number=(form.contact_number.data or "").strip() or None,
+            personnel_type=form.personnel_type.data,
             status=form.status.data,
             user_id=form.user_id.data or None,  # 0 sentinel -> NULL
         )
         db.session.add(technician)
         db.session.commit()
 
-        flash(f"Technician '{technician.full_name}' was added successfully.", "success")
+        label = "Field assistant" if technician.personnel_type == "field_assistant" else "Technician"
+        flash(f"{label} '{technician.full_name}' was added successfully.", "success")
         return redirect(url_for("technicians.list_technicians"))
 
     return render_template("technicians/form.html", form=form, mode="add", technician=None)
@@ -154,11 +164,13 @@ def edit_technician(technician_id):
     if form.validate_on_submit():
         technician.full_name = form.full_name.data.strip()
         technician.contact_number = (form.contact_number.data or "").strip() or None
+        technician.personnel_type = form.personnel_type.data
         technician.status = form.status.data
         technician.user_id = form.user_id.data or None
 
         db.session.commit()
-        flash(f"Technician '{technician.full_name}' was updated successfully.", "success")
+        label = "Field assistant" if technician.personnel_type == "field_assistant" else "Technician"
+        flash(f"{label} '{technician.full_name}' was updated successfully.", "success")
         return redirect(url_for("technicians.list_technicians"))
 
     return render_template("technicians/form.html", form=form, mode="edit", technician=technician)

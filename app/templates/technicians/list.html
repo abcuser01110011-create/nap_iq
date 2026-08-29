@@ -1,13 +1,27 @@
 {% extends "dashboard_base.html" %}
-{% block title %}Technicians{% endblock %}
-{% block page_title %}Technicians{% endblock %}
+{% block title %}Personnel{% endblock %}
+{% block page_title %}Personnel{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ technicians|length }} profile{{ '' if technicians|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('technicians.add_technician') }}" class="btn btn-primary rounded-pill px-3">
-        <i class="bi bi-person-plus me-1"></i>Add Technician
-    </a>
+    <div class="dropdown">
+        <button type="button" class="btn btn-primary rounded-pill px-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-plus me-1"></i>Add Personnel
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <a class="dropdown-item" href="{{ url_for('technicians.add_technician', type='technician') }}">
+                    <i class="bi bi-person-badge me-2"></i>Technician
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" href="{{ url_for('technicians.add_technician', type='field_assistant') }}">
+                    <i class="bi bi-person-lines-fill me-2"></i>Field Assistant
+                </a>
+            </li>
+        </ul>
+    </div>
 </div>
 
 <div class="subs-table-card mb-3">
@@ -53,6 +67,7 @@
             <thead>
                 <tr>
                     <th>Full Name</th>
+                    <th>Type</th>
                     <th>Contact</th>
                     <th>Linked Login</th>
                     <th>Status</th>
@@ -64,6 +79,9 @@
                 {% for technician in technicians %}
                 <tr class="disp-row">
                     <td><span class="disp-primary-link">{{ technician.full_name }}</span></td>
+                    <td class="disp-subtext">
+                        {{ 'Field Assistant' if technician.personnel_type == 'field_assistant' else 'Technician' }}
+                    </td>
                     <td class="disp-subtext">{{ technician.contact_number or "—" }}</td>
                     <td>
                         {% if technician.user %}
@@ -98,9 +116,9 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="disp-empty">
+                    <td colspan="7" class="disp-empty">
                         <i class="bi bi-person-badge display-6 d-block mb-2"></i>
-                        No technicians found{% if search_term or status_filter %} matching your filters{% endif %}.
+                        No personnel found{% if search_term or status_filter %} matching your filters{% endif %}.
                     </td>
                 </tr>
                 {% endfor %}
