@@ -1,14 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 10 125 145" fill="none">
     <!-- PG Networks mark redrawn as a single-weight line-art icon (no
          fill, no background tile) for the sign-in/sign-out loading
-         screen -- three signal arcs over a dot, tower pole with a
-         flared base underneath, matching the arcs/pole shape of the
-         brand mark but drawn purely as outline strokes. -->
-    <path d="M46.84 49.21 A14 14 0 0 1 73.16 49.21" stroke="#5b8cff" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M37.45 45.79 A24 24 0 0 1 82.55 45.79" stroke="#5b8cff" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M28.05 42.37 A34 34 0 0 1 91.95 42.37" stroke="#5b8cff" stroke-width="4.5" stroke-linecap="round"/>
-    <circle cx="60" cy="54" r="5.5" stroke="#5b8cff" stroke-width="4.5"/>
-    <path d="M60 59.5 L60 130" stroke="#5b8cff" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M60 130 L46 144" stroke="#5b8cff" stroke-width="4.5" stroke-linecap="round"/>
-    <path d="M60 130 L74 144" stroke="#5b8cff" stroke-width="4.5" stroke-linecap="round"/>
+         screen -- traces the actual brand mark (the ostrich silhouette)
+         rather than a generic signal/tower glyph: beak + head, the long
+         front/back curves of the neck, the body with its looping "wing"
+         line, the back sweeping into a tail point, and the two legs. -->
+    <path d="M35 33
+     C38 25 44 19 51 19
+     C54 19 55 21 53 24
+     C49 27 45 28 44 33
+     C43 40 46 46 47 53
+     C48 61 49 68 53 74
+     C57 80 62 84 68 87
+     C74 90 79 89 83 85"
+          stroke="#5b8cff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M51 19
+     C58 20 64 25 66 33
+     C68 41 65 48 62 55
+     C59 63 60 71 65 77
+     C69 82 72 87 71 92
+     C75 82 82 68 92 60
+     C102 53 112 52 122 57
+     C130 61 136 68 138 78
+     C140 88 136 96 128 100"
+          stroke="#5b8cff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M83 65
+     C89 60 95 60 98 65
+     C101 70 98 75 92 77
+     C87 79 85 83 88 87
+     C92 92 99 92 105 88"
+          stroke="#5b8cff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M94 95 C91 108 88 121 86 135 C85 140 83 144 80 147"
+          stroke="#5b8cff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M104 95 C106 108 109 121 111 135 C112 140 114 144 117 146"
+          stroke="#5b8cff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
