@@ -886,6 +886,77 @@
 /* (app/templates/dispatch/index.html)                                */
 /* ---------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------- */
+/* DISPATCH BOARD — Repairs / Installations stacked (vertical) split */
+/* (app/templates/dispatch/index.html only -- .disp-board-columns    */
+/* isn't used by the other pages that share .disp-section/.disp-     */
+/* table-card, e.g. issues/list.html, so this doesn't affect them.)  */
+/* Both sections sit as equal-height rows filling the space below    */
+/* the topbar, each scrolling independently, so an admin can see     */
+/* Repairs and Installations at once instead of scrolling the whole  */
+/* page to get from one to the other. Full table width is kept for   */
+/* each (rather than splitting side-by-side) since the table has too */
+/* many columns to stay comfortably readable at half-width. */
+/* ---------------------------------------------------------------- */
+
+.disp-board-columns {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: stretch;
+    /* 100vh minus the sticky topbar and .dash-content's own top+bottom
+       padding (1.5rem each), so the rows fill exactly what's left of
+       the viewport. */
+    height: calc(100vh - var(--napiq-topbar-height) - 3rem);
+}
+
+.disp-board-columns > .disp-section {
+    flex: 1 1 50%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-top: 0 !important;
+}
+
+.disp-board-columns > .disp-section .disp-section-title {
+    flex-shrink: 0;
+}
+
+.disp-board-columns > .disp-section .disp-table-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.disp-board-columns > .disp-section .table-responsive {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.disp-board-columns > .disp-section .disp-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--napiq-surface);
+}
+
+@media (max-width: 575.98px) {
+    /* On a phone, half the viewport height per section can get too
+       cramped once a table row or two is showing, so let each section
+       claim a bit more room and let the page itself scroll between
+       them instead. */
+    .disp-board-columns {
+        height: auto;
+    }
+
+    .disp-board-columns > .disp-section {
+        height: 70vh;
+        flex: none;
+    }
+}
+
 .disp-section + .disp-section {
     margin-top: 1.75rem;
 }

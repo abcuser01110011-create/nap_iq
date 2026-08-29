@@ -366,6 +366,8 @@
                         {% for category, message in messages %}
                             <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show shadow-sm"
                                  role="alert">
+                                {% if category == 'success' %}<i class="bi bi-check-circle-fill me-1"></i>{% endif %}
+                                {% if category in ('danger', 'error') %}<i class="bi bi-exclamation-triangle-fill me-1"></i>{% endif %}
                                 {{ message }}
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>

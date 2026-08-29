@@ -57,11 +57,60 @@ body {
     pointer-events: none;
 }
 
+/* Same glassy, translucent treatment as the login page's own toasts
+   (.login-flash in login.css) -- tinted background + matching border
+   + soft-colored text per category, rather than Bootstrap's stock
+   solid alert colors -- so every toast in the app (post-login
+   "Welcome back", logged-out confirmations, form save/error notices,
+   etc.) reads as one consistent component regardless of which layout
+   it's rendered from. */
 .flash-stack .alert {
-    border: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
     margin-bottom: 0;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.45);
     pointer-events: auto;
+}
+
+.flash-stack .alert-success {
+    background: rgba(25, 135, 84, 0.16);
+    border-color: rgba(25, 135, 84, 0.4);
+    color: #a9f0cd;
+}
+
+.flash-stack .alert-danger {
+    background: rgba(220, 53, 69, 0.16);
+    border-color: rgba(220, 53, 69, 0.4);
+    color: #ffc2c9;
+}
+
+.flash-stack .alert-warning {
+    background: rgba(255, 193, 7, 0.16);
+    border-color: rgba(255, 193, 7, 0.4);
+    color: #ffe29a;
+}
+
+.flash-stack .alert-info {
+    background: rgba(13, 202, 240, 0.16);
+    border-color: rgba(13, 202, 240, 0.4);
+    color: #9eeaf9;
+}
+
+/* Bootstrap's default .btn-close is a dark glyph, made for light
+   backgrounds -- invisible against these dark, translucent toasts.
+   Same fix Bootstrap's own .btn-close-white utility uses. */
+.flash-stack .btn-close {
+    filter: invert(1) grayscale(1) brightness(200%);
+    opacity: 0.8;
+}
+
+.flash-stack .btn-close:hover {
+    opacity: 1;
 }
 
 /* =====================================================================

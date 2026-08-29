@@ -2,57 +2,59 @@
 {% block title %}Issues{% endblock %}
 {% block page_title %}Issues{% endblock %}
 {% block page_subtitle %}
-<p class="text-muted small mb-0">
+<p class="text-muted small mb-0" id="issuesRecordCount">
     {{ issues|length }} issue{{ '' if issues|length == 1 else 's' }} shown &middot;
     full history — see the <a href="{{ url_for('dispatch.index') }}">Dispatch Board</a> for open work only
 </p>
 {% endblock %}
 
 {% block content %}
+{% set status_options = [
+    ('', 'All'),
+    ('pending', 'Pending'),
+    ('assigned', 'Assigned'),
+    ('in_progress', 'In Progress'),
+    ('resolved', 'Resolved'),
+    ('closed', 'Closed'),
+] %}
+{% set priority_options = [
+    ('', 'All'),
+    ('low', 'Low'),
+    ('medium', 'Medium'),
+    ('high', 'High'),
+    ('critical', 'Critical'),
+] %}
 
-<div class="subs-table-card mb-3">
-    <div class="p-3">
-        <form method="get" action="{{ url_for('issues.list_issues') }}" class="row g-2 align-items-end">
-            <div class="col-sm-6 col-md-5">
-                <label class="form-label small text-muted mb-1">Search</label>
-                <div class="subs-search-form mb-0">
-                    <i class="bi bi-search"></i>
-                    <input
-                        type="text" name="q"
-                        placeholder="Issue code, type, or subscriber..."
-                        value="{{ search_term }}"
-                        aria-label="Search issues"
-                        autocomplete="off"
-                    >
-                </div>
-            </div>
-            <div class="col-sm-3 col-md-3">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="status" class="form-select">
-                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in ['pending', 'assigned', 'in_progress', 'resolved', 'closed'] %}
-                    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|replace('_',' ')|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-3 col-md-2">
-                <label class="form-label small text-muted mb-1">Priority</label>
-                <select name="priority" class="form-select">
-                    <option value="" {% if not priority_filter %}selected{% endif %}>All Priorities</option>
-                    {% for p in ['low', 'medium', 'high', 'critical'] %}
-                    <option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-12 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary rounded-pill px-3">
-                    <i class="bi bi-funnel me-1"></i>Filter
-                </button>
-                {% if search_term or status_filter or priority_filter %}
-                    <a href="{{ url_for('issues.list_issues') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
+<div class="subs-filterbar">
+    <form method="get" action="{{ url_for('issues.list_issues') }}" class="subs-search-form" id="issuesSearchForm">
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        {% if priority_filter %}<input type="hidden" name="priority" value="{{ priority_filter }}">{% endif %}
+        <i class="bi bi-search"></i>
+        <input
+            type="text" name="q" id="issuesSearchInput"
+            placeholder="Issue code, type, or subscriber..."
+            value="{{ search_term }}"
+            aria-label="Search issues"
+            autocomplete="off"
+        >
+    </form>
+
+    <div class="subs-pill-group" role="group" aria-label="Filter by status">
+        {% for value, label in status_options %}
+            <a
+                class="subs-pill {{ 'subs-pill-active' if status_filter == value else '' }}"
+                href="{{ url_for('issues.list_issues', q=search_term, status=value, priority=priority_filter) }}"
+            >{{ label }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="subs-pill-group" role="group" aria-label="Filter by priority">
+        {% for value, label in priority_options %}
+            <a
+                class="subs-pill {{ 'subs-pill-active' if priority_filter == value else '' }}"
+                href="{{ url_for('issues.list_issues', q=search_term, status=status_filter, priority=value) }}"
+            >{{ label }}</a>
+        {% endfor %}
     </div>
 </div>
 
@@ -71,10 +73,20 @@
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="issuesTableBody">
                 {% for issue in issues %}
                 {% set assignment = assignment_by_issue.get(issue.id) %}
-                <tr class="disp-row disp-row-clickable" onclick="window.location='{{ url_for('issues.view_issue', issue_id=issue.id) }}';">
+                {% set search_blob = [
+                    issue.issue_code,
+                    issue.issue_type,
+                    issue.subscriber.full_name if issue.subscriber else "",
+                    issue.subscriber.subscriber_code if issue.subscriber else "",
+                    issue.nap.nap_code if issue.nap else "",
+                    issue.status|replace('_', ' '),
+                    issue.priority,
+                    assignment.technician.full_name if assignment and assignment.technician else "",
+                ]|select|join(' ')|lower %}
+                <tr class="disp-row disp-row-clickable" data-search="{{ search_blob }}" onclick="window.location='{{ url_for('issues.view_issue', issue_id=issue.id) }}';">
                     <td>
                         <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="disp-primary-link">
                             {{ issue.issue_code or ('#' ~ issue.id) }}
@@ -119,15 +131,74 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr>
+                <tr id="issuesEmptyRow">
                     <td colspan="8" class="disp-empty">
                         <i class="bi bi-exclamation-triangle display-6 d-block mb-2"></i>
                         No issues found{% if search_term or status_filter or priority_filter %} matching your filters{% endif %}.
                     </td>
                 </tr>
                 {% endfor %}
+                {% if issues %}
+                <tr id="issuesNoMatchRow" class="d-none">
+                    <td colspan="8" class="disp-empty">
+                        <i class="bi bi-search display-6 d-block mb-2"></i>
+                        No issues match "<span id="issuesNoMatchQuery"></span>".
+                    </td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Instant client-side filtering as the admin types — same pattern
+    // as subscribers/list.html: filters the rows already on the page
+    // (issue code, type, subscriber, NAP, status, priority, assigned
+    // technician) with no page reload / no Enter key required. The
+    // status/priority pills above still do a real server-side filter
+    // (they navigate), so this only narrows *within* whichever
+    // status/priority subset is currently loaded.
+    (function () {
+        var input = document.getElementById('issuesSearchInput');
+        var body = document.getElementById('issuesTableBody');
+        if (!input || !body) return;
+
+        var rows = Array.prototype.slice.call(body.querySelectorAll('tr.disp-row'));
+        var noMatchRow = document.getElementById('issuesNoMatchRow');
+        var noMatchQuery = document.getElementById('issuesNoMatchQuery');
+        var recordCount = document.getElementById('issuesRecordCount');
+
+        function applyFilter() {
+            var term = input.value.trim().toLowerCase();
+            var visibleCount = 0;
+
+            rows.forEach(function (row) {
+                var match = !term || (row.dataset.search || '').indexOf(term) !== -1;
+                row.classList.toggle('d-none', !match);
+                if (match) visibleCount += 1;
+            });
+
+            if (noMatchRow) {
+                var showEmpty = term && visibleCount === 0;
+                noMatchRow.classList.toggle('d-none', !showEmpty);
+                if (showEmpty && noMatchQuery) {
+                    noMatchQuery.textContent = input.value.trim();
+                }
+            }
+
+            if (recordCount) {
+                recordCount.textContent = visibleCount + (visibleCount === 1 ? ' issue shown' : ' issues shown');
+            }
+        }
+
+        input.addEventListener('input', applyFilter);
+
+        // No-JS / slow-typist fallback: Enter still submits a real
+        // server-side search (?q=...), which also covers issues
+        // outside the currently loaded status/priority subset.
+    })();
+</script>
 {% endblock %}
