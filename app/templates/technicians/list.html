@@ -84,7 +84,9 @@
                     </td>
                     <td class="disp-subtext">{{ technician.contact_number or "—" }}</td>
                     <td>
-                        {% if technician.user %}
+                        {% if technician.personnel_type == 'field_assistant' %}
+                            <span class="disp-subtext">—</span>
+                        {% elif technician.user %}
                             <span class="disp-code-pill">{{ technician.user.username }}</span>
                         {% else %}
                             <span class="disp-subtext">Not linked</span>

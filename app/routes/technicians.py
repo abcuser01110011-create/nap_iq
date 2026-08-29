@@ -117,12 +117,17 @@ def add_technician():
         form.personnel_type.data = requested_type
 
     if form.validate_on_submit():
+        # Field assistants don't get mobile-app access, so a linked
+        # login only ever applies to technicians — enforced here too,
+        # not just hidden client-side, in case of a stale/tampered POST.
+        linked_user_id = form.user_id.data if form.personnel_type.data == "technician" else 0
+
         technician = Technician(
             full_name=form.full_name.data.strip(),
             contact_number=(form.contact_number.data or "").strip() or None,
             personnel_type=form.personnel_type.data,
             status=form.status.data,
-            user_id=form.user_id.data or None,  # 0 sentinel -> NULL
+            user_id=linked_user_id or None,  # 0 sentinel -> NULL
         )
         db.session.add(technician)
         db.session.commit()
@@ -166,7 +171,10 @@ def edit_technician(technician_id):
         technician.contact_number = (form.contact_number.data or "").strip() or None
         technician.personnel_type = form.personnel_type.data
         technician.status = form.status.data
-        technician.user_id = form.user_id.data or None
+        # Same rule as add_technician: field assistants never keep a
+        # linked login, even if one was set before the type was changed.
+        linked_user_id = form.user_id.data if form.personnel_type.data == "technician" else 0
+        technician.user_id = linked_user_id or None
 
         db.session.commit()
         label = "Field assistant" if technician.personnel_type == "field_assistant" else "Technician"

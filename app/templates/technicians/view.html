@@ -37,6 +37,7 @@
                     <dt class="col-sm-4 text-muted fw-normal">Resolved Issues</dt>
                     <dd class="col-sm-8">{{ technician.resolved_issues_count }}</dd>
 
+                    {% if technician.personnel_type != 'field_assistant' %}
                     <dt class="col-sm-4 text-muted fw-normal">Linked Login</dt>
                     <dd class="col-sm-8">
                         {% if technician.user %}
@@ -45,6 +46,7 @@
                             <span class="text-muted">Not linked</span>
                         {% endif %}
                     </dd>
+                    {% endif %}
                 </dl>
             </div>
         </div>

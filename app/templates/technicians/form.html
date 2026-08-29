@@ -48,14 +48,14 @@
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6" id="linked-login-field" style="{{ 'display:none;' if is_field_assistant else '' }}">
                             <label class="form-label">{{ form.user_id.label }}</label>
                             {{ form.user_id(class="form-select" ~ (" is-invalid" if form.user_id.errors else "")) }}
                             {% for error in form.user_id.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                             <div class="form-text">
-                                Only technician-role accounts not already linked to another profile are listed.
+                                Only technician-role accounts not already linked to another profile are listed. Mobile app access is for technicians only — field assistants don't get a linked login.
                             </div>
                         </div>
                     </div>
@@ -74,4 +74,23 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        var typeSelect = document.getElementById('{{ form.personnel_type.id }}');
+        var linkedLoginField = document.getElementById('linked-login-field');
+        var linkedLoginSelect = document.getElementById('{{ form.user_id.id }}');
+        if (!typeSelect || !linkedLoginField) return;
+
+        function syncLinkedLoginVisibility() {
+            var isFieldAssistant = typeSelect.value === 'field_assistant';
+            linkedLoginField.style.display = isFieldAssistant ? 'none' : '';
+            if (isFieldAssistant && linkedLoginSelect) {
+                linkedLoginSelect.value = '0';
+            }
+        }
+
+        typeSelect.addEventListener('change', syncLinkedLoginVisibility);
+    })();
+</script>
 {% endblock %}
