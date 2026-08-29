@@ -120,6 +120,50 @@
     color: #ffffff;
 }
 
+/* Live connection readout -- reflects whatever network-speed.js has
+   most recently measured (Network Information API where supported,
+   otherwise a periodic active probe), and updates in place for as
+   long as the overlay is showing rather than being set once. */
+.auth-transition-network {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: -0.55rem 0 1.15rem;
+    font-size: 0.75rem;
+    color: rgba(226, 232, 255, 0.65);
+}
+
+.auth-transition-network-dot {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #8892b0;
+    transition: background-color 0.25s ease;
+}
+
+.auth-transition-network[data-quality="fast"] .auth-transition-network-dot {
+    background: #35d488;
+}
+
+.auth-transition-network[data-quality="moderate"] .auth-transition-network-dot {
+    background: var(--login-accent-bright, #3b6bff);
+}
+
+.auth-transition-network[data-quality="slow"] .auth-transition-network-dot,
+.auth-transition-network[data-quality="offline"] .auth-transition-network-dot {
+    background: #ffb648;
+}
+
+.auth-transition-network[data-quality="offline"] .auth-transition-network-dot {
+    background: #ff5b6a;
+}
+
+.auth-transition-network[data-quality="slow"] .auth-transition-network-dot,
+.auth-transition-network[data-quality="offline"] .auth-transition-network-dot {
+    animation: authTransitionDot 1s ease-in-out infinite;
+}
+
 .auth-transition-steps {
     list-style: none;
     margin: 0 0 1.35rem;
