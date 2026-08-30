@@ -843,6 +843,13 @@
                 if (response.ok && payload.status === "success") {
                     modalInstance.hide();
                     showTicketSuccessToast("Ticket Successfully Created!");
+                    // Tells napmap.js (a separate script) to refresh
+                    // immediately rather than waiting for its background
+                    // timer/tab-focus refresh -- so the priority just set
+                    // on this ticket (Repair's admin-chosen priority,
+                    // Fiber Break's forced Critical, etc.) colors the
+                    // affected subscriber marker(s) right away.
+                    window.dispatchEvent(new CustomEvent("napiq:ticket-created"));
                 } else if (payload.errors) {
                     showFieldErrors(payload.errors);
                     showGeneralError("Please fix the highlighted fields and try again.");

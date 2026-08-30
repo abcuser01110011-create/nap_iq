@@ -483,6 +483,17 @@
             if (!document.hidden) refreshLiveData();
         });
         window.addEventListener("focus", () => refreshLiveData());
+
+        // Instant catch-up right after the "+ Tickets" modal creates a
+        // ticket (tickets.js, a separate script) -- without this, a
+        // freshly-created issue's priority (e.g. a Repair ticket's
+        // admin-chosen priority, or a Fiber Break's forced Critical)
+        // wouldn't color the affected subscriber's marker until the
+        // background timer/focus refresh above eventually got to it.
+        // `force=true` since a ticket was just successfully saved, not
+        // an ambient background tick -- there's nothing here to avoid
+        // interrupting.
+        window.addEventListener("napiq:ticket-created", () => refreshLiveData(true));
     }
 
     /** Rebuilds the NAP, issue, and subscriber marker layers. */
@@ -2376,13 +2387,21 @@
         const reportModalEl = document.getElementById("reportIssueModal");
         const subscriberSelect = document.getElementById("reportIssueSubscriber");
 
-        reportBtn.addEventListener("click", () => {
-            if (issueModeActive) {
-                exitIssueMode();
-            } else {
-                enterIssueMode();
-            }
-        });
+        // reportIssueModeBtn was removed from the GeoMap toolbar (the
+        // "+ Tickets" quick-create modal now covers reporting a
+        // trouble ticket), so this is optional: everything else in
+        // this function (the subscriber-select auto-fill, the modal's
+        // own submit handling) still works standalone, just with no
+        // button left to enter "issue mode" (click-to-drop-a-pin) from.
+        if (reportBtn) {
+            reportBtn.addEventListener("click", () => {
+                if (issueModeActive) {
+                    exitIssueMode();
+                } else {
+                    enterIssueMode();
+                }
+            });
+        }
 
         bannerCancelBtn.addEventListener("click", exitIssueMode);
         modalCancelBtn.addEventListener("click", exitIssueMode);
@@ -2540,9 +2559,11 @@
         issueModeActive = true;
 
         const btn = document.getElementById("reportIssueModeBtn");
-        btn.classList.remove("btn-warning");
-        btn.classList.add("btn-outline-danger");
-        btn.innerHTML = '<i class="bi bi-x-lg me-1"></i>Cancel Report';
+        if (btn) {
+            btn.classList.remove("btn-warning");
+            btn.classList.add("btn-outline-danger");
+            btn.innerHTML = '<i class="bi bi-x-lg me-1"></i>Cancel Report';
+        }
 
         document.getElementById("issueModeBanner").classList.remove("d-none");
         document.getElementById("napMap").classList.add("add-mode-cursor");
@@ -2553,9 +2574,11 @@
         issueModeActive = false;
 
         const btn = document.getElementById("reportIssueModeBtn");
-        btn.classList.remove("btn-outline-danger");
-        btn.classList.add("btn-warning");
-        btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Report an Issue';
+        if (btn) {
+            btn.classList.remove("btn-outline-danger");
+            btn.classList.add("btn-warning");
+            btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Report an Issue';
+        }
 
         document.getElementById("issueModeBanner").classList.add("d-none");
         document.getElementById("napMap").classList.remove("add-mode-cursor");

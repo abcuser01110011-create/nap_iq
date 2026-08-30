@@ -126,9 +126,6 @@
         <button type="button" id="addNapModeBtn" class="btn btn-primary btn-sm shadow-sm">
             <i class="bi bi-plus-lg me-1"></i>Add NAP
         </button>
-        <button type="button" id="reportIssueModeBtn" class="btn btn-warning btn-sm shadow-sm">
-            <i class="bi bi-exclamation-triangle me-1"></i>Report an Issue
-        </button>
         {# Installation Planning, Phase 3 (40%): admin-only, matching the
            prototype's role === 'admin' toggle. Jinja-gated (stricter than
            the two buttons above, which only the backend gates) per
@@ -141,13 +138,21 @@
         {% endif %}
     </div>
 
-    <!-- Floating top-left horizontal toolbar: Layers / Filters / Navigation
-         as small dropdown menus instead of a tall stacked-cards column.
-         Same control ids as before (showNapsToggle, showIssuesToggle,
-         showSubscribersToggle, status-filter/portsFilter/issue-status-filter/
-         issue-priority-filter, navDestinationPanel, navOriginPanel) so none
-         of napmap.js / nav-*.js needed any changes — only the surrounding
-         markup changed from stacked cards to dropdown menus. -->
+    <!-- Floating top-left horizontal toolbar: Layers / Filters as small
+         dropdown menus instead of a tall stacked-cards column. The
+         third dropdown that used to live here (Navigation
+         destination/origin, #navDestinationPanel/#navOriginPanel) was
+         removed from the UI -- nav-destination.js/nav-origin.js's own
+         render() functions already no-op when those containers don't
+         exist (see their own "if (!panel) return;" guards), so the
+         underlying destination-selection store and manual-origin
+         picker still work internally (e.g. a marker popup's "Set as
+         destination" button), there's just no panel left to display
+         them in. Same control ids as before for what remains
+         (showNapsToggle, showIssuesToggle, showSubscribersToggle,
+         status-filter/portsFilter/issue-status-filter/
+         issue-priority-filter) so napmap.js needed no changes for
+         those. -->
     <div class="napmap-float napmap-float-top-left">
         <div class="napmap-toolbar d-flex flex-row flex-wrap gap-2">
             <div class="dropdown napmap-toolbar-dropdown">
@@ -300,34 +305,6 @@
                 </div>
             </div>
 
-            <div class="dropdown napmap-toolbar-dropdown">
-                <button type="button" class="btn btn-light btn-sm shadow-sm dropdown-toggle napmap-toolbar-btn"
-                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-                    <i class="bi bi-signpost-split me-1"></i>Navigation
-                </button>
-                <div class="dropdown-menu napmap-dropdown-menu p-2">
-                    <!-- Phase 23 (15%): navigation destination selection. Purely a
-                         read-out of NapIQNavigation's in-memory state (see
-                         nav-destination.js) — clicking a NAP/issue/subscriber
-                         marker's "Set as destination" popup button is what actually
-                         populates this. No routing/GPS/demo travel here. -->
-                    <label class="form-label small text-muted mb-1">
-                        <i class="bi bi-signpost-split me-1"></i>Navigation destination
-                    </label>
-                    <div id="navDestinationPanel"></div>
-
-                    <!-- Phase 8 (adapted onto Phase 23's navigation
-                         architecture): manual navigation origin, set
-                         either by clicking a point on the map
-                         (nav-origin-picker.js) or by typing coordinates
-                         (nav-origin.js's own small form). -->
-                    <hr class="my-2">
-                    <label class="form-label small text-muted mb-1">
-                        <i class="bi bi-flag me-1"></i>Navigation origin
-                    </label>
-                    <div id="navOriginPanel"></div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -360,16 +337,6 @@
             <div id="mapResultCount" class="napmap-legend-count"></div>
         </div>
     </div>
-
-    <!-- Navigation Card — foundation only this phase (destination
-       summary + idle/no-route status + empty controls container
-       for later phases). Rendered by nav-card.js from the same
-       NapIQNavigation store the "Navigation destination" panel
-       above already uses, so both always agree. data-role
-       drives the admin/technician heading, same distinction the
-       prototype's NavigationCard makes. -->
-    <div id="navigationCard" class="nav-card"
-         data-role="{{ current_user.role if current_user else '' }}"></div>
 
     {# Installation Planning, Phase 4 (55%): Installation Planner
        suggestion panel. Shares the exact same bottom-right slot as

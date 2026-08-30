@@ -923,13 +923,21 @@
    treatment. */
 .napmap-detail-panel {
     position: absolute;
-    top: 0;
+    /* Docked below the top-right button row (Tickets / Add NAP / Plan
+       Installation) instead of top: 0 -- the panel used to span the
+       full height of .napmap-shell and, being z-index 1003 (above
+       .napmap-float-top-right's 1001), visually sat on top of those
+       buttons and swallowed their clicks whenever it was open. Same
+       62px clearance .napmap-float-top-banner already uses for the
+       same "sit below the ~34-36px compact button rows" reason. */
+    top: 62px;
     right: 0;
     bottom: 0;
     width: 360px;
     max-width: calc(100% - 16px);
     background: var(--napiq-surface, #ffffff);
     border-left: 1px solid var(--napiq-border, #e6e9ef);
+    border-top: 1px solid var(--napiq-border, #e6e9ef);
     box-shadow: -6px 0 18px rgba(15, 23, 42, 0.12);
     z-index: 1003; /* above .napmap-float-top-banner (1002) so it never hides behind mode banners */
     display: flex;
@@ -945,6 +953,16 @@
 .napmap-detail-panel.napmap-detail-panel-open {
     transform: translateX(0);
     pointer-events: auto;
+}
+
+@media (max-width: 767.98px) {
+    .napmap-detail-panel {
+        /* The top-right button row wraps onto two lines on narrower
+           viewports (same breakpoint .napmap-float-top-banner already
+           switches at, for the same reason), so the panel needs more
+           clearance here too or it goes back to overlapping row two. */
+        top: 108px;
+    }
 }
 
 @media (max-width: 575.98px) {
