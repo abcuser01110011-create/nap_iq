@@ -259,6 +259,15 @@
     background-color: #1c2438;
 }
 
+/* Ticket form's Customer + Barangay autocomplete dropdowns
+   (.ticket-subscriber-dropdown, shared by both -- see napmap.css)
+   were missing this override, so in dark mode hovered rows kept the
+   light-mode background with light text on top of it -- effectively
+   invisible. Same treatment as .nap-search-dropdown above. */
+[data-bs-theme="dark"] .ticket-subscriber-dropdown .list-group-item:hover {
+    background-color: #1c2438;
+}
+
 [data-bs-theme="dark"] .issue-popup .issue-popup-code,
 [data-bs-theme="dark"] .nap-popup .nap-popup-code,
 [data-bs-theme="dark"] .issue-popup dt,

@@ -36,7 +36,10 @@
         : "";
 
     // Santa Cruz, Laguna's PSGC city/municipality code.
-    const BARANGAY_API_URL = "https://psgc.gitlab.io/api/cities-municipalities/0403400000/barangays/";
+    // (Was 0403400000 -- not a real PSGC code, so this silently
+    // 404'd and cached itself as an empty list. Santa Cruz, Laguna's
+    // actual code is 0403426000.)
+    const BARANGAY_API_URL = "https://psgc.gitlab.io/api/cities-municipalities/0403426000/barangays/";
 
     let modalInstance = null;
     let currentCategory = "SO"; // "SO" | "TN"
@@ -245,29 +248,29 @@
         });
     }
 
+    // The visible "Location" field was removed from the TN form (the
+    // pin itself is never user-editable -- it's always the selected
+    // subscriber's own registered coordinates, per the "pin error"
+    // rule in app/routes/issues.py). This still has to run on every
+    // subscriber pick for TN, though: it's what blocks submission
+    // when a subscriber has no registered location on file, and it
+    // now surfaces that through the existing Customer field's help
+    // text instead of a dedicated field.
     function updateLocationForSubscriber() {
         if (currentCategory !== "TN") return;
-        const status = document.getElementById("ticketFormPinStatus");
-        const autoInput = document.getElementById("ticketFormLocationAuto");
         const submitBtn = document.getElementById("ticketFormSubmitBtn");
         if (!selectedSubscriber) {
-            autoInput.value = "";
-            status.textContent = "Select the affected subscriber to fill this in from their registered address.";
-            status.className = "form-text text-muted";
             submitBtn.disabled = false;
             return;
         }
         if (selectedSubscriber.latitude == null || selectedSubscriber.longitude == null) {
-            autoInput.value = selectedSubscriber.address || "";
-            status.textContent =
-                "This subscriber has no registered location on file, so a trouble ticket can't be pinned for them yet.";
-            status.className = "form-text text-danger";
+            setSubscriberHelp(
+                "This subscriber has no registered location on file, so a trouble ticket can't be pinned for them yet.",
+                "text-danger"
+            );
             submitBtn.disabled = true;
             return;
         }
-        autoInput.value = selectedSubscriber.address || "(no address on file, using registered coordinates)";
-        status.textContent = "Location filled in from " + selectedSubscriber.full_name + "'s registered address.";
-        status.className = "form-text text-success";
         submitBtn.disabled = false;
     }
 
@@ -385,11 +388,7 @@
         renderBarangayResults([]);
         loadBarangays();
 
-        const autoWrapper = document.getElementById("ticketFormLocationAutoWrapper");
-        if (category === "SO") {
-            autoWrapper.classList.add("d-none");
-        } else {
-            autoWrapper.classList.remove("d-none");
+        if (category === "TN") {
             updateLocationForSubscriber();
         }
 
