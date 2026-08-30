@@ -147,11 +147,14 @@ CREATE TABLE IF NOT EXISTS technical_issues (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- service_requests: new installation / disconnection / relocation / upgrade
+-- service_requests: new installation / disconnection / relocation / upgrade / add_nap
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS service_requests (
     id                INT AUTO_INCREMENT PRIMARY KEY,
-    request_type      ENUM('new_installation', 'disconnection', 'relocation', 'upgrade')
+    -- 'add_nap': a ticket asking a field assistant to install a brand
+    -- new NAP, created from the GeoMap "+ Tickets" quick-create modal.
+    -- See app/models.py's ServiceRequest.request_type comment.
+    request_type      ENUM('new_installation', 'disconnection', 'relocation', 'upgrade', 'add_nap')
                           NOT NULL,
     subscriber_id     INT,
     requested_nap_id  INT,

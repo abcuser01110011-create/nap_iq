@@ -314,11 +314,24 @@ class ServiceRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     request_type = db.Column(
         db.Enum(
-            "new_installation", "disconnection", "relocation", "upgrade",
+            "new_installation", "disconnection", "relocation", "upgrade", "add_nap",
             name="service_request_type",
         ),
         nullable=False,
     )
+    # "add_nap": a ticket asking a field assistant to install a brand
+    # new NAP (as opposed to connecting a subscriber to an existing
+    # one). Created from the GeoMap "+ Tickets" quick-create modal,
+    # same dispatch pipeline (Assignment via _dispatch_field_assistant)
+    # every other Service Order type already uses -- see
+    # QuickAddNapRequestForm (app/forms.py) and
+    # quick_add_nap_request() (app/routes/service_requests.py) for the
+    # exact fields collected. Since this table has no dedicated
+    # columns for a NAP's planned name/port capacity, `full_name` is
+    # reused for the planned NAP name and `notes` carries the planned
+    # NAP code preview + port capacity, same "fold what has no column"
+    # pattern quick_add_request() already uses for new_installation's
+    # priority/plan/scheduled fields.
     subscriber_id = db.Column(db.Integer, db.ForeignKey("subscribers.id"), nullable=True)
     requested_nap_id = db.Column(db.Integer, db.ForeignKey("naps.id"), nullable=True)
     status = db.Column(

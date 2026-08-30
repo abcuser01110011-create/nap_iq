@@ -147,6 +147,21 @@
         </div>
 
         <div class="sr-doc-section">
+            {% if service_request.request_type == 'add_nap' %}
+            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">NAP Information</span></div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Planned NAP Name</div>
+                    <div class="fvalue">{{ service_request.full_name or "—" }}</div>
+                </div>
+            </div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Barangay</div>
+                    <div class="fvalue">{{ service_request.address or "—" }}</div>
+                </div>
+            </div>
+            {% else %}
             <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Customer Information</span></div>
             {% if service_request.subscriber %}
             <div class="sr-doc-row">
@@ -200,6 +215,7 @@
             </div>
             {% else %}
             <p class="text-muted mb-0">No subscriber record linked to this request.</p>
+            {% endif %}
             {% endif %}
         </div>
 

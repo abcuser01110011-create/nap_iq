@@ -1329,3 +1329,68 @@ class QuickServiceRequestForm(FlaskForm):
         "Description",
         validators=[Optional(), Length(max=2000, message="Description is too long.")],
     )
+
+
+class QuickAddNapRequestForm(FlaskForm):
+    """Used by the GeoMap's "+ Tickets" quick-create modal for the SO
+    "Add NAP" ticket type -- a little different in shape from
+    QuickServiceRequestForm above since there's no customer/applicant
+    involved: this collects the NAP a field assistant is being sent
+    out to install (its planned name, barangay, and port capacity),
+    not someone applying for service.
+
+    Creating this ticket never creates a real `Nap` row -- it only
+    creates the ServiceRequest and dispatches it to the chosen field
+    assistant, same as every other Service Order type. The actual NAP
+    still gets added (via the existing Add NAP page/map-pin flow)
+    once the field assistant has completed the on-site installation.
+
+    This table has no dedicated columns for a NAP's name/port
+    capacity, so the route folds what doesn't have a column (planned
+    NAP code preview, port capacity) into `notes` -- same pattern
+    quick_add_request() already uses for new_installation's
+    priority/plan/scheduled fields.
+    """
+
+    request_type = SelectField(
+        "Request Type",
+        choices=[("add_nap", "Add NAP")],
+        validators=[DataRequired(message="Request type is required.")],
+    )
+    nap_name = StringField(
+        "NAP Name",
+        validators=[
+            DataRequired(message="NAP name is required."),
+            Length(max=150, message="NAP name is too long."),
+        ],
+    )
+    barangay = StringField(
+        "Location",
+        validators=[
+            DataRequired(message="Barangay is required."),
+            Length(max=255, message="Location is too long."),
+        ],
+    )
+    port_capacity = IntegerField(
+        "Port Capacity",
+        validators=[
+            DataRequired(message="Port capacity is required."),
+            NumberRange(min=1, message="Port capacity must be at least 1."),
+        ],
+    )
+    status = SelectField(
+        "Status",
+        choices=[
+            ("pending", "Pending"),
+            ("approved", "Approved"),
+            ("scheduled", "Scheduled"),
+            ("completed", "Completed"),
+            ("rejected", "Rejected"),
+        ],
+        default="pending",
+        validators=[DataRequired()],
+    )
+    notes = TextAreaField(
+        "Notes",
+        validators=[Optional(), Length(max=2000, message="Notes are too long.")],
+    )

@@ -23,6 +23,7 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   disconnection: "Disconnection",
   relocation: "Relocation",
   upgrade: "Upgrade",
+  add_nap: "Add NAP",
 };
 
 // Phase 28: display label for Assignment.job_type ("repair" |

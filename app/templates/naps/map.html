@@ -101,11 +101,11 @@
     <div class="napmap-float napmap-float-top-right d-flex gap-2 flex-wrap">
         {# "+ Tickets" replaces the old "Table View" link. Two groups,
            bold non-clickable header + clickable type rows underneath:
-           Service Order (SO) opens the ticketFormModal below (New
-           Installation) or, for "Add NAP", just triggers the existing
-           Add NAP mode button -- Add NAP already is a full feature on
-           this page, so there's no reason to build a second path to
-           it. Trouble Ticket (TN) opens the same modal in its TN
+           Service Order (SO) opens the ticketFormModal below -- "New
+           Installation" and "Add NAP" both submit as real tickets
+           (see app/routes/service_requests.py's quick_add_request()/
+           quick_add_nap_request()), just with different fields.
+           Trouble Ticket (TN) opens the same modal in its TN
            configuration (Fiber Break / Repair). See
            app/static/js/tickets.js. #}
         <div class="dropdown">
@@ -613,12 +613,16 @@
                         <div class="invalid-feedback d-block small" data-error-for="request_type"></div>
                     </div>
 
-                    {# SO: plain free-text customer name. Not matched or looked
-                       up against the subscribers table -- this is meant for
-                       someone applying for service who isn't a subscriber
-                       yet, so it never fetches or auto-suggests anything. #}
+                    {# SO: plain free-text customer name -- except "Add NAP",
+                       which repurposes this same input for the NAP's planned
+                       name (there's no customer involved). Relabeled/
+                       re-placeholder'd per type in tickets.js's applyCategory().
+                       Not matched or looked up against the subscribers table --
+                       this is meant for someone applying for service who isn't
+                       a subscriber yet, so it never fetches or auto-suggests
+                       anything. #}
                     <div class="mb-2" id="ticketFormCustomerNameWrapper">
-                        <label class="form-label small text-muted mb-1">Customer</label>
+                        <label class="form-label small text-muted mb-1" id="ticketFormCustomerNameLabel">Customer</label>
                         <input type="text" class="form-control" id="ticketFormCustomerName"
                                placeholder="Customer's full name" autocomplete="off">
                         <div class="invalid-feedback d-block small" data-error-for="full_name"></div>
@@ -675,6 +679,24 @@
                             <input type="tel" class="form-control" id="ticketFormContactNumber"
                                    placeholder="09XX XXX XXXX" autocomplete="off">
                             <div class="invalid-feedback d-block small" data-error-for="contact_number"></div>
+                        </div>
+                    </div>
+
+                    {# "Add NAP" only: the NAP's own auto-increment code (a
+                       display preview -- see /api/naps/next-code -- never
+                       user-editable, never reserved) and the port capacity
+                       the field assistant should install. Hidden for every
+                       other type; see ticketFormSOExtraFields above. #}
+                    <div class="row g-2 d-none" id="ticketFormAddNapExtraFields">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">NAP Code</label>
+                            <input type="text" class="form-control" id="ticketFormNapCode" readonly>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Port Capacity</label>
+                            <input type="number" class="form-control" id="ticketFormPortCapacity"
+                                   min="1" step="1" placeholder="e.g. 8">
+                            <div class="invalid-feedback d-block small" data-error-for="port_capacity"></div>
                         </div>
                     </div>
 

@@ -41,7 +41,7 @@
                 <label class="form-label small text-muted mb-1">Type</label>
                 <select name="type" class="form-select">
                     <option value="" {% if not type_filter %}selected{% endif %}>All Types</option>
-                    {% for t in ['new_installation', 'relocation', 'upgrade', 'disconnection'] %}
+                    {% for t in ['new_installation', 'relocation', 'upgrade', 'disconnection', 'add_nap'] %}
                     <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t|replace('_',' ')|capitalize }}</option>
                     {% endfor %}
                 </select>

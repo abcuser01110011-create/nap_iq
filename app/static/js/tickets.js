@@ -6,14 +6,21 @@
  * type opens #ticketFormModal (see naps/map.html), reconfigured for
  * that category:
  *
- *   - SO "Add NAP" doesn't open the modal at all -- it just clicks
- *     the page's own existing #addNapModeBtn, since Add NAP is
- *     already a full feature here.
- *   - SO "New Installation" / "Relocation" submit to
- *     POST /service-requests/quick-add (app/routes/service_requests.py).
- *     Location is a free Barangay picker (Santa Cruz, Laguna, via the
- *     public PSGC API) since a service_request has no "must match a
- *     subscriber's exact pin" rule.
+ *   - SO "New Installation" submits to POST /service-requests/quick-add
+ *     (app/routes/service_requests.py). Location is a free Barangay
+ *     picker (Santa Cruz, Laguna, via the public PSGC API) since a
+ *     service_request has no "must match a subscriber's exact pin"
+ *     rule.
+ *   - SO "Add NAP" submits to POST /service-requests/quick-add-nap
+ *     (same file, quick_add_nap_request()) -- a ticket asking a field
+ *     assistant to install a brand new NAP, not a customer
+ *     application. It reuses the Customer field for the NAP's planned
+ *     name, the Barangay field for its location, and swaps the New
+ *     Installation-only Plan/Contact Number row for a read-only
+ *     auto-increment NAP Code preview (/api/naps/next-code) plus a
+ *     Port Capacity field. It never creates a real `naps` row itself
+ *     -- that still happens on-site once the field assistant
+ *     completes the job, same as any other Service Order.
  *   - TN types submit to the existing POST /issues/report
  *     (app/routes/issues.py). That route requires the submitted
  *     latitude/longitude to exactly match the selected subscriber's
@@ -22,11 +29,11 @@
  *     read-only field auto-filled from the chosen subscriber instead
  *     of a free picker.
  *
- * Priority/Assigned Team/Technician/Scheduled are collected in both
- * forms, but only Priority (TN) and Status (SO) map onto real
- * columns today -- the rest are folded into the description/notes
- * text server-side so nothing typed is lost. See the two routes'
- * docstrings for the full explanation.
+ * Priority/Assigned Team/Technician/Scheduled are collected in all
+ * three forms, but only Priority (TN), Status (SO), and Port Capacity
+ * (Add NAP) map onto real columns today -- the rest are folded into
+ * the description/notes text server-side so nothing typed is lost.
+ * See the routes' docstrings for the full explanation.
  */
 (function () {
     "use strict";
@@ -68,6 +75,13 @@
     // below for what that changes in the form and on submit.
     function isFiberBreakForm() {
         return currentCategory === "TN" && currentTypeValue === "Fiber Break";
+    }
+
+    // "Add NAP" is the one SO type that isn't a customer application
+    // -- see applyCategory()/submitAddNap() below for what that
+    // changes in the form and on submit.
+    function isAddNapForm() {
+        return currentCategory === "SO" && currentTypeValue === "add_nap";
     }
 
     function escapeHtml(str) {
@@ -149,6 +163,22 @@
         const codeInput = document.getElementById("ticketFormCode");
         codeInput.value = "Loading…";
         fetch("/api/tickets/next-code?category=" + encodeURIComponent(category))
+            .then((r) => r.json())
+            .then((data) => {
+                codeInput.value = (data && data.code) || "";
+            })
+            .catch(() => {
+                codeInput.value = "";
+            });
+    }
+
+    // "Add NAP" only -- preview of the actual NAP's own auto-increment
+    // code (N-001, N-002, ...), separate from the ticket code above.
+    // Same "preview, not a reservation" contract as loadNextTicketCode.
+    function loadNextNapCode() {
+        const codeInput = document.getElementById("ticketFormNapCode");
+        codeInput.value = "Loading…";
+        fetch("/api/naps/next-code")
             .then((r) => r.json())
             .then((data) => {
                 codeInput.value = (data && data.code) || "";
@@ -489,6 +519,10 @@
         document.getElementById("ticketFormNapInput").value = "";
         document.getElementById("ticketFormPlan").value = "";
         document.getElementById("ticketFormContactNumber").value = "";
+        document.getElementById("ticketFormNapCode").value = "";
+        document.getElementById("ticketFormPortCapacity").value = "";
+        document.getElementById("ticketFormCustomerNameLabel").textContent = "Customer";
+        document.getElementById("ticketFormCustomerName").placeholder = "Customer's full name";
         setSubscriberHelp("", "text-muted");
         setNapHelp("", "text-muted");
         renderSubscriberResults([]);
@@ -504,6 +538,7 @@
         currentCategory = category;
         currentTypeValue = typeValue;
         const isFiberBreak = isFiberBreakForm();
+        const isAddNap = isAddNapForm();
 
         // Type is a fixed label now (set by whichever dropdown item
         // was clicked), not something the admin can change after the
@@ -529,7 +564,15 @@
         document.getElementById("ticketFormCustomerNameWrapper").classList.toggle("d-none", !isSO);
         document.getElementById("ticketFormSubscriberWrapper").classList.toggle("d-none", isSO || isFiberBreak);
         document.getElementById("ticketFormNapWrapper").classList.toggle("d-none", !isFiberBreak);
-        document.getElementById("ticketFormSOExtraFields").classList.toggle("d-none", !isSO);
+        document.getElementById("ticketFormSOExtraFields").classList.toggle("d-none", !isSO || isAddNap);
+        document.getElementById("ticketFormAddNapExtraFields").classList.toggle("d-none", !isAddNap);
+
+        // "Add NAP" repurposes the free-text Customer field for the
+        // NAP's planned name instead -- there's no customer here.
+        document.getElementById("ticketFormCustomerNameLabel").textContent = isAddNap ? "NAP Name" : "Customer";
+        document.getElementById("ticketFormCustomerName").placeholder =
+            isAddNap ? "e.g. Brgy. Calios NAP 2" : "Customer's full name";
+        if (isAddNap) loadNextNapCode();
 
         setSubscriberHelp("", "text-muted");
         renderSubscriberResults([]);
@@ -557,9 +600,11 @@
         // Fiber Break always flags every connected line critical (see
         // report_fiber_break()'s docstring) -- lock the Priority
         // dropdown to Critical rather than leaving a selectable value
-        // the backend would silently override anyway.
+        // the backend would silently override anyway. "Add NAP" has
+        // no priority concept at all (it isn't submitted -- see
+        // submitAddNap()), so the control is just disabled there too.
         const prioritySelect = document.getElementById("ticketFormPriority");
-        prioritySelect.disabled = isFiberBreak;
+        prioritySelect.disabled = isFiberBreak || isAddNap;
         if (isFiberBreak) prioritySelect.value = "critical";
 
         // Status only makes sense as a real choice for SO (a
@@ -749,6 +794,31 @@
         });
     }
 
+    function submitAddNap() {
+        const formData = new FormData();
+        formData.append("request_type", "add_nap");
+        // Repurposed Customer field -- see ticketFormCustomerNameWrapper
+        // in naps/map.html and QuickAddNapRequestForm's docstring.
+        formData.append("nap_name", document.getElementById("ticketFormCustomerName").value.trim());
+        formData.append("barangay", document.getElementById("ticketFormBarangayInput").value);
+        formData.append("port_capacity", document.getElementById("ticketFormPortCapacity").value);
+        formData.append("status", document.getElementById("ticketFormStatus").value);
+        formData.append("notes", document.getElementById("ticketFormDescription").value);
+        formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
+        formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
+        formData.append(
+            "technicians_label",
+            addedTechnicians.map((t) => t.full_name).join(", ")
+        );
+        formData.append("csrf_token", CSRF_TOKEN);
+
+        return fetch("/service-requests/quick-add-nap", {
+            method: "POST",
+            headers: { "X-CSRFToken": CSRF_TOKEN },
+            body: formData,
+        });
+    }
+
     function submitTN() {
         const formData = new FormData();
         formData.append("issue_type", document.getElementById("ticketFormTypeValue").value);
@@ -809,6 +879,7 @@
         document.querySelectorAll("#ticketForm [data-error-for]").forEach((el) => (el.textContent = ""));
 
         const isFiberBreak = isFiberBreakForm();
+        const isAddNap = isAddNapForm();
 
         if (isFiberBreak) {
             // Fiber Break needs the affected NAP, not a subscriber.
@@ -826,8 +897,9 @@
             }
         } else if (!document.getElementById("ticketFormCustomerName").value.trim()) {
             // SO's Customer field is free text -- just needs something
-            // typed, not a match against any existing record.
-            showGeneralError("Please enter the customer's name.");
+            // typed, not a match against any existing record. "Add
+            // NAP" repurposes the same field for the NAP's name.
+            showGeneralError(isAddNap ? "Please enter the NAP name." : "Please enter the customer's name.");
             return;
         }
 
@@ -835,7 +907,9 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
 
-        const request = currentCategory === "SO" ? submitSO() : (isFiberBreak ? submitFiberBreak() : submitTN());
+        const request = isAddNap
+            ? submitAddNap()
+            : (currentCategory === "SO" ? submitSO() : (isFiberBreak ? submitFiberBreak() : submitTN()));
 
         request
             .then((response) => response.json().then((payload) => ({ response, payload })))
@@ -881,14 +955,6 @@
                 const category = item.getAttribute("data-category");
                 const typeValue = item.getAttribute("data-type-value");
                 const typeLabel = item.getAttribute("data-type-label");
-
-                if (typeValue === "add_nap") {
-                    // "Add NAP" isn't a ticket -- it's the page's own
-                    // existing Add NAP mode. Just trigger that.
-                    const addNapBtn = document.getElementById("addNapModeBtn");
-                    if (addNapBtn) addNapBtn.click();
-                    return;
-                }
                 openTicketForm(category, typeValue, typeLabel);
             });
         });

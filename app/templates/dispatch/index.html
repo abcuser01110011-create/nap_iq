@@ -170,6 +170,9 @@
                             {% if req.subscriber %}
                                 <span class="disp-code-pill">{{ req.subscriber.subscriber_code }}</span>
                                 {{ req.subscriber.full_name }}
+                            {% elif req.request_type == 'add_nap' and req.full_name %}
+                                {{ req.full_name }}
+                                <div class="disp-subtext">Planned NAP</div>
                             {% elif req.full_name %}
                                 {{ req.full_name }}
                                 <div class="disp-subtext">Walk-in applicant</div>

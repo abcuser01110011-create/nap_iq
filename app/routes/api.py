@@ -337,6 +337,23 @@ def tickets_next_code_json():
     return jsonify({"category": category, "code": f"{category} {next_number:05d}"})
 
 
+@api_bp.route("/naps/next-code")
+@role_required("administrator")
+def naps_next_code_json():
+    """Returns a display-only preview of the NAP code the GeoMap's
+    "+ Tickets" > "Add NAP" quick-create form will suggest, formatted
+    "N-001" (3-digit, zero-padded, one ahead of the current NAP row
+    count) -- same "preview, not a reservation" contract as
+    tickets_next_code_json() above. The Add NAP ticket this feeds
+    (service_requests.quick_add_nap_request()) never creates a real
+    Nap row itself, so this is purely informational for whoever fills
+    out the ticket; the NAP eventually created on-site gets its real
+    nap_code the normal way, same as any other NAP.
+    """
+    next_number = Nap.query.count() + 1
+    return jsonify({"code": f"N-{next_number:03d}"})
+
+
 @api_bp.route("/service-requests/<int:request_id>/recommend-nap")
 @role_required("administrator")
 def service_request_recommend_nap_json(request_id):

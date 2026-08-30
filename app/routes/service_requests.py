@@ -70,7 +70,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from app.extensions import db
 from app.auth import role_required
 from app.models import ServiceRequest, Subscriber, Nap, Assignment, Technician
-from app.forms import ServiceRequestForm, QuickServiceRequestForm
+from app.forms import ServiceRequestForm, QuickServiceRequestForm, QuickAddNapRequestForm
 from app.notifications_utils import notify
 from app.nap_recommendation import recommend_naps
 from app.email_utils import send_status_email
@@ -456,6 +456,83 @@ def quick_add_request():
                     "id": service_request.id,
                     "request_type": service_request.request_type,
                     "status": service_request.status,
+                },
+            }
+        ),
+        201,
+    )
+
+
+@service_requests_bp.route("/quick-add-nap", methods=["POST"])
+@role_required("administrator")
+def quick_add_nap_request():
+    """Creates an "Add NAP" ticket from the GeoMap's "+ Tickets"
+    quick-create modal. Called via fetch()/AJAX, so it returns JSON
+    rather than a redirect -- same pattern as quick_add_request()
+    above.
+
+    Unlike quick_add_request() (New Installation), this doesn't take
+    a customer/applicant -- it's a request for a field assistant to go
+    install a brand new NAP. Nothing here writes to the `naps` table:
+    this only creates the ServiceRequest ticket and dispatches it, the
+    same as any other Service Order. The real Nap row still gets
+    created separately (via the existing Add NAP page/map-pin flow)
+    once the field assistant has actually installed it on site --
+    this ticket's `nap_code_preview` is only ever a display preview,
+    same spirit as /api/tickets/next-code's ticket-code preview,
+    never reserved and never written to a real Nap.
+    """
+    form = QuickAddNapRequestForm()
+
+    if not form.validate_on_submit():
+        return jsonify({"status": "error", "errors": form.errors}), 400
+
+    # Server-computed, not trusted from the client -- same "never
+    # trust a client-supplied code" reasoning as every other
+    # auto-increment preview in this app (see tickets_next_code_json
+    # in app/routes/api.py). One ahead of the current NAP count, same
+    # zero-padded shape naps.py's own NAP codes use elsewhere.
+    nap_code_preview = f"N-{Nap.query.count() + 1:03d}"
+
+    extra_lines = [
+        f"Planned NAP Code: {nap_code_preview}",
+        f"Port Capacity: {form.port_capacity.data} ports",
+    ]
+    assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
+    if assigned_team_label:
+        extra_lines.append(f"Assigned Team: {assigned_team_label}")
+    technicians_label = (request.form.get("technicians_label") or "").strip()
+    if technicians_label:
+        extra_lines.append(f"Technician(s) requested: {technicians_label}")
+
+    notes_parts = ["\n".join(extra_lines)]
+    if (form.notes.data or "").strip():
+        notes_parts.append(form.notes.data.strip())
+    notes = "\n\n".join(notes_parts)
+
+    service_request = ServiceRequest(
+        request_type="add_nap",
+        subscriber_id=None,
+        status=form.status.data,
+        address=form.barangay.data.strip(),
+        full_name=form.nap_name.data.strip(),
+        notes=notes,
+    )
+    db.session.add(service_request)
+    db.session.flush()  # service_request.id is needed below before commit
+    _dispatch_field_assistant(service_request, request.form.get("assigned_team_id"))
+    db.session.commit()
+
+    return (
+        jsonify(
+            {
+                "status": "success",
+                "message": f"Add NAP ticket #{service_request.id} was created.",
+                "service_request": {
+                    "id": service_request.id,
+                    "request_type": service_request.request_type,
+                    "status": service_request.status,
+                    "nap_code_preview": nap_code_preview,
                 },
             }
         ),

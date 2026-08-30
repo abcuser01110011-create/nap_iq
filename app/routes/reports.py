@@ -79,7 +79,7 @@ ISSUE_PRIORITY_ORDER = ["critical", "high", "medium", "low"]
 NAP_STATUS_ORDER = ["active", "inactive", "full", "maintenance"]
 SUBSCRIBER_STATUS_ORDER = ["active", "inactive", "disconnected"]
 SERVICE_REQUEST_STATUS_ORDER = ["pending", "approved", "scheduled", "completed", "rejected"]
-SERVICE_REQUEST_TYPE_ORDER = ["new_installation", "disconnection", "relocation", "upgrade"]
+SERVICE_REQUEST_TYPE_ORDER = ["new_installation", "disconnection", "relocation", "upgrade", "add_nap"]
 PAYMENT_STATUS_ORDER = ["pending", "confirmed", "overdue", "voided"]
 PAYMENT_METHOD_ORDER = ["cash", "gcash", "bank_transfer", "other"]
 
