@@ -19,6 +19,7 @@ import { ApiError, type Assignment } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
+import LiveTrackingMap from "../../components/LiveTrackingMap";
 import { colors } from "../../theme/technician";
 import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
 
@@ -321,24 +322,50 @@ export default function JobDetailScreen({ route, navigation }: any) {
         )}
         {error && <Text style={styles.error}>{error}</Text>}
 
+        {/* Ticket Details — mirrors the admin's ticket view (issues/view.html
+            / service_requests/form.html): ticket identity, priority/status,
+            requester info, and description/notes all in one place, so the
+            field assistant sees the same information an admin filled in
+            before deciding to accept. No map here — see "Live tracking"
+            below, which only appears once the job is accepted. */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Subscriber</Text>
-          {lat != null && lng != null && (
-            <JobLocationMap
-              latitude={lat}
-              longitude={lng}
-              label={assignment.subscriber?.full_name ?? assignment.service_request?.full_name ?? assignment.issue?.issue_code ?? "Job location"}
-              isOnline={isOnline}
-              onOpenExternal={openMaps}
-            />
-          )}
+          <Text style={styles.cardLabel}>Ticket Details</Text>
+          <InfoRow
+            label="Ticket ID"
+            value={
+              assignment.issue?.issue_code ??
+              (assignment.service_request ? `Installation #${assignment.service_request.id}` : `Job #${assignment.id}`)
+            }
+          />
+          <InfoRow
+            label="Type"
+            value={
+              assignment.issue?.issue_type ??
+              (assignment.service_request
+                ? REQUEST_TYPE_LABELS[assignment.service_request.request_type] ?? assignment.service_request.request_type
+                : undefined)
+            }
+          />
+          {assignment.issue && <InfoRow label="Priority" value={assignment.issue.priority} />}
+          <InfoRow label="Status" value={STATUS_LABELS[assignment.status] ?? assignment.status} />
           {/* A walk-in Service Order (GeoMap "+ Tickets" modal, free-text
               Customer field) has no linked Subscriber -- fall back to the
               request's own full_name/address/contact_number, which the
               backend passes through for exactly this case. */}
-          <InfoRow label="Name" value={assignment.subscriber?.full_name ?? assignment.service_request?.full_name} />
+          <InfoRow
+            label="Subscriber"
+            value={
+              assignment.subscriber
+                ? `${assignment.subscriber.subscriber_code} — ${assignment.subscriber.full_name}`
+                : assignment.service_request?.full_name
+            }
+          />
           <InfoRow label="Address" value={assignment.subscriber?.address ?? assignment.issue?.address ?? assignment.service_request?.address} />
           <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
+          {lat != null && lng != null && <InfoRow label="Coordinates" value={`${lat.toFixed(6)}, ${lng.toFixed(6)}`} />}
+          {assignment.issue && <InfoRow label="Description" value={assignment.issue.description} />}
+          {assignment.service_request && <InfoRow label="Plan / notes" value={assignment.service_request.notes} />}
+          {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
           {lat != null && lng != null && (
             <TouchableOpacity style={styles.mapLink} onPress={openMaps}>
               <Text style={styles.mapLinkText}>Open in Maps</Text>
@@ -346,24 +373,22 @@ export default function JobDetailScreen({ route, navigation }: any) {
           )}
         </View>
 
-        {assignment.issue && (
+        {/* Live tracking — only shown once the technician has accepted the
+            job (status moves past "assigned"). Before that, the field
+            assistant only sees the ticket form above and the Accept
+            button below. */}
+        {lat != null && lng != null && assignment.status !== "assigned" && (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Issue</Text>
-            <InfoRow label="Priority" value={assignment.issue.priority} />
-            <InfoRow label="Description" value={assignment.issue.description} />
-            {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
-          </View>
-        )}
-
-        {assignment.service_request && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Installation</Text>
-            <InfoRow
-              label="Request type"
-              value={REQUEST_TYPE_LABELS[assignment.service_request.request_type] ?? assignment.service_request.request_type}
+            <Text style={styles.cardLabel}>Live tracking</Text>
+            <LiveTrackingMap
+              destinationLatitude={lat}
+              destinationLongitude={lng}
+              destinationLabel={
+                assignment.subscriber?.full_name ?? assignment.service_request?.full_name ?? assignment.issue?.issue_code ?? "job location"
+              }
+              isOnline={isOnline}
+              onOpenExternal={openMaps}
             />
-            <InfoRow label="Plan / notes" value={assignment.service_request.notes} />
-            {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
           </View>
         )}
 
