@@ -51,6 +51,7 @@
 
     let modalInstance = null;
     let currentCategory = "SO"; // "SO" | "TN"
+    let currentTypeValue = ""; // e.g. "new_installation", "Fiber Break", "Repair"
     let barangaysLoaded = false;
     let barangaysLoading = false;
     let allBarangays = [];
@@ -58,6 +59,16 @@
     let subscribersLoaded = false;
     let selectedSubscriber = null; // {id, subscriber_code, full_name, address, latitude, longitude}
     let addedTechnicians = []; // [{id, full_name}]
+    let allNaps = []; // Fiber Break's NAP picker (loaded lazily, once)
+    let napsLoaded = false;
+    let selectedNap = null; // {id, nap_code, name, address}
+
+    // Fiber Break is the one TN type that reports against a whole NAP
+    // rather than a single subscriber -- see applyCategory()/submitFiberBreak()
+    // below for what that changes in the form and on submit.
+    function isFiberBreakForm() {
+        return currentCategory === "TN" && currentTypeValue === "Fiber Break";
+    }
 
     function escapeHtml(str) {
         return String(str == null ? "" : str).replace(/[&<>"']/g, (c) => (
@@ -118,6 +129,19 @@
             })
             .catch(() => {
                 allSubscribers = [];
+            });
+    }
+
+    function loadNaps() {
+        if (napsLoaded) return Promise.resolve();
+        return fetch("/api/naps")
+            .then((r) => r.json())
+            .then((data) => {
+                allNaps = data || [];
+                napsLoaded = true;
+            })
+            .catch(() => {
+                allNaps = [];
             });
     }
 
@@ -307,6 +331,88 @@
     }
 
     // ------------------------------------------------------------------
+    // NAP autocomplete (Fiber Break's Customer-field replacement)
+    // ------------------------------------------------------------------
+
+    /* Fiber Break reports an outage against a whole NAP, not one
+     * customer, so its "Customer" field is swapped out for this NAP
+     * picker instead -- same live "type to get recommendations" list-
+     * group pattern the subscriber field above already uses, just
+     * searching /api/naps (already loaded for the GeoMap itself) by
+     * NAP code, name, or address rather than by subscriber. */
+
+    function renderNapResults(matches) {
+        const box = document.getElementById("ticketFormNapResults");
+        if (!matches.length) {
+            box.classList.add("d-none");
+            box.innerHTML = "";
+            return;
+        }
+        box.innerHTML = matches
+            .slice(0, 8)
+            .map(
+                (n) =>
+                    '<button type="button" class="list-group-item list-group-item-action" data-nap-id="' + n.id + '">' +
+                        '<span class="fw-semibold">' + escapeHtml(n.nap_code) + "</span> — " +
+                        escapeHtml(n.name) +
+                        '<div class="small text-muted">' +
+                            (n.address ? escapeHtml(n.address) + " · " : "") +
+                            escapeHtml((n.connected_lines || []).length + " connected line(s)") +
+                        "</div>" +
+                        "</button>"
+            )
+            .join("");
+        box.classList.remove("d-none");
+    }
+
+    function setNapHelp(message, className) {
+        const help = document.getElementById("ticketFormNapHelp");
+        if (!help) return;
+        help.textContent = message;
+        help.className = "form-text " + className;
+    }
+
+    function onNapInput() {
+        const input = document.getElementById("ticketFormNapInput");
+        selectedNap = null;
+        document.getElementById("ticketFormNapId").value = "";
+
+        const term = input.value.trim().toLowerCase();
+        if (!term) {
+            setNapHelp("", "text-muted");
+            renderNapResults([]);
+            return;
+        }
+
+        loadNaps().then(() => {
+            const matches = allNaps.filter(
+                (n) =>
+                    (n.nap_code || "").toLowerCase().includes(term) ||
+                    (n.name || "").toLowerCase().includes(term) ||
+                    (n.address || "").toLowerCase().includes(term)
+            );
+            renderNapResults(matches);
+            if (!matches.length) {
+                setNapHelp("No matching NAP on file for \"" + input.value.trim() + "\".", "text-danger");
+            } else {
+                setNapHelp("", "text-muted");
+            }
+        });
+    }
+
+    function selectNap(nap) {
+        selectedNap = nap;
+        document.getElementById("ticketFormNapId").value = nap.id;
+        document.getElementById("ticketFormNapInput").value = nap.nap_code + " — " + nap.name;
+        renderNapResults([]);
+        const lineCount = (nap.connected_lines || []).length;
+        setNapHelp(
+            "Matched " + nap.nap_code + " — " + lineCount + " connected subscriber(s) will be flagged critical.",
+            "text-success"
+        );
+    }
+
+    // ------------------------------------------------------------------
     // Barangay autocomplete (Location field, both categories)
     // ------------------------------------------------------------------
 
@@ -375,21 +481,29 @@
         document.querySelectorAll("#ticketForm [data-error-for]").forEach((el) => (el.textContent = ""));
         document.querySelectorAll("#ticketForm .is-invalid").forEach((el) => el.classList.remove("is-invalid"));
         selectedSubscriber = null;
+        selectedNap = null;
         addedTechnicians = [];
         document.getElementById("ticketFormSubscriberId").value = "";
         document.getElementById("ticketFormCustomerName").value = "";
+        document.getElementById("ticketFormNapId").value = "";
+        document.getElementById("ticketFormNapInput").value = "";
         document.getElementById("ticketFormPlan").value = "";
         document.getElementById("ticketFormContactNumber").value = "";
         setSubscriberHelp("", "text-muted");
+        setNapHelp("", "text-muted");
         renderSubscriberResults([]);
+        renderNapResults([]);
         renderBarangayResults([]);
         renderTechnicianChips();
+        document.getElementById("ticketFormPriority").disabled = false;
         document.getElementById("ticketFormCreated").value = todayLabel();
         document.getElementById("ticketFormSubmitBtn").disabled = false;
     }
 
     function applyCategory(category, typeValue, typeLabel) {
         currentCategory = category;
+        currentTypeValue = typeValue;
+        const isFiberBreak = isFiberBreakForm();
 
         // Type is a fixed label now (set by whichever dropdown item
         // was clicked), not something the admin can change after the
@@ -403,31 +517,50 @@
         loadNextTicketCode(category);
 
         // Customer field is a completely different control per
-        // category -- SO gets a plain free-text name (no lookup at
-        // all, since the applicant usually isn't a subscriber yet);
-        // TN keeps the live subscriber-match search, since the backend
-        // requires the pin to exactly match a registered subscriber's
-        // location. Only one of the two wrappers is ever shown.
+        // category/type -- SO gets a plain free-text name (no lookup
+        // at all, since the applicant usually isn't a subscriber
+        // yet); TN keeps the live subscriber-match search, since the
+        // backend requires the pin to exactly match a registered
+        // subscriber's location. Fiber Break is the one exception:
+        // it's a NAP-wide outage, not one customer's complaint, so it
+        // swaps the Customer field out entirely for the NAP picker
+        // below. Only one of the three wrappers is ever shown.
         const isSO = category === "SO";
         document.getElementById("ticketFormCustomerNameWrapper").classList.toggle("d-none", !isSO);
-        document.getElementById("ticketFormSubscriberWrapper").classList.toggle("d-none", isSO);
+        document.getElementById("ticketFormSubscriberWrapper").classList.toggle("d-none", isSO || isFiberBreak);
+        document.getElementById("ticketFormNapWrapper").classList.toggle("d-none", !isFiberBreak);
         document.getElementById("ticketFormSOExtraFields").classList.toggle("d-none", !isSO);
 
         setSubscriberHelp("", "text-muted");
         renderSubscriberResults([]);
+        setNapHelp("", "text-muted");
+        renderNapResults([]);
+        if (isFiberBreak) loadNaps();
 
-        // Barangay search now applies to both categories -- for SO it's
-        // the real submitted `barangay` value; for TN it's supplementary
-        // context folded into the description (the pin itself still has
-        // to come from the selected subscriber's own registered
-        // location, per the "pin error" rule in app/routes/issues.py).
+        // Barangay applies to SO and every other TN type (it's the
+        // real submitted `barangay` for SO, and supplementary context
+        // folded into the description for TN) -- but Fiber Break
+        // drops it entirely: it's reported against a NAP, not a
+        // barangay-scoped address, and the pin for every affected
+        // ticket comes from each connected subscriber's own
+        // registered location instead (see report_fiber_break() in
+        // app/routes/issues.py).
+        document.getElementById("ticketFormBarangayWrapper").classList.toggle("d-none", isFiberBreak);
         document.getElementById("ticketFormBarangayInput").value = "";
         renderBarangayResults([]);
-        loadBarangays();
+        if (!isFiberBreak) loadBarangays();
 
-        if (category === "TN") {
+        if (category === "TN" && !isFiberBreak) {
             updateLocationForSubscriber();
         }
+
+        // Fiber Break always flags every connected line critical (see
+        // report_fiber_break()'s docstring) -- lock the Priority
+        // dropdown to Critical rather than leaving a selectable value
+        // the backend would silently override anyway.
+        const prioritySelect = document.getElementById("ticketFormPriority");
+        prioritySelect.disabled = isFiberBreak;
+        if (isFiberBreak) prioritySelect.value = "critical";
 
         // Status only makes sense as a real choice for SO (a
         // service_request can start anywhere); a brand-new trouble
@@ -647,12 +780,43 @@
         });
     }
 
+    function submitFiberBreak() {
+        const formData = new FormData();
+        formData.append("nap_id", document.getElementById("ticketFormNapId").value || "");
+        formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
+
+        const extra = [];
+        const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
+        if (team) extra.push("Assigned Team: " + team);
+        if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
+        const scheduled = document.getElementById("ticketFormScheduled").value;
+        if (scheduled) extra.push("Scheduled: " + scheduled);
+        const typed = document.getElementById("ticketFormDescription").value.trim();
+        const description = [extra.join("\n"), typed].filter(Boolean).join("\n\n");
+        formData.append("description", description);
+        formData.append("csrf_token", CSRF_TOKEN);
+
+        return fetch("/issues/report-fiber-break", {
+            method: "POST",
+            headers: { "X-CSRFToken": CSRF_TOKEN },
+            body: formData,
+        });
+    }
+
     function handleSubmit(event) {
         event.preventDefault();
         document.getElementById("ticketFormGeneralError").classList.add("d-none");
         document.querySelectorAll("#ticketForm [data-error-for]").forEach((el) => (el.textContent = ""));
 
-        if (currentCategory === "TN") {
+        const isFiberBreak = isFiberBreakForm();
+
+        if (isFiberBreak) {
+            // Fiber Break needs the affected NAP, not a subscriber.
+            if (!document.getElementById("ticketFormNapId").value) {
+                showGeneralError("Please select the affected NAP.");
+                return;
+            }
+        } else if (currentCategory === "TN") {
             // TN still needs a real subscriber match -- the backend
             // requires the pin to exactly match a registered
             // subscriber's location.
@@ -671,7 +835,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
 
-        const request = currentCategory === "SO" ? submitSO() : submitTN();
+        const request = currentCategory === "SO" ? submitSO() : (isFiberBreak ? submitFiberBreak() : submitTN());
 
         request
             .then((response) => response.json().then((payload) => ({ response, payload })))
@@ -739,6 +903,15 @@
             if (sub) selectSubscriber(sub);
         });
 
+        const napInput = document.getElementById("ticketFormNapInput");
+        napInput.addEventListener("input", onNapInput);
+        document.getElementById("ticketFormNapResults").addEventListener("click", (event) => {
+            const btn = event.target.closest("[data-nap-id]");
+            if (!btn) return;
+            const nap = allNaps.find((n) => String(n.id) === btn.getAttribute("data-nap-id"));
+            if (nap) selectNap(nap);
+        });
+
         const barangayInput = document.getElementById("ticketFormBarangayInput");
         barangayInput.addEventListener("input", onBarangayInput);
         document.getElementById("ticketFormBarangayResults").addEventListener("click", (event) => {
@@ -751,6 +924,9 @@
         document.addEventListener("click", (event) => {
             if (!event.target.closest("#ticketFormSubscriberInput") && !event.target.closest("#ticketFormSubscriberResults")) {
                 renderSubscriberResults([]);
+            }
+            if (!event.target.closest("#ticketFormNapInput") && !event.target.closest("#ticketFormNapResults")) {
+                renderNapResults([]);
             }
             if (!event.target.closest("#ticketFormBarangayInput") && !event.target.closest("#ticketFormBarangayResults")) {
                 renderBarangayResults([]);

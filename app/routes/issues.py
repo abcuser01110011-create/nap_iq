@@ -370,6 +370,157 @@ def report_issue():
     return jsonify({"status": "error", "errors": form.errors}), 400
 
 
+@issues_bp.route("/report-fiber-break", methods=["POST"])
+@role_required(*_STAFF_ROLES)
+def report_fiber_break():
+    """Creates a NAP-wide Fiber Break trouble ticket from the GeoMap's
+    "+ Tickets" quick-create modal.
+
+    Unlike `report_issue()` above (one subscriber -> one ticket), a
+    fiber break is reported against the NAP itself: the admin picks
+    the affected NAP (not a single customer), and this route fans
+    that out into one `TechnicalIssue` per subscriber still connected
+    to it (`nap.subscribers`, excluding `disconnected` ones -- same
+    "still occupies a slot" rule `/api/naps`'s `_slot_usage()` uses).
+    Each of those per-subscriber issues reuses the exact same
+    merge-into-existing-open-issue behaviour `report_issue()` already
+    has, just looped, so a subscriber who already has an open ticket
+    gets it updated in place instead of duplicated.
+
+    This is deliberately NOT a single NAP-level row: `TechnicalIssue.
+    subscriber_id` is a required column (every issue belongs to a
+    subscriber so it can be pinned, dispatched, and shown on that
+    subscriber's own map marker), and reusing that per-subscriber
+    shape is what makes this "just work" with everything already
+    built on it -- no GeoMap JS changes needed:
+
+      - Each new issue is `priority="critical"` (forced here,
+        regardless of what the modal's Priority dropdown showed),
+        `nap_id` set to the chosen NAP, `latitude`/`longitude` copied
+        from the subscriber's own registered location (same pin rule
+        `report_issue()` enforces). napmap.js's `buildSubscriberIcon()`
+        already colors/pulses a subscriber's marker by the worst-
+        priority open issue they have -- so every connected
+        subscriber's icon turns critical/red automatically the next
+        time the GeoMap refreshes (it already polls
+        `refreshLiveData()` on an interval and on tab focus; nothing
+        new needed here).
+      - `_dispatch_field_assistant()` is called per created/updated
+        issue exactly like `report_issue()` does, so if an "Assigned
+        Team" field assistant was chosen in the modal, every one of
+        these tickets shows up on that field assistant's mobile
+        Assignments dashboard, same as any other trouble ticket.
+
+    A subscriber with no registered latitude/longitude on file is
+    silently skipped (same "can't be pinned" case `report_issue()`
+    hard-blocks on for a single subscriber) rather than failing the
+    whole NAP-wide ticket for one bad record.
+
+    Returns 400 with `errors.nap_id` if no NAP id was submitted, the
+    NAP doesn't exist, or the NAP currently has zero connected (non-
+    disconnected) subscribers to notify.
+    """
+    nap_id_raw = request.form.get("nap_id")
+    if not nap_id_raw:
+        return jsonify({"status": "error", "errors": {"nap_id": ["Please select the affected NAP."]}}), 400
+
+    try:
+        nap_id = int(nap_id_raw)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "errors": {"nap_id": ["Invalid NAP selected."]}}), 400
+
+    nap = Nap.query.get(nap_id)
+    if nap is None:
+        return jsonify({"status": "error", "errors": {"nap_id": ["Selected NAP was not found."]}}), 400
+
+    affected_subscribers = [s for s in nap.subscribers if s.status != "disconnected"]
+    if not affected_subscribers:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "errors": {"nap_id": [f"{nap.nap_code} has no connected subscribers to notify."]},
+                }
+            ),
+            400,
+        )
+
+    description = (request.form.get("description") or "").strip() or (
+        f"Fiber break reported at {nap.nap_code} — {nap.name}. All connected lines affected."
+    )
+    assigned_team_id = request.form.get("assigned_team_id")
+
+    created_count = 0
+    updated_count = 0
+    skipped_no_location = 0
+
+    for subscriber in affected_subscribers:
+        if subscriber.latitude is None or subscriber.longitude is None:
+            skipped_no_location += 1
+            continue
+
+        existing_issue = (
+            TechnicalIssue.query.filter(
+                TechnicalIssue.subscriber_id == subscriber.id,
+                TechnicalIssue.status.in_(_OPEN_ISSUE_STATUSES),
+            )
+            .order_by(TechnicalIssue.created_at.desc())
+            .first()
+        )
+
+        if existing_issue is not None:
+            existing_issue.issue_type = "Fiber Break"
+            existing_issue.description = description
+            existing_issue.priority = "critical"
+            existing_issue.address = subscriber.address
+            existing_issue.latitude = subscriber.latitude
+            existing_issue.longitude = subscriber.longitude
+            existing_issue.nap_id = nap.id
+            notify_issue_updated(existing_issue)
+            db.session.commit()
+            _dispatch_field_assistant(existing_issue, assigned_team_id)
+            updated_count += 1
+        else:
+            issue = TechnicalIssue(
+                issue_type="Fiber Break",
+                description=description,
+                priority="critical",
+                status="pending",
+                address=subscriber.address,
+                latitude=subscriber.latitude,
+                longitude=subscriber.longitude,
+                subscriber_id=subscriber.id,
+                nap_id=nap.id,
+            )
+            db.session.add(issue)
+            db.session.commit()  # issue.id is now populated by MySQL
+
+            issue.issue_code = f"ISS-{issue.id:04d}"
+            notify_new_issue_reported(issue)
+            _dispatch_field_assistant(issue, assigned_team_id)
+            created_count += 1
+
+        db.session.commit()
+
+    total_flagged = created_count + updated_count
+    return (
+        jsonify(
+            {
+                "status": "success",
+                "nap": {"id": nap.id, "nap_code": nap.nap_code, "name": nap.name},
+                "created": created_count,
+                "updated": updated_count,
+                "skipped_no_location": skipped_no_location,
+                "message": (
+                    f"Fiber Break ticket created for {nap.nap_code} — {total_flagged} "
+                    f"connected subscriber(s) flagged critical."
+                ),
+            }
+        ),
+        201,
+    )
+
+
 @issues_bp.route("/<int:issue_id>")
 @role_required(*_STAFF_ROLES)
 def view_issue(issue_id):

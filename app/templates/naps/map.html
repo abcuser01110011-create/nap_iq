@@ -671,6 +671,23 @@
                         <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
                     </div>
 
+                    {# Fiber Break only: a fiber break is a NAP-wide outage, not a
+                       single customer's complaint, so this replaces the Customer
+                       field entirely -- pick the affected NAP instead, with the
+                       same live auto-recommend search pattern the Customer field
+                       uses for Repair/other TN types. Hidden for every other
+                       type; see ticketFormSubscriberWrapper/ticketFormCustomerNameWrapper
+                       above for the other two. #}
+                    <div class="mb-2 position-relative d-none" id="ticketFormNapWrapper">
+                        <label class="form-label small text-muted mb-1">NAP</label>
+                        <input type="text" class="form-control" id="ticketFormNapInput"
+                               placeholder="Search by NAP code or name…" autocomplete="off">
+                        <input type="hidden" id="ticketFormNapId">
+                        <div id="ticketFormNapResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        <div id="ticketFormNapHelp" class="form-text"></div>
+                        <div class="invalid-feedback d-block small" data-error-for="nap_id"></div>
+                    </div>
+
                     {# SO only: plan + contact number. Plan options come from
                        the same subscriber_plan_types list the Plan
                        Installation form step already suggests from (see
