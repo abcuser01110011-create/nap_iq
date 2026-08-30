@@ -41,13 +41,12 @@
     let modalInstance = null;
     let currentCategory = "SO"; // "SO" | "TN"
     let barangaysLoaded = false;
-    let barangayOptionsHtml = '<option value="">Select barangay</option>';
+    let barangaysLoading = false;
+    let allBarangays = [];
     let allSubscribers = [];
     let subscribersLoaded = false;
     let selectedSubscriber = null; // {id, subscriber_code, full_name, address, latitude, longitude}
     let addedTechnicians = []; // [{id, full_name}]
-    let plansLoaded = false;
-    let plansOptionsHtml = '<option value="">-- None --</option>';
 
     function escapeHtml(str) {
         return String(str == null ? "" : str).replace(/[&<>"']/g, (c) => (
@@ -64,27 +63,29 @@
     // Data loading (lazy, once)
     // ------------------------------------------------------------------
 
+    // Fetched lazily, once, and cached in allBarangays for client-side
+    // filtering (same shape as loadSubscribers() below). Unlike the
+    // old <select> version, a failed fetch doesn't get stuck forever:
+    // barangaysLoaded only flips to true on success, so the next time
+    // the field is focused it tries again instead of silently staying
+    // empty for the rest of the session.
     function loadBarangays() {
-        if (barangaysLoaded) return;
-        barangaysLoaded = true;
-        fetch(BARANGAY_API_URL)
+        if (barangaysLoaded || barangaysLoading) return Promise.resolve();
+        barangaysLoading = true;
+        return fetch(BARANGAY_API_URL)
             .then((r) => r.json())
             .then((list) => {
-                const options = ['<option value="">Select barangay</option>'];
-                (list || [])
-                    .slice()
-                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-                    .forEach((b) => {
-                        options.push('<option value="' + escapeHtml(b.name) + '">' + escapeHtml(b.name) + "</option>");
-                    });
-                barangayOptionsHtml = options.join("");
-                const select = document.getElementById("ticketFormBarangay");
-                if (select && currentCategory === "SO") select.innerHTML = barangayOptionsHtml;
+                allBarangays = (list || [])
+                    .map((b) => b.name)
+                    .filter(Boolean)
+                    .sort((a, b) => a.localeCompare(b));
+                barangaysLoaded = true;
             })
             .catch(() => {
-                barangayOptionsHtml = '<option value="">Could not load barangays -- type not available</option>';
-                const select = document.getElementById("ticketFormBarangay");
-                if (select && currentCategory === "SO") select.innerHTML = barangayOptionsHtml;
+                allBarangays = [];
+            })
+            .finally(() => {
+                barangaysLoading = false;
             });
     }
 
@@ -98,27 +99,6 @@
             })
             .catch(() => {
                 allSubscribers = [];
-            });
-    }
-
-    function loadPlans() {
-        if (plansLoaded) return;
-        plansLoaded = true;
-        fetch("/api/plans")
-            .then((r) => r.json())
-            .then((list) => {
-                const options = ['<option value="">-- None --</option>'];
-                (list || []).forEach((p) => {
-                    options.push('<option value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + "</option>");
-                });
-                plansOptionsHtml = options.join("");
-                const select = document.getElementById("ticketFormPlan");
-                if (select) select.innerHTML = plansOptionsHtml;
-            })
-            .catch(() => {
-                plansOptionsHtml = '<option value="">-- Could not load --</option>';
-                const select = document.getElementById("ticketFormPlan");
-                if (select) select.innerHTML = plansOptionsHtml;
             });
     }
 
@@ -158,20 +138,69 @@
     // Subscriber autocomplete
     // ------------------------------------------------------------------
 
-    /* Plain "Customer" field -- typing does not pop up a live list of
-     * suggestions. The typed value is only resolved against the real
-     * subscriber records when the field loses focus (or Enter is
-     * pressed), via resolveSubscriberFromInput() below. */
+    /* "Customer" field behaves differently per category, per how the
+     * two ticket types actually use it:
+     *   - TN (Trouble Ticket) needs a real subscriber match (the
+     *     backend requires the pin to exactly match a registered
+     *     subscriber's location), so it gets a live auto-recommend
+     *     list as you type -- same floating list-group pattern the
+     *     topbar's own NAP search already uses.
+     *   - SO (Service Order) has no such requirement, so it stays a
+     *     plain field: no list popping up while typing, just resolved
+     *     against the subscriber list on blur/Enter so a name can
+     *     still be linked when one matches.
+     */
+
+    function renderSubscriberResults(matches) {
+        const box = document.getElementById("ticketFormSubscriberResults");
+        if (!matches.length) {
+            box.classList.add("d-none");
+            box.innerHTML = "";
+            return;
+        }
+        box.innerHTML = matches
+            .slice(0, 8)
+            .map(
+                (s) =>
+                    '<button type="button" class="list-group-item list-group-item-action" data-sub-id="' + s.id + '">' +
+                        '<span class="fw-semibold">' + escapeHtml(s.subscriber_code) + "</span> — " +
+                        escapeHtml(s.full_name) +
+                        (s.address ? '<div class="small text-muted">' + escapeHtml(s.address) + "</div>" : "") +
+                        "</button>"
+            )
+            .join("");
+        box.classList.remove("d-none");
+    }
 
     function onSubscriberInput() {
+        const input = document.getElementById("ticketFormSubscriberInput");
         selectedSubscriber = null;
         document.getElementById("ticketFormSubscriberId").value = "";
-        setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
         updateLocationForSubscriber();
+
+        if (currentCategory !== "TN") {
+            setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+            return;
+        }
+
+        const term = input.value.trim().toLowerCase();
+        if (!term) {
+            renderSubscriberResults([]);
+            return;
+        }
+        loadSubscribers().then(() => {
+            const matches = allSubscribers.filter(
+                (s) =>
+                    s.full_name.toLowerCase().includes(term) ||
+                    (s.subscriber_code || "").toLowerCase().includes(term)
+            );
+            renderSubscriberResults(matches);
+        });
     }
 
     function setSubscriberHelp(message, className) {
         const help = document.getElementById("ticketFormSubscriberHelp");
+        if (!help) return;
         help.textContent = message;
         help.className = "form-text " + className;
     }
@@ -180,11 +209,13 @@
         selectedSubscriber = sub;
         document.getElementById("ticketFormSubscriberId").value = sub.id;
         document.getElementById("ticketFormSubscriberInput").value = sub.subscriber_code + " — " + sub.full_name;
+        renderSubscriberResults([]);
         setSubscriberHelp("Matched " + sub.full_name + ".", "text-success");
         updateLocationForSubscriber();
     }
 
     function resolveSubscriberFromInput() {
+        if (currentCategory === "TN") return; // already resolved by clicking a suggestion
         const input = document.getElementById("ticketFormSubscriberInput");
         const term = input.value.trim().toLowerCase();
         if (!term) {
@@ -202,13 +233,15 @@
                     (s.subscriber_code + " — " + s.full_name).toLowerCase() === term
             );
             if (match) {
-                selectSubscriber(match);
+                selectedSubscriber = match;
+                document.getElementById("ticketFormSubscriberId").value = match.id;
+                setSubscriberHelp("Matched " + match.full_name + ".", "text-success");
             } else {
                 selectedSubscriber = null;
                 document.getElementById("ticketFormSubscriberId").value = "";
                 setSubscriberHelp("No matching customer on file for \"" + input.value.trim() + "\".", "text-danger");
-                updateLocationForSubscriber();
             }
+            updateLocationForSubscriber();
         });
     }
 
@@ -236,6 +269,37 @@
         status.textContent = "Location filled in from " + selectedSubscriber.full_name + "'s registered address.";
         status.className = "form-text text-success";
         submitBtn.disabled = false;
+    }
+
+    // ------------------------------------------------------------------
+    // Barangay autocomplete (Location field, both categories)
+    // ------------------------------------------------------------------
+
+    function renderBarangayResults(matches) {
+        const box = document.getElementById("ticketFormBarangayResults");
+        if (!matches.length) {
+            box.classList.add("d-none");
+            box.innerHTML = "";
+            return;
+        }
+        box.innerHTML = matches
+            .slice(0, 8)
+            .map((name) => '<button type="button" class="list-group-item list-group-item-action">' + escapeHtml(name) + "</button>")
+            .join("");
+        box.classList.remove("d-none");
+    }
+
+    function onBarangayInput() {
+        const input = document.getElementById("ticketFormBarangayInput");
+        const term = input.value.trim().toLowerCase();
+        if (!term) {
+            renderBarangayResults([]);
+            return;
+        }
+        loadBarangays().then(() => {
+            const matches = allBarangays.filter((name) => name.toLowerCase().includes(term));
+            renderBarangayResults(matches);
+        });
     }
 
     // ------------------------------------------------------------------
@@ -279,6 +343,8 @@
         addedTechnicians = [];
         document.getElementById("ticketFormSubscriberId").value = "";
         setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+        renderSubscriberResults([]);
+        renderBarangayResults([]);
         renderTechnicianChips();
         document.getElementById("ticketFormCreated").value = todayLabel();
         document.getElementById("ticketFormSubmitBtn").disabled = false;
@@ -294,20 +360,35 @@
         document.getElementById("ticketFormTypeValue").value = typeValue;
 
         document.getElementById("ticketFormTitle").textContent =
-            category === "SO" ? "Service Order" : "Trouble Ticket";
+            category === "SO" ? "Service Order" : "Ticket Number";
 
         loadNextTicketCode(category);
-        loadPlans();
 
-        const barangayWrapper = document.getElementById("ticketFormBarangayWrapper");
+        // Customer field placeholder/help matches whichever behavior
+        // this category gets -- see the comment above
+        // renderSubscriberResults() for why the two categories differ.
+        const subscriberInput = document.getElementById("ticketFormSubscriberInput");
+        if (category === "TN") {
+            subscriberInput.placeholder = "Search by name or subscriber code…";
+        } else {
+            subscriberInput.placeholder = "Type the customer's exact name or subscriber code";
+        }
+        setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+        renderSubscriberResults([]);
+
+        // Barangay search now applies to both categories -- for SO it's
+        // the real submitted `barangay` value; for TN it's supplementary
+        // context folded into the description (the pin itself still has
+        // to come from the selected subscriber's own registered
+        // location, per the "pin error" rule in app/routes/issues.py).
+        document.getElementById("ticketFormBarangayInput").value = "";
+        renderBarangayResults([]);
+        loadBarangays();
+
         const autoWrapper = document.getElementById("ticketFormLocationAutoWrapper");
         if (category === "SO") {
-            barangayWrapper.classList.remove("d-none");
             autoWrapper.classList.add("d-none");
-            document.getElementById("ticketFormBarangay").innerHTML = barangayOptionsHtml;
-            loadBarangays();
         } else {
-            barangayWrapper.classList.add("d-none");
             autoWrapper.classList.remove("d-none");
             updateLocationForSubscriber();
         }
@@ -377,11 +458,10 @@
         const formData = new FormData();
         formData.append("request_type", document.getElementById("ticketFormTypeValue").value);
         formData.append("subscriber_id", document.getElementById("ticketFormSubscriberId").value || "0");
-        formData.append("barangay", document.getElementById("ticketFormBarangay").value);
+        formData.append("barangay", document.getElementById("ticketFormBarangayInput").value);
         formData.append("status", document.getElementById("ticketFormStatus").value);
         formData.append("notes", document.getElementById("ticketFormDescription").value);
         formData.append("priority_label", selectedOptionLabel(document.getElementById("ticketFormPriority")));
-        formData.append("plan_label", document.getElementById("ticketFormPlan").value);
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
         formData.append(
             "technicians_label",
@@ -408,8 +488,8 @@
         formData.append("address", selectedSubscriber ? selectedSubscriber.address || "" : "");
 
         const extra = [];
-        const plan = document.getElementById("ticketFormPlan").value;
-        if (plan) extra.push("Plan: " + plan);
+        const barangay = document.getElementById("ticketFormBarangayInput").value.trim();
+        if (barangay) extra.push("Barangay: " + barangay);
         const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
         if (team) extra.push("Assigned Team: " + team);
         if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
@@ -504,6 +584,31 @@
                 resolveSubscriberFromInput();
             }
         });
+        document.getElementById("ticketFormSubscriberResults").addEventListener("click", (event) => {
+            const btn = event.target.closest("[data-sub-id]");
+            if (!btn) return;
+            const sub = allSubscribers.find((s) => String(s.id) === btn.getAttribute("data-sub-id"));
+            if (sub) selectSubscriber(sub);
+        });
+
+        const barangayInput = document.getElementById("ticketFormBarangayInput");
+        barangayInput.addEventListener("input", onBarangayInput);
+        document.getElementById("ticketFormBarangayResults").addEventListener("click", (event) => {
+            const btn = event.target.closest(".list-group-item");
+            if (!btn) return;
+            barangayInput.value = btn.textContent;
+            renderBarangayResults([]);
+        });
+
+        document.addEventListener("click", (event) => {
+            if (!event.target.closest("#ticketFormSubscriberInput") && !event.target.closest("#ticketFormSubscriberResults")) {
+                renderSubscriberResults([]);
+            }
+            if (!event.target.closest("#ticketFormBarangayInput") && !event.target.closest("#ticketFormBarangayResults")) {
+                renderBarangayResults([]);
+            }
+        });
+
         document.getElementById("ticketFormAddTechnicianBtn").addEventListener("click", addTechnicianFromSelect);
         document.getElementById("ticketFormTechnicianChips").addEventListener("click", (event) => {
             const btn = event.target.closest("[data-remove-tech]");

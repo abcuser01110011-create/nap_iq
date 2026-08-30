@@ -44,7 +44,7 @@ service-request-scoped one.
 from flask import Blueprint, jsonify, g, abort, request
 
 from app.auth import role_required
-from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, Plan
+from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
 
@@ -307,17 +307,6 @@ def personnel_json():
             for p in people
         ]
     )
-
-
-@api_bp.route("/plans")
-@role_required("administrator")
-def plans_json():
-    """Lightweight JSON feed of the `plans` table (Settings > App
-    Settings > Plans) -- used by the GeoMap's "+ Tickets" quick-create
-    modal to populate its Plan dropdown, same pattern as
-    personnel_json() above."""
-    plans = Plan.query.order_by(Plan.name).all()
-    return jsonify([{"id": p.id, "name": p.name} for p in plans])
 
 
 @api_bp.route("/tickets/next-code")

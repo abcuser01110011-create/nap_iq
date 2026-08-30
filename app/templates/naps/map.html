@@ -652,24 +652,18 @@
                     <div class="mb-2 position-relative">
                         <label class="form-label small text-muted mb-1">Customer</label>
                         <input type="text" class="form-control" id="ticketFormSubscriberInput"
-                               placeholder="Type the customer's exact name or subscriber code" autocomplete="off">
+                               placeholder="Search by name or subscriber code…" autocomplete="off">
                         <input type="hidden" id="ticketFormSubscriberId">
+                        <div id="ticketFormSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
                         <div id="ticketFormSubscriberHelp" class="form-text">Confirm with Tab or Enter.</div>
                         <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label small text-muted mb-1">Plan</label>
-                        <select class="form-select" id="ticketFormPlan">
-                            <option value="">-- None --</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-2" id="ticketFormBarangayWrapper">
-                        <label class="form-label small text-muted mb-1">Location</label>
-                        <select class="form-select" id="ticketFormBarangay">
-                            <option value="">Loading barangays…</option>
-                        </select>
+                    <div class="mb-2 position-relative" id="ticketFormBarangayWrapper">
+                        <label class="form-label small text-muted mb-1">Barangay</label>
+                        <input type="text" class="form-control" id="ticketFormBarangayInput"
+                               placeholder="Search barangay (Santa Cruz, Laguna)…" autocomplete="off">
+                        <div id="ticketFormBarangayResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
                         <div class="invalid-feedback d-block small" data-error-for="barangay"></div>
                     </div>
 

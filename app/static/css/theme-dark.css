@@ -135,6 +135,16 @@
     border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* .ticket-type-menu's dropdown-header (naps/map.html's "+ Tickets"
+   menu) hardcodes a near-black color in napmap.css since it has no
+   --napiq-text token to fall back on -- invisible against Bootstrap's
+   own dark dropdown-menu background, so it needs its own override
+   here same as every other hardcoded-color app class this file
+   patches. */
+[data-bs-theme="dark"] .ticket-type-menu .dropdown-header {
+    color: #dfe3ee;
+}
+
 [data-bs-theme="dark"] .notif-dropdown-item {
     border-color: rgba(255, 255, 255, 0.06);
     color: #dfe3ee;
