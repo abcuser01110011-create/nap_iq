@@ -185,13 +185,15 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         if issue
         else None,
         # Phase 28: the installation counterpart to `issue` above.
-        # ServiceRequest has no `address` column of its own (Phase 22
-        # only added latitude/longitude — see that column's comment
-        # in app/models.py), so unlike `issue` there's no separate
-        # address field here; the mobile app falls back to
-        # `subscriber.address` for installs, the same way it already
-        # falls back to `issue.address` when a repair's own subscriber
-        # has none.
+        # `full_name`/`address`/`contact_number` are the walk-in
+        # applicant fields (see ServiceRequest in app/models.py) --
+        # only ever populated for a Service Order with no linked
+        # Subscriber (the GeoMap "+ Tickets" quick-create modal's
+        # Customer field is free text, not matched against
+        # `subscribers`). Passed through here so the mobile app can
+        # fall back to them when `subscriber` below is null, same
+        # "prefer the real linked record, fall back to the request's
+        # own copy" pattern as latitude/longitude above.
         "service_request": {
             "id": service_request.id,
             "request_type": service_request.request_type,
@@ -199,6 +201,9 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "notes": service_request.notes,
             "latitude": float(service_request.latitude) if service_request.latitude is not None else None,
             "longitude": float(service_request.longitude) if service_request.longitude is not None else None,
+            "full_name": service_request.full_name,
+            "address": service_request.address,
+            "contact_number": service_request.contact_number,
         }
         if service_request
         else None,

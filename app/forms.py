@@ -1266,12 +1266,17 @@ class QuickServiceRequestForm(FlaskForm):
       NAP mode instead, so it never reaches this form. "Upgrade" and
       "Disconnection" (valid ServiceRequestForm types) aren't part of
       this quick menu either.
-    - No walk-in-applicant path: a Subscriber must already exist. The
-      full Add Service Request page is still there for a walk-in
-      applicant with no subscriber record yet.
+    - Walk-in-applicant only: unlike the old version of this form,
+      "Customer" is a plain free-text name -- it is never matched or
+      looked up against the `subscribers` table (the person applying
+      for service usually isn't a subscriber yet). Saved straight onto
+      this request's own `full_name` column, same as the full Add
+      Service Request page's walk-in path (see ServiceRequestForm's
+      docstring above) -- this form just always takes that path
+      instead of only doing so conditionally.
 
     The quick-create modal also collects a few things this table has
-    no dedicated columns for yet -- priority, assigned team,
+    no dedicated columns for yet -- priority, plan, assigned team,
     technician(s), and a scheduled date. Rather than a field per
     concept here, the route folds whatever the admin entered for
     those into `notes` as plain text (see quick_add_request()) so
@@ -1287,10 +1292,16 @@ class QuickServiceRequestForm(FlaskForm):
         ],
         validators=[DataRequired(message="Request type is required.")],
     )
-    subscriber_id = SelectField(
-        "Subscriber",
-        coerce=int,
-        validators=[DataRequired(message="Please select a subscriber.")],
+    full_name = StringField(
+        "Customer",
+        validators=[
+            DataRequired(message="Customer name is required."),
+            Length(max=150, message="Customer name is too long."),
+        ],
+    )
+    contact_number = StringField(
+        "Contact Number",
+        validators=[Optional(), Length(max=20, message="Contact number is too long.")],
     )
     barangay = StringField(
         "Location",

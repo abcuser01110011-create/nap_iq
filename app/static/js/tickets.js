@@ -377,6 +377,9 @@
         selectedSubscriber = null;
         addedTechnicians = [];
         document.getElementById("ticketFormSubscriberId").value = "";
+        document.getElementById("ticketFormCustomerName").value = "";
+        document.getElementById("ticketFormPlan").value = "";
+        document.getElementById("ticketFormContactNumber").value = "";
         setSubscriberHelp("", "text-muted");
         renderSubscriberResults([]);
         renderBarangayResults([]);
@@ -399,15 +402,17 @@
 
         loadNextTicketCode(category);
 
-        // Customer field placeholder/help matches whichever behavior
-        // this category gets -- see the comment above
-        // renderSubscriberResults() for why the two categories differ.
-        const subscriberInput = document.getElementById("ticketFormSubscriberInput");
-        if (category === "TN") {
-            subscriberInput.placeholder = "Search by name or subscriber code…";
-        } else {
-            subscriberInput.placeholder = "Type the customer's exact name or subscriber code";
-        }
+        // Customer field is a completely different control per
+        // category -- SO gets a plain free-text name (no lookup at
+        // all, since the applicant usually isn't a subscriber yet);
+        // TN keeps the live subscriber-match search, since the backend
+        // requires the pin to exactly match a registered subscriber's
+        // location. Only one of the two wrappers is ever shown.
+        const isSO = category === "SO";
+        document.getElementById("ticketFormCustomerNameWrapper").classList.toggle("d-none", !isSO);
+        document.getElementById("ticketFormSubscriberWrapper").classList.toggle("d-none", isSO);
+        document.getElementById("ticketFormSOExtraFields").classList.toggle("d-none", !isSO);
+
         setSubscriberHelp("", "text-muted");
         renderSubscriberResults([]);
 
@@ -464,6 +469,77 @@
         });
     }
 
+    // ------------------------------------------------------------------
+    // Center-screen success toast
+    // ------------------------------------------------------------------
+
+    /** Centered, self-dismissing confirmation toast for a successfully
+     *  created ticket. Fully self-contained (injects its own styles on
+     *  first use) so no template/CSS changes were needed elsewhere.
+     *  Stays up for at least TOAST_MIN_VISIBLE_MS, and disappears
+     *  automatically then -- or immediately if the user clicks
+     *  anywhere on the page (including on the toast itself) before
+     *  that. */
+    const TOAST_MIN_VISIBLE_MS = 3000;
+
+    function ensureToastStyles() {
+        if (document.getElementById("napiqTicketToastStyles")) return;
+        const style = document.createElement("style");
+        style.id = "napiqTicketToastStyles";
+        style.textContent = [
+            "#napiqTicketToast{position:fixed;top:50%;left:50%;",
+            "transform:translate(-50%,-50%) scale(.96);z-index:2000;",
+            "background:#198754;color:#fff;padding:.9rem 1.6rem;",
+            "border-radius:.6rem;box-shadow:0 .75rem 2rem rgba(0,0,0,.35);",
+            "font-weight:600;font-size:1rem;display:flex;align-items:center;",
+            "gap:.5rem;text-align:center;opacity:0;",
+            "transition:opacity .18s ease, transform .18s ease;pointer-events:none;}",
+            "#napiqTicketToast.napiq-toast-show{opacity:1;transform:translate(-50%,-50%) scale(1);}",
+        ].join("");
+        document.head.appendChild(style);
+    }
+
+    function showTicketSuccessToast(message) {
+        ensureToastStyles();
+
+        const existing = document.getElementById("napiqTicketToast");
+        if (existing) existing.remove();
+
+        const toast = document.createElement("div");
+        toast.id = "napiqTicketToast";
+        toast.setAttribute("role", "status");
+        toast.setAttribute("aria-live", "polite");
+        toast.innerHTML =
+            '<i class="bi bi-check-circle-fill"></i><span>' + escapeHtml(message) + "</span>";
+        document.body.appendChild(toast);
+        // Force a reflow before adding the "show" class so the
+        // fade/scale transition actually plays instead of snapping in.
+        void toast.offsetWidth;
+        toast.classList.add("napiq-toast-show");
+
+        let dismissed = false;
+        let autoTimer = null;
+
+        function dismiss() {
+            if (dismissed) return;
+            dismissed = true;
+            if (autoTimer) clearTimeout(autoTimer);
+            document.removeEventListener("click", onDocClick, true);
+            toast.classList.remove("napiq-toast-show");
+            setTimeout(() => toast.remove(), 200);
+        }
+
+        function onDocClick() {
+            dismiss();
+        }
+
+        // Attach the click-anywhere listener on the next tick so the
+        // very click that triggered this toast (the form's Create
+        // button) doesn't immediately dismiss it.
+        setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+        autoTimer = setTimeout(dismiss, TOAST_MIN_VISIBLE_MS);
+    }
+
     /** Same dismissible-alert-above-the-map pattern napmap.js's own
      *  showAlert() uses -- duplicated here (rather than shared) since
      *  that one is private to napmap.js's own IIFE. */
@@ -488,11 +564,16 @@
     function submitSO() {
         const formData = new FormData();
         formData.append("request_type", document.getElementById("ticketFormTypeValue").value);
-        formData.append("subscriber_id", document.getElementById("ticketFormSubscriberId").value || "0");
+        // Free-text customer name -- never matched against the
+        // subscribers table (see ticketFormCustomerNameWrapper in
+        // naps/map.html and QuickServiceRequestForm's docstring).
+        formData.append("full_name", document.getElementById("ticketFormCustomerName").value.trim());
+        formData.append("contact_number", document.getElementById("ticketFormContactNumber").value.trim());
         formData.append("barangay", document.getElementById("ticketFormBarangayInput").value);
         formData.append("status", document.getElementById("ticketFormStatus").value);
         formData.append("notes", document.getElementById("ticketFormDescription").value);
         formData.append("priority_label", selectedOptionLabel(document.getElementById("ticketFormPriority")));
+        formData.append("plan_label", document.getElementById("ticketFormPlan").value);
         formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
         formData.append(
@@ -545,8 +626,18 @@
         document.getElementById("ticketFormGeneralError").classList.add("d-none");
         document.querySelectorAll("#ticketForm [data-error-for]").forEach((el) => (el.textContent = ""));
 
-        if (!document.getElementById("ticketFormSubscriberId").value) {
-            showGeneralError("Please select a subscriber.");
+        if (currentCategory === "TN") {
+            // TN still needs a real subscriber match -- the backend
+            // requires the pin to exactly match a registered
+            // subscriber's location.
+            if (!document.getElementById("ticketFormSubscriberId").value) {
+                showGeneralError("Please select a subscriber.");
+                return;
+            }
+        } else if (!document.getElementById("ticketFormCustomerName").value.trim()) {
+            // SO's Customer field is free text -- just needs something
+            // typed, not a match against any existing record.
+            showGeneralError("Please enter the customer's name.");
             return;
         }
 
@@ -561,9 +652,7 @@
             .then(({ response, payload }) => {
                 if (response.ok && payload.status === "success") {
                     modalInstance.hide();
-                    if (window.showAlert) {
-                        window.showAlert("success", payload.message);
-                    }
+                    showTicketSuccessToast("Ticket successfully created");
                 } else if (payload.errors) {
                     showFieldErrors(payload.errors);
                     showGeneralError("Please fix the highlighted fields and try again.");

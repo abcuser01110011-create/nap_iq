@@ -649,7 +649,22 @@
                         <div class="invalid-feedback d-block small" data-error-for="request_type"></div>
                     </div>
 
-                    <div class="mb-2 position-relative">
+                    {# SO: plain free-text customer name. Not matched or looked
+                       up against the subscribers table -- this is meant for
+                       someone applying for service who isn't a subscriber
+                       yet, so it never fetches or auto-suggests anything. #}
+                    <div class="mb-2" id="ticketFormCustomerNameWrapper">
+                        <label class="form-label small text-muted mb-1">Customer</label>
+                        <input type="text" class="form-control" id="ticketFormCustomerName"
+                               placeholder="Customer's full name" autocomplete="off">
+                        <div class="invalid-feedback d-block small" data-error-for="full_name"></div>
+                    </div>
+
+                    {# TN: real subscriber match required (the backend needs the
+                       pin to exactly match a registered subscriber's location),
+                       so this keeps the live auto-recommend search. Hidden for
+                       SO -- see ticketFormCustomerNameWrapper above. #}
+                    <div class="mb-2 position-relative d-none" id="ticketFormSubscriberWrapper">
                         <label class="form-label small text-muted mb-1">Customer</label>
                         <input type="text" class="form-control" id="ticketFormSubscriberInput"
                                placeholder="Search by name or subscriber code…" autocomplete="off">
@@ -657,6 +672,29 @@
                         <div id="ticketFormSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
                         <div id="ticketFormSubscriberHelp" class="form-text"></div>
                         <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
+                    </div>
+
+                    {# SO only: plan + contact number. Plan options come from
+                       the same subscriber_plan_types list the Plan
+                       Installation form step already suggests from (see
+                       app/routes/naps.py), so there's no separate list to
+                       keep in sync. #}
+                    <div class="row g-2" id="ticketFormSOExtraFields">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Plan</label>
+                            <select class="form-select" id="ticketFormPlan">
+                                <option value="">-- Select Plan --</option>
+                                {% for plan_type in subscriber_plan_types %}
+                                <option value="{{ plan_type }}">{{ plan_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Contact Number</label>
+                            <input type="tel" class="form-control" id="ticketFormContactNumber"
+                                   placeholder="09XX XXX XXXX" autocomplete="off">
+                            <div class="invalid-feedback d-block small" data-error-for="contact_number"></div>
+                        </div>
                     </div>
 
                     <div class="mb-2 position-relative" id="ticketFormBarangayWrapper">

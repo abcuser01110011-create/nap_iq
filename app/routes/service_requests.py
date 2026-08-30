@@ -388,24 +388,20 @@ def quick_add_request():
     naps.quick_add_nap() / issues.report_issue(). See
     QuickServiceRequestForm's own docstring (app/forms.py) for exactly
     how this is narrower than the full Add Service Request page, and
-    for why priority/assigned-team/technician/scheduled-date all end
-    up folded into `notes` instead of their own columns.
+    for why priority/plan/assigned-team/technician/scheduled-date all
+    end up folded into `notes` instead of their own columns.
+
+    "Customer" here is always a plain free-text name (form.full_name)
+    -- it is never looked up against the `subscribers` table, since
+    this modal is meant for someone applying for service who isn't a
+    subscriber yet. That means every request created here is a
+    walk-in (`subscriber_id` stays None), same as the full Add Service
+    Request page's walk-in path.
     """
     form = QuickServiceRequestForm()
-    form.subscriber_id.choices = [
-        (s.id, f"{s.subscriber_code} — {s.full_name}")
-        for s in Subscriber.query.filter_by(status="active").order_by(Subscriber.full_name).all()
-    ]
 
     if not form.validate_on_submit():
         return jsonify({"status": "error", "errors": form.errors}), 400
-
-    subscriber = Subscriber.query.get(form.subscriber_id.data)
-    if subscriber is None:
-        return (
-            jsonify({"status": "error", "errors": {"subscriber_id": ["Selected subscriber was not found."]}}),
-            400,
-        )
 
     # Fields the modal collects that service_requests has no column
     # for yet -- folded into notes as plain text rather than dropped,
@@ -416,6 +412,9 @@ def quick_add_request():
     priority_label = (request.form.get("priority_label") or "").strip()
     if priority_label:
         extra_lines.append(f"Priority: {priority_label}")
+    plan_label = (request.form.get("plan_label") or "").strip()
+    if plan_label:
+        extra_lines.append(f"Plan: {plan_label}")
     assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
     if assigned_team_label:
         extra_lines.append(f"Assigned Team: {assigned_team_label}")
@@ -435,9 +434,11 @@ def quick_add_request():
 
     service_request = ServiceRequest(
         request_type=form.request_type.data,
-        subscriber_id=subscriber.id,
+        subscriber_id=None,
         status=form.status.data,
         address=(form.barangay.data or "").strip() or None,
+        full_name=form.full_name.data.strip(),
+        contact_number=(form.contact_number.data or "").strip() or None,
         notes=notes,
     )
     db.session.add(service_request)

@@ -65,6 +65,25 @@ export interface AssignmentSubscriber {
   longitude: number | null;
 }
 
+// Phase 28 (installation dispatch) + GeoMap "+ Tickets" walk-in Service
+// Orders: full_name/address/contact_number are the request's own copy
+// of the applicant's details, only ever populated when there's no
+// linked Subscriber (a walk-in whose Customer field was typed as free
+// text, never matched against `subscribers`). The mobile app falls
+// back to these when `Assignment.subscriber` below is null -- see
+// AssignmentsScreen.tsx/JobDetailScreen.tsx.
+export interface AssignmentServiceRequest {
+  id: number;
+  request_type: string;
+  status: string;
+  notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  full_name: string | null;
+  address: string | null;
+  contact_number: string | null;
+}
+
 export interface AssignmentNap {
   id: number;
   nap_code: string;
@@ -76,6 +95,9 @@ export interface AssignmentNap {
 export interface Assignment {
   id: number;
   status: AssignmentStatus;
+  /** "repair" for a technical_issue-sourced assignment, "installation"
+   * for a service_request-sourced one. */
+  job_type: "repair" | "installation";
   assigned_at: string | null;
   completed_at: string | null;
   resolution_notes: string | null;
@@ -83,7 +105,11 @@ export interface Assignment {
    * null until one's been uploaded. Set via
    * ApiClient.technician.uploadAssignmentPhoto(). */
   photo_url: string | null;
+  /** Absolute URL to the customer's install signature (installations
+   * only), or null until one's been uploaded. */
+  signature_url: string | null;
   issue: AssignmentIssue | null;
+  service_request: AssignmentServiceRequest | null;
   subscriber: AssignmentSubscriber | null;
   nap: AssignmentNap | null;
 }

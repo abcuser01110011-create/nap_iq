@@ -21,6 +21,27 @@ function jobTitle(item: {
   return `Job #${item.id}`;
 }
 
+// A GeoMap "+ Tickets" walk-in Service Order has no linked Subscriber
+// at all (its Customer field is free text, never matched against
+// `subscribers`) — `assignment.subscriber` is null for those, so the
+// card falls back to the request's own full_name/address, which the
+// backend now passes through for exactly this case (see
+// _serialize_assignment() in app/routes/api_v1/technician.py).
+function customerName(item: {
+  subscriber?: { full_name: string } | null;
+  service_request?: { full_name?: string | null } | null;
+}) {
+  return item.subscriber?.full_name ?? item.service_request?.full_name ?? "—";
+}
+
+function customerAddress(item: {
+  subscriber?: { address?: string | null } | null;
+  issue?: { address?: string | null } | null;
+  service_request?: { address?: string | null } | null;
+}) {
+  return item.subscriber?.address ?? item.issue?.address ?? item.service_request?.address;
+}
+
 export default function AssignmentsScreen({ navigation }: any) {
   const { user } = useAuth();
   const { openAssignments, refreshing, refresh, pendingByAssignment, isOnline } = useOffline();
@@ -64,8 +85,8 @@ export default function AssignmentsScreen({ navigation }: any) {
               <View style={styles.jobTypeRow}>
                 <Text style={styles.jobTypeTag}>{JOB_TYPE_LABELS[item.job_type] ?? item.job_type}</Text>
               </View>
-              <Text style={styles.cardSubtitle}>{item.subscriber?.full_name ?? "—"}</Text>
-              <Text style={styles.cardAddress}>{item.subscriber?.address ?? item.issue?.address}</Text>
+              <Text style={styles.cardSubtitle}>{customerName(item)}</Text>
+              <Text style={styles.cardAddress}>{customerAddress(item)}</Text>
               <View style={styles.cardFooter}>
                 {item.issue?.priority && (
                   <Text style={styles.priority}>Priority: {item.issue.priority}</Text>

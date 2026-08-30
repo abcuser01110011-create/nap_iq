@@ -307,7 +307,9 @@ export default function JobDetailScreen({ route, navigation }: any) {
         <Text style={styles.title}>
           {assignment.issue?.issue_code ??
             (assignment.service_request
-              ? assignment.subscriber?.subscriber_code ?? `Installation #${assignment.service_request.id}`
+              ? assignment.subscriber?.subscriber_code ??
+                assignment.service_request.full_name ??
+                `Installation #${assignment.service_request.id}`
               : `Job #${assignment.id}`)}
         </Text>
         <Text style={styles.subtitle}>
@@ -346,14 +348,18 @@ export default function JobDetailScreen({ route, navigation }: any) {
             <JobLocationMap
               latitude={lat}
               longitude={lng}
-              label={assignment.subscriber?.full_name ?? assignment.issue?.issue_code ?? "Job location"}
+              label={assignment.subscriber?.full_name ?? assignment.service_request?.full_name ?? assignment.issue?.issue_code ?? "Job location"}
               isOnline={isOnline}
               onOpenExternal={openMaps}
             />
           )}
-          <InfoRow label="Name" value={assignment.subscriber?.full_name} />
-          <InfoRow label="Address" value={assignment.subscriber?.address ?? assignment.issue?.address} />
-          <InfoRow label="Contact" value={assignment.subscriber?.contact_number} />
+          {/* A walk-in Service Order (GeoMap "+ Tickets" modal, free-text
+              Customer field) has no linked Subscriber -- fall back to the
+              request's own full_name/address/contact_number, which the
+              backend passes through for exactly this case. */}
+          <InfoRow label="Name" value={assignment.subscriber?.full_name ?? assignment.service_request?.full_name} />
+          <InfoRow label="Address" value={assignment.subscriber?.address ?? assignment.issue?.address ?? assignment.service_request?.address} />
+          <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
           {lat != null && lng != null && (
             <TouchableOpacity style={styles.mapLink} onPress={openMaps}>
               <Text style={styles.mapLinkText}>Open in Maps</Text>
