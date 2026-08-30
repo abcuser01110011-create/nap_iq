@@ -69,7 +69,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import ServiceRequest, Subscriber, Nap
+from app.models import ServiceRequest, Subscriber, Nap, Assignment, Technician
 from app.forms import ServiceRequestForm, QuickServiceRequestForm
 from app.notifications_utils import notify
 from app.nap_recommendation import recommend_naps
@@ -166,6 +166,40 @@ def _sync_subscriber_nap(service_request):
         if previous_nap is not None:
             sync_nap_status(previous_nap)
         sync_nap_status(subscriber.nap)
+
+
+def _dispatch_field_assistant(service_request, assigned_team_id):
+    """Phase 30: creates a real `Assignment` row linking the field
+    assistant chosen in the GeoMap "+ Tickets" quick-create modal's
+    "Assigned Team" dropdown to this brand-new service request, so it
+    immediately shows up on that field assistant's mobile Assignments
+    dashboard (app/routes/api_v1/technician.py's `list_assignments()`
+    reads straight from this table).
+
+    Previously `quick_add_request()` only folded the chosen name into
+    `notes` as text and left actual dispatch for the Dispatch Board
+    once the request reached 'scheduled' -- this now dispatches
+    immediately at creation time instead, same as the Dispatch
+    Board's own `assign_request()` (app/routes/dispatch.py), since the
+    admin already picked someone in the same form. Silently does
+    nothing if no assigned team was chosen, or if the id doesn't match
+    a real field_assistant Technician -- the request itself still
+    gets created either way.
+    """
+    if not assigned_team_id:
+        return
+    technician = Technician.query.filter_by(
+        id=assigned_team_id, personnel_type="field_assistant"
+    ).first()
+    if technician is None:
+        return
+    db.session.add(
+        Assignment(
+            service_request_id=service_request.id,
+            technician_id=technician.id,
+            status="assigned",
+        )
+    )
 
 
 def _notify_status_change(service_request):
@@ -408,6 +442,8 @@ def quick_add_request():
     )
     db.session.add(service_request)
     _sync_subscriber_nap(service_request)
+    db.session.flush()  # service_request.id is needed below before commit
+    _dispatch_field_assistant(service_request, request.form.get("assigned_team_id"))
     db.session.commit()
 
     return (

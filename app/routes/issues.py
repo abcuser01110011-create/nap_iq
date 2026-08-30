@@ -154,6 +154,34 @@ def list_issues():
     )
 
 
+def _dispatch_field_assistant(issue, assigned_team_id):
+    """Phase 30: the technical_issue counterpart of
+    app/routes/service_requests.py's `_dispatch_field_assistant()` --
+    see that function's docstring. Creates an `Assignment` row for the
+    field assistant chosen in the "+ Tickets" modal's "Assigned Team"
+    dropdown so this trouble ticket immediately appears on that field
+    assistant's mobile Assignments dashboard, instead of only being
+    dispatchable later from the Dispatch Board. Silently does nothing
+    if no assigned team was chosen, or if the id doesn't resolve to a
+    real field_assistant Technician.
+    """
+    if not assigned_team_id:
+        return
+    technician = Technician.query.filter_by(
+        id=assigned_team_id, personnel_type="field_assistant"
+    ).first()
+    if technician is None:
+        return
+    db.session.add(
+        Assignment(
+            technical_issue_id=issue.id,
+            technician_id=technician.id,
+            status="assigned",
+        )
+    )
+    issue.status = "assigned"
+
+
 @issues_bp.route("/report", methods=["POST"])
 @role_required(*_STAFF_ROLES)
 def report_issue():
@@ -308,6 +336,7 @@ def report_issue():
         # how the seed data's ISS-#### codes are formatted.
         issue.issue_code = f"ISS-{issue.id:04d}"
         notify_new_issue_reported(issue)
+        _dispatch_field_assistant(issue, request.form.get("assigned_team_id"))
         db.session.commit()
 
         return (

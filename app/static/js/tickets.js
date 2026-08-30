@@ -39,7 +39,15 @@
     // (Was 0403400000 -- not a real PSGC code, so this silently
     // 404'd and cached itself as an empty list. Santa Cruz, Laguna's
     // actual code is 0403426000.)
-    const BARANGAY_API_URL = "https://psgc.gitlab.io/api/cities-municipalities/0403426000/barangays/";
+    //
+    // psgc.gitlab.io itself has since become unreliable (frequent
+    // 403/timeouts from this host), so this now points at PSGC
+    // Cloud's equivalent "barangays of a city/municipality" endpoint
+    // instead -- same code scheme, same request shape, just a host
+    // that's actually up. See loadBarangays() below for why the
+    // response is parsed defensively rather than assumed to be a
+    // bare array.
+    const BARANGAY_API_URL = "https://psgc.cloud/api/cities-municipalities/0403426000/barangays";
 
     let modalInstance = null;
     let currentCategory = "SO"; // "SO" | "TN"
@@ -76,9 +84,17 @@
         if (barangaysLoaded || barangaysLoading) return Promise.resolve();
         barangaysLoading = true;
         return fetch(BARANGAY_API_URL)
-            .then((r) => r.json())
-            .then((list) => {
-                allBarangays = (list || [])
+            .then((r) => {
+                if (!r.ok) throw new Error("barangay API responded " + r.status);
+                return r.json();
+            })
+            .then((payload) => {
+                // Different PSGC-style hosts wrap the list differently
+                // (a bare array vs. `{ data: [...] }`) -- accept either
+                // instead of assuming one shape and silently caching an
+                // empty list when the host's format doesn't match.
+                const list = Array.isArray(payload) ? payload : (payload && Array.isArray(payload.data) ? payload.data : []);
+                allBarangays = list
                     .map((b) => b.name)
                     .filter(Boolean)
                     .sort((a, b) => a.localeCompare(b));
@@ -181,23 +197,39 @@
         document.getElementById("ticketFormSubscriberId").value = "";
         updateLocationForSubscriber();
 
-        if (currentCategory !== "TN") {
-            setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+        const term = input.value.trim().toLowerCase();
+
+        if (!term) {
+            // Nothing typed yet -- no hint text needed, and (for TN)
+            // no suggestion list either.
+            setSubscriberHelp("", "text-muted");
+            if (currentCategory === "TN") renderSubscriberResults([]);
             return;
         }
 
-        const term = input.value.trim().toLowerCase();
-        if (!term) {
-            renderSubscriberResults([]);
-            return;
-        }
+        // Live validation for both categories: instead of a static
+        // "Confirm with Tab or Enter." placeholder, show the actual
+        // "no match" error as soon as what's typed doesn't match any
+        // subscriber -- rather than waiting for blur/Enter (SO) or
+        // only reacting once a suggestion is clicked (TN).
         loadSubscribers().then(() => {
             const matches = allSubscribers.filter(
                 (s) =>
                     s.full_name.toLowerCase().includes(term) ||
                     (s.subscriber_code || "").toLowerCase().includes(term)
             );
-            renderSubscriberResults(matches);
+
+            if (currentCategory === "TN") {
+                renderSubscriberResults(matches);
+            }
+
+            if (!matches.length) {
+                setSubscriberHelp("No matching customer on file for \"" + input.value.trim() + "\".", "text-danger");
+            } else {
+                // Still narrowing down -- clear any stale error rather
+                // than showing a generic hint while they keep typing.
+                setSubscriberHelp("", "text-muted");
+            }
         });
     }
 
@@ -224,7 +256,7 @@
         if (!term) {
             selectedSubscriber = null;
             document.getElementById("ticketFormSubscriberId").value = "";
-            setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+            setSubscriberHelp("", "text-muted");
             updateLocationForSubscriber();
             return;
         }
@@ -345,7 +377,7 @@
         selectedSubscriber = null;
         addedTechnicians = [];
         document.getElementById("ticketFormSubscriberId").value = "";
-        setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+        setSubscriberHelp("", "text-muted");
         renderSubscriberResults([]);
         renderBarangayResults([]);
         renderTechnicianChips();
@@ -376,7 +408,7 @@
         } else {
             subscriberInput.placeholder = "Type the customer's exact name or subscriber code";
         }
-        setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+        setSubscriberHelp("", "text-muted");
         renderSubscriberResults([]);
 
         // Barangay search now applies to both categories -- for SO it's
@@ -461,6 +493,7 @@
         formData.append("status", document.getElementById("ticketFormStatus").value);
         formData.append("notes", document.getElementById("ticketFormDescription").value);
         formData.append("priority_label", selectedOptionLabel(document.getElementById("ticketFormPriority")));
+        formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
         formData.append(
             "technicians_label",
@@ -497,6 +530,7 @@
         const typed = document.getElementById("ticketFormDescription").value.trim();
         const description = [extra.join("\n"), typed].filter(Boolean).join("\n\n") || "Reported via the GeoMap Tickets menu.";
         formData.append("description", description);
+        formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("csrf_token", CSRF_TOKEN);
 
         return fetch("/issues/report", {
