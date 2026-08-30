@@ -1089,6 +1089,40 @@
         const closeBtn = document.getElementById("napDetailCloseBtn");
         if (closeBtn) closeBtn.addEventListener("click", closeNapDetailPanel);
         map.on("click", closeNapDetailPanel);
+        setupTicketsDropdownPanelToggle();
+    }
+
+    /**
+     * The "+ Tickets" dropdown menu (#ticketsDropdownBtn) lives in the
+     * same top-right corner the NAP detail panel slides in under (see
+     * .napmap-detail-panel's "docked below the top-right button row"
+     * comment in napmap.css) -- when the panel is already open and the
+     * dropdown opens on top of it, the dropdown's own items end up
+     * behind the panel (panel z-index 1003 vs. Bootstrap's dropdown
+     * z-index), so the "New Installation" / "Fiber Break" etc. options
+     * become impossible to click.
+     *
+     * Rather than fight z-index ordering, this temporarily slides the
+     * detail panel back out (without touching its "open" state/content
+     * -- see .napmap-detail-panel-suppressed in napmap.css, which wins
+     * over .napmap-detail-panel-open) for as long as the dropdown is
+     * open, and slides it back into view the moment the dropdown
+     * closes. If the panel wasn't open to begin with, these classes
+     * are no-ops.
+     */
+    function setupTicketsDropdownPanelToggle() {
+        const dropdownToggle = document.getElementById("ticketsDropdownBtn");
+        const panel = document.getElementById("napDetailPanel");
+        if (!dropdownToggle || !panel) return;
+        const dropdownEl = dropdownToggle.closest(".dropdown");
+        if (!dropdownEl) return;
+
+        dropdownEl.addEventListener("show.bs.dropdown", () => {
+            panel.classList.add("napmap-detail-panel-suppressed");
+        });
+        dropdownEl.addEventListener("hide.bs.dropdown", () => {
+            panel.classList.remove("napmap-detail-panel-suppressed");
+        });
     }
 
     function escapeHtml(str) {

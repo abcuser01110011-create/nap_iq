@@ -955,6 +955,20 @@
     pointer-events: auto;
 }
 
+/* Temporarily slides an already-open panel back out while the
+   "+ Tickets" dropdown (#ticketsDropdownBtn) is open, so the dropdown's
+   own menu items -- which render in that same top-right corner -- are
+   never covered by the panel. Combined with .napmap-detail-panel-open
+   (not swapped for it) so the panel's open/populated state is
+   untouched underneath; this rule just wins on transform/pointer-events
+   for as long as it's present. Removed the instant the dropdown closes,
+   which slides the panel back into view. See
+   setupTicketsDropdownPanelToggle() in napmap.js. */
+.napmap-detail-panel.napmap-detail-panel-suppressed {
+    transform: translateX(100%);
+    pointer-events: none;
+}
+
 @media (max-width: 767.98px) {
     .napmap-detail-panel {
         /* The top-right button row wraps onto two lines on narrower

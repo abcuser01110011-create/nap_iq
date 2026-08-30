@@ -19,7 +19,6 @@ import { ApiError, type Assignment } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
-import LiveTrackingMap from "../../components/LiveTrackingMap";
 import { colors } from "../../theme/technician";
 import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
 
@@ -373,18 +372,20 @@ export default function JobDetailScreen({ route, navigation }: any) {
           )}
         </View>
 
-        {/* Live tracking — only shown once the technician has accepted the
-            job (status moves past "assigned"). Before that, the field
+        {/* Location — only shown once the technician has accepted the job
+            (status moves past "assigned"). Before that, the field
             assistant only sees the ticket form above and the Accept
-            button below. */}
+            button below. Tapping the preview opens the device's Google
+            Maps (or Apple Maps on iOS) app for actual turn-by-turn
+            navigation, same as the "Open in Maps" link above. */}
         {lat != null && lng != null && assignment.status !== "assigned" && (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Live tracking</Text>
-            <LiveTrackingMap
-              destinationLatitude={lat}
-              destinationLongitude={lng}
-              destinationLabel={
-                assignment.subscriber?.full_name ?? assignment.service_request?.full_name ?? assignment.issue?.issue_code ?? "job location"
+            <Text style={styles.cardLabel}>Location</Text>
+            <JobLocationMap
+              latitude={lat}
+              longitude={lng}
+              label={
+                assignment.subscriber?.full_name ?? assignment.service_request?.full_name ?? assignment.issue?.issue_code ?? "Job location"
               }
               isOnline={isOnline}
               onOpenExternal={openMaps}
