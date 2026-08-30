@@ -221,6 +221,12 @@ ISSUE_TYPE_CHOICES = [
     ("Fiber/Cable Problem", "Fiber/Cable Problem"),
     ("NAP Problem", "NAP Problem"),
     ("Connection Problem", "Connection Problem"),
+    # GeoMap "+ Tickets" quick-create menu (Trouble Ticket / TN group)
+    # adds these two on top of the pre-existing list above. issue_type
+    # is a plain String(50) column, not a DB-level enum, so adding
+    # values here is a front end/choices-only change -- no migration.
+    ("Last-Mile Checking", "Last-Mile Checking"),
+    ("Repair", "Repair"),
     ("Other", "Other"),
 ]
 
@@ -1247,3 +1253,62 @@ class ServiceRequestForm(FlaskForm):
             if not ok:
                 return False
         return True
+
+
+class QuickServiceRequestForm(FlaskForm):
+    """Used by the GeoMap's "+ Tickets" quick-create modal for Service
+    Order tickets. Deliberately narrower than the full
+    ServiceRequestForm/Add Service Request page above:
+
+    - Only "New Installation" and "Relocation" are offered. "Add NAP"
+      (the third Service Order type in the quick-create menu) isn't a
+      service_request at all -- it opens the map's own existing Add
+      NAP mode instead, so it never reaches this form. "Upgrade" and
+      "Disconnection" (valid ServiceRequestForm types) aren't part of
+      this quick menu either.
+    - No walk-in-applicant path: a Subscriber must already exist. The
+      full Add Service Request page is still there for a walk-in
+      applicant with no subscriber record yet.
+
+    The quick-create modal also collects a few things this table has
+    no dedicated columns for yet -- priority, assigned team,
+    technician(s), and a scheduled date. Rather than a field per
+    concept here, the route folds whatever the admin entered for
+    those into `notes` as plain text (see quick_add_request()) so
+    nothing typed is lost; this form only validates what actually has
+    a column.
+    """
+
+    request_type = SelectField(
+        "Request Type",
+        choices=[
+            ("new_installation", "New Installation"),
+            ("relocation", "Relocation"),
+        ],
+        validators=[DataRequired(message="Request type is required.")],
+    )
+    subscriber_id = SelectField(
+        "Subscriber",
+        coerce=int,
+        validators=[DataRequired(message="Please select a subscriber.")],
+    )
+    barangay = StringField(
+        "Location",
+        validators=[Optional(), Length(max=255, message="Location is too long.")],
+    )
+    status = SelectField(
+        "Status",
+        choices=[
+            ("pending", "Pending"),
+            ("approved", "Approved"),
+            ("scheduled", "Scheduled"),
+            ("completed", "Completed"),
+            ("rejected", "Rejected"),
+        ],
+        default="pending",
+        validators=[DataRequired()],
+    )
+    notes = TextAreaField(
+        "Description",
+        validators=[Optional(), Length(max=2000, message="Description is too long.")],
+    )

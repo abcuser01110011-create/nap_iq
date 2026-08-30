@@ -97,11 +97,35 @@
         {% endif %}
     </div>
 
-    <!-- Floating top-right mode buttons (Table View / Add NAP / Report Issue) -->
+    <!-- Floating top-right mode buttons (+ Tickets / Add NAP / Report Issue) -->
     <div class="napmap-float napmap-float-top-right d-flex gap-2 flex-wrap">
-        <a href="{{ url_for('naps.list_naps') }}" class="btn btn-light btn-sm shadow-sm">
-            <i class="bi bi-list-ul me-1"></i>Table View
-        </a>
+        {# "+ Tickets" replaces the old "Table View" link. Two groups,
+           bold non-clickable header + clickable type rows underneath:
+           Service Order (SO) opens the ticketFormModal below (New
+           Installation / Relocation) or, for "Add NAP", just triggers
+           the existing Add NAP mode button -- Add NAP already is a
+           full feature on this page, so there's no reason to build a
+           second path to it. Trouble Ticket (TN) opens the same
+           modal in its TN configuration. See app/static/js/tickets.js. #}
+        <div class="dropdown">
+            <button type="button" id="ticketsDropdownBtn" class="btn btn-primary btn-sm shadow-sm dropdown-toggle"
+                    data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <i class="bi bi-plus-lg me-1"></i>Tickets
+            </button>
+            <ul class="dropdown-menu ticket-type-menu" aria-labelledby="ticketsDropdownBtn">
+                <li><h6 class="dropdown-header">Service Order (SO)</h6></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="new_installation" data-type-label="New Installation">New Installation</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="relocation" data-type-label="Relocation">Relocation</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="add_nap" data-type-label="Add NAP">Add NAP</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Trouble Ticket (TN)</h6></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="No Internet" data-type-label="No Internet">No Internet</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Slow Internet" data-type-label="Slow Internet">Slow Internet</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Connection Problem" data-type-label="Connection Problem">Connection Problem</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Last-Mile Checking" data-type-label="Last-Mile Checking">Last-Mile Checking</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Repair" data-type-label="Repair">Repair</a></li>
+            </ul>
+        </div>
         <button type="button" id="addNapModeBtn" class="btn btn-primary btn-sm shadow-sm">
             <i class="bi bi-plus-lg me-1"></i>Add NAP
         </button>
@@ -597,6 +621,123 @@
         </div>
     </div>
 </div>
+
+<!-- "+ Tickets" quick-create modal: one shared form, reconfigured by
+     app/static/js/tickets.js for either a Service Order (SO) or a
+     Trouble Ticket (TN) depending on which dropdown item was
+     clicked. Centered (not side-docked like reportIssueModal above)
+     since nothing here needs map-click interaction while it's open. -->
+<div class="modal" id="ticketFormModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="ticketForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ticketFormTitle">SO. New</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="ticketFormGeneralError" class="alert alert-danger d-none py-2 small"></div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Type</label>
+                        <select class="form-select" id="ticketFormType"></select>
+                        <div class="invalid-feedback d-block small" data-error-for="request_type"></div>
+                    </div>
+
+                    <div class="mb-2 position-relative">
+                        <label class="form-label small text-muted mb-1">Subscriber</label>
+                        <input type="text" class="form-control" id="ticketFormSubscriberInput"
+                               placeholder="Search by name or subscriber code…" autocomplete="off">
+                        <input type="hidden" id="ticketFormSubscriberId">
+                        <div id="ticketFormSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
+                    </div>
+
+                    <div class="mb-2" id="ticketFormBarangayWrapper">
+                        <label class="form-label small text-muted mb-1">Location</label>
+                        <select class="form-select" id="ticketFormBarangay">
+                            <option value="">Loading barangays…</option>
+                        </select>
+                        <div class="invalid-feedback d-block small" data-error-for="barangay"></div>
+                    </div>
+
+                    <div class="mb-2 d-none" id="ticketFormLocationAutoWrapper">
+                        <label class="form-label small text-muted mb-1">Location</label>
+                        <input type="text" class="form-control" id="ticketFormLocationAuto" readonly>
+                        <div id="ticketFormPinStatus" class="form-text">
+                            Select the affected subscriber to fill this in from their registered address.
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Priority</label>
+                            <select class="form-select" id="ticketFormPriority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Status</label>
+                            <select class="form-select" id="ticketFormStatus">
+                                <option value="pending" selected>Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="completed">Completed</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2 mt-2">
+                        <label class="form-label small text-muted mb-1">Assigned Team <span class="text-muted">(field assistant)</span></label>
+                        <select class="form-select" id="ticketFormAssignedTeam">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Technician</label>
+                        <div class="d-flex gap-2">
+                            <select class="form-select" id="ticketFormTechnicianSelect">
+                                <option value="">-- Select Technician --</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="ticketFormAddTechnicianBtn">
+                                <i class="bi bi-plus-lg"></i> Add
+                            </button>
+                        </div>
+                        <div id="ticketFormTechnicianChips" class="d-flex flex-wrap gap-1 mt-2"></div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Created</label>
+                            <input type="text" class="form-control" id="ticketFormCreated" readonly>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Scheduled</label>
+                            <input type="date" class="form-control" id="ticketFormScheduled">
+                        </div>
+                    </div>
+
+                    <div class="mb-1 mt-2">
+                        <label class="form-label small text-muted mb-1">Description <span class="text-muted">(optional)</span></label>
+                        <textarea class="form-control" id="ticketFormDescription" rows="3"
+                                  placeholder="Customer requested installation of a new fiber internet connection."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="ticketFormSubmitBtn">
+                        <i class="bi bi-check-lg me-1"></i>Create
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -611,6 +752,12 @@
    <script src="{{ url_for('static', ...) }}"> tag on this page). #}
 <script>window.NAP_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
 <script src="{{ url_for('static', filename='js/napmap.js') }}"></script>
+{# "+ Tickets" quick-create dropdown/modal -- self-contained, loads
+   after napmap.js only so it can piggyback on the Add NAP button's
+   existing mode toggle for the "Add NAP" menu item; otherwise reads
+   nothing from napmap.js's internal state and reads its own CSRF
+   token from the same <meta name="csrf-token"> tag napmap.js uses. #}
+<script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
 {# Phase 8 (adapted onto Phase 23's navigation architecture):
    nav-origin.js defines window.NapIQNavOrigin (mirrors
    nav-destination.js) and must load before nav-origin-picker.js,

@@ -1098,3 +1098,66 @@
     font-size: 0.85rem;
     padding: 0.5rem 0;
 }
+
+/* "+ Tickets" quick-create dropdown (naps/map.html) + its shared
+   modal (#ticketFormModal). The dropdown reuses Bootstrap's own
+   .dropdown-menu/.dropdown-header/.dropdown-item, so this only adds
+   the bits Bootstrap doesn't style by default: making the group
+   labels read as plain bold text (not a disabled/greyed-out look)
+   and sizing the menu itself. */
+.ticket-type-menu {
+    min-width: 220px;
+}
+
+.ticket-type-menu .dropdown-header {
+    font-weight: 700;
+    color: var(--napiq-text, #1b1f28);
+    text-transform: none;
+    font-size: 0.85rem;
+    padding-left: 1rem;
+    padding-top: 0.5rem;
+}
+
+.ticket-type-menu .dropdown-header:first-child {
+    padding-top: 0.25rem;
+}
+
+.ticket-type-menu .dropdown-item.ticket-type-option {
+    padding-left: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Subscriber autocomplete inside #ticketFormModal -- same floating
+   list-group pattern as .nap-search-dropdown above, just scoped to
+   the modal's own field instead of the topbar search. */
+.ticket-subscriber-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 1060; /* above the modal's own content */
+    border-radius: 0.4rem;
+}
+
+.ticket-subscriber-dropdown .list-group-item {
+    cursor: pointer;
+}
+
+.ticket-subscriber-dropdown .list-group-item:hover {
+    background-color: #f1f6fb;
+}
+
+/* Technician "chips" added under the Technician picker in
+   #ticketFormModal. */
+#ticketFormTechnicianChips .badge {
+    font-weight: 500;
+    padding: 0.4rem 0.5rem;
+}
+
+#ticketFormTechnicianChips .btn-close {
+    width: 0.5rem;
+    height: 0.5rem;
+    padding: 0.25rem;
+}

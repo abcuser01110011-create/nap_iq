@@ -65,12 +65,12 @@ Routes:
     POST /service-requests/<id>/assign-nap     -> assign_nap        (Phase 22, see above)
 """
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 from app.extensions import db
 from app.auth import role_required
 from app.models import ServiceRequest, Subscriber, Nap
-from app.forms import ServiceRequestForm
+from app.forms import ServiceRequestForm, QuickServiceRequestForm
 from app.notifications_utils import notify
 from app.nap_recommendation import recommend_naps
 from app.email_utils import send_status_email
@@ -343,6 +343,87 @@ def add_request():
         return redirect(url_for("service_requests.list_requests"))
 
     return render_template("service_requests/form.html", form=form, mode="add", service_request=None)
+
+
+@service_requests_bp.route("/quick-add", methods=["POST"])
+@role_required("administrator")
+def quick_add_request():
+    """Creates a Service Order (New Installation / Relocation) from the
+    GeoMap's "+ Tickets" quick-create modal. Called via fetch()/AJAX,
+    so it returns JSON rather than a redirect -- same pattern as
+    naps.quick_add_nap() / issues.report_issue(). See
+    QuickServiceRequestForm's own docstring (app/forms.py) for exactly
+    how this is narrower than the full Add Service Request page, and
+    for why priority/assigned-team/technician/scheduled-date all end
+    up folded into `notes` instead of their own columns.
+    """
+    form = QuickServiceRequestForm()
+    form.subscriber_id.choices = [
+        (s.id, f"{s.subscriber_code} — {s.full_name}")
+        for s in Subscriber.query.filter_by(status="active").order_by(Subscriber.full_name).all()
+    ]
+
+    if not form.validate_on_submit():
+        return jsonify({"status": "error", "errors": form.errors}), 400
+
+    subscriber = Subscriber.query.get(form.subscriber_id.data)
+    if subscriber is None:
+        return (
+            jsonify({"status": "error", "errors": {"subscriber_id": ["Selected subscriber was not found."]}}),
+            400,
+        )
+
+    # Fields the modal collects that service_requests has no column
+    # for yet -- folded into notes as plain text rather than dropped,
+    # so nothing the admin typed disappears. None of this creates a
+    # real technician Assignment; dispatch that from the Dispatch
+    # Board once the request is scheduled, same as any other install.
+    extra_lines = []
+    priority_label = (request.form.get("priority_label") or "").strip()
+    if priority_label:
+        extra_lines.append(f"Priority: {priority_label}")
+    assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
+    if assigned_team_label:
+        extra_lines.append(f"Assigned Team: {assigned_team_label}")
+    technicians_label = (request.form.get("technicians_label") or "").strip()
+    if technicians_label:
+        extra_lines.append(f"Technician(s) requested: {technicians_label}")
+    scheduled_label = (request.form.get("scheduled") or "").strip()
+    if scheduled_label:
+        extra_lines.append(f"Scheduled: {scheduled_label}")
+
+    notes_parts = []
+    if extra_lines:
+        notes_parts.append("\n".join(extra_lines))
+    if (form.notes.data or "").strip():
+        notes_parts.append(form.notes.data.strip())
+    notes = "\n\n".join(notes_parts) or None
+
+    service_request = ServiceRequest(
+        request_type=form.request_type.data,
+        subscriber_id=subscriber.id,
+        status=form.status.data,
+        address=(form.barangay.data or "").strip() or None,
+        notes=notes,
+    )
+    db.session.add(service_request)
+    _sync_subscriber_nap(service_request)
+    db.session.commit()
+
+    return (
+        jsonify(
+            {
+                "status": "success",
+                "message": f"Service request #{service_request.id} was created.",
+                "service_request": {
+                    "id": service_request.id,
+                    "request_type": service_request.request_type,
+                    "status": service_request.status,
+                },
+            }
+        ),
+        201,
+    )
 
 
 @service_requests_bp.route("/<int:request_id>/edit", methods=["GET", "POST"])

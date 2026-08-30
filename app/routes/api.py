@@ -279,6 +279,36 @@ def subscribers_json():
     return jsonify(data)
 
 
+@api_bp.route("/personnel")
+@role_required("administrator")
+def personnel_json():
+    """Lightweight JSON feed of `technicians` table rows -- which
+    holds both technician and field_assistant profiles (see
+    Technician.personnel_type) -- used by the GeoMap's "+ Tickets"
+    quick-create modal to populate its Assigned Team (field
+    assistants) and Technician pickers. `?type=technician` or
+    `?type=field_assistant` narrows to one or the other; omitted
+    returns both. Administrator-only, matching every other route that
+    manages dispatch staffing (app/routes/dispatch.py)."""
+    personnel_type = request.args.get("type")
+    query = Technician.query
+    if personnel_type in ("technician", "field_assistant"):
+        query = query.filter_by(personnel_type=personnel_type)
+
+    people = query.order_by(Technician.full_name).all()
+    return jsonify(
+        [
+            {
+                "id": p.id,
+                "full_name": p.full_name,
+                "status": p.status,
+                "personnel_type": p.personnel_type,
+            }
+            for p in people
+        ]
+    )
+
+
 @api_bp.route("/service-requests/<int:request_id>/recommend-nap")
 @role_required("administrator")
 def service_request_recommend_nap_json(request_id):
