@@ -118,7 +118,7 @@
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="relocation" data-type-label="Relocation">Relocation</a></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="add_nap" data-type-label="Add NAP">Add NAP</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><h6 class="dropdown-header">Trouble Ticket (TN)</h6></li>
+                <li><h6 class="dropdown-header">Ticket Number (TN)</h6></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="No Internet" data-type-label="No Internet">No Internet</a></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Slow Internet" data-type-label="Slow Internet">Slow Internet</a></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Connection Problem" data-type-label="Connection Problem">Connection Problem</a></li>
@@ -605,8 +605,7 @@
 
                     <div class="mb-1">
                         <label class="form-label small text-muted mb-1">Description</label>
-                        <textarea class="form-control" name="description" id="reportIssueDescription" rows="3"
-                                  placeholder="What's happening?"></textarea>
+                        <textarea class="form-control" name="description" id="reportIssueDescription" rows="3"></textarea>
                         <div class="invalid-feedback d-block small" data-error-for="description"></div>
                     </div>
                     <div class="form-text">Issue ID and status are assigned automatically.</div>
@@ -632,25 +631,38 @@
         <div class="modal-content">
             <form id="ticketForm" novalidate>
                 <div class="modal-header">
-                    <h5 class="modal-title" id="ticketFormTitle">SO. New</h5>
+                    <h5 class="modal-title" id="ticketFormTitle">Service Order</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div id="ticketFormGeneralError" class="alert alert-danger d-none py-2 small"></div>
 
                     <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Ticket Code</label>
+                        <input type="text" class="form-control" id="ticketFormCode" readonly>
+                    </div>
+
+                    <div class="mb-2">
                         <label class="form-label small text-muted mb-1">Type</label>
-                        <select class="form-select" id="ticketFormType"></select>
+                        <input type="text" class="form-control" id="ticketFormType" readonly>
+                        <input type="hidden" id="ticketFormTypeValue">
                         <div class="invalid-feedback d-block small" data-error-for="request_type"></div>
                     </div>
 
                     <div class="mb-2 position-relative">
-                        <label class="form-label small text-muted mb-1">Subscriber</label>
+                        <label class="form-label small text-muted mb-1">Customer</label>
                         <input type="text" class="form-control" id="ticketFormSubscriberInput"
-                               placeholder="Search by name or subscriber code…" autocomplete="off">
+                               placeholder="Type the customer's exact name or subscriber code" autocomplete="off">
                         <input type="hidden" id="ticketFormSubscriberId">
-                        <div id="ticketFormSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        <div id="ticketFormSubscriberHelp" class="form-text">Confirm with Tab or Enter.</div>
                         <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Plan</label>
+                        <select class="form-select" id="ticketFormPlan">
+                            <option value="">-- None --</option>
+                        </select>
                     </div>
 
                     <div class="mb-2" id="ticketFormBarangayWrapper">
@@ -724,8 +736,7 @@
 
                     <div class="mb-1 mt-2">
                         <label class="form-label small text-muted mb-1">Description <span class="text-muted">(optional)</span></label>
-                        <textarea class="form-control" id="ticketFormDescription" rows="3"
-                                  placeholder="Customer requested installation of a new fiber internet connection."></textarea>
+                        <textarea class="form-control" id="ticketFormDescription" rows="3"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">

@@ -382,6 +382,9 @@ def quick_add_request():
     priority_label = (request.form.get("priority_label") or "").strip()
     if priority_label:
         extra_lines.append(f"Priority: {priority_label}")
+    plan_label = (request.form.get("plan_label") or "").strip()
+    if plan_label:
+        extra_lines.append(f"Plan: {plan_label}")
     assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
     if assigned_team_label:
         extra_lines.append(f"Assigned Team: {assigned_team_label}")

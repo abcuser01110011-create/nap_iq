@@ -38,19 +38,6 @@
     // Santa Cruz, Laguna's PSGC city/municipality code.
     const BARANGAY_API_URL = "https://psgc.gitlab.io/api/cities-municipalities/0403400000/barangays/";
 
-    const SO_TYPE_CHOICES = [
-        { value: "new_installation", label: "New Installation" },
-        { value: "relocation", label: "Relocation" },
-        { value: "add_nap", label: "Add NAP" },
-    ];
-    const TN_TYPE_CHOICES = [
-        { value: "No Internet", label: "No Internet" },
-        { value: "Slow Internet", label: "Slow Internet" },
-        { value: "Connection Problem", label: "Connection Problem" },
-        { value: "Last-Mile Checking", label: "Last-Mile Checking" },
-        { value: "Repair", label: "Repair" },
-    ];
-
     let modalInstance = null;
     let currentCategory = "SO"; // "SO" | "TN"
     let barangaysLoaded = false;
@@ -59,6 +46,8 @@
     let subscribersLoaded = false;
     let selectedSubscriber = null; // {id, subscriber_code, full_name, address, latitude, longitude}
     let addedTechnicians = []; // [{id, full_name}]
+    let plansLoaded = false;
+    let plansOptionsHtml = '<option value="">-- None --</option>';
 
     function escapeHtml(str) {
         return String(str == null ? "" : str).replace(/[&<>"']/g, (c) => (
@@ -112,6 +101,40 @@
             });
     }
 
+    function loadPlans() {
+        if (plansLoaded) return;
+        plansLoaded = true;
+        fetch("/api/plans")
+            .then((r) => r.json())
+            .then((list) => {
+                const options = ['<option value="">-- None --</option>'];
+                (list || []).forEach((p) => {
+                    options.push('<option value="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + "</option>");
+                });
+                plansOptionsHtml = options.join("");
+                const select = document.getElementById("ticketFormPlan");
+                if (select) select.innerHTML = plansOptionsHtml;
+            })
+            .catch(() => {
+                plansOptionsHtml = '<option value="">-- Could not load --</option>';
+                const select = document.getElementById("ticketFormPlan");
+                if (select) select.innerHTML = plansOptionsHtml;
+            });
+    }
+
+    function loadNextTicketCode(category) {
+        const codeInput = document.getElementById("ticketFormCode");
+        codeInput.value = "Loading…";
+        fetch("/api/tickets/next-code?category=" + encodeURIComponent(category))
+            .then((r) => r.json())
+            .then((data) => {
+                codeInput.value = (data && data.code) || "";
+            })
+            .catch(() => {
+                codeInput.value = "";
+            });
+    }
+
     function loadPersonnel(personnelType, selectEl, placeholder) {
         selectEl.innerHTML = '<option value="">Loading…</option>';
         fetch("/api/personnel?type=" + encodeURIComponent(personnelType))
@@ -135,53 +158,58 @@
     // Subscriber autocomplete
     // ------------------------------------------------------------------
 
-    function renderSubscriberResults(matches) {
-        const box = document.getElementById("ticketFormSubscriberResults");
-        if (!matches.length) {
-            box.classList.add("d-none");
-            box.innerHTML = "";
-            return;
-        }
-        box.innerHTML = matches
-            .slice(0, 8)
-            .map(
-                (s) =>
-                    '<button type="button" class="list-group-item list-group-item-action" data-sub-id="' + s.id + '">' +
-                        '<span class="fw-semibold">' + escapeHtml(s.subscriber_code) + "</span> — " +
-                        escapeHtml(s.full_name) +
-                        (s.address ? '<div class="small text-muted">' + escapeHtml(s.address) + "</div>" : "") +
-                        "</button>"
-            )
-            .join("");
-        box.classList.remove("d-none");
-    }
+    /* Plain "Customer" field -- typing does not pop up a live list of
+     * suggestions. The typed value is only resolved against the real
+     * subscriber records when the field loses focus (or Enter is
+     * pressed), via resolveSubscriberFromInput() below. */
 
     function onSubscriberInput() {
-        const input = document.getElementById("ticketFormSubscriberInput");
-        const term = input.value.trim().toLowerCase();
         selectedSubscriber = null;
         document.getElementById("ticketFormSubscriberId").value = "";
+        setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
         updateLocationForSubscriber();
-        if (!term) {
-            renderSubscriberResults([]);
-            return;
-        }
-        loadSubscribers().then(() => {
-            const matches = allSubscribers.filter(
-                (s) =>
-                    s.full_name.toLowerCase().includes(term) ||
-                    (s.subscriber_code || "").toLowerCase().includes(term)
-            );
-            renderSubscriberResults(matches);
-        });
+    }
+
+    function setSubscriberHelp(message, className) {
+        const help = document.getElementById("ticketFormSubscriberHelp");
+        help.textContent = message;
+        help.className = "form-text " + className;
     }
 
     function selectSubscriber(sub) {
         selectedSubscriber = sub;
         document.getElementById("ticketFormSubscriberId").value = sub.id;
         document.getElementById("ticketFormSubscriberInput").value = sub.subscriber_code + " — " + sub.full_name;
-        renderSubscriberResults([]);
+        setSubscriberHelp("Matched " + sub.full_name + ".", "text-success");
         updateLocationForSubscriber();
+    }
+
+    function resolveSubscriberFromInput() {
+        const input = document.getElementById("ticketFormSubscriberInput");
+        const term = input.value.trim().toLowerCase();
+        if (!term) {
+            selectedSubscriber = null;
+            document.getElementById("ticketFormSubscriberId").value = "";
+            setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
+            updateLocationForSubscriber();
+            return;
+        }
+        loadSubscribers().then(() => {
+            const match = allSubscribers.find(
+                (s) =>
+                    s.full_name.toLowerCase() === term ||
+                    (s.subscriber_code || "").toLowerCase() === term ||
+                    (s.subscriber_code + " — " + s.full_name).toLowerCase() === term
+            );
+            if (match) {
+                selectSubscriber(match);
+            } else {
+                selectedSubscriber = null;
+                document.getElementById("ticketFormSubscriberId").value = "";
+                setSubscriberHelp("No matching customer on file for \"" + input.value.trim() + "\".", "text-danger");
+                updateLocationForSubscriber();
+            }
+        });
     }
 
     function updateLocationForSubscriber() {
@@ -250,7 +278,7 @@
         selectedSubscriber = null;
         addedTechnicians = [];
         document.getElementById("ticketFormSubscriberId").value = "";
-        renderSubscriberResults([]);
+        setSubscriberHelp("Confirm with Tab or Enter.", "text-muted");
         renderTechnicianChips();
         document.getElementById("ticketFormCreated").value = todayLabel();
         document.getElementById("ticketFormSubmitBtn").disabled = false;
@@ -258,15 +286,18 @@
 
     function applyCategory(category, typeValue, typeLabel) {
         currentCategory = category;
-        const choices = category === "SO" ? SO_TYPE_CHOICES : TN_TYPE_CHOICES;
-        const typeSelect = document.getElementById("ticketFormType");
-        typeSelect.innerHTML = choices
-            .map((c) => '<option value="' + escapeHtml(c.value) + '">' + escapeHtml(c.label) + "</option>")
-            .join("");
-        typeSelect.value = typeValue;
+
+        // Type is a fixed label now (set by whichever dropdown item
+        // was clicked), not something the admin can change after the
+        // fact -- the hidden field is what actually gets submitted.
+        document.getElementById("ticketFormType").value = typeLabel;
+        document.getElementById("ticketFormTypeValue").value = typeValue;
 
         document.getElementById("ticketFormTitle").textContent =
-            (category === "SO" ? "SO. " : "TN. ") + "New — " + typeLabel;
+            category === "SO" ? "Service Order" : "Trouble Ticket";
+
+        loadNextTicketCode(category);
+        loadPlans();
 
         const barangayWrapper = document.getElementById("ticketFormBarangayWrapper");
         const autoWrapper = document.getElementById("ticketFormLocationAutoWrapper");
@@ -344,12 +375,13 @@
 
     function submitSO() {
         const formData = new FormData();
-        formData.append("request_type", document.getElementById("ticketFormType").value);
+        formData.append("request_type", document.getElementById("ticketFormTypeValue").value);
         formData.append("subscriber_id", document.getElementById("ticketFormSubscriberId").value || "0");
         formData.append("barangay", document.getElementById("ticketFormBarangay").value);
         formData.append("status", document.getElementById("ticketFormStatus").value);
         formData.append("notes", document.getElementById("ticketFormDescription").value);
         formData.append("priority_label", selectedOptionLabel(document.getElementById("ticketFormPriority")));
+        formData.append("plan_label", document.getElementById("ticketFormPlan").value);
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
         formData.append(
             "technicians_label",
@@ -367,7 +399,7 @@
 
     function submitTN() {
         const formData = new FormData();
-        formData.append("issue_type", document.getElementById("ticketFormType").value);
+        formData.append("issue_type", document.getElementById("ticketFormTypeValue").value);
         formData.append("subscriber_id", document.getElementById("ticketFormSubscriberId").value || "0");
         formData.append("nap_id", "0");
         formData.append("latitude", selectedSubscriber ? selectedSubscriber.latitude : "");
@@ -376,6 +408,8 @@
         formData.append("address", selectedSubscriber ? selectedSubscriber.address || "" : "");
 
         const extra = [];
+        const plan = document.getElementById("ticketFormPlan").value;
+        if (plan) extra.push("Plan: " + plan);
         const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
         if (team) extra.push("Assigned Team: " + team);
         if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
@@ -461,16 +495,13 @@
         });
 
         document.getElementById("ticketForm").addEventListener("submit", handleSubmit);
-        document.getElementById("ticketFormSubscriberInput").addEventListener("input", onSubscriberInput);
-        document.getElementById("ticketFormSubscriberResults").addEventListener("click", (event) => {
-            const btn = event.target.closest("[data-sub-id]");
-            if (!btn) return;
-            const sub = allSubscribers.find((s) => String(s.id) === btn.getAttribute("data-sub-id"));
-            if (sub) selectSubscriber(sub);
-        });
-        document.addEventListener("click", (event) => {
-            if (!event.target.closest("#ticketFormSubscriberInput") && !event.target.closest("#ticketFormSubscriberResults")) {
-                renderSubscriberResults([]);
+        const subscriberInput = document.getElementById("ticketFormSubscriberInput");
+        subscriberInput.addEventListener("input", onSubscriberInput);
+        subscriberInput.addEventListener("blur", resolveSubscriberFromInput);
+        subscriberInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                resolveSubscriberFromInput();
             }
         });
         document.getElementById("ticketFormAddTechnicianBtn").addEventListener("click", addTechnicianFromSelect);

@@ -44,7 +44,7 @@ service-request-scoped one.
 from flask import Blueprint, jsonify, g, abort, request
 
 from app.auth import role_required
-from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest
+from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, Plan
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
 
@@ -307,6 +307,45 @@ def personnel_json():
             for p in people
         ]
     )
+
+
+@api_bp.route("/plans")
+@role_required("administrator")
+def plans_json():
+    """Lightweight JSON feed of the `plans` table (Settings > App
+    Settings > Plans) -- used by the GeoMap's "+ Tickets" quick-create
+    modal to populate its Plan dropdown, same pattern as
+    personnel_json() above."""
+    plans = Plan.query.order_by(Plan.name).all()
+    return jsonify([{"id": p.id, "name": p.name} for p in plans])
+
+
+@api_bp.route("/tickets/next-code")
+@role_required("administrator")
+def tickets_next_code_json():
+    """Returns a preview of the ticket code the "+ Tickets" quick-create
+    modal's next Service Order or Trouble Ticket will get, formatted
+    "SO 00001" / "TN 00001" (5-digit, zero-padded, one ahead of the
+    current row count). Display-only: the actual record created by
+    quick_add_request()/report_issue() still gets its real code from
+    its own primary key once the row exists, same as every other
+    auto-increment id in this app -- this just lets the modal show the
+    admin what to expect before they hit Create, without reserving a
+    number (so submitting out of order, or not at all, never leaves a
+    gap the preview promised).
+
+    `?category=SO` or `?category=TN` selects which table to count;
+    anything else 400s. Administrator-only, matching every other route
+    that feeds this modal (personnel_json, plans_json above).
+    """
+    category = (request.args.get("category") or "").upper()
+    if category == "SO":
+        next_number = ServiceRequest.query.count() + 1
+    elif category == "TN":
+        next_number = TechnicalIssue.query.count() + 1
+    else:
+        abort(400)
+    return jsonify({"category": category, "code": f"{category} {next_number:05d}"})
 
 
 @api_bp.route("/service-requests/<int:request_id>/recommend-nap")
