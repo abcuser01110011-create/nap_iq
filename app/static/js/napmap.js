@@ -105,14 +105,23 @@
     // the subscriber connection so both read the same way at a glance.
     let subscriberConnectionLayer;
     let issueConnectionLayer;
-    // Coverage radius ring: one L.circle per shown NAP, radius sourced
-    // from Settings > App Settings > Max Connection Radius (meters) --
-    // see AppSettings.nap_connection_radius_meters in app/models.py.
-    // A geographic L.circle (not a fixed-pixel divIcon) so the ring is
-    // always a true to-scale radius in meters at any zoom level,
-    // rather than an approximation that only looks right at one zoom.
+    // Coverage radius ring: a single L.circle for whichever NAP is
+    // currently focused/clicked (see focusedNapForRadius below),
+    // radius sourced from Settings > App Settings > Max Connection
+    // Radius (meters) -- see AppSettings.nap_connection_radius_meters
+    // in app/models.py. A geographic L.circle (not a fixed-pixel
+    // divIcon) so the ring is always a true to-scale radius in meters
+    // at any zoom level, rather than an approximation that only looks
+    // right at one zoom.
     let coverageRadiusLayer;
     let napConnectionRadiusMeters = 0; // 0 = no limit set / feature off
+    // The single NAP whose coverage ring is currently shown -- set by
+    // focusNapOnMap() below. Previously every visible NAP drew its own
+    // ring simultaneously, which made overlapping installations
+    // unreadable; now only the clicked/focused NAP's ring is ever on
+    // the map at once, and it moves to the newly clicked NAP instead
+    // of adding another one alongside it.
+    let focusedNapForRadius = null;
     let allNaps = [];              // full NAP dataset from the API
     let allIssues = [];            // full technical issue dataset from the API
     let allSubscribers = [];       // active subscribers, for the Report Issue form
@@ -606,29 +615,18 @@
     function renderNapMarkers() {
         markerLayer.clearLayers();
         Object.keys(markersById).forEach((key) => delete markersById[key]);
-        coverageRadiusLayer.clearLayers();
 
         const showNaps = document.getElementById("showNapsToggle").checked;
         if (!showNaps) {
+            coverageRadiusLayer.clearLayers();
             updateResultCount();
             return;
         }
-
-        // Coverage radius toggle only exists in the DOM at all when an
-        // admin has set a Max Connection Radius above 0 (see map.html)
-        // -- 0 means "no limit", so there's nothing to draw either way.
-        const coverageToggle = document.getElementById("showCoverageRadiusToggle");
-        const showCoverageRadius =
-            napConnectionRadiusMeters > 0 && !!coverageToggle && coverageToggle.checked;
 
         const filters = getActiveFilters();
         let shown = 0;
         allNaps.forEach((nap) => {
             if (!passesFilters(nap, filters)) return;
-
-            if (showCoverageRadius) {
-                coverageRadiusLayer.addLayer(buildCoverageRadiusCircle(nap));
-            }
 
             const marker = L.marker([nap.latitude, nap.longitude], {
                 icon: buildIcon(nap),
@@ -644,7 +642,39 @@
             shown += 1;
         });
 
+        // Only ever draw one coverage ring at a time -- whichever NAP
+        // is currently focused (see focusNapOnMap()) -- rather than
+        // one per visible NAP. Re-run here too (not just from
+        // focusNapOnMap) so a filter change that hides the focused
+        // NAP also clears its ring instead of leaving it orphaned.
+        renderCoverageRadiusForFocusedNap();
+
         updateResultCount();
+    }
+
+    /**
+     * Draws (or clears) the single coverage-radius ring for whichever
+     * NAP is currently focused/clicked, per focusedNapForRadius. Only
+     * ever shows at most one ring on the map -- see the "Show
+     * Coverage Radius" comment on buildCoverageRadiusCircle() below
+     * for the ring's own styling.
+     */
+    function renderCoverageRadiusForFocusedNap() {
+        coverageRadiusLayer.clearLayers();
+
+        // Coverage radius toggle only exists in the DOM at all when an
+        // admin has set a Max Connection Radius above 0 (see map.html)
+        // -- 0 means "no limit", so there's nothing to draw either way.
+        const coverageToggle = document.getElementById("showCoverageRadiusToggle");
+        const showCoverageRadius =
+            napConnectionRadiusMeters > 0 && !!coverageToggle && coverageToggle.checked;
+        if (!showCoverageRadius || !focusedNapForRadius) return;
+
+        // Don't draw a ring for a NAP that's no longer actually
+        // plotted (filtered out, or Show NAPs turned off).
+        if (!markersById[focusedNapForRadius.id]) return;
+
+        coverageRadiusLayer.addLayer(buildCoverageRadiusCircle(focusedNapForRadius));
     }
 
     /**
@@ -858,6 +888,10 @@
             NAP_FOCUS_PAN_DURATION
         );
         openNapDetailPanel(nap);
+        // Move the single coverage ring over to this NAP (see
+        // renderCoverageRadiusForFocusedNap() above).
+        focusedNapForRadius = nap;
+        renderCoverageRadiusForFocusedNap();
     }
 
     // How long (ms) the panel's slide out/in swap takes when switching
@@ -1798,6 +1832,10 @@
         if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
         document.getElementById("portsFilter").value = "all";
 
+        // Set before renderNapMarkers() so its own
+        // renderCoverageRadiusForFocusedNap() call already draws the
+        // ring for this NAP instead of the previously-focused one.
+        focusedNapForRadius = nap;
         renderNapMarkers();
 
         focusMapOn(
@@ -1854,6 +1892,9 @@
         if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
         document.getElementById("portsFilter").value = "all";
 
+        // See selectNap() above for why this is set before
+        // renderNapMarkers() rather than after.
+        focusedNapForRadius = nap;
         renderNapMarkers();
         openNapDetailPanel(nap);
     }

@@ -479,7 +479,10 @@
      *  Stays up for at least TOAST_MIN_VISIBLE_MS, and disappears
      *  automatically then -- or immediately if the user clicks
      *  anywhere on the page (including on the toast itself) before
-     *  that. */
+     *  that. Styled as a white card with a green check-in-a-ring icon
+     *  and a few scattered "confetti" dots around it, matching the
+     *  rest of the app's success-state visual language rather than a
+     *  plain colored banner. */
     const TOAST_MIN_VISIBLE_MS = 3000;
 
     function ensureToastStyles() {
@@ -489,12 +492,26 @@
         style.textContent = [
             "#napiqTicketToast{position:fixed;top:50%;left:50%;",
             "transform:translate(-50%,-50%) scale(.96);z-index:2000;",
-            "background:#198754;color:#fff;padding:.9rem 1.6rem;",
-            "border-radius:.6rem;box-shadow:0 .75rem 2rem rgba(0,0,0,.35);",
-            "font-weight:600;font-size:1rem;display:flex;align-items:center;",
-            "gap:.5rem;text-align:center;opacity:0;",
+            "background:#fff;color:#1f2937;padding:2rem 2.75rem;",
+            "border-radius:1.1rem;box-shadow:0 1.25rem 3rem rgba(15,23,42,.28);",
+            "display:flex;flex-direction:column;align-items:center;gap:1rem;",
+            "text-align:center;opacity:0;min-width:260px;",
             "transition:opacity .18s ease, transform .18s ease;pointer-events:none;}",
             "#napiqTicketToast.napiq-toast-show{opacity:1;transform:translate(-50%,-50%) scale(1);}",
+            "#napiqTicketToast .napiq-toast-icon-wrap{position:relative;width:96px;height:96px;",
+            "display:flex;align-items:center;justify-content:center;}",
+            "#napiqTicketToast .napiq-toast-circle{width:64px;height:64px;border-radius:50%;",
+            "background:#e3f9ec;display:flex;align-items:center;justify-content:center;",
+            "box-shadow:0 0 0 6px rgba(34,197,94,.08);}",
+            "#napiqTicketToast .napiq-toast-circle i{color:#16a34a;font-size:2rem;line-height:1;}",
+            "#napiqTicketToast .napiq-toast-dot{position:absolute;border-radius:50%;}",
+            "#napiqTicketToast .napiq-toast-dot-1{width:7px;height:7px;background:#60a5fa;top:2px;left:14px;}",
+            "#napiqTicketToast .napiq-toast-dot-2{width:5px;height:5px;background:#fbbf24;top:10px;right:6px;}",
+            "#napiqTicketToast .napiq-toast-dot-3{width:6px;height:6px;background:#34d399;bottom:14px;left:0;}",
+            "#napiqTicketToast .napiq-toast-dot-4{width:4px;height:4px;background:#60a5fa;bottom:4px;right:16px;}",
+            "#napiqTicketToast .napiq-toast-dot-5{width:5px;height:5px;background:#fbbf24;top:34px;left:-6px;}",
+            "#napiqTicketToast .napiq-toast-dot-6{width:4px;height:4px;background:#34d399;top:30px;right:-8px;}",
+            "#napiqTicketToast .napiq-toast-text{font-weight:700;font-size:1.2rem;color:#1f2937;}",
         ].join("");
         document.head.appendChild(style);
     }
@@ -510,7 +527,16 @@
         toast.setAttribute("role", "status");
         toast.setAttribute("aria-live", "polite");
         toast.innerHTML =
-            '<i class="bi bi-check-circle-fill"></i><span>' + escapeHtml(message) + "</span>";
+            '<div class="napiq-toast-icon-wrap">' +
+                '<span class="napiq-toast-dot napiq-toast-dot-1"></span>' +
+                '<span class="napiq-toast-dot napiq-toast-dot-2"></span>' +
+                '<span class="napiq-toast-dot napiq-toast-dot-3"></span>' +
+                '<span class="napiq-toast-dot napiq-toast-dot-4"></span>' +
+                '<span class="napiq-toast-dot napiq-toast-dot-5"></span>' +
+                '<span class="napiq-toast-dot napiq-toast-dot-6"></span>' +
+                '<div class="napiq-toast-circle"><i class="bi bi-check-lg"></i></div>' +
+            "</div>" +
+            '<div class="napiq-toast-text">' + escapeHtml(message) + "</div>";
         document.body.appendChild(toast);
         // Force a reflow before adding the "show" class so the
         // fade/scale transition actually plays instead of snapping in.
@@ -652,7 +678,7 @@
             .then(({ response, payload }) => {
                 if (response.ok && payload.status === "success") {
                     modalInstance.hide();
-                    showTicketSuccessToast("Ticket successfully created");
+                    showTicketSuccessToast("Ticket Successfully Created!");
                 } else if (payload.errors) {
                     showFieldErrors(payload.errors);
                     showGeneralError("Please fix the highlighted fields and try again.");
