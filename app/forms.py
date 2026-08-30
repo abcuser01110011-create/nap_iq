@@ -222,11 +222,18 @@ ISSUE_TYPE_CHOICES = [
     ("NAP Problem", "NAP Problem"),
     ("Connection Problem", "Connection Problem"),
     # GeoMap "+ Tickets" quick-create menu (Trouble Ticket / TN group)
-    # adds these two on top of the pre-existing list above. issue_type
-    # is a plain String(50) column, not a DB-level enum, so adding
-    # values here is a front end/choices-only change -- no migration.
+    # adds these on top of the pre-existing list above. issue_type is
+    # a plain String(50) column, not a DB-level enum, so adding values
+    # here is a front end/choices-only change -- no migration.
     ("Last-Mile Checking", "Last-Mile Checking"),
     ("Repair", "Repair"),
+    # The "+ Tickets" TN menu's current lineup is just Fiber Break /
+    # Repair (see naps/map.html) -- kept here in the shared choices
+    # list (alongside the older values above) rather than replacing
+    # them outright, since this same list also backs the separate
+    # "Report an Issue" modal and the customer self-service issue
+    # report form, both of which still offer the older options.
+    ("Fiber Break", "Fiber Break"),
     ("Other", "Other"),
 ]
 
@@ -1260,12 +1267,12 @@ class QuickServiceRequestForm(FlaskForm):
     Order tickets. Deliberately narrower than the full
     ServiceRequestForm/Add Service Request page above:
 
-    - Only "New Installation" and "Relocation" are offered. "Add NAP"
-      (the third Service Order type in the quick-create menu) isn't a
+    - Only "New Installation" is offered. "Add NAP" (the other
+      Service Order type in the quick-create menu) isn't a
       service_request at all -- it opens the map's own existing Add
-      NAP mode instead, so it never reaches this form. "Upgrade" and
-      "Disconnection" (valid ServiceRequestForm types) aren't part of
-      this quick menu either.
+      NAP mode instead, so it never reaches this form. "Relocation",
+      "Upgrade", and "Disconnection" (valid ServiceRequestForm types)
+      aren't part of this quick menu.
     - Walk-in-applicant only: unlike the old version of this form,
       "Customer" is a plain free-text name -- it is never matched or
       looked up against the `subscribers` table (the person applying
@@ -1288,7 +1295,6 @@ class QuickServiceRequestForm(FlaskForm):
         "Request Type",
         choices=[
             ("new_installation", "New Installation"),
-            ("relocation", "Relocation"),
         ],
         validators=[DataRequired(message="Request type is required.")],
     )

@@ -14,14 +14,20 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as Location from "expo-location";
 import { ApiError, type Assignment } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
-import SignaturePad from "../../components/SignaturePad";
 import { colors } from "../../theme/technician";
 import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
+
+// How long we'll wait for a GPS fix before treating it as a timeout —
+// same value/reasoning as the customer app's "Track My Location" step
+// on ApplyForServiceScreen: expo-location's getCurrentPositionAsync
+// has no built-in timeout, so this is enforced by racing it against a
+// plain setTimeout below.
+const LOCATION_FIX_TIMEOUT_MS = 20000;
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -40,7 +46,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
     getAssignment,
     acceptJob,
     startJob,
-    saveNotes,
     completeJob,
     applyAssignmentUpdate,
     pendingByAssignment,
@@ -55,30 +60,34 @@ export default function JobDetailScreen({ route, navigation }: any) {
   // isn't in either cached list yet, which shouldn't normally happen
   // but keeps this screen from ever rendering blank).
   const assignment = getAssignment(initial.id) ?? initial;
+  // Resolution notes are optional — the field is still here for the
+  // technician to jot down what they found/did, but nothing requires
+  // it before a job can be completed, and there's no separate "Save
+  // notes" step; whatever's typed here is sent along automatically
+  // when the job is marked complete (see handleComplete below).
   const [notes, setNotes] = useState(assignment.resolution_notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
   // The completion photo is uploaded immediately on pick (it isn't
   // queued through the offline pending-actions system like
-  // accept/start/notes/complete are — see applyAssignmentUpdate's
-  // comment in OfflineContext for why). photoUri holds a local
-  // preview the moment something's picked, before the network call
-  // resolves; assignment.photo_url (from the server, via
-  // applyAssignmentUpdate) is the source of truth once it lands.
+  // accept/start/complete are — see applyAssignmentUpdate's comment
+  // in OfflineContext for why). photoUri holds a local preview the
+  // moment something's picked, before the network call resolves;
+  // assignment.photo_url (from the server, via applyAssignmentUpdate)
+  // is the source of truth once it lands.
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
-  // Phase 28: the customer's sign-off, install-only — same
-  // immediate-upload pattern as the completion photo above (see that
-  // state's comment), just against
-  // client.technician.uploadAssignmentSignature() and a different
-  // response field (assignment.signature_url).
+  // Pin location — install-only, replaces the old customer-signature
+  // step. Same "Track My Location" pattern the customer app uses on
+  // ApplyForServiceScreen: a real device GPS fix, submitted straight
+  // to the server as soon as it's captured (not queued offline, same
+  // reasoning as the photo above — a stale queued fix would be
+  // actively misleading here).
   const isInstallation = assignment.job_type === "installation";
-  const [signatureUri, setSignatureUri] = useState<string | null>(null);
-  const [signatureUploading, setSignatureUploading] = useState(false);
-  const [signatureError, setSignatureError] = useState<string | null>(null);
-  const [signaturePadVisible, setSignaturePadVisible] = useState(false);
+  const [pinCapturing, setPinCapturing] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
@@ -99,15 +108,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const handleStart = () => {
     setError(null);
     startJob(assignment.id);
-  };
-
-  const handleSaveNotes = () => {
-    if (!notes.trim()) {
-      setError("Enter some notes before saving.");
-      return;
-    }
-    setError(null);
-    saveNotes(assignment.id, notes.trim());
   };
 
   const uploadPhoto = async (uri: string, mimeType: string | undefined) => {
@@ -164,76 +164,59 @@ export default function JobDetailScreen({ route, navigation }: any) {
     uploadPhoto(result.assets[0].uri, result.assets[0].mimeType);
   };
 
-  const uploadSignature = async (uri: string, mimeType: string | undefined) => {
+  const getFixWithTimeout = (options: Location.LocationOptions, timeoutMs: number) => {
+    return Promise.race([
+      Location.getCurrentPositionAsync(options),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs);
+      }),
+    ]);
+  };
+
+  // Fires when the technician taps "Pin My Location" / "Update My
+  // Location" on an installation job. Same request pattern as the
+  // customer app's "Track My Location" step (services-enabled check,
+  // then permission, then a timed fix) but posted straight to the
+  // server as soon as it lands, rather than staying purely local —
+  // this is what actually satisfies the pin-location requirement
+  // client.technician.pinAssignmentLocation() (see
+  // pin_assignment_location() in api_v1/technician.py).
+  const handlePinLocation = async () => {
     if (!isOnline) {
-      setSignatureError("You're offline — connect to the internet to upload a signature.");
+      setPinError("You're offline — connect to the internet to pin your location.");
       return;
     }
-    setSignatureError(null);
-    setSignatureUri(uri);
-    setSignatureUploading(true);
+    setPinError(null);
+    setPinCapturing(true);
     try {
-      const extFromUri = uri.split(".").pop()?.toLowerCase() || "jpg";
-      const type = mimeType ?? `image/${extFromUri === "jpg" ? "jpeg" : extFromUri}`;
-      const name = `signature-${assignment.id}.${extFromUri}`;
-      const result = await client.technician.uploadAssignmentSignature(assignment.id, { uri, name, type });
-      // Clear the local raw-photo preview now that the upload has
-      // succeeded — otherwise it would keep shadowing
-      // assignment.signature_url below forever, hiding the
-      // server-side scanned/cropped e-signature behind the original
-      // unprocessed phone photo.
-      setSignatureUri(null);
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setPinError("Location services are turned off on this device. Enable them in Settings, then try again.");
+        return;
+      }
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setPinError("Location permission was denied. Allow location access for PG Networks in your device settings, then try again.");
+        return;
+      }
+
+      const position = await getFixWithTimeout({ accuracy: Location.Accuracy.High }, LOCATION_FIX_TIMEOUT_MS);
+      const { latitude, longitude } = position.coords;
+
+      const result = await client.technician.pinAssignmentLocation(assignment.id, latitude, longitude);
       applyAssignmentUpdate(result.assignment);
-    } catch (err) {
-      setSignatureUri(null);
-      setSignatureError(
-        err instanceof ApiError ? err.body.error ?? "Upload failed. Try again." : "Upload failed. Try again."
-      );
+    } catch (err: any) {
+      if (err?.message === "TIMEOUT") {
+        setPinError("Timed out waiting for a location fix. Try again, ideally outdoors with a clear view of the sky.");
+      } else if (err instanceof ApiError) {
+        setPinError(err.body.error ?? "Couldn't save your location. Try again.");
+      } else {
+        setPinError("Could not get your location. Please try again.");
+      }
     } finally {
-      setSignatureUploading(false);
+      setPinCapturing(false);
     }
-  };
-
-  const handleDrawSignature = () => {
-    setSignaturePadVisible(true);
-  };
-
-  // Fires once the customer taps "Use this signature" in the pad —
-  // base64 is the raw PNG (no data-URL prefix, see SignaturePad's
-  // onOK handler) of what they drew on a plain white background.
-  // Written out to a temp file so it can go through the exact same
-  // uploadSignature(uri, mimeType) path as the old photo-based flow
-  // — same endpoint, same server-side scan/cleanup, same error
-  // handling — no backend or upload-plumbing changes needed for this
-  // to work.
-  const handleSignatureCaptured = async (base64: string) => {
-    setSignaturePadVisible(false);
-    const uri = `${FileSystem.cacheDirectory}signature-${assignment.id}-${Date.now()}.png`;
-    try {
-      await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-    } catch {
-      setSignatureError("Couldn't save the signature. Please try again.");
-      return;
-    }
-    uploadSignature(uri, "image/png");
-  };
-
-  const handlePickSignatureFromLibrary = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        "Photo library access needed",
-        "Enable photo library access for PG Networks in your device settings to attach the customer's sign-off."
-      );
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsEditing: false,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-    uploadSignature(result.assets[0].uri, result.assets[0].mimeType);
   };
 
   const handleComplete = () => {
@@ -241,12 +224,8 @@ export default function JobDetailScreen({ route, navigation }: any) {
       setError("Add a completion photo before marking this job complete.");
       return;
     }
-    if (isInstallation && !assignment.signature_url) {
-      setError("Add the customer's signature before marking this installation complete.");
-      return;
-    }
-    if (!notes.trim() && !assignment.resolution_notes) {
-      setError("Resolution notes are required to complete a job.");
+    if (isInstallation && (assignment.pin_latitude == null || assignment.pin_longitude == null)) {
+      setError("Pin your location before marking this installation complete.");
       return;
     }
     Alert.alert("Complete this job?", "This marks the issue resolved and can't be undone.", [
@@ -392,20 +371,15 @@ export default function JobDetailScreen({ route, navigation }: any) {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Resolution notes</Text>
             {canEditNotes ? (
-              <>
-                <TextInput
-                  style={styles.textArea}
-                  placeholder="What did you find, and what did you do?"
-                  placeholderTextColor={colors.textFaint}
-                  multiline
-                  numberOfLines={4}
-                  value={notes}
-                  onChangeText={setNotes}
-                />
-                <TouchableOpacity style={styles.secondaryButton} onPress={handleSaveNotes}>
-                  <Text style={styles.secondaryButtonText}>Save notes</Text>
-                </TouchableOpacity>
-              </>
+              <TextInput
+                style={styles.textArea}
+                placeholder="What did you find, and what did you do? (optional)"
+                placeholderTextColor={colors.textFaint}
+                multiline
+                numberOfLines={4}
+                value={notes}
+                onChangeText={setNotes}
+              />
             ) : (
               <Text style={styles.notesText}>
                 {assignment.resolution_notes || "No notes recorded."}
@@ -460,44 +434,46 @@ export default function JobDetailScreen({ route, navigation }: any) {
 
         {isInstallation && showPhotoCard && (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Customer sign-off</Text>
-            {signatureUri || assignment.signature_url ? (
-              <Image
-                source={{ uri: signatureUri ?? assignment.signature_url! }}
-                style={styles.photoPreview}
-                resizeMode="cover"
+            <Text style={styles.cardLabel}>Pin location</Text>
+            {assignment.pin_latitude != null && assignment.pin_longitude != null ? (
+              <JobLocationMap
+                latitude={assignment.pin_latitude}
+                longitude={assignment.pin_longitude}
+                label="Pinned location"
+                isOnline={isOnline}
+                onOpenExternal={() => {
+                  const url = Platform.select({
+                    ios: `maps:0,0?q=${assignment.pin_latitude},${assignment.pin_longitude}`,
+                    android: `geo:0,0?q=${assignment.pin_latitude},${assignment.pin_longitude}`,
+                    default: `https://maps.google.com/?q=${assignment.pin_latitude},${assignment.pin_longitude}`,
+                  });
+                  Linking.openURL(url!).catch(() => {});
+                }}
               />
             ) : (
               <Text style={styles.notesText}>
                 {canEditNotes
-                  ? "No signature added yet — required before completing this installation."
-                  : "No signature was attached."}
+                  ? "No location pinned yet — required before completing this installation."
+                  : "No location was pinned."}
               </Text>
             )}
-            {signatureUploading && (
+            {pinCapturing && (
               <View style={styles.photoUploadingRow}>
                 <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.photoUploadingText}>Uploading…</Text>
+                <Text style={styles.photoUploadingText}>Getting your location…</Text>
               </View>
             )}
-            {signatureError && <Text style={styles.error}>{signatureError}</Text>}
+            {pinError && <Text style={styles.error}>{pinError}</Text>}
             {canEditNotes && (
-              <View style={styles.photoButtonRow}>
-                <TouchableOpacity
-                  style={styles.secondaryButtonSmall}
-                  onPress={handleDrawSignature}
-                  disabled={signatureUploading}
-                >
-                  <Text style={styles.secondaryButtonText}>Draw signature</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.secondaryButtonSmall}
-                  onPress={handlePickSignatureFromLibrary}
-                  disabled={signatureUploading}
-                >
-                  <Text style={styles.secondaryButtonText}>Choose from library</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handlePinLocation}
+                disabled={pinCapturing}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {assignment.pin_latitude != null ? "Update My Location" : "Pin My Location"}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -523,11 +499,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
           )}
         </View>
       </ScrollView>
-      <SignaturePad
-        visible={signaturePadVisible}
-        onCancel={() => setSignaturePadVisible(false)}
-        onSave={handleSignatureCaptured}
-      />
     </KeyboardAvoidingView>
   );
 }

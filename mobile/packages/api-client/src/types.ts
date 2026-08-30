@@ -106,8 +106,16 @@ export interface Assignment {
    * ApiClient.technician.uploadAssignmentPhoto(). */
   photo_url: string | null;
   /** Absolute URL to the customer's install signature (installations
-   * only), or null until one's been uploaded. */
+   * only), or null until one's been uploaded. No longer required for
+   * completion (superseded by pin_latitude/pin_longitude below), but
+   * still returned for any already-recorded sign-offs. */
   signature_url: string | null;
+  /** The technician's own on-site GPS fix for an installation,
+   * captured via ApiClient.technician.pinAssignmentLocation() —
+   * required (in place of a signature) before an installation can be
+   * marked complete. Null until pinned; always null for a repair. */
+  pin_latitude: number | null;
+  pin_longitude: number | null;
   issue: AssignmentIssue | null;
   service_request: AssignmentServiceRequest | null;
   subscriber: AssignmentSubscriber | null;

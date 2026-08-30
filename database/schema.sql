@@ -246,7 +246,15 @@ CREATE TABLE IF NOT EXISTS assignments (
     photo_filename        VARCHAR(255) NULL,
     -- Phase 28: an install's required customer sign-off, stored the
     -- same way as photo_filename above. NULL for repair assignments.
+    -- No longer required for completion -- see pin_latitude /
+    -- pin_longitude below.
     signature_filename     VARCHAR(255) NULL,
+    -- Replaces the customer-signature requirement above: the
+    -- technician's own GPS fix, captured on-device (same "Track My
+    -- Location" pattern as the customer app's ApplyForServiceScreen).
+    -- NULL for repair assignments.
+    pin_latitude          DECIMAL(10,7) NULL,
+    pin_longitude         DECIMAL(10,7) NULL,
     completed_at          TIMESTAMP NULL,
     created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

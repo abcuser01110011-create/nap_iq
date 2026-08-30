@@ -102,11 +102,12 @@
         {# "+ Tickets" replaces the old "Table View" link. Two groups,
            bold non-clickable header + clickable type rows underneath:
            Service Order (SO) opens the ticketFormModal below (New
-           Installation / Relocation) or, for "Add NAP", just triggers
-           the existing Add NAP mode button -- Add NAP already is a
-           full feature on this page, so there's no reason to build a
-           second path to it. Trouble Ticket (TN) opens the same
-           modal in its TN configuration. See app/static/js/tickets.js. #}
+           Installation) or, for "Add NAP", just triggers the existing
+           Add NAP mode button -- Add NAP already is a full feature on
+           this page, so there's no reason to build a second path to
+           it. Trouble Ticket (TN) opens the same modal in its TN
+           configuration (Fiber Break / Repair). See
+           app/static/js/tickets.js. #}
         <div class="dropdown">
             <button type="button" id="ticketsDropdownBtn" class="btn btn-primary btn-sm shadow-sm dropdown-toggle"
                     data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
@@ -115,14 +116,10 @@
             <ul class="dropdown-menu ticket-type-menu" aria-labelledby="ticketsDropdownBtn">
                 <li><h6 class="dropdown-header">Service Order (SO)</h6></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="new_installation" data-type-label="New Installation">New Installation</a></li>
-                <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="relocation" data-type-label="Relocation">Relocation</a></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="add_nap" data-type-label="Add NAP">Add NAP</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><h6 class="dropdown-header">Ticket Number (TN)</h6></li>
-                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="No Internet" data-type-label="No Internet">No Internet</a></li>
-                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Slow Internet" data-type-label="Slow Internet">Slow Internet</a></li>
-                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Connection Problem" data-type-label="Connection Problem">Connection Problem</a></li>
-                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Last-Mile Checking" data-type-label="Last-Mile Checking">Last-Mile Checking</a></li>
+                <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Fiber Break" data-type-label="Fiber Break">Fiber Break</a></li>
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Repair" data-type-label="Repair">Repair</a></li>
             </ul>
         </div>

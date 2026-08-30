@@ -329,6 +329,17 @@ export class ApiClient {
       }
       return data as { assignment: Assignment };
     },
+    /** Records the technician's own on-site GPS fix for an
+     * installation assignment — the replacement for the old
+     * customer-signature step above. Plain JSON (no file involved),
+     * so this goes through the shared request() helper like
+     * saveNotes/completeAssignment rather than a manual fetch()
+     * call. */
+    pinAssignmentLocation: (assignmentId: number, latitude: number, longitude: number) =>
+      this.request<{ assignment: Assignment }>(
+        `/api/v1/technician/assignments/${assignmentId}/pin-location`,
+        { method: "POST", body: { latitude, longitude } }
+      ),
     registerDeviceToken: (token: string, platform: "ios" | "android") =>
       this.request<{ ok: true }>("/api/v1/technician/device-token", {
         method: "POST",

@@ -449,7 +449,19 @@ class Assignment(db.Model):
     # api_v1/technician.py's upload_assignment_signature()). Only ever
     # set for a service_request-linked (installation) assignment; a
     # repair assignment has no signature step and this stays NULL.
+    # No longer required for completion (superseded by pin_latitude /
+    # pin_longitude below) -- kept as-is rather than dropped, so any
+    # already-recorded sign-offs aren't lost.
     signature_filename = db.Column(db.String(255), nullable=True)
+    # Replaces the customer-signature requirement above: the
+    # technician's own GPS fix, captured on-device the same way the
+    # customer mobile app's "Track My Location" step on
+    # ApplyForServiceScreen works (see
+    # api_v1/technician.py's pin_assignment_location()). Only ever set
+    # for a service_request-linked (installation) assignment; a repair
+    # assignment has no pin-location step and these stay NULL.
+    pin_latitude = db.Column(db.Numeric(10, 7), nullable=True)
+    pin_longitude = db.Column(db.Numeric(10, 7), nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(

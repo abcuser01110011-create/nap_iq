@@ -49,7 +49,12 @@ Routes:
     POST /api/v1/technician/assignments/<id>/notes       -> save_notes
     POST /api/v1/technician/assignments/<id>/photo       -> upload_assignment_photo
     POST /api/v1/technician/assignments/<id>/signature   -> upload_assignment_signature
-                                                             (Phase 28, install-only)
+                                                             (Phase 28, install-only, kept
+                                                             but no longer required -- see
+                                                             pin-location below)
+    POST /api/v1/technician/assignments/<id>/pin-location -> pin_assignment_location
+                                                             (install-only; replaces the
+                                                             signature requirement)
     POST /api/v1/technician/assignments/<id>/complete    -> complete_assignment
 """
 
@@ -169,8 +174,17 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         "photo_url": assignment.photo_filename,
         # Phase 28: same passthrough pattern as photo_url above — only
         # ever non-null for an installation (see
-        # upload_assignment_signature()'s docstring below).
+        # upload_assignment_signature()'s docstring below). No longer
+        # required for completion (superseded by pin_latitude /
+        # pin_longitude below) but still returned for any
+        # already-recorded sign-offs.
         "signature_url": assignment.signature_filename,
+        # The technician's on-site GPS fix for an installation,
+        # captured via pin_assignment_location() below — the
+        # replacement for the customer-signature requirement above.
+        # Only ever non-null for an installation.
+        "pin_latitude": float(assignment.pin_latitude) if assignment.pin_latitude is not None else None,
+        "pin_longitude": float(assignment.pin_longitude) if assignment.pin_longitude is not None else None,
         "issue": {
             "id": issue.id,
             "issue_code": issue.issue_code,
@@ -348,10 +362,8 @@ def save_notes(assignment_id):
 
     data = request.get_json(silent=True) or {}
     notes = str(data.get("resolution_notes") or "").strip()
-    if not notes:
-        return jsonify(error="resolution_notes is required."), 400
 
-    assignment.resolution_notes = notes
+    assignment.resolution_notes = notes or None
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
@@ -591,19 +603,73 @@ def upload_assignment_signature(assignment_id):
     return jsonify(assignment=_serialize_assignment(assignment)), 200
 
 
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/pin-location", methods=["POST"])
+@jwt_role_required("field_assistant")
+def pin_assignment_location(assignment_id):
+    """Records the technician's own on-site GPS fix for an
+    *installation* assignment — the replacement for the old customer
+    e-signature requirement (see upload_assignment_signature() above,
+    kept but no longer required). Required by complete_assignment()
+    below the same way a signature used to be. A repair
+    (technical_issue-sourced) assignment has no pin-location step at
+    all, so this rejects with 409 rather than silently accepting one.
+
+    Mirrors the customer mobile app's "Track My Location" step on
+    ApplyForServiceScreen: a plain device GPS fix, taken with
+    expo-location and posted here as JSON (no image involved, so no
+    Cloudinary round-trip like the photo/signature endpoints above).
+    Same statuses valid as those routes -- 'accepted' or
+    'in_progress'.
+    """
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.service_request_id is None:
+        return jsonify(error="A pinned location only applies to an installation assignment."), 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return jsonify(error="A location can only be pinned on an assignment you've accepted or started."), 409
+
+    data = request.get_json(silent=True) or {}
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
+    if latitude is None or longitude is None:
+        return jsonify(error="latitude and longitude are required."), 400
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError):
+        return jsonify(error="latitude and longitude must be numbers."), 400
+
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        return jsonify(error="latitude/longitude are out of range."), 400
+
+    assignment.pin_latitude = latitude
+    assignment.pin_longitude = longitude
+    db.session.commit()
+
+    return jsonify(assignment=_serialize_assignment(assignment)), 200
+
+
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
 @jwt_role_required("field_assistant")
 def complete_assignment(assignment_id):
     """in_progress -> completed (a repair's issue -> resolved).
-    Requires resolution notes, exactly as technician.py's
-    complete_assignment() does — accepts a fresh `resolution_notes`
-    value in the body, or falls back to whatever was already saved via
-    save_notes() above if the body omits it.
+    Resolution notes are optional -- if given, they're saved before
+    completing; if omitted, whatever was already saved via
+    save_notes() (or nothing at all) is kept as-is.
 
-    Phase 28: an installation additionally requires a customer
-    signature (not just the completion photo every job requires)
-    before it can be marked complete — see
-    upload_assignment_signature()'s docstring.
+    Phase 28: an installation additionally requires the technician's
+    pinned on-site location (not just the completion photo every job
+    requires) before it can be marked complete — see
+    pin_assignment_location()'s docstring above. This replaces the
+    older customer-signature requirement.
 
     Phase 29: once those checks pass and the Assignment itself moves
     to 'completed' below, an installation additionally flips
@@ -626,15 +692,13 @@ def complete_assignment(assignment_id):
         return jsonify(error="A completion photo is required before this assignment can be marked complete."), 400
 
     is_installation = assignment.service_request_id is not None
-    if is_installation and not assignment.signature_filename:
-        return jsonify(error="A customer signature is required before this installation can be marked complete."), 400
+    if is_installation and (assignment.pin_latitude is None or assignment.pin_longitude is None):
+        return jsonify(error="Pinning your location is required before this installation can be marked complete."), 400
 
     data = request.get_json(silent=True) or {}
     notes = str(data.get("resolution_notes") or assignment.resolution_notes or "").strip()
-    if not notes:
-        return jsonify(error="resolution_notes is required to complete an assignment."), 400
 
-    assignment.resolution_notes = notes
+    assignment.resolution_notes = notes or None
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
 
