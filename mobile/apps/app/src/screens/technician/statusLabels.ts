@@ -33,6 +33,24 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   installation: "Installation",
 };
 
+// Same palette and urgency order as the GeoMap's priority markers
+// (app/static/js/napmap.js's PRIORITY_COLORS / PRIORITY_RANK) — kept
+// in sync so a priority reads the same color and ranks the same way
+// everywhere in the app, not just on the map.
+export const PRIORITY_COLORS: Record<string, string> = {
+  low: "#6c757d",
+  medium: "#ffc107",
+  high: "#fd7e14",
+  critical: "#dc3545",
+};
+
+export const PRIORITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
 // The admin's "+ Tickets" quick-create form (app/templates/naps/map.html,
 // ticketFormModal) labels this same value "Ticket Code" and formats it
 // "TN 00006" for a Trouble Ticket (repair) / "SO 00001" for a Service

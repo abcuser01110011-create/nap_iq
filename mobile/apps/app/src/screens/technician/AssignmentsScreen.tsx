@@ -1,10 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import SyncBanner from "../../offline/SyncBanner";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
+import { JOB_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_RANK, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // Company's home service area — the same default the admin's Barangay
 // picker already falls back to when nothing is typed (see
@@ -18,6 +18,26 @@ function jobAddress(item: {
   service_request?: { address?: string | null } | null;
 }) {
   return item.subscriber?.address ?? item.issue?.address ?? item.service_request?.address ?? DEFAULT_ADDRESS;
+}
+
+// Line 2 used to show only the coarse job_type ("Repair"/
+// "Installation"), which meant a Fiber Break looked identical to any
+// other repair on the list — the only way to tell them apart was to
+// open the job. This shows the actual specific type instead (same
+// value the detail screen's "Type" row already uses: issue_type for
+// a repair, e.g. "Fiber Break"/"NAP Problem"; the request_type label
+// for an installation), falling back to the coarse job_type only if
+// neither is available.
+function jobTypeLabel(item: {
+  job_type: "repair" | "installation";
+  issue?: { issue_type?: string | null } | null;
+  service_request?: { request_type?: string | null } | null;
+}) {
+  if (item.issue?.issue_type) return item.issue.issue_type;
+  if (item.service_request?.request_type) {
+    return REQUEST_TYPE_LABELS[item.service_request.request_type] ?? item.service_request.request_type;
+  }
+  return JOB_TYPE_LABELS[item.job_type] ?? item.job_type;
 }
 
 // Both a repair (technical_issue.priority) and an installation-type
@@ -41,6 +61,17 @@ export default function AssignmentsScreen({ navigation }: any) {
     return unsubscribe;
   }, [navigation, refresh, isOnline]);
 
+  // Critical first, then high, medium, low — a job with no priority
+  // at all (neither the issue nor the service_request has one set)
+  // sinks to the bottom rather than being treated as "low". Ties keep
+  // their original (most-recent-first) order, since Array.sort is
+  // stable.
+  const sortedAssignments = useMemo(() => {
+    return [...openAssignments].sort(
+      (a, b) => (PRIORITY_RANK[jobPriority(b) ?? ""] ?? 0) - (PRIORITY_RANK[jobPriority(a) ?? ""] ?? 0)
+    );
+  }, [openAssignments]);
+
   return (
     <View style={styles.screen}>
       <SyncBanner />
@@ -50,7 +81,7 @@ export default function AssignmentsScreen({ navigation }: any) {
       </View>
 
       <FlatList
-        data={openAssignments}
+        data={sortedAssignments}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -77,11 +108,15 @@ export default function AssignmentsScreen({ navigation }: any) {
                 </View>
               </View>
               <View style={styles.jobTypeRow}>
-                <Text style={styles.jobTypeTag}>{JOB_TYPE_LABELS[item.job_type] ?? item.job_type}</Text>
+                <Text style={styles.jobTypeTag}>{jobTypeLabel(item)}</Text>
               </View>
               <Text style={styles.cardAddress}>{jobAddress(item)}</Text>
               <View style={styles.cardFooter}>
-                {priority && <Text style={styles.priority}>Priority: {priority}</Text>}
+                {priority && (
+                  <Text style={[styles.priority, { color: PRIORITY_COLORS[priority] ?? colors.textFaint }]}>
+                    Priority: {priority}
+                  </Text>
+                )}
                 {pending > 0 && <Text style={styles.pendingTag}>Queued — will sync</Text>}
               </View>
             </TouchableOpacity>

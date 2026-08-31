@@ -405,11 +405,20 @@ def report_fiber_break():
         time the GeoMap refreshes (it already polls
         `refreshLiveData()` on an interval and on tab focus; nothing
         new needed here).
-      - `_dispatch_field_assistant()` is called per created/updated
-        issue exactly like `report_issue()` does, so if an "Assigned
-        Team" field assistant was chosen in the modal, every one of
-        these tickets shows up on that field assistant's mobile
-        Assignments dashboard, same as any other trouble ticket.
+
+    Dispatch is deliberately NOT one Assignment per subscriber,
+    though: what needs fixing is the NAP's fiber, not each individual
+    subscriber's line, so a field assistant only needs to be sent out
+    once. Only the *first* affected subscriber's issue gets dispatched
+    (see `_dispatch_field_assistant` call below) -- and that one
+    issue's address/latitude/longitude are pointed at the NAP itself
+    rather than that subscriber's home, since the NAP is where the
+    field assistant actually needs to go. Every other affected
+    subscriber still gets/keeps their own critical issue (so their map
+    marker still turns red and the outage still shows on their
+    account), it's just never separately dispatched -- one ticket on
+    the field assistant's mobile dashboard per fiber break, not one
+    per connected line.
 
     A subscriber with no registered latitude/longitude on file is
     silently skipped (same "can't be pinned" case `report_issue()`
@@ -453,6 +462,7 @@ def report_fiber_break():
     created_count = 0
     updated_count = 0
     skipped_no_location = 0
+    dispatched = False  # only the first affected subscriber's issue gets an Assignment
 
     for subscriber in affected_subscribers:
         if subscriber.latitude is None or subscriber.longitude is None:
@@ -478,7 +488,16 @@ def report_fiber_break():
             existing_issue.nap_id = nap.id
             notify_issue_updated(existing_issue)
             db.session.commit()
-            _dispatch_field_assistant(existing_issue, assigned_team_id)
+            if not dispatched and assigned_team_id:
+                # The dispatched ticket points at the NAP itself, not
+                # this subscriber's home -- that's where the fiber
+                # actually needs fixing, and where the field assistant
+                # needs to go.
+                existing_issue.address = nap.address
+                existing_issue.latitude = nap.latitude
+                existing_issue.longitude = nap.longitude
+                _dispatch_field_assistant(existing_issue, assigned_team_id)
+                dispatched = True
             updated_count += 1
         else:
             issue = TechnicalIssue(
@@ -497,7 +516,12 @@ def report_fiber_break():
 
             issue.issue_code = f"ISS-{issue.id:04d}"
             notify_new_issue_reported(issue)
-            _dispatch_field_assistant(issue, assigned_team_id)
+            if not dispatched and assigned_team_id:
+                issue.address = nap.address
+                issue.latitude = nap.latitude
+                issue.longitude = nap.longitude
+                _dispatch_field_assistant(issue, assigned_team_id)
+                dispatched = True
             created_count += 1
 
         db.session.commit()
