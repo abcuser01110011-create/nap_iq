@@ -9,6 +9,15 @@
     </a>
 </div>
 
+{# Phase: ports are not individually tracked in the DB (Subscriber has
+   no port_number column) -- only a total_ports count and each linked
+   subscriber's status. So the per-port table below assigns port
+   numbers 1..N by simply lining up every non-disconnected subscriber
+   (oldest first) against the open slots, the same "occupied" rule
+   app/nap_status.py already uses everywhere else (GeoMap, Dashboard,
+   sync_nap_status). It's a display-only numbering, not a stored one. #}
+{% set occupied_subs = nap.subscribers|selectattr('status', 'ne', 'disconnected')|sort(attribute='id')|list %}
+
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card shadow-sm">
@@ -16,8 +25,8 @@
 
                 <div class="d-flex justify-content-between align-items-start mb-4">
                     <div>
-                        <h3 class="mb-0">{{ nap.nap_code }}</h3>
-                        <div class="text-muted">{{ nap.name }}</div>
+                        <div class="text-muted small">{{ nap.nap_code }}</div>
+                        <h3 class="mb-0">{{ nap.name }}</h3>
                     </div>
                     {% set status_classes = {
                         'active': 'text-bg-success',
@@ -33,9 +42,6 @@
                 <dl class="row mb-0">
                     <dt class="col-sm-4 text-muted fw-normal">Address</dt>
                     <dd class="col-sm-8">{{ nap.address or "—" }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Coordinates</dt>
-                    <dd class="col-sm-8">{{ nap.latitude }}, {{ nap.longitude }}</dd>
 
                     <dt class="col-sm-4 text-muted fw-normal">Total Ports</dt>
                     <dd class="col-sm-8">{{ nap.total_ports }}</dd>
@@ -59,11 +65,58 @@
 
                 <hr class="my-4">
 
+                <h6 class="text-muted mb-3">Ports</h6>
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 12%;">Port Number</th>
+                                <th>Customer</th>
+                                <th>Plan</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for port_num in range(1, nap.total_ports + 1) %}
+                                {% set sub = occupied_subs[port_num - 1] if port_num <= occupied_subs|length else None %}
+                                <tr>
+                                    <td>{{ port_num }}</td>
+                                    {% if sub %}
+                                        <td>
+                                            {% if current_user and current_user.role == 'administrator' %}
+                                                <a href="{{ url_for('subscribers.view_subscriber', subscriber_id=sub.id) }}">{{ sub.full_name }}</a>
+                                            {% else %}
+                                                {{ sub.full_name }}
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ sub.plan_type or "—" }}</td>
+                                        <td>
+                                            {% set sub_status_classes = {
+                                                'active': 'text-bg-success',
+                                                'inactive': 'text-bg-secondary',
+                                                'disconnected': 'text-bg-danger',
+                                                'pending_review': 'text-bg-warning'
+                                            } %}
+                                            <span class="badge {{ sub_status_classes.get(sub.status, 'text-bg-secondary') }}">
+                                                {{ sub.status|replace('_', ' ')|capitalize }}
+                                            </span>
+                                        </td>
+                                    {% else %}
+                                        <td class="text-muted">—</td>
+                                        <td class="text-muted">—</td>
+                                        <td><span class="badge text-bg-light text-muted border">Available</span></td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
                 <div class="d-flex justify-content-end gap-2">
                     {# Phase 13 (65%, navigation destination panels): opens the
                        GeoMap with this NAP pre-armed as the navigation
                        destination (naps.geomap()'s ?navigate_type=/?navigate_id=,
-                       read by napmap.js's focusNavigationFromQueryParam()) —
+                       read by napmap.js's focusNavigationFromQueryParam()) --
                        the same "Navigate" entry point subscribers/view.html and
                        issues/view.html now offer. #}
                     <a href="{{ url_for('naps.geomap', navigate_type='nap', navigate_id=nap.id) }}" class="btn btn-outline-success">
