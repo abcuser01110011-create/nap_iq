@@ -1312,25 +1312,20 @@
             .join(" ");
     }
 
-    /** Builds the popup HTML shown when an issue marker is clicked. */
+    /** Builds the popup HTML shown when an issue marker is clicked.
+     * Deliberately mirrors buildSubscriberPopupHtml()'s layout (code
+     * line, title, one address/subtitle line, then the same two
+     * buttons) instead of the old Priority/Status/Subscriber/NAP/
+     * Description/Reported <dl> -- the two popups are meant to read
+     * as the same "shape" of card. issue.address comes straight from
+     * /api/issues (no reverse-geocoding needed, unlike the subscriber
+     * popup's address line). */
     function buildIssuePopupHtml(issue) {
-        const priorityColor = PRIORITY_COLORS[issue.priority] || "#6c757d";
         return (
             '<div class="issue-popup">' +
             '<div class="issue-popup-code">' + escapeHtml(issue.issue_code || ("Issue #" + issue.id)) + "</div>" +
             "<h6>" + escapeHtml(issue.issue_type) + "</h6>" +
-            '<dl class="row mb-1">' +
-            '<dt class="col-5">Priority</dt><dd class="col-7">' +
-                '<span class="legend-dot legend-dot-square" style="background:' + priorityColor + '"></span> ' +
-                formatStatusLabel(issue.priority) + "</dd>" +
-            '<dt class="col-5">Status</dt><dd class="col-7">' + formatStatusLabel(issue.status) + "</dd>" +
-            '<dt class="col-5">Subscriber</dt><dd class="col-7">' +
-                escapeHtml(issue.subscriber_code ? issue.subscriber_code + " — " + issue.subscriber_name : (issue.subscriber_name || "\u2014")) +
-                "</dd>" +
-            '<dt class="col-5">NAP</dt><dd class="col-7">' + escapeHtml(issue.nap_code || "\u2014") + "</dd>" +
-            '<dt class="col-5">Description</dt><dd class="col-7">' + escapeHtml(issue.description || "\u2014") + "</dd>" +
-            '<dt class="col-5">Reported</dt><dd class="col-7">' + formatDateTime(issue.created_at) + "</dd>" +
-            "</dl>" +
+            '<div class="issue-popup-address">' + escapeHtml(issue.address || "\u2014") + "</div>" +
             '<div class="d-flex gap-1">' +
             '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + issue.subscriber_id + '">View Subs</a>' +
             '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +

@@ -427,6 +427,14 @@
     color: #6c757d;
 }
 
+/* Same look as .subscriber-popup-address -- the issue popup now uses
+   a single address/subtitle line instead of the old <dl> above. */
+.issue-popup-address {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
 .nap-popup h6 {
     margin-bottom: 0.25rem;
 }
