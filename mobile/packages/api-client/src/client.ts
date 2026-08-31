@@ -232,18 +232,31 @@ export class ApiClient {
         { method: "POST" }
       ),
 
-    saveNotes: (assignmentId: number, resolutionNotes: string) =>
+    /** `portNumber` is optional and, when omitted, leaves whatever
+     * port was previously saved untouched — passing `null` explicitly
+     * clears it. Mirrors _validate_port_number()'s "missing key vs.
+     * blank value" distinction in api_v1/technician.py. */
+    saveNotes: (assignmentId: number, resolutionNotes: string, portNumber?: number | null) =>
       this.request<{ assignment: Assignment }>(
         `/api/v1/technician/assignments/${assignmentId}/notes`,
-        { method: "POST", body: { resolution_notes: resolutionNotes } }
+        {
+          method: "POST",
+          body: {
+            resolution_notes: resolutionNotes,
+            ...(portNumber !== undefined ? { port_number: portNumber } : {}),
+          },
+        }
       ),
 
-    completeAssignment: (assignmentId: number, resolutionNotes?: string) =>
+    completeAssignment: (assignmentId: number, resolutionNotes?: string, portNumber?: number | null) =>
       this.request<{ assignment: Assignment }>(
         `/api/v1/technician/assignments/${assignmentId}/complete`,
         {
           method: "POST",
-          body: resolutionNotes !== undefined ? { resolution_notes: resolutionNotes } : {},
+          body: {
+            ...(resolutionNotes !== undefined ? { resolution_notes: resolutionNotes } : {}),
+            ...(portNumber !== undefined ? { port_number: portNumber } : {}),
+          },
         }
       ),
 

@@ -46,8 +46,8 @@ interface OfflineContextValue {
   applyAssignmentUpdate: (updated: Assignment) => void;
   acceptJob: (id: number) => void;
   startJob: (id: number) => void;
-  saveNotes: (id: number, notes: string) => void;
-  completeJob: (id: number, notes?: string) => void;
+  saveNotes: (id: number, notes: string, portNumber?: number | null) => void;
+  completeJob: (id: number, notes?: string, portNumber?: number | null) => void;
 }
 
 const OfflineContext = createContext<OfflineContextValue | null>(null);
@@ -59,11 +59,21 @@ async function callRemote(client: ApiClient, action: PendingAction): Promise<Ass
     case "start":
       return (await client.technician.startAssignment(action.assignmentId)).assignment;
     case "notes":
-      return (await client.technician.saveNotes(action.assignmentId, action.payload?.resolution_notes ?? ""))
-        .assignment;
+      return (
+        await client.technician.saveNotes(
+          action.assignmentId,
+          action.payload?.resolution_notes ?? "",
+          action.payload?.port_number
+        )
+      ).assignment;
     case "complete":
-      return (await client.technician.completeAssignment(action.assignmentId, action.payload?.resolution_notes))
-        .assignment;
+      return (
+        await client.technician.completeAssignment(
+          action.assignmentId,
+          action.payload?.resolution_notes,
+          action.payload?.port_number
+        )
+      ).assignment;
   }
 }
 
@@ -255,8 +265,22 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       applyAssignmentUpdate: applyServerResult,
       acceptJob: (id) => enqueue(id, "accept", null),
       startJob: (id) => enqueue(id, "start", null),
-      saveNotes: (id, notes) => enqueue(id, "notes", { resolution_notes: notes }),
-      completeJob: (id, notes) => enqueue(id, "complete", notes ? { resolution_notes: notes } : null),
+      saveNotes: (id, notes, portNumber) =>
+        enqueue(id, "notes", {
+          resolution_notes: notes,
+          ...(portNumber !== undefined ? { port_number: portNumber } : {}),
+        }),
+      completeJob: (id, notes, portNumber) =>
+        enqueue(
+          id,
+          "complete",
+          notes || portNumber !== undefined
+            ? {
+                ...(notes ? { resolution_notes: notes } : {}),
+                ...(portNumber !== undefined ? { port_number: portNumber } : {}),
+              }
+            : null
+        ),
     }),
     [
       ready,

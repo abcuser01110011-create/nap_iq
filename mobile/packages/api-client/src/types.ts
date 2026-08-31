@@ -91,6 +91,10 @@ export interface AssignmentNap {
   name: string;
   latitude: number | null;
   longitude: number | null;
+  /** Drives the mobile Job Detail screen's port dropdown — valid
+   * options are 1..total_ports (see _validate_port_number() in
+   * api_v1/technician.py). */
+  total_ports: number;
 }
 
 export interface Assignment {
@@ -102,6 +106,10 @@ export interface Assignment {
   assigned_at: string | null;
   completed_at: string | null;
   resolution_notes: string | null;
+  /** The NAP port the field assistant serviced, chosen from the Job
+   * Detail screen's dropdown (1..nap.total_ports). Null until set;
+   * always null for an assignment with no linked NAP. */
+  port_number: number | null;
   /** Absolute URL to the technician's required completion photo, or
    * null until one's been uploaded. Set via
    * ApiClient.technician.uploadAssignmentPhoto(). */

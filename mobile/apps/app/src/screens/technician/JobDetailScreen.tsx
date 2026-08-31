@@ -5,6 +5,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -74,6 +75,14 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const [notes, setNotes] = useState(assignment.resolution_notes ?? "");
   const [error, setError] = useState<string | null>(null);
 
+  // The NAP port the technician serviced — same "no separate save
+  // step, sent along automatically on complete" treatment as notes
+  // above. Only shown/settable when the job has a linked NAP, since
+  // that's what supplies the 1..total_ports range (see
+  // _validate_port_number() in api_v1/technician.py).
+  const [portNumber, setPortNumber] = useState<number | null>(assignment.port_number ?? null);
+  const [portModalVisible, setPortModalVisible] = useState(false);
+
   // The completion photo is uploaded immediately on pick (it isn't
   // queued through the offline pending-actions system like
   // accept/start/complete are — see applyAssignmentUpdate's comment
@@ -105,6 +114,12 @@ export default function JobDetailScreen({ route, navigation }: any) {
     if (!notes) setNotes(assignment.resolution_notes ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignment.resolution_notes]);
+
+  // Same pattern as notes above, for the port dropdown.
+  useEffect(() => {
+    if (portNumber == null) setPortNumber(assignment.port_number ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignment.port_number]);
 
   const handleAccept = () => {
     setError(null);
@@ -241,7 +256,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
         style: "default",
         onPress: () => {
           setError(null);
-          completeJob(assignment.id, notes.trim() || undefined);
+          completeJob(assignment.id, notes.trim() || undefined, portNumber);
           navigation.goBack();
         },
       },
@@ -420,6 +435,71 @@ export default function JobDetailScreen({ route, navigation }: any) {
             />
           </View>
         )}
+
+        {(canEditNotes || isClosed) && assignment.nap && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Port number</Text>
+            {canEditNotes ? (
+              <TouchableOpacity
+                style={styles.dropdownField}
+                onPress={() => setPortModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={portNumber != null ? styles.dropdownValue : styles.dropdownPlaceholder}>
+                  {portNumber != null ? `Port ${portNumber}` : "Select a port (optional)"}
+                </Text>
+                <Text style={styles.dropdownChevron}>{"\u25BE"}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.notesText}>
+                {portNumber != null ? `Port ${portNumber}` : "No port recorded."}
+              </Text>
+            )}
+          </View>
+        )}
+
+        <Modal
+          visible={portModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPortModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setPortModalVisible(false)}
+          >
+            <View style={styles.portModalCard}>
+              <Text style={styles.modalTitle}>Select a port</Text>
+              <ScrollView style={styles.portList}>
+                {assignment.nap &&
+                  Array.from({ length: assignment.nap.total_ports }, (_, i) => i + 1).map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      style={styles.portOption}
+                      onPress={() => {
+                        setPortNumber(n);
+                        setPortModalVisible(false);
+                      }}
+                    >
+                      <Text style={n === portNumber ? styles.portOptionTextSelected : styles.portOptionText}>
+                        Port {n}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.portClearRow}
+                onPress={() => {
+                  setPortNumber(null);
+                  setPortModalVisible(false);
+                }}
+              >
+                <Text style={styles.portClearText}>Clear selection</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {(canEditNotes || isClosed) && (
           <View style={styles.card}>
@@ -620,6 +700,46 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   notesText: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+  dropdownField: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  dropdownValue: { color: colors.text, fontSize: 14, fontWeight: "600" },
+  dropdownPlaceholder: { color: colors.textFaint, fontSize: 14 },
+  dropdownChevron: { color: colors.textFaint, fontSize: 14 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  portModalCard: {
+    width: "100%",
+    maxHeight: "70%",
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: 16,
+  },
+  modalTitle: { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: 10 },
+  portList: { marginBottom: 8 },
+  portOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  portOptionText: { color: colors.textMuted, fontSize: 15 },
+  portOptionTextSelected: { color: colors.primary, fontSize: 15, fontWeight: "700" },
+  portClearRow: { paddingVertical: 12, alignItems: "center" },
+  portClearText: { color: colors.danger, fontSize: 14, fontWeight: "600" },
   secondaryButton: {
     borderWidth: 1,
     borderColor: colors.primary,

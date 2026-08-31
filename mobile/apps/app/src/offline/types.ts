@@ -8,6 +8,11 @@ export type PendingActionType = "accept" | "start" | "notes" | "complete";
 
 export interface PendingActionPayload {
   resolution_notes?: string;
+  /** The NAP port serviced, from the Job Detail screen's port
+   * dropdown. Undefined leaves whatever was previously saved
+   * untouched; null explicitly clears it — same distinction the
+   * `notes`/`complete` API calls make (see client.ts). */
+  port_number?: number | null;
 }
 
 export interface PendingAction {
