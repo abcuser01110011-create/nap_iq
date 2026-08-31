@@ -1623,9 +1623,11 @@
             "</dl>" +
             '<div class="d-flex gap-1">' +
             '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + subscriber.id + '">View Subs</a>' +
-            '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
-            (openIssue ? 'data-view-ticket-id="' + openIssue.id + '"' : "disabled") +
-            '><i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>' +
+            (openIssue ?
+                '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
+                'data-view-ticket-id="' + openIssue.id + '">' +
+                '<i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>'
+                : "") +
             "</div>" +
             "</div>"
         );
