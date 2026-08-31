@@ -248,10 +248,30 @@ export default function JobDetailScreen({ route, navigation }: any) {
     ]);
   };
 
+  // A Fiber Break job is dispatched against the NAP, not any one
+  // subscriber's home (see report_fiber_break() in
+  // app/routes/issues.py — every connected subscriber gets their own
+  // shadow ticket so their account/marker reflects the outage, but
+  // only the NAP itself is where a field assistant actually needs to
+  // go). The backend already points the *dispatched* issue's own
+  // latitude/longitude at the NAP for exactly this reason, but
+  // `assignment.subscriber` is always that ticket's linked
+  // subscriber's own home coordinates regardless of issue type — so
+  // for a Fiber Break specifically, the NAP's coordinates (falling
+  // back to the issue's, which mirror the NAP once dispatched) must
+  // be preferred over the subscriber's. Every other job type (a
+  // single subscriber's own repair, or an installation) keeps the
+  // original subscriber-first priority, since those really are about
+  // that one address.
+  const isFiberBreak = assignment.issue?.issue_type === "Fiber Break";
+  const lat = isFiberBreak
+    ? assignment.nap?.latitude ?? assignment.issue?.latitude ?? assignment.subscriber?.latitude ?? assignment.service_request?.latitude
+    : assignment.subscriber?.latitude ?? assignment.issue?.latitude ?? assignment.service_request?.latitude;
+  const lng = isFiberBreak
+    ? assignment.nap?.longitude ?? assignment.issue?.longitude ?? assignment.subscriber?.longitude ?? assignment.service_request?.longitude
+    : assignment.subscriber?.longitude ?? assignment.issue?.longitude ?? assignment.service_request?.longitude;
+
   const openMaps = () => {
-    const lat = assignment.subscriber?.latitude ?? assignment.issue?.latitude ?? assignment.service_request?.latitude;
-    const lng =
-      assignment.subscriber?.longitude ?? assignment.issue?.longitude ?? assignment.service_request?.longitude;
     if (lat == null || lng == null) return;
     const url = Platform.select({
       ios: `maps:0,0?q=${lat},${lng}`,
@@ -260,9 +280,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
     });
     Linking.openURL(url!).catch(() => {});
   };
-
-  const lat = assignment.subscriber?.latitude ?? assignment.issue?.latitude ?? assignment.service_request?.latitude;
-  const lng = assignment.subscriber?.longitude ?? assignment.issue?.longitude ?? assignment.service_request?.longitude;
 
   const canAccept = assignment.status === "assigned";
   const canStart = assignment.status === "accepted";

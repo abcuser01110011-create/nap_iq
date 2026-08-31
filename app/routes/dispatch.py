@@ -162,6 +162,91 @@ def _service_request_recommendation_source(service_request):
     )
 
 
+def _fiber_break_siblings(issue):
+    """Every *other* open Fiber Break TechnicalIssue tied to the same
+    NAP as `issue`. report_fiber_break() (app/routes/issues.py) fans a
+    single fiber break out into one TechnicalIssue per still-connected
+    subscriber purely so each subscriber's own marker/account reflects
+    the outage -- but the fiber itself is one job, not one per
+    subscriber. Empty list for anything that isn't a NAP-linked Fiber
+    Break issue.
+    """
+    if issue.issue_type != "Fiber Break" or issue.nap_id is None:
+        return []
+    return (
+        TechnicalIssue.query.filter(
+            TechnicalIssue.nap_id == issue.nap_id,
+            TechnicalIssue.issue_type == "Fiber Break",
+            TechnicalIssue.id != issue.id,
+        )
+        .all()
+    )
+
+
+def _fiber_break_already_dispatched(issue):
+    """True if a *sibling* Fiber Break issue on the same NAP already
+    has an open assignment -- i.e. a field assistant has already been
+    sent for this outage. Guards assign()/reassign() so a second
+    technician can never get dispatched against the same fiber break
+    just because a different connected subscriber's shadow issue
+    happened to be the one an administrator clicked.
+    """
+    siblings = _fiber_break_siblings(issue)
+    if not siblings:
+        return False
+    sibling_ids = [s.id for s in siblings]
+    return (
+        Assignment.query.filter(
+            Assignment.technical_issue_id.in_(sibling_ids),
+            Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
+        ).first()
+        is not None
+    )
+
+
+def _dedupe_fiber_break_issues(issues, assignment_by_issue):
+    """Collapses the Dispatch Board's issue list down to a single
+    dispatchable row per NAP-wide fiber break, instead of one row per
+    connected subscriber. Without this, every one of report_fiber_
+    break()'s per-subscriber shadow issues shows up as its own
+    assignable card, and an administrator assigning several of them
+    (even by accident) sends multiple field assistants -- and puts
+    multiple duplicate "Fiber Break" jobs on one mobile dashboard --
+    for what is a single outage needing a single visit.
+
+    Picks, per (nap_id) fiber-break group: whichever issue already has
+    an open assignment (so the board reflects reality once someone's
+    been dispatched), otherwise the oldest issue in the group -- the
+    same "first affected subscriber" issue report_fiber_break() itself
+    always dispatches against. `issues` is expected newest-first (as
+    index() already queries it), so the last matching item in a group
+    is the oldest.
+    """
+    groups = {}
+    for issue in issues:
+        if issue.issue_type == "Fiber Break" and issue.nap_id is not None:
+            groups.setdefault(issue.nap_id, []).append(issue)
+
+    def _sort_key(issue):
+        # Dispatched siblings sort first (False < True, so "has no
+        # assignment" sorts after "has one"); ties broken by oldest
+        # created_at, matching report_fiber_break()'s own "first
+        # affected subscriber" choice.
+        return (assignment_by_issue.get(issue.id) is None, issue.created_at)
+
+    keep_ids = {min(group, key=_sort_key).id for group in groups.values()}
+
+    result = []
+    for issue in issues:
+        if issue.issue_type == "Fiber Break" and issue.nap_id is not None:
+            if issue.id in keep_ids:
+                result.append(issue)
+            # else: skip -- collapsed into its group's representative
+        else:
+            result.append(issue)
+    return result
+
+
 def _release_technician_if_idle(technician):
     """Sets a 'busy' technician back to 'available' if this was their
     last open assignment. Mirrors the same check Phase 9's
@@ -211,6 +296,11 @@ def index():
     assignment_by_request = {
         a.service_request_id: a for a in open_assignments if a.service_request_id is not None
     }
+
+    # Collapse one row per NAP-wide fiber break instead of one row per
+    # connected subscriber's shadow issue -- see
+    # _dedupe_fiber_break_issues() above for why.
+    issues = _dedupe_fiber_break_issues(issues, assignment_by_issue)
 
     technicians = Technician.query.order_by(Technician.full_name).all()
     available_technician_count = sum(1 for t in technicians if t.status == "available")
@@ -282,6 +372,16 @@ def assign(issue_id):
         flash(
             f"{issue.issue_code or ('#' + str(issue.id))} already has an open "
             "assignment — use Reassign instead.",
+            "warning",
+        )
+        return redirect(request.referrer or url_for("dispatch.index"))
+
+    if _fiber_break_already_dispatched(issue):
+        flash(
+            f"A field assistant is already dispatched for this NAP's fiber "
+            f"break (via another connected subscriber's ticket) — "
+            f"{issue.issue_code or ('#' + str(issue.id))} doesn't need a "
+            "separate dispatch.",
             "warning",
         )
         return redirect(request.referrer or url_for("dispatch.index"))
