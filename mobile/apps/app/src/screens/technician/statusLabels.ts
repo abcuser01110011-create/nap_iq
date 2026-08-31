@@ -32,3 +32,20 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   repair: "Repair",
   installation: "Installation",
 };
+
+// The admin's "+ Tickets" quick-create form (app/templates/naps/map.html,
+// ticketFormModal) labels this same value "Ticket Code" and formats it
+// "TN 00006" for a Trouble Ticket (repair) / "SO 00001" for a Service
+// Order (installation) — 5-digit, zero-padded, space-separated (see
+// app/routes/api.py's tickets_next_code_json). The field assistant's
+// dashboard needs to show that same code, not a different convention,
+// so this mirrors it exactly from the record's real id.
+export function ticketCode(item: {
+  issue?: { id: number } | null;
+  service_request?: { id: number } | null;
+  id: number;
+}): string {
+  if (item.issue) return `TN ${String(item.issue.id).padStart(5, "0")}`;
+  if (item.service_request) return `SO ${String(item.service_request.id).padStart(5, "0")}`;
+  return `Job #${item.id}`;
+}

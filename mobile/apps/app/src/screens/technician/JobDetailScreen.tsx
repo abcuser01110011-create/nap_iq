@@ -20,7 +20,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
+import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // How long we'll wait for a GPS fix before treating it as a timeout —
 // same value/reasoning as the customer app's "Track My Location" step
@@ -34,14 +34,6 @@ const LOCATION_FIX_TIMEOUT_MS = 20000;
 // ticket with no address on file still shows something sensible
 // instead of a blank row.
 const DEFAULT_ADDRESS = "Sta. Cruz, Laguna";
-
-// "Add NAP" tickets repurpose the walk-in full_name field for a
-// planned NAP's name rather than a person's — append "nap" so it
-// reads clearly wherever that name is shown.
-function requesterLabel(fullName: string | null | undefined, requestType: string | null | undefined) {
-  if (!fullName) return fullName;
-  return requestType === "add_nap" ? `${fullName} nap` : fullName;
-}
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -342,13 +334,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
             below, which only appears once the job is accepted. */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Ticket Details</Text>
-          <InfoRow
-            label="Ticket ID"
-            value={
-              assignment.issue?.issue_code ??
-              (assignment.service_request ? `Installation #${assignment.service_request.id}` : `Job #${assignment.id}`)
-            }
-          />
+          <InfoRow label="Ticket ID" value={ticketCode(assignment)} />
           <InfoRow
             label="Type"
             value={
@@ -365,14 +351,15 @@ export default function JobDetailScreen({ route, navigation }: any) {
               request's own full_name/address/contact_number, which the
               backend passes through for exactly this case. "Add NAP"
               repurposes that same field for a planned NAP's name, so it
-              gets its own label + the " nap" suffix (see requesterLabel
-              above) instead of being called a "Subscriber". */}
+              gets its own label ("NAP" instead of "Subscriber") — but the
+              name itself is shown exactly as entered, free-text, with no
+              default label or suffix appended. */}
           <InfoRow
             label={assignment.service_request?.request_type === "add_nap" ? "NAP" : "Subscriber"}
             value={
               assignment.subscriber
                 ? `${assignment.subscriber.subscriber_code} — ${assignment.subscriber.full_name}`
-                : requesterLabel(assignment.service_request?.full_name, assignment.service_request?.request_type)
+                : assignment.service_request?.full_name
             }
           />
           <InfoRow

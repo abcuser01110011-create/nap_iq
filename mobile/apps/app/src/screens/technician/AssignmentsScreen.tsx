@@ -4,22 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import SyncBanner from "../../offline/SyncBanner";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, STATUS_LABELS } from "./statusLabels";
-
-// Phase 28: an installation assignment has no issue_code equivalent
-// (ServiceRequest isn't given a human-facing code) — fall back to the
-// subscriber's own code, which Phase 26 already generates at
-// registration, before falling back to the raw assignment id.
-function jobTitle(item: {
-  issue?: { issue_code: string } | null;
-  service_request?: { id: number } | null;
-  subscriber?: { subscriber_code: string } | null;
-  id: number;
-}) {
-  if (item.issue) return item.issue.issue_code;
-  if (item.service_request) return item.subscriber?.subscriber_code ?? `Installation #${item.service_request.id}`;
-  return `Job #${item.id}`;
-}
+import { JOB_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // Company's home service area — the same default the admin's Barangay
 // picker already falls back to when nothing is typed (see
@@ -86,7 +71,7 @@ export default function AssignmentsScreen({ navigation }: any) {
                   one. Status badge sits alongside line 1, not counted
                   as one of the four lines. */}
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{jobTitle(item)}</Text>
+                <Text style={styles.cardTitle}>{ticketCode(item)}</Text>
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{STATUS_LABELS[item.status] ?? item.status}</Text>
                 </View>
