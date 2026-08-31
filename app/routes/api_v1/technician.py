@@ -133,6 +133,48 @@ def _get_own_assignment_or_404(profile, assignment_id):
     return assignment
 
 
+def _assignment_nap(assignment: Assignment):
+    """The NAP an assignment's issue/service_request is linked to (or
+    None), shared by _serialize_assignment() below and
+    _validate_port_number()'s range check so both stay in sync."""
+    issue = assignment.technical_issue
+    service_request = assignment.service_request
+    return issue.nap if issue else (service_request.requested_nap if service_request else None)
+
+
+def _validate_port_number(assignment: Assignment, data: dict):
+    """Parses an optional `port_number` field against the range of the
+    assignment's linked NAP (1..nap.total_ports) for the mobile Job
+    Detail screen's port dropdown. Mirrors resolution_notes' "blank
+    clears it" behavior, but a missing key leaves whatever was
+    previously saved untouched (so e.g. a save_notes() call that only
+    updates notes doesn't accidentally wipe an already-chosen port).
+
+    Returns (value_to_save, error) — error is an (message, http_status)
+    tuple to short-circuit the caller with, or None on success.
+    """
+    if "port_number" not in data:
+        return assignment.port_number, None
+
+    raw = data.get("port_number")
+    if raw is None or str(raw).strip() == "":
+        return None, None
+
+    try:
+        port_number = int(raw)
+    except (TypeError, ValueError):
+        return None, ("port_number must be a whole number.", 400)
+
+    nap = _assignment_nap(assignment)
+    if nap is None:
+        return None, ("This assignment has no NAP linked, so a port number can't be set.", 400)
+
+    if port_number < 1 or port_number > nap.total_ports:
+        return None, (f"port_number must be between 1 and {nap.total_ports}.", 400)
+
+    return port_number, None
+
+
 def _serialize_assignment(assignment: Assignment) -> dict:
     """The fields the mobile app needs per assignment — including
     enough of the linked issue-or-request/subscriber/NAP to show a
@@ -154,7 +196,7 @@ def _serialize_assignment(assignment: Assignment) -> dict:
     issue = assignment.technical_issue
     service_request = assignment.service_request
     subscriber = issue.subscriber if issue else (service_request.subscriber if service_request else None)
-    nap = issue.nap if issue else (service_request.requested_nap if service_request else None)
+    nap = _assignment_nap(assignment)
 
     return {
         "id": assignment.id,
@@ -166,6 +208,9 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         "job_type": "repair" if issue is not None else "installation",
         "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None,
         "completed_at": assignment.completed_at.isoformat() if assignment.completed_at else None,
+        # The port chosen from the mobile Job Detail screen's dropdown
+        # (1..nap.total_ports below) — see _validate_port_number().
+        "port_number": assignment.port_number,
         "resolution_notes": assignment.resolution_notes,
         # assignment.photo_filename now stores the full Cloudinary
         # URL directly (set in upload_assignment_photo() above), so
@@ -239,6 +284,9 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "name": nap.name,
             "latitude": float(nap.latitude) if nap.latitude is not None else None,
             "longitude": float(nap.longitude) if nap.longitude is not None else None,
+            # Drives the mobile Job Detail screen's port dropdown —
+            # options 1..total_ports.
+            "total_ports": nap.total_ports,
         }
         if nap
         else None,
@@ -347,9 +395,10 @@ def start_assignment(assignment_id):
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
 @jwt_role_required("field_assistant")
 def save_notes(assignment_id):
-    """Saves/updates resolution notes without changing status. Valid
-    from 'accepted' or 'in_progress' — same rule as technician.py's
-    save_notes()."""
+    """Saves/updates resolution notes (and, optionally, the serviced
+    port_number — see _validate_port_number()) without changing
+    status. Valid from 'accepted' or 'in_progress' — same rule as
+    technician.py's save_notes()."""
     profile = _get_own_profile_or_404()
     if profile is None:
         return jsonify(error="No technician profile is linked to this account yet."), 404
@@ -364,7 +413,13 @@ def save_notes(assignment_id):
     data = request.get_json(silent=True) or {}
     notes = str(data.get("resolution_notes") or "").strip()
 
+    port_number, error = _validate_port_number(assignment, data)
+    if error:
+        message, status = error
+        return jsonify(error=message), status
+
     assignment.resolution_notes = notes or None
+    assignment.port_number = port_number
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
@@ -664,7 +719,8 @@ def complete_assignment(assignment_id):
     """in_progress -> completed (a repair's issue -> resolved).
     Resolution notes are optional -- if given, they're saved before
     completing; if omitted, whatever was already saved via
-    save_notes() (or nothing at all) is kept as-is.
+    save_notes() (or nothing at all) is kept as-is. port_number works
+    the same way -- see _validate_port_number().
 
     Phase 28: an installation additionally requires the technician's
     pinned on-site location (not just the completion photo every job
@@ -699,7 +755,13 @@ def complete_assignment(assignment_id):
     data = request.get_json(silent=True) or {}
     notes = str(data.get("resolution_notes") or assignment.resolution_notes or "").strip()
 
+    port_number, error = _validate_port_number(assignment, data)
+    if error:
+        message, status = error
+        return jsonify(error=message), status
+
     assignment.resolution_notes = notes or None
+    assignment.port_number = port_number
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
 

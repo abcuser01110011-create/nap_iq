@@ -240,6 +240,12 @@ CREATE TABLE IF NOT EXISTS assignments (
     status                ENUM('assigned', 'accepted', 'in_progress', 'completed', 'cancelled')
                               NOT NULL DEFAULT 'assigned',
     dispatch_score        DECIMAL(5,2),
+    -- The NAP port the field assistant connected/serviced, chosen
+    -- from a dropdown of 1..naps.total_ports (of whichever NAP this
+    -- assignment's issue/service_request is linked to) on the mobile
+    -- Job Detail screen, right before Resolution Notes. NULL for an
+    -- assignment with no NAP linked, or simply not yet chosen.
+    port_number           INT NULL,
     -- Phase 20 (phase_8.pdf "Add resolution notes" / "Save resolution
     -- notes"): free-text notes the technician records against their
     -- own assignment — what was found, what was done, parts used,
@@ -277,6 +283,11 @@ CREATE TABLE IF NOT EXISTS assignments (
         FOREIGN KEY (technician_id) REFERENCES technicians(id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
+
+-- For an already-provisioned database (CREATE TABLE IF NOT EXISTS above
+-- won't retrofit an existing install):
+--   ALTER TABLE assignments
+--       ADD COLUMN port_number INT NULL AFTER dispatch_score;
 
 -- ---------------------------------------------------------------------
 -- app_settings: singleton row of admin-configurable app-level config

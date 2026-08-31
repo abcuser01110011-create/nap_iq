@@ -460,6 +460,15 @@ class Assignment(db.Model):
         default="assigned",
     )
     dispatch_score = db.Column(db.Numeric(5, 2), nullable=True)
+    # The NAP port the field assistant connected/serviced for this
+    # assignment, picked from a dropdown of 1..nap.total_ports on the
+    # mobile Job Detail screen (see database/schema.sql's comment on
+    # this column and app/routes/api_v1/technician.py's
+    # _validate_port_number()). Nullable/unset for an assignment with
+    # no NAP linked, or simply not yet chosen. Kept on the assignment
+    # row (not the NAP) for the same reassignment-history reason as
+    # resolution_notes below.
+    port_number = db.Column(db.Integer, nullable=True)
     # Phase 20: see database/schema.sql's comment on this column —
     # the technician's own free-text notes on what was found/done,
     # kept per-assignment so reassignment history stays intact.
