@@ -277,7 +277,6 @@
 
 /* #ticketDetailsModal ("View Ticket") -- same treatment as the
    issue/NAP popups above. */
-[data-bs-theme="dark"] .ticket-details-code,
 [data-bs-theme="dark"] #ticketDetailsModal dt {
     color: #93a0b8;
 }

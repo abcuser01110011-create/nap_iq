@@ -449,16 +449,10 @@
 }
 
 /* #ticketDetailsModal (read-only "View Ticket" popup) -- same
-   code/label styling as .issue-popup/.nap-popup above, just scoped
-   to the modal instead of a Leaflet popup. */
-.ticket-details-code {
-    font-size: 0.75rem;
-    letter-spacing: 0.03em;
-    color: #6c757d;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-
+   label styling as .issue-popup/.nap-popup above, just scoped
+   to the modal instead of a Leaflet popup. The ticket code itself
+   is now just the first dd in the dl (#ticketDetailsCode), not a
+   separately styled line. */
 #ticketDetailsModal dt {
     font-weight: 500;
     color: #6c757d;

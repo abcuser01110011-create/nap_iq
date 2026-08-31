@@ -1313,7 +1313,7 @@
             '<dt class="col-5">Reported</dt><dd class="col-7">' + formatDateTime(issue.created_at) + "</dd>" +
             "</dl>" +
             '<div class="d-flex gap-1">' +
-            '<a class="btn btn-sm btn-outline-warning flex-fill" href="/issues/' + issue.id + '">View Issue</a>' +
+            '<a class="btn btn-sm btn-outline-warning flex-fill" href="/subscribers/' + issue.subscriber_id + '">View Subs</a>' +
             '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
             'data-view-ticket-id="' + issue.id + '">' +
             '<i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>' +
@@ -1389,9 +1389,6 @@
 
         const priorityDot = document.getElementById("ticketDetailsPriorityDot");
         if (priorityDot) priorityDot.style.background = PRIORITY_COLORS[issue.priority] || "#6c757d";
-
-        const viewIssueLink = document.getElementById("ticketDetailsViewIssueLink");
-        if (viewIssueLink) viewIssueLink.href = "/issues/" + issue.id;
 
         ticketDetailsModalInstance.show();
     }
