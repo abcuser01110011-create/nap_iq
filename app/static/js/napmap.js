@@ -1383,7 +1383,15 @@
         ticketDetailsModalInstance = new bootstrap.Modal(modalEl);
     }
 
-    /** Fills #ticketDetailsModal from an in-memory issue record and shows it. */
+    /** Fills #ticketDetailsModal from an in-memory issue record and shows it.
+     * "Ticket Code" here deliberately uses the "TN 00033" convention
+     * (see mobile/apps/app/src/screens/technician/statusLabels.ts
+     * ticketCode()) rather than issue.issue_code's "ISS-0037" -- this
+     * modal represents the ticket a technician is dispatched on, and
+     * needs to match what they see in the field-assistant app. The
+     * Issues module (list/view page, GeoMap issue-popup badge) keeps
+     * showing issue_code as-is; that's a separate, intentional
+     * identifier for the underlying complaint record. */
     function openTicketDetailsModal(issue) {
         if (!ticketDetailsModalInstance) return;
 
@@ -1393,7 +1401,7 @@
             if (el) el.textContent = value || "\u2014";
         };
 
-        setText("ticketDetailsCode", issue.issue_code || ("Issue #" + issue.id));
+        setText("ticketDetailsCode", "TN " + String(issue.id).padStart(5, "0"));
         setText("ticketDetailsType", issue.issue_type);
         setText("ticketDetailsNap", issue.nap_code);
         setText("ticketDetailsPriority", formatStatusLabel(issue.priority));
