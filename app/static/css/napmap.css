@@ -448,6 +448,16 @@
     color: #6c757d;
 }
 
+.subscriber-popup h6 {
+    margin-bottom: 0.25rem;
+}
+
+.subscriber-popup-address {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
 /* #ticketDetailsModal (read-only "View Ticket" popup) -- same
    label styling as .issue-popup/.nap-popup above, just scoped
    to the modal instead of a Leaflet popup. The ticket code itself

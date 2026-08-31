@@ -271,7 +271,8 @@
 [data-bs-theme="dark"] .issue-popup .issue-popup-code,
 [data-bs-theme="dark"] .nap-popup .nap-popup-code,
 [data-bs-theme="dark"] .issue-popup dt,
-[data-bs-theme="dark"] .nap-popup dt {
+[data-bs-theme="dark"] .nap-popup dt,
+[data-bs-theme="dark"] .subscriber-popup-address {
     color: #93a0b8;
 }
 

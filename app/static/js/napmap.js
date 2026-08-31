@@ -423,6 +423,9 @@
         // Same delegated-listener pattern, for the issue popup's
         // "View Ticket" button (see handleViewTicketButtonInPopup).
         map.on("popupopen", handleViewTicketButtonInPopup);
+        // Same pattern, for the subscriber popup's reverse-geocoded
+        // address line (see resolveSubscriberAddress()).
+        map.on("popupopen", handleSubscriberAddressInPopup);
         // Rebuild every marker layer whenever the zoom level settles,
         // so icon sizes (see getIconScale()) track the new zoom
         // instead of staying pinned at whatever size they were built
@@ -1329,7 +1332,7 @@
             '<dt class="col-5">Reported</dt><dd class="col-7">' + formatDateTime(issue.created_at) + "</dd>" +
             "</dl>" +
             '<div class="d-flex gap-1">' +
-            '<a class="btn btn-sm btn-outline-warning flex-fill" href="/subscribers/' + issue.subscriber_id + '">View Subs</a>' +
+            '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + issue.subscriber_id + '">View Subs</a>' +
             '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
             'data-view-ticket-id="' + issue.id + '">' +
             '<i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>' +
@@ -1626,9 +1629,7 @@
             '<div class="subscriber-popup">' +
             '<div class="nap-popup-code">' + escapeHtml(subscriber.subscriber_code) + "</div>" +
             "<h6>" + escapeHtml(subscriber.full_name) + "</h6>" +
-            '<dl class="row mb-1">' +
-            '<dt class="col-5">Address</dt><dd class="col-7">' + escapeHtml(subscriber.address || "\u2014") + "</dd>" +
-            "</dl>" +
+            '<div class="subscriber-popup-address" data-address-for="' + subscriber.id + '">Locating address\u2026</div>' +
             '<div class="d-flex gap-1">' +
             '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + subscriber.id + '">View Subs</a>' +
             (openIssue ?
@@ -1639,6 +1640,70 @@
             "</div>" +
             "</div>"
         );
+    }
+
+    // Fixed suffix appended to every reverse-geocoded subscriber address --
+    // the whole coverage area is Sta. Cruz, Laguna, so there's no need to
+    // depend on the geocoder to get the city/province right (it often
+    // won't, this far from a major landmark).
+    const SUBSCRIBER_ADDRESS_SUFFIX = "Sta. Cruz, Laguna";
+
+    // subscriber.id -> resolved address string (or a rejected/pending
+    // Promise while in flight). Keeps re-opening the same popup from
+    // re-hitting Nominatim every time.
+    const subscriberAddressCache = {};
+
+    /** Reverse-geocodes a subscriber's lat/lon via OpenStreetMap's Nominatim
+     * (the same tile provider already credited in the map's attribution),
+     * falling back to any address already on file, and finally to just the
+     * town name if neither is available. Result is always suffixed with
+     * ", Sta. Cruz, Laguna" and cached per subscriber id. */
+    async function resolveSubscriberAddress(subscriber) {
+        if (subscriberAddressCache[subscriber.id]) {
+            return subscriberAddressCache[subscriber.id];
+        }
+
+        const promise = (async () => {
+            const lat = Number(subscriber.latitude);
+            const lon = Number(subscriber.longitude);
+            if (!isFinite(lat) || !isFinite(lon)) {
+                return subscriber.address ? subscriber.address + ", " + SUBSCRIBER_ADDRESS_SUFFIX : SUBSCRIBER_ADDRESS_SUFFIX;
+            }
+
+            try {
+                const url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&lat=" + lat + "&lon=" + lon;
+                const response = await fetch(url, { headers: { Accept: "application/json" } });
+                if (!response.ok) throw new Error("geocode request failed");
+                const data = await response.json();
+                const addr = data.address || {};
+                const street = addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood;
+                const short = street ? [street, addr.house_number].filter(Boolean).reverse().join(" ").trim() : null;
+                return (short || subscriber.address || "Unnamed road") + ", " + SUBSCRIBER_ADDRESS_SUFFIX;
+            } catch (err) {
+                return subscriber.address ? subscriber.address + ", " + SUBSCRIBER_ADDRESS_SUFFIX : SUBSCRIBER_ADDRESS_SUFFIX;
+            }
+        })();
+
+        subscriberAddressCache[subscriber.id] = promise;
+        return promise;
+    }
+
+    /** Delegated handler, attached once to `map`'s "popupopen" event (see
+     * init()) -- fills in the subscriber popup's address line once it's
+     * resolved, same pattern as handleViewTicketButtonInPopup(). */
+    function handleSubscriberAddressInPopup(event) {
+        const container = event.popup.getElement();
+        if (!container) return;
+        const el = container.querySelector("[data-address-for]");
+        if (!el) return;
+
+        const subscriberId = Number(el.getAttribute("data-address-for"));
+        const subscriber = allSubscribers.find((s) => s.id === subscriberId);
+        if (!subscriber) return;
+
+        resolveSubscriberAddress(subscriber).then((text) => {
+            el.textContent = text;
+        });
     }
 
     // ---------------- Navigation destination selection (Phase 23, 15%) ----------------
