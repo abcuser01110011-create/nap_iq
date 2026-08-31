@@ -29,6 +29,20 @@ import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS } from "./statusLab
 // plain setTimeout below.
 const LOCATION_FIX_TIMEOUT_MS = 20000;
 
+// Company's home service area — same default the admin's Barangay
+// picker falls back to (see app/static/js/tickets.js). Used so a
+// ticket with no address on file still shows something sensible
+// instead of a blank row.
+const DEFAULT_ADDRESS = "Sta. Cruz, Laguna";
+
+// "Add NAP" tickets repurpose the walk-in full_name field for a
+// planned NAP's name rather than a person's — append "nap" so it
+// reads clearly wherever that name is shown.
+function requesterLabel(fullName: string | null | undefined, requestType: string | null | undefined) {
+  if (!fullName) return fullName;
+  return requestType === "add_nap" ? `${fullName} nap` : fullName;
+}
+
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
   return (
@@ -287,7 +301,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
           {assignment.issue?.issue_code ??
             (assignment.service_request
               ? assignment.subscriber?.subscriber_code ??
-                assignment.service_request.full_name ??
                 `Installation #${assignment.service_request.id}`
               : `Job #${assignment.id}`)}
         </Text>
@@ -345,21 +358,32 @@ export default function JobDetailScreen({ route, navigation }: any) {
                 : undefined)
             }
           />
-          {assignment.issue && <InfoRow label="Priority" value={assignment.issue.priority} />}
+          <InfoRow label="Priority" value={assignment.issue?.priority ?? assignment.service_request?.priority} />
           <InfoRow label="Status" value={STATUS_LABELS[assignment.status] ?? assignment.status} />
           {/* A walk-in Service Order (GeoMap "+ Tickets" modal, free-text
               Customer field) has no linked Subscriber -- fall back to the
               request's own full_name/address/contact_number, which the
-              backend passes through for exactly this case. */}
+              backend passes through for exactly this case. "Add NAP"
+              repurposes that same field for a planned NAP's name, so it
+              gets its own label + the " nap" suffix (see requesterLabel
+              above) instead of being called a "Subscriber". */}
           <InfoRow
-            label="Subscriber"
+            label={assignment.service_request?.request_type === "add_nap" ? "NAP" : "Subscriber"}
             value={
               assignment.subscriber
                 ? `${assignment.subscriber.subscriber_code} — ${assignment.subscriber.full_name}`
-                : assignment.service_request?.full_name
+                : requesterLabel(assignment.service_request?.full_name, assignment.service_request?.request_type)
             }
           />
-          <InfoRow label="Address" value={assignment.subscriber?.address ?? assignment.issue?.address ?? assignment.service_request?.address} />
+          <InfoRow
+            label="Address"
+            value={
+              assignment.subscriber?.address ??
+              assignment.issue?.address ??
+              assignment.service_request?.address ??
+              DEFAULT_ADDRESS
+            }
+          />
           <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
           {lat != null && lng != null && <InfoRow label="Coordinates" value={`${lat.toFixed(6)}, ${lng.toFixed(6)}`} />}
           {assignment.issue && <InfoRow label="Description" value={assignment.issue.description} />}

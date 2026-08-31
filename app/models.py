@@ -342,6 +342,17 @@ class ServiceRequest(db.Model):
         nullable=False,
         default="pending",
     )
+    # Same "low"/"medium"/"high"/"critical" scale as
+    # TechnicalIssue.priority above -- nullable since only the GeoMap
+    # "+ Tickets" quick-create modal (New Installation and Add NAP)
+    # collects it today; previously only folded as text into `notes`
+    # (see quick_add_request()'s docstring), now a real column so it
+    # can actually be displayed (e.g. the field assistant mobile app's
+    # job list/detail) rather than just archived in free text.
+    priority = db.Column(
+        db.Enum("low", "medium", "high", "critical", name="service_request_priority"),
+        nullable=True,
+    )
     # Phase 22: customer/proposed-installation coordinates — see the
     # matching comment on this table in database/schema.sql. Nullable;
     # a request with no location set here simply can't be run through

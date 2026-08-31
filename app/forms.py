@@ -1283,12 +1283,12 @@ class QuickServiceRequestForm(FlaskForm):
       instead of only doing so conditionally.
 
     The quick-create modal also collects a few things this table has
-    no dedicated columns for yet -- priority, plan, assigned team,
-    technician(s), and a scheduled date. Rather than a field per
-    concept here, the route folds whatever the admin entered for
-    those into `notes` as plain text (see quick_add_request()) so
-    nothing typed is lost; this form only validates what actually has
-    a column.
+    no dedicated columns for yet -- plan, assigned team, technician(s),
+    and a scheduled date (priority now has its own column -- see
+    ServiceRequest.priority). Rather than a field per concept here, the
+    route folds whatever the admin entered for those into `notes` as
+    plain text (see quick_add_request()) so nothing typed is lost;
+    this form only validates what actually has a column.
     """
 
     request_type = SelectField(
@@ -1312,6 +1312,12 @@ class QuickServiceRequestForm(FlaskForm):
     barangay = StringField(
         "Location",
         validators=[Optional(), Length(max=255, message="Location is too long.")],
+    )
+    priority = SelectField(
+        "Priority",
+        choices=[("low", "Low"), ("medium", "Medium"), ("high", "High"), ("critical", "Critical")],
+        default="medium",
+        validators=[DataRequired()],
     )
     status = SelectField(
         "Status",
@@ -1377,6 +1383,12 @@ class QuickAddNapRequestForm(FlaskForm):
             DataRequired(message="Port capacity is required."),
             NumberRange(min=1, message="Port capacity must be at least 1."),
         ],
+    )
+    priority = SelectField(
+        "Priority",
+        choices=[("low", "Low"), ("medium", "Medium"), ("high", "High"), ("critical", "Critical")],
+        default="medium",
+        validators=[DataRequired()],
     )
     status = SelectField(
         "Status",

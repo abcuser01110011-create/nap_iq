@@ -21,25 +21,28 @@ function jobTitle(item: {
   return `Job #${item.id}`;
 }
 
-// A GeoMap "+ Tickets" walk-in Service Order has no linked Subscriber
-// at all (its Customer field is free text, never matched against
-// `subscribers`) — `assignment.subscriber` is null for those, so the
-// card falls back to the request's own full_name/address, which the
-// backend now passes through for exactly this case (see
-// _serialize_assignment() in app/routes/api_v1/technician.py).
-function customerName(item: {
-  subscriber?: { full_name: string } | null;
-  service_request?: { full_name?: string | null } | null;
-}) {
-  return item.subscriber?.full_name ?? item.service_request?.full_name ?? "—";
-}
+// Company's home service area — the same default the admin's Barangay
+// picker already falls back to when nothing is typed (see
+// app/static/js/tickets.js). Used here so a ticket with no address on
+// file still shows something sensible instead of a blank line.
+const DEFAULT_ADDRESS = "Sta. Cruz, Laguna";
 
-function customerAddress(item: {
+function jobAddress(item: {
   subscriber?: { address?: string | null } | null;
   issue?: { address?: string | null } | null;
   service_request?: { address?: string | null } | null;
 }) {
-  return item.subscriber?.address ?? item.issue?.address ?? item.service_request?.address;
+  return item.subscriber?.address ?? item.issue?.address ?? item.service_request?.address ?? DEFAULT_ADDRESS;
+}
+
+// Both a repair (technical_issue.priority) and an installation-type
+// Service Order (service_request.priority, added alongside "Add NAP")
+// carry a priority now -- prefer whichever one this job actually has.
+function jobPriority(item: {
+  issue?: { priority?: string | null } | null;
+  service_request?: { priority?: string | null } | null;
+}) {
+  return item.issue?.priority ?? item.service_request?.priority ?? null;
 }
 
 export default function AssignmentsScreen({ navigation }: any) {
@@ -71,11 +74,17 @@ export default function AssignmentsScreen({ navigation }: any) {
         ListEmptyComponent={<Text style={styles.empty}>No open assignments right now.</Text>}
         renderItem={({ item }) => {
           const pending = pendingByAssignment[item.id] ?? 0;
+          const priority = jobPriority(item);
           return (
             <TouchableOpacity
               style={styles.card}
               onPress={() => navigation.navigate("JobDetail", { assignment: item })}
             >
+              {/* Line 1: Ticket code. Line 2: Type. Line 3: Address
+                  (defaults to the home service area, see
+                  DEFAULT_ADDRESS). Line 4: Priority, if this job has
+                  one. Status badge sits alongside line 1, not counted
+                  as one of the four lines. */}
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>{jobTitle(item)}</Text>
                 <View style={styles.badge}>
@@ -85,12 +94,9 @@ export default function AssignmentsScreen({ navigation }: any) {
               <View style={styles.jobTypeRow}>
                 <Text style={styles.jobTypeTag}>{JOB_TYPE_LABELS[item.job_type] ?? item.job_type}</Text>
               </View>
-              <Text style={styles.cardSubtitle}>{customerName(item)}</Text>
-              <Text style={styles.cardAddress}>{customerAddress(item)}</Text>
+              <Text style={styles.cardAddress}>{jobAddress(item)}</Text>
               <View style={styles.cardFooter}>
-                {item.issue?.priority && (
-                  <Text style={styles.priority}>Priority: {item.issue.priority}</Text>
-                )}
+                {priority && <Text style={styles.priority}>Priority: {priority}</Text>}
                 {pending > 0 && <Text style={styles.pendingTag}>Queued — will sync</Text>}
               </View>
             </TouchableOpacity>
@@ -124,8 +130,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  cardSubtitle: { color: colors.textMuted, fontSize: 14, marginTop: 4 },
-  cardAddress: { color: colors.textFaint, fontSize: 13, marginTop: 2 },
+  cardAddress: { color: colors.textFaint, fontSize: 13, marginTop: 6 },
   cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 },
   priority: { color: colors.textFaint, fontSize: 12, textTransform: "capitalize" },
   pendingTag: { color: colors.primary, fontSize: 12, fontWeight: "700" },

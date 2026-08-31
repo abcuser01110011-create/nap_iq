@@ -388,8 +388,9 @@ def quick_add_request():
     naps.quick_add_nap() / issues.report_issue(). See
     QuickServiceRequestForm's own docstring (app/forms.py) for exactly
     how this is narrower than the full Add Service Request page, and
-    for why priority/plan/assigned-team/technician/scheduled-date all
-    end up folded into `notes` instead of their own columns.
+    for why plan/assigned-team/technician/scheduled-date all end up
+    folded into `notes` instead of their own columns (priority has its
+    own column now -- see ServiceRequest.priority).
 
     "Customer" here is always a plain free-text name (form.full_name)
     -- it is never looked up against the `subscribers` table, since
@@ -409,9 +410,6 @@ def quick_add_request():
     # real technician Assignment; dispatch that from the Dispatch
     # Board once the request is scheduled, same as any other install.
     extra_lines = []
-    priority_label = (request.form.get("priority_label") or "").strip()
-    if priority_label:
-        extra_lines.append(f"Priority: {priority_label}")
     plan_label = (request.form.get("plan_label") or "").strip()
     if plan_label:
         extra_lines.append(f"Plan: {plan_label}")
@@ -436,6 +434,7 @@ def quick_add_request():
         request_type=form.request_type.data,
         subscriber_id=None,
         status=form.status.data,
+        priority=form.priority.data,
         address=(form.barangay.data or "").strip() or None,
         full_name=form.full_name.data.strip(),
         contact_number=(form.contact_number.data or "").strip() or None,
@@ -514,6 +513,7 @@ def quick_add_nap_request():
         request_type="add_nap",
         subscriber_id=None,
         status=form.status.data,
+        priority=form.priority.data,
         address=form.barangay.data.strip(),
         full_name=form.nap_name.data.strip(),
         notes=notes,
@@ -665,7 +665,10 @@ def approve_request(request_id):
     """
     service_request = ServiceRequest.query.get_or_404(request_id)
     if service_request.status != "pending":
-        flash("Only a pending service request can be approved this way.", "warning")
+        message = "Only a pending service request can be approved this way."
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"status": "error", "message": message}), 409
+        flash(message, "warning")
         return redirect(request.referrer or url_for("service_requests.list_requests"))
 
     service_request.status = "approved"
@@ -702,13 +705,28 @@ def approve_request(request_id):
     db.session.commit()
 
     if assigned_nap is not None:
-        flash(
+        message = (
             f"Service request was approved and NAP '{assigned_nap.nap_code}' "
-            "was assigned automatically.",
-            "success",
+            "was assigned automatically."
         )
     else:
-        flash("Service request was approved.", "success")
+        message = "Service request was approved."
+
+    # AJAX path (see form.html's Approve button): the ticket toast that
+    # follows this needs to know whether to offer an "Assign Now" link,
+    # so this returns JSON instead of the classic flash+redirect. Any
+    # non-AJAX caller (a JS-disabled browser, a bookmarked POST, curl)
+    # still gets the original behavior untouched.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify(
+            {
+                "status": "success",
+                "message": message,
+                "service_request": {"id": service_request.id, "status": service_request.status},
+            }
+        )
+
+    flash(message, "success")
     return redirect(request.referrer or url_for("service_requests.list_requests"))
 
 

@@ -118,6 +118,14 @@
                     <div class="fvalue">{{ service_request.created_at.strftime('%B %d, %Y') }}</div>
                 </div>
             </div>
+            {% if service_request.priority %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Priority</div>
+                    <div class="fvalue text-capitalize">{{ service_request.priority }}</div>
+                </div>
+            </div>
+            {% endif %}
             <div class="sr-doc-row">
                 <div class="sr-doc-field full">
                     <div class="flabel">Requested NAP</div>
@@ -236,8 +244,9 @@
 
 {% if service_request.status == 'pending' %}
 <div class="d-flex justify-content-center gap-2 mt-4">
-    <form method="post" action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
-          onsubmit="return confirm('Approve this service request?');">
+    <form method="post" id="approveRequestForm"
+          action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
+          data-dispatch-url="{{ url_for('dispatch.index') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-outline-success">
             <i class="bi bi-check-lg me-1"></i>Approve
@@ -251,6 +260,7 @@
         </button>
     </form>
 </div>
+<script src="{{ url_for('static', filename='js/service-request-approve.js') }}"></script>
 {% endif %}
 
 {% else %}

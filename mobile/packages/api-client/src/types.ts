@@ -76,6 +76,7 @@ export interface AssignmentServiceRequest {
   id: number;
   request_type: string;
   status: string;
+  priority: "low" | "medium" | "high" | "critical" | null;
   notes: string | null;
   latitude: number | null;
   longitude: number | null;

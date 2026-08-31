@@ -212,6 +212,7 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "id": service_request.id,
             "request_type": service_request.request_type,
             "status": service_request.status,
+            "priority": service_request.priority,
             "notes": service_request.notes,
             "latitude": float(service_request.latitude) if service_request.latitude is not None else None,
             "longitude": float(service_request.longitude) if service_request.longitude is not None else None,

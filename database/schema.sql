@@ -160,6 +160,10 @@ CREATE TABLE IF NOT EXISTS service_requests (
     requested_nap_id  INT,
     status            ENUM('pending', 'approved', 'scheduled', 'completed', 'rejected')
                           NOT NULL DEFAULT 'pending',
+    -- Same low/medium/high/critical scale as technical_issues.priority
+    -- below. Nullable -- only the GeoMap quick-create modal collects
+    -- it today. See app/models.py's ServiceRequest.priority comment.
+    priority          ENUM('low', 'medium', 'high', 'critical'),
     -- Phase 22 (phase_11.pdf "nearest available NAP recommendation"):
     -- the customer/proposed-installation coordinates the recommendation
     -- is computed from. Nullable — an existing request created before

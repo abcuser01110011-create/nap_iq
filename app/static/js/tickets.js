@@ -30,10 +30,11 @@
  *     of a free picker.
  *
  * Priority/Assigned Team/Technician/Scheduled are collected in all
- * three forms, but only Priority (TN), Status (SO), and Port Capacity
- * (Add NAP) map onto real columns today -- the rest are folded into
- * the description/notes text server-side so nothing typed is lost.
- * See the routes' docstrings for the full explanation.
+ * three forms, but only Priority (all three), Status (SO/Add NAP),
+ * and Port Capacity (Add NAP) map onto real columns today -- the
+ * rest are folded into the description/notes text server-side so
+ * nothing typed is lost. See the routes' docstrings for the full
+ * explanation.
  */
 (function () {
     "use strict";
@@ -600,11 +601,11 @@
         // Fiber Break always flags every connected line critical (see
         // report_fiber_break()'s docstring) -- lock the Priority
         // dropdown to Critical rather than leaving a selectable value
-        // the backend would silently override anyway. "Add NAP" has
-        // no priority concept at all (it isn't submitted -- see
-        // submitAddNap()), so the control is just disabled there too.
+        // the backend would silently override anyway. Every other
+        // type (including "Add NAP" now that ServiceRequest has its
+        // own priority column) leaves it selectable.
         const prioritySelect = document.getElementById("ticketFormPriority");
-        prioritySelect.disabled = isFiberBreak || isAddNap;
+        prioritySelect.disabled = isFiberBreak;
         if (isFiberBreak) prioritySelect.value = "critical";
 
         // Status only makes sense as a real choice for SO (a
@@ -776,7 +777,7 @@
         formData.append("barangay", document.getElementById("ticketFormBarangayInput").value);
         formData.append("status", document.getElementById("ticketFormStatus").value);
         formData.append("notes", document.getElementById("ticketFormDescription").value);
-        formData.append("priority_label", selectedOptionLabel(document.getElementById("ticketFormPriority")));
+        formData.append("priority", document.getElementById("ticketFormPriority").value);
         formData.append("plan_label", document.getElementById("ticketFormPlan").value);
         formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
@@ -804,6 +805,7 @@
         formData.append("port_capacity", document.getElementById("ticketFormPortCapacity").value);
         formData.append("status", document.getElementById("ticketFormStatus").value);
         formData.append("notes", document.getElementById("ticketFormDescription").value);
+        formData.append("priority", document.getElementById("ticketFormPriority").value);
         formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
         formData.append(
