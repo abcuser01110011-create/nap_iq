@@ -171,6 +171,22 @@
         return worstPriority ? (PRIORITY_COLORS[worstPriority] || NO_ISSUE_LINE_COLOR) : NO_ISSUE_LINE_COLOR;
     }
 
+    /** Same "worst open issue" rule as getSubscriberWorstOpenPriority(),
+     * but returns the actual issue record (for the subscriber popup's
+     * "View Ticket" button) instead of just its priority. Null when
+     * the subscriber has no open (pending/assigned/in_progress) issue. */
+    function getSubscriberOpenIssue(subscriberId) {
+        let worstIssue = null;
+        allIssues.forEach((issue) => {
+            if (issue.subscriber_id !== subscriberId) return;
+            if (OPEN_ISSUE_STATUSES.indexOf(issue.status) === -1) return;
+            if (!worstIssue || PRIORITY_RANK[issue.priority] > PRIORITY_RANK[worstIssue.priority]) {
+                worstIssue = issue;
+            }
+        });
+        return worstIssue;
+    }
+
     // Dark-mode basemap: originally this swapped in a CARTO "dark_all"
     // raster tile layer (basemaps.cartocdn.com) whenever the app's display
     // theme (js/theme.js, Settings > Display Settings) was dark. CARTO has
@@ -1597,6 +1613,7 @@
 
     /** Builds the popup HTML shown when a subscriber marker is clicked. */
     function buildSubscriberPopupHtml(subscriber) {
+        const openIssue = getSubscriberOpenIssue(subscriber.id);
         return (
             '<div class="subscriber-popup">' +
             '<div class="nap-popup-code">' + escapeHtml(subscriber.subscriber_code) + "</div>" +
@@ -1605,10 +1622,10 @@
             '<dt class="col-5">Address</dt><dd class="col-7">' + escapeHtml(subscriber.address || "\u2014") + "</dd>" +
             "</dl>" +
             '<div class="d-flex gap-1">' +
-            '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + subscriber.id + '">View Subscriber</a>' +
-            '<button type="button" class="btn btn-sm btn-outline-success flex-fill" ' +
-            'data-dest-type="subscriber" data-dest-id="' + subscriber.id + '">' +
-            '<i class="bi bi-signpost-split me-1"></i>Set as destination</button>' +
+            '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + subscriber.id + '">View Subs</a>' +
+            '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
+            (openIssue ? 'data-view-ticket-id="' + openIssue.id + '"' : "disabled") +
+            '><i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>' +
             "</div>" +
             "</div>"
         );
