@@ -448,6 +448,27 @@
     color: #6c757d;
 }
 
+/* #ticketDetailsModal (read-only "View Ticket" popup) -- same
+   code/label styling as .issue-popup/.nap-popup above, just scoped
+   to the modal instead of a Leaflet popup. */
+.ticket-details-code {
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+#ticketDetailsModal dt {
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.ticket-details-description {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+}
+
 /* Phase 8 (adapted): manual map-click origin picker
    (nav-origin.js / nav-origin-picker.js). Additive only — nothing
    above this block was changed. */

@@ -776,6 +776,57 @@
         </div>
     </div>
 </div>
+
+{# Read-only "View Ticket" details modal -- opened from a GeoMap issue
+   popup's "View Ticket" button (see openTicketDetailsModal() in
+   napmap.js). Separate from #ticketFormModal above, which is the
+   "+ Tickets" *create* form; this one only ever displays an existing
+   ticket, never submits anything. #}
+<div class="modal" id="ticketDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ticket Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ticket-details-code" id="ticketDetailsCode">&mdash;</div>
+                <dl class="row mb-0">
+                    <dt class="col-5">Type</dt>
+                    <dd class="col-7" id="ticketDetailsType">&mdash;</dd>
+
+                    <dt class="col-5">NAP</dt>
+                    <dd class="col-7" id="ticketDetailsNap">&mdash;</dd>
+
+                    <dt class="col-5">Priority</dt>
+                    <dd class="col-7">
+                        <span class="legend-dot legend-dot-square" id="ticketDetailsPriorityDot"></span>
+                        <span id="ticketDetailsPriority">&mdash;</span>
+                    </dd>
+
+                    <dt class="col-5">Status</dt>
+                    <dd class="col-7" id="ticketDetailsStatus">&mdash;</dd>
+
+                    <dt class="col-5">Assigned Team</dt>
+                    <dd class="col-7" id="ticketDetailsAssignedTeam">&mdash;</dd>
+
+                    <dt class="col-5">Technician(s)</dt>
+                    <dd class="col-7" id="ticketDetailsTechnicians">&mdash;</dd>
+
+                    <dt class="col-5">Date Created</dt>
+                    <dd class="col-7" id="ticketDetailsCreated">&mdash;</dd>
+                </dl>
+                <hr class="my-2">
+                <label class="form-label small text-muted mb-1">Description</label>
+                <p class="ticket-details-description mb-0" id="ticketDetailsDescription">&mdash;</p>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-outline-warning" id="ticketDetailsViewIssueLink">View Full Issue</a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}

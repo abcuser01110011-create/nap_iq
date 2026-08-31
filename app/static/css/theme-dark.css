@@ -275,6 +275,13 @@
     color: #93a0b8;
 }
 
+/* #ticketDetailsModal ("View Ticket") -- same treatment as the
+   issue/NAP popups above. */
+[data-bs-theme="dark"] .ticket-details-code,
+[data-bs-theme="dark"] #ticketDetailsModal dt {
+    color: #93a0b8;
+}
+
 [data-bs-theme="dark"] .nav-card > .card > .card-header {
     background: linear-gradient(180deg, #171f33 0%, #121a2b 100%) !important;
     border-bottom-color: rgba(139, 92, 246, 0.25);

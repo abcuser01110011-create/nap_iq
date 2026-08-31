@@ -404,6 +404,9 @@
         // covers all of them since Leaflet re-injects popup HTML into
         // the DOM fresh each time a marker opens.
         map.on("popupopen", handleDestinationButtonInPopup);
+        // Same delegated-listener pattern, for the issue popup's
+        // "View Ticket" button (see handleViewTicketButtonInPopup).
+        map.on("popupopen", handleViewTicketButtonInPopup);
         // Rebuild every marker layer whenever the zoom level settles,
         // so icon sizes (see getIconScale()) track the new zoom
         // instead of staying pinned at whatever size they were built
@@ -470,6 +473,7 @@
 
         setupQuickAdd();
         setupReportIssue();
+        setupTicketDetailsModal();
         setupNapDetailPanel();
 
         // Background safety net -- see refreshLiveData()'s docstring.
@@ -1310,12 +1314,106 @@
             "</dl>" +
             '<div class="d-flex gap-1">' +
             '<a class="btn btn-sm btn-outline-warning flex-fill" href="/issues/' + issue.id + '">View Issue</a>' +
-            '<button type="button" class="btn btn-sm btn-outline-success flex-fill" ' +
-            'data-dest-type="issue" data-dest-id="' + issue.id + '">' +
-            '<i class="bi bi-signpost-split me-1"></i>Set as destination</button>' +
+            '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
+            'data-view-ticket-id="' + issue.id + '">' +
+            '<i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>' +
             "</div>" +
             "</div>"
         );
+    }
+
+    // ---------------- View Ticket (read-only ticket details) ----------------
+    // The GeoMap issue popup's old "Set as destination" button is now
+    // "View Ticket" -- it opens #ticketDetailsModal (naps/map.html)
+    // populated from the same in-memory issue record the popup itself
+    // was built from (allIssues), no extra API call needed.
+    //
+    // A ticket's Assigned Team / Technician(s) requested / Barangay /
+    // Scheduled values have no dedicated columns (see tickets.js's
+    // submitTN()/submitFiberBreak() docstring) -- they're folded as
+    // "Label: value" lines onto the front of `description`, separated
+    // from the free-typed text by a blank line. parseTicketExtras()
+    // reverses that so the modal can show them as their own fields
+    // instead of leaving them buried in the Description text.
+    const TICKET_EXTRA_LABELS = ["Assigned Team", "Technician(s) requested", "Barangay", "Scheduled"];
+
+    function parseTicketExtras(description) {
+        const extras = { assignedTeam: "", technicians: "", barangay: "", scheduled: "" };
+        if (!description) return { extras: extras, description: "" };
+
+        const lines = String(description).split("\n");
+        let splitAt = 0;
+        for (; splitAt < lines.length; splitAt++) {
+            const line = lines[splitAt];
+            const match = TICKET_EXTRA_LABELS.find((label) => line.indexOf(label + ": ") === 0);
+            if (!match) break;
+            const value = line.slice(match.length + 2).trim();
+            if (match === "Assigned Team") extras.assignedTeam = value;
+            else if (match === "Technician(s) requested") extras.technicians = value;
+            else if (match === "Barangay") extras.barangay = value;
+            else if (match === "Scheduled") extras.scheduled = value;
+        }
+
+        const rest = lines.slice(splitAt).join("\n").trim();
+        return { extras: extras, description: rest };
+    }
+
+    let ticketDetailsModalInstance = null;
+
+    /** Wires the #ticketDetailsModal instance up once at init(). */
+    function setupTicketDetailsModal() {
+        const modalEl = document.getElementById("ticketDetailsModal");
+        if (!modalEl || typeof bootstrap === "undefined") return;
+        ticketDetailsModalInstance = new bootstrap.Modal(modalEl);
+    }
+
+    /** Fills #ticketDetailsModal from an in-memory issue record and shows it. */
+    function openTicketDetailsModal(issue) {
+        if (!ticketDetailsModalInstance) return;
+
+        const parsed = parseTicketExtras(issue.description);
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value || "\u2014";
+        };
+
+        setText("ticketDetailsCode", issue.issue_code || ("Issue #" + issue.id));
+        setText("ticketDetailsType", issue.issue_type);
+        setText("ticketDetailsNap", issue.nap_code);
+        setText("ticketDetailsPriority", formatStatusLabel(issue.priority));
+        setText("ticketDetailsStatus", formatStatusLabel(issue.status));
+        setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam);
+        setText("ticketDetailsTechnicians", parsed.extras.technicians);
+        setText("ticketDetailsCreated", formatDateTime(issue.created_at));
+        setText("ticketDetailsDescription", parsed.description);
+
+        const priorityDot = document.getElementById("ticketDetailsPriorityDot");
+        if (priorityDot) priorityDot.style.background = PRIORITY_COLORS[issue.priority] || "#6c757d";
+
+        const viewIssueLink = document.getElementById("ticketDetailsViewIssueLink");
+        if (viewIssueLink) viewIssueLink.href = "/issues/" + issue.id;
+
+        ticketDetailsModalInstance.show();
+    }
+
+    /**
+     * Delegated handler, attached once to `map`'s "popupopen" event
+     * (see init()) -- same pattern as handleDestinationButtonInPopup.
+     * Every issue popup this file builds may contain one
+     * `[data-view-ticket-id]` button; this wires its click to look
+     * the issue up (by id, in allIssues) and open the ticket modal.
+     */
+    function handleViewTicketButtonInPopup(event) {
+        const container = event.popup.getElement();
+        if (!container) return;
+        const btn = container.querySelector("[data-view-ticket-id]");
+        if (!btn) return;
+
+        btn.addEventListener("click", () => {
+            const entityId = Number(btn.getAttribute("data-view-ticket-id"));
+            const issue = allIssues.find((i) => i.id === entityId);
+            if (issue) openTicketDetailsModal(issue);
+        });
     }
 
     // ---------------- Subscriber markers (Phase 23, 15%) ----------------
