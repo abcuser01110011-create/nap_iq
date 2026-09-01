@@ -108,8 +108,25 @@ DISPATCHABLE_REQUEST_STATUSES = ("scheduled",)
 def _populate_technician_choices(form, *, exclude_technician_id=None):
     """Fills in the Technician dropdown from the current roster,
     labelled with their status so an administrator can see at a
-    glance who's actually free before dispatching them."""
-    technicians = Technician.query.order_by(Technician.full_name).all()
+    glance who's actually free before dispatching them.
+
+    Restricted to personnel_type == 'field_assistant' — see the
+    Technician model's docstring in app/models.py and
+    app/routes/technicians.py's module docstring: a plain
+    'technician' profile never has a linked `users` row/mobile login,
+    so dispatching one here would create a real `assignments` row
+    (the issue/request flips to 'assigned', the administrator sees a
+    success flash) that can never actually appear on any mobile
+    Assignments screen — there's no account for it to show up on.
+    Every other dispatch entry point (issues.py's and
+    service_requests.py's `_dispatch_field_assistant()`) already
+    filters this same way; this is the one that was missed.
+    """
+    technicians = (
+        Technician.query.filter_by(personnel_type="field_assistant")
+        .order_by(Technician.full_name)
+        .all()
+    )
     form.technician_id.choices = [(0, "-- Select Technician --")] + [
         (t.id, f"{t.full_name} ({t.status})")
         for t in technicians

@@ -330,7 +330,19 @@ def get_recommendations(issue, limit=None):
     """
     issue_coords = _issue_coordinates(issue)
 
-    technicians = [t for t in Technician.query.all() if t.status != "offline"]
+    # personnel_type == 'field_assistant' only — a plain 'technician'
+    # profile has no linked mobile login (see the Technician model's
+    # docstring and app/routes/technicians.py), so recommending one
+    # here would let an administrator confirm a dispatch that can
+    # never appear on any mobile Assignments screen. Same restriction
+    # app/routes/dispatch.py's _populate_technician_choices() applies
+    # to the manual dropdown these recommendations are ultimately
+    # submitted through.
+    technicians = [
+        t
+        for t in Technician.query.filter_by(personnel_type="field_assistant").all()
+        if t.status != "offline"
+    ]
 
     open_assignments = Assignment.query.filter(
         Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES)
