@@ -123,7 +123,13 @@ CREATE TABLE IF NOT EXISTS technicians (
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS technical_issues (
     id              INT AUTO_INCREMENT PRIMARY KEY,
-    issue_code      VARCHAR(20) UNIQUE,
+    -- Not UNIQUE: a Fiber Break outage is fanned out into one row per
+    -- still-connected subscriber (report_fiber_break(), app/routes/
+    -- issues.py) and every one of those rows deliberately shares the
+    -- same issue_code, so opening any affected subscriber's ticket
+    -- shows the same code. Plain (non-unique) index kept for the
+    -- issues list's issue_code search.
+    issue_code      VARCHAR(20),
     issue_type      VARCHAR(50)  NOT NULL,
     description     TEXT,
     priority        ENUM('low', 'medium', 'high', 'critical') NOT NULL DEFAULT 'medium',
@@ -143,7 +149,8 @@ CREATE TABLE IF NOT EXISTS technical_issues (
         ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_issues_nap
         FOREIGN KEY (nap_id) REFERENCES naps(id)
-        ON DELETE SET NULL ON UPDATE CASCADE
+        ON DELETE SET NULL ON UPDATE CASCADE,
+    INDEX idx_issues_issue_code (issue_code)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
