@@ -86,6 +86,7 @@ from app.jwt_auth import jwt_role_required
 from app.models import Assignment, Nap, ServiceRequest, Technician, TechnicalIssue
 from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
+from app.routes.service_requests import _sync_subscriber_nap
 from app.notifications_utils import notify, notify_issue_status_change
 
 api_v1_technician_bp = Blueprint(
@@ -973,6 +974,21 @@ def complete_assignment(assignment_id):
         if subscriber is not None:
             subscriber.status = "active"
             subscriber.installed_at = date.today()
+            # Phase 37: the mobile completion flow was setting the
+            # subscriber active/installed but never writing
+            # `Subscriber.nap_id` itself — that's the field the
+            # GeoMap's connector line and NAP detail panel (slot
+            # capacity, "Connected lines") actually read (see
+            # `_sync_subscriber_nap`'s docstring in
+            # app/routes/service_requests.py). The admin's own
+            # approve/assign/edit routes already call it after
+            # touching `requested_nap_id`; a technician finishing the
+            # job on the phone is just as much a write to that same
+            # field (set earlier via the "link NAP" step) and was the
+            # one path that skipped it, so a mobile-completed install
+            # never grew a connector line or counted toward slot
+            # capacity even though the underlying assignment was done.
+            _sync_subscriber_nap(service_request)
             # This is the same "a subscriber just occupied a slot"
             # case every other write path in the app already re-syncs
             # for (see app/nap_status.py) -- without it, a NAP whose
