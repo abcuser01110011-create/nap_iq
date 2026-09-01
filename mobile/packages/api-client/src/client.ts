@@ -120,7 +120,21 @@ export class ApiClient {
     }
 
     const text = await response.text();
-    const data = text ? JSON.parse(text) : {};
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      // Whatever answered wasn't our Flask JSON API at all — a 404
+      // HTML page, a proxy/ngrok error page, a dev server's default
+      // error screen, etc. Surfacing the real HTTP status here (and a
+      // message that says so) instead of throwing a raw, un-caught
+      // SyntaxError avoids every caller's catch block generically
+      // reporting "couldn't load"/"couldn't save" with no clue that
+      // the actual problem was talking to the wrong server/endpoint.
+      throw new ApiError(response.status, {
+        error: `Server returned a non-JSON response (HTTP ${response.status}). Check that the app is pointed at the right server and that this endpoint is deployed.`,
+      });
+    }
 
     if (!response.ok) {
       throw new ApiError(response.status, data as ApiErrorBody);
@@ -352,6 +366,27 @@ export class ApiClient {
       this.request<{ assignment: Assignment }>(
         `/api/v1/technician/assignments/${assignmentId}/pin-location`,
         { method: "POST", body: { latitude, longitude } }
+      ),
+    /** Nearest-suitable-NAP candidates for the assignment's already-
+     * pinned on-site location (see pinAssignmentLocation above) — for
+     * an installation dispatched with no NAP linked. Mirrors the
+     * admin "Recommend NAP" list's shape, nearest first, so the
+     * screen can render it directly. 409s server-side if no location
+     * has been pinned yet. */
+    nearbyNaps: (assignmentId: number) =>
+      this.request<{ naps: NearbyNap[] }>(
+        `/api/v1/technician/assignments/${assignmentId}/nearby-naps`
+      ),
+    /** Links the chosen NAP (from nearbyNaps above) to the
+     * assignment's installation, the field counterpart to the admin's
+     * "Use This NAP" action. Returns the updated assignment — its
+     * `nap` field (and therefore the Job Detail screen's port
+     * dropdown) is populated from this response without a separate
+     * refetch. */
+    linkNap: (assignmentId: number, napId: number) =>
+      this.request<{ assignment: Assignment }>(
+        `/api/v1/technician/assignments/${assignmentId}/link-nap`,
+        { method: "POST", body: { nap_id: napId } }
       ),
     registerDeviceToken: (token: string, platform: "ios" | "android") =>
       this.request<{ ok: true }>("/api/v1/technician/device-token", {

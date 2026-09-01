@@ -694,6 +694,13 @@ export default function JobDetailScreen({ route, navigation }: any) {
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={styles.photoUploadingText}>Looking up nearby NAPs…</Text>
                 </View>
+              ) : nearbyNapsError ? (
+                <View>
+                  <Text style={styles.error}>{nearbyNapsError}</Text>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={handleFindNearbyNaps}>
+                    <Text style={styles.secondaryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
               ) : nearbyNapsList.length === 0 ? (
                 <Text style={styles.notesText}>
                   No active NAP with a free port was found near your pinned location.
@@ -721,7 +728,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
                   ))}
                 </ScrollView>
               )}
-              {nearbyNapsError && <Text style={styles.error}>{nearbyNapsError}</Text>}
             </View>
           </TouchableOpacity>
         </Modal>
