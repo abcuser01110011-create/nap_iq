@@ -83,7 +83,7 @@ except ImportError:  # pragma: no cover - exercised only if the dep is missing
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
-from app.models import Assignment, Nap, ServiceRequest, Technician, TechnicalIssue
+from app.models import Assignment, Nap, ServiceRequest, Subscriber, Technician, TechnicalIssue
 from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
@@ -971,6 +971,43 @@ def complete_assignment(assignment_id):
         service_request = assignment.service_request
         subscriber = service_request.subscriber
         service_request.status = "completed"
+
+        # Phase 38: a walk-in "New Installation" ticket — created via
+        # the GeoMap "+ Tickets" quick-create modal, or the full Add
+        # Service Request page's walk-in path — is deliberately
+        # created with subscriber_id=None (see quick_add_request()'s
+        # docstring in app/routes/service_requests.py): the customer
+        # name typed into it is plain free text, never looked up
+        # against `subscribers`. That's fine right up until the job
+        # is actually finished — at that point there IS a real,
+        # connected customer on a real port of a real NAP, so leaving
+        # subscriber_id unset forever meant a mobile-completed
+        # walk-in install could never show up as a connected line or
+        # count toward slot capacity, no matter how correctly
+        # everything else here ran. This provisions the Subscriber
+        # row from exactly the details already on file
+        # (full_name/contact_number/address/plan_label) — the same
+        # thing an administrator would otherwise have to do by hand
+        # via Subscribers -> Add Subscriber right after every walk-in
+        # install. Same "PENDING-<id> placeholder, then flush, then
+        # the real SUB-#### code" two-step the mobile self-registration
+        # path already uses (see register_customer() in
+        # api_v1/customer.py) — subscriber_code has to be unique, and
+        # the real code needs this row's own id before it can be built.
+        if subscriber is None and is_new_installation:
+            subscriber = Subscriber(
+                subscriber_code=f"PENDING-{assignment.id}",
+                full_name=service_request.full_name or "Walk-in customer",
+                address=service_request.address,
+                contact_number=service_request.contact_number,
+                plan_type=service_request.plan_label,
+                status="active",
+            )
+            db.session.add(subscriber)
+            db.session.flush()  # assigns subscriber.id
+            subscriber.subscriber_code = f"SUB-{subscriber.id:04d}"
+            service_request.subscriber_id = subscriber.id
+
         if subscriber is not None:
             subscriber.status = "active"
             subscriber.installed_at = date.today()
