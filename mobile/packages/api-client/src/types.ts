@@ -95,6 +95,11 @@ export interface AssignmentNap {
    * options are 1..total_ports (see _validate_port_number() in
    * api_v1/technician.py). */
   total_ports: number;
+  /** Ports already recorded on some other (non-cancelled) assignment
+   * for this same NAP — see _nap_occupied_ports() in
+   * api_v1/technician.py. The Job Detail screen's port dropdown
+   * disables these instead of offering them. */
+  occupied_ports: number[];
 }
 
 export interface Assignment {

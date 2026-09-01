@@ -83,7 +83,7 @@ except ImportError:  # pragma: no cover - exercised only if the dep is missing
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
-from app.models import Assignment, Nap, Technician
+from app.models import Assignment, Nap, ServiceRequest, Technician, TechnicalIssue
 from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.notifications_utils import notify, notify_issue_status_change
@@ -143,6 +143,38 @@ def _assignment_nap(assignment: Assignment):
     return issue.nap if issue else (service_request.requested_nap if service_request else None)
 
 
+def _nap_occupied_ports(nap: Nap, exclude_assignment_id=None):
+    """Port numbers already recorded, on *any other* assignment, for
+    this NAP — repair or install, whichever type it came from — so
+    the mobile Job Detail screen's port dropdown can hide/disable
+    ports another technician (or an earlier job on this same NAP)
+    already used. `exclude_assignment_id` leaves out the assignment
+    currently being edited, so re-opening a job doesn't lock the
+    technician out of the port they themselves already picked for it.
+
+    A cancelled assignment's port is freed up again (excluded here),
+    same "cancelled doesn't count" treatment the rest of the dispatch
+    flow already gives a cancelled Assignment.
+    """
+    query = (
+        Assignment.query
+        .filter(Assignment.port_number.isnot(None))
+        .filter(Assignment.status != "cancelled")
+        .outerjoin(TechnicalIssue, TechnicalIssue.id == Assignment.technical_issue_id)
+        .outerjoin(ServiceRequest, ServiceRequest.id == Assignment.service_request_id)
+        .filter(
+            db.or_(
+                TechnicalIssue.nap_id == nap.id,
+                ServiceRequest.requested_nap_id == nap.id,
+            )
+        )
+    )
+    if exclude_assignment_id is not None:
+        query = query.filter(Assignment.id != exclude_assignment_id)
+
+    return sorted({row.port_number for row in query.with_entities(Assignment.port_number)})
+
+
 def _validate_port_number(assignment: Assignment, data: dict):
     """Parses an optional `port_number` field against the range of the
     assignment's linked NAP (1..nap.total_ports) for the mobile Job
@@ -172,6 +204,9 @@ def _validate_port_number(assignment: Assignment, data: dict):
 
     if port_number < 1 or port_number > nap.total_ports:
         return None, (f"port_number must be between 1 and {nap.total_ports}.", 400)
+
+    if port_number in _nap_occupied_ports(nap, exclude_assignment_id=assignment.id):
+        return None, (f"Port {port_number} is already in use on this NAP.", 409)
 
     return port_number, None
 
@@ -288,6 +323,12 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             # Drives the mobile Job Detail screen's port dropdown —
             # options 1..total_ports.
             "total_ports": nap.total_ports,
+            # Ports another (non-cancelled) assignment on this same
+            # NAP already recorded — this assignment's own
+            # already-chosen port is left out, so the technician isn't
+            # locked out of what they themselves picked. The mobile
+            # dropdown disables/hides these instead of offering them.
+            "occupied_ports": _nap_occupied_ports(nap, exclude_assignment_id=assignment.id),
         }
         if nap
         else None,

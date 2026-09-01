@@ -530,20 +530,40 @@ export default function JobDetailScreen({ route, navigation }: any) {
               <Text style={styles.modalTitle}>Select a port</Text>
               <ScrollView style={styles.portList}>
                 {assignment.nap &&
-                  Array.from({ length: assignment.nap.total_ports }, (_, i) => i + 1).map((n) => (
-                    <TouchableOpacity
-                      key={n}
-                      style={styles.portOption}
-                      onPress={() => {
-                        setPortNumber(n);
-                        setPortModalVisible(false);
-                      }}
-                    >
-                      <Text style={n === portNumber ? styles.portOptionTextSelected : styles.portOptionText}>
-                        Port {n}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  Array.from({ length: assignment.nap.total_ports }, (_, i) => i + 1).map((n) => {
+                    // A port already recorded on some other assignment
+                    // for this NAP (see occupied_ports in
+                    // api_v1/technician.py) can't be picked again —
+                    // this assignment's own already-chosen port is
+                    // never in that list, so re-selecting it is still
+                    // allowed. Disabled + labeled rather than removed
+                    // from the list entirely, so the port numbering
+                    // stays consistent with the NAP's physical layout.
+                    const isOccupied = assignment.nap!.occupied_ports?.includes(n) ?? false;
+                    return (
+                      <TouchableOpacity
+                        key={n}
+                        style={styles.portOption}
+                        disabled={isOccupied}
+                        onPress={() => {
+                          setPortNumber(n);
+                          setPortModalVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={
+                            isOccupied
+                              ? styles.portOptionTextDisabled
+                              : n === portNumber
+                              ? styles.portOptionTextSelected
+                              : styles.portOptionText
+                          }
+                        >
+                          Port {n}{isOccupied ? " · In use" : ""}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
               </ScrollView>
               <TouchableOpacity
                 style={styles.portClearRow}
@@ -927,6 +947,7 @@ const styles = StyleSheet.create({
   },
   portOptionText: { color: colors.textMuted, fontSize: 15 },
   portOptionTextSelected: { color: colors.primary, fontSize: 15, fontWeight: "700" },
+  portOptionTextDisabled: { color: colors.textMuted, fontSize: 15, opacity: 0.4 },
   napOption: {
     flexDirection: "row",
     alignItems: "center",
