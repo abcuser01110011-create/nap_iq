@@ -999,6 +999,22 @@ def complete_assignment(assignment_id):
                 subscriber_code=f"PENDING-{assignment.id}",
                 full_name=service_request.full_name or "Walk-in customer",
                 address=service_request.address,
+                # The GeoMap only draws a subscriber's marker/connector
+                # line when it has coordinates (see napmap.js's
+                # `if (subscriber.latitude == null ...) return;` guard) —
+                # a walk-in ticket's own `service_request.latitude/
+                # longitude` are usually unset (that modal never
+                # collects them, see quick_add_request()'s docstring),
+                # but `assignment.pin_latitude/pin_longitude` are the
+                # technician's actual on-site pin, already required
+                # before an installation can be completed (Phase 28),
+                # so they're always available here and are exactly
+                # where this customer really is. Falls back to the
+                # service request's own coordinates on the off chance
+                # a pin is somehow missing, rather than leaving the
+                # new subscriber un-mappable.
+                latitude=assignment.pin_latitude or service_request.latitude,
+                longitude=assignment.pin_longitude or service_request.longitude,
                 contact_number=service_request.contact_number,
                 plan_type=service_request.plan_label,
                 status="active",
