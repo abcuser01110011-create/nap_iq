@@ -436,28 +436,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
           </View>
         )}
 
-        {(canEditNotes || isClosed) && assignment.nap && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Port number</Text>
-            {canEditNotes ? (
-              <TouchableOpacity
-                style={styles.dropdownField}
-                onPress={() => setPortModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Text style={portNumber != null ? styles.dropdownValue : styles.dropdownPlaceholder}>
-                  {portNumber != null ? `Port ${portNumber}` : "Select a port (optional)"}
-                </Text>
-                <Text style={styles.dropdownChevron}>{"\u25BE"}</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.notesText}>
-                {portNumber != null ? `Port ${portNumber}` : "No port recorded."}
-              </Text>
-            )}
-          </View>
-        )}
-
         <Modal
           visible={portModalVisible}
           transparent
@@ -611,6 +589,36 @@ export default function JobDetailScreen({ route, navigation }: any) {
             )}
           </View>
         )}
+
+        {/* Only shown once the technician has pinned their on-site
+            location above — a port pick doesn't make sense before
+            that, since pinning is how we know they're actually at
+            the NAP. */}
+        {isInstallation &&
+          (canEditNotes || isClosed) &&
+          assignment.nap &&
+          assignment.pin_latitude != null &&
+          assignment.pin_longitude != null && (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Port number</Text>
+              {canEditNotes ? (
+                <TouchableOpacity
+                  style={styles.dropdownField}
+                  onPress={() => setPortModalVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={portNumber != null ? styles.dropdownValue : styles.dropdownPlaceholder}>
+                    {portNumber != null ? `Port ${portNumber}` : "Select a port (optional)"}
+                  </Text>
+                  <Text style={styles.dropdownChevron}>{"\u25BE"}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.notesText}>
+                  {portNumber != null ? `Port ${portNumber}` : "No port recorded."}
+                </Text>
+              )}
+            </View>
+          )}
 
         <View style={styles.actions}>
           {canAccept && (
