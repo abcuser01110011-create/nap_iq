@@ -827,6 +827,17 @@ def link_nap(assignment_id):
             409,
         )
 
+    # If this is actually changing an already-linked NAP (not the
+    # first link) — e.g. a mistouch correction from the Job Detail
+    # screen's NAP field — any previously chosen port_number is a
+    # physical port on the OLD NAP hardware. Leaving it in place after
+    # switching NAPs would silently misrepresent which port was
+    # serviced, so it's cleared here rather than carried over just
+    # because it happens to still be in range for the new NAP's
+    # total_ports.
+    if assignment.service_request.requested_nap_id != nap.id:
+        assignment.port_number = None
+
     assignment.service_request.requested_nap_id = nap.id
     db.session.commit()
 

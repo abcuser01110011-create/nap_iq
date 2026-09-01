@@ -102,6 +102,15 @@ export default function JobDetailScreen({ route, navigation }: any) {
   // reasoning as the photo above — a stale queued fix would be
   // actively misleading here).
   const isInstallation = assignment.job_type === "installation";
+  // NAP linking / port picking only make sense for a genuine "New
+  // installation" ticket (connecting a subscriber into a free port on
+  // an existing NAP) — an "Add NAP" ticket (installing the NAP box
+  // itself, see REQUEST_TYPE_LABELS in statusLabels.ts) is also
+  // `job_type === "installation"` but has no subscriber port to
+  // record, so it's narrower than isInstallation above rather than
+  // replacing it (pin-location/photo still apply to both types).
+  const isNewInstallationTicket =
+    isInstallation && assignment.service_request?.request_type === "new_installation";
   const [pinCapturing, setPinCapturing] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
 
@@ -246,7 +255,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
       // Now that we have a location, go straight to "here's what's
       // nearby" instead of leaving the technician to find that
       // themselves.
-      if (isInstallation && result.assignment.nap == null) {
+      if (isNewInstallationTicket && result.assignment.nap == null) {
         handleFindNearbyNaps();
       }
     } catch (err: any) {
@@ -293,6 +302,13 @@ export default function JobDetailScreen({ route, navigation }: any) {
     try {
       const result = await client.technician.linkNap(assignment.id, nap.id);
       applyAssignmentUpdate(result.assignment);
+      // The server clears port_number when the linked NAP actually
+      // changes (see link_nap() in api_v1/technician.py) — mirror
+      // that locally too, since the port-sync effect above only ever
+      // pulls FROM the server when local state is already null, and
+      // won't overwrite a port the technician had already picked
+      // in this session.
+      setPortNumber(result.assignment.port_number ?? null);
       setNapModalVisible(false);
     } catch (err: any) {
       setNearbyNapsError(
@@ -658,7 +674,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
             linked, this card disappears and the Port number card
             below takes over. Not shown for a closed job with no NAP
             ever linked (nothing left to do). */}
-        {isInstallation &&
+        {isNewInstallationTicket &&
           canEditNotes &&
           assignment.pin_latitude != null &&
           assignment.pin_longitude != null &&
@@ -717,8 +733,10 @@ export default function JobDetailScreen({ route, navigation }: any) {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.portOptionText}>
                           {nap.nap_code} — {nap.name}
-                          {nap.is_recommended ? "  ★ Nearest" : ""}
                         </Text>
+                        {nap.is_recommended && (
+                          <Text style={styles.nearestBadge}>★ Nearest</Text>
+                        )}
                         <Text style={styles.napOptionSubtext}>
                           {nap.distance_km.toFixed(2)} km away · {nap.available_ports}/{nap.total_ports} ports free
                         </Text>
@@ -735,14 +753,34 @@ export default function JobDetailScreen({ route, navigation }: any) {
         {/* Only shown once the technician has pinned their on-site
             location above — a port pick doesn't make sense before
             that, since pinning is how we know they're actually at
-            the NAP. */}
-        {isInstallation &&
+            the NAP. isNewInstallationTicket (not the broader
+            isInstallation) — an "Add NAP" ticket has no subscriber
+            port to record. */}
+        {isNewInstallationTicket &&
           (canEditNotes || isClosed) &&
           assignment.nap &&
           assignment.pin_latitude != null &&
           assignment.pin_longitude != null && (
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>Port number</Text>
+              <Text style={styles.cardLabel}>NAP</Text>
+              {canEditNotes ? (
+                <TouchableOpacity
+                  style={styles.dropdownField}
+                  onPress={handleFindNearbyNaps}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dropdownValue}>
+                    {assignment.nap.nap_code} — {assignment.nap.name}
+                  </Text>
+                  <Text style={styles.dropdownChevron}>{"\u25BE"}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.notesText}>
+                  {assignment.nap.nap_code} — {assignment.nap.name}
+                </Text>
+              )}
+
+              <Text style={[styles.cardLabel, styles.cardLabelSpaced]}>Port number</Text>
               {canEditNotes ? (
                 <TouchableOpacity
                   style={styles.dropdownField}
@@ -833,6 +871,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 10,
   },
+  cardLabelSpaced: { marginTop: 18 },
   infoRow: { marginBottom: 8 },
   infoLabel: { color: colors.textFaint, fontSize: 12 },
   infoValue: { color: colors.text, fontSize: 14, fontWeight: "600", marginTop: 2 },
@@ -897,6 +936,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   napOptionSubtext: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
+  nearestBadge: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 4,
+  },
   portClearRow: { paddingVertical: 12, alignItems: "center" },
   portClearText: { color: colors.danger, fontSize: 14, fontWeight: "600" },
   secondaryButton: {
