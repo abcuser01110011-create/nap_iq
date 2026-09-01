@@ -287,15 +287,75 @@ def report_issue():
             # Status/issue_code are left untouched -- this is the same
             # ticket, not a new one, so it keeps its place in the
             # existing pending/assigned/in_progress workflow.
+            #
+            # Bug fix: an Assigned Team picked on *this* submission was
+            # previously dropped entirely on the merge path -- only the
+            # brand-new-issue branch below ever called
+            # _dispatch_field_assistant(), so re-reporting for a
+            # subscriber who already had an open issue silently folded
+            # the new report's text into that issue but never created
+            # the Assignment the admin just picked in the modal. The
+            # field assistant would never see the job, with no error
+            # shown -- the request still came back "success". Only
+            # dispatches if the issue doesn't already have an open
+            # assignment (this merge path isn't the Reassign action;
+            # an issue that's already dispatched keeps its existing
+            # assignment untouched, same as before this fix).
+            current_open_assignment = Assignment.query.filter(
+                Assignment.technical_issue_id == existing_issue.id,
+                Assignment.status.in_(_OPEN_ASSIGNMENT_STATUSES),
+            ).first()
+            already_dispatched = current_open_assignment is not None
+            newly_dispatched = False
+            # Set whenever an Assigned Team was picked on *this*
+            # submission but couldn't be applied because the issue
+            # already has an open assignment -- previously this was
+            # dropped with no indication at all (see the "Bug fix"
+            # note above this block): the response still said
+            # "success" and the admin had no way to tell their pick
+            # was ignored. Now surfaced in the message below so the
+            # admin knows to use Reassign (on the Dispatch board or
+            # this issue's own page) instead, if that's what they
+            # actually wanted.
+            ignored_team_pick = None
+            if not already_dispatched:
+                assigned_team_id = request.form.get("assigned_team_id")
+                if assigned_team_id:
+                    _dispatch_field_assistant(existing_issue, assigned_team_id)
+                    newly_dispatched = existing_issue.status == "assigned"
+            else:
+                assigned_team_id = request.form.get("assigned_team_id")
+                if assigned_team_id and str(current_open_assignment.technician_id) != str(assigned_team_id):
+                    picked = Technician.query.get(assigned_team_id)
+                    ignored_team_pick = picked.full_name if picked else "the selected field assistant"
             notify_issue_updated(existing_issue)
             db.session.commit()
+
+            message = f"Issue '{existing_issue.issue_code}' was updated with this report."
+            if newly_dispatched:
+                message += " A field assistant was dispatched."
+            elif ignored_team_pick:
+                current_name = current_open_assignment.technician.full_name if current_open_assignment.technician else "its current assignee"
+                message += (
+                    f" Note: this ticket already has an open assignment ({current_name}), "
+                    f"so {ignored_team_pick} was NOT dispatched — use Reassign if you want to "
+                    "change who's on it."
+                )
 
             return (
                 jsonify(
                     {
                         "status": "success",
                         "updated": True,
-                        "message": f"Issue '{existing_issue.issue_code}' was updated with this report.",
+                        "message": message,
+                        # True whenever the merge path above skipped a
+                        # newly-picked Assigned Team because the
+                        # ticket was already dispatched -- lets the
+                        # GeoMap modal (tickets.js) show this as a
+                        # warning toast instead of the plain success
+                        # one, same "pin_error"-style flag pattern
+                        # already used elsewhere in this route.
+                        "assignment_ignored": ignored_team_pick is not None,
                         "issue": {
                             "id": existing_issue.id,
                             "issue_code": existing_issue.issue_code,

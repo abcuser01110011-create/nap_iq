@@ -918,7 +918,18 @@
             .then(({ response, payload }) => {
                 if (response.ok && payload.status === "success") {
                     modalInstance.hide();
-                    showTicketSuccessToast("Ticket Successfully Created!");
+                    if (payload.assignment_ignored) {
+                        // The Assigned Team picked on this submission
+                        // wasn't applied -- the ticket merged into an
+                        // already-dispatched issue for this subscriber
+                        // (see issues.py's report_issue() merge path).
+                        // A plain success toast would hide that from
+                        // the admin, so show the real message as a
+                        // warning instead.
+                        showMapAlert("warning", payload.message);
+                    } else {
+                        showTicketSuccessToast("Ticket Successfully Created!");
+                    }
                     // Tells napmap.js (a separate script) to refresh
                     // immediately rather than waiting for its background
                     // timer/tab-focus refresh -- so the priority just set
