@@ -256,6 +256,19 @@ def geomap():
     marker popup. An unrecognized `navigate_type` or unknown/foreign
     id simply selects nothing; the map still loads normally.
 
+    Phase 34 (admin "Navigate" on a completed Service Request): adds
+    `service_request` as a fourth accepted `navigate_type` — the
+    "Navigate" button on service_requests/form.html's read-only view,
+    shown once a request is 'completed' (installation/add_nap tickets
+    don't reach the technical_issues table, so they were never
+    reachable via `navigate_type=issue`). Service requests aren't
+    preloaded into any in-memory dataset the way NAPs/subscribers/
+    issues are, so unlike the other three, napmap.js fetches this
+    one's location on demand (from the existing
+    GET /api/service-requests/<id>/recommend-nap endpoint) instead of
+    looking it up client-side — see focusNavigationFromQueryParam()'s
+    "service_request" branch.
+
     Phase 14 (70%, technician dispatch integration): also resolves the
     signed-in user's own Technician profile id (if any) and passes it
     to the template as `own_technician_id`, so `nav-technician-origin.js`
@@ -284,7 +297,7 @@ def geomap():
     recommend_request_id = request.args.get("recommend_request_id", type=int)
     navigate_type = request.args.get("navigate_type", "").strip()
     navigate_id = request.args.get("navigate_id", type=int)
-    if navigate_type not in ("nap", "subscriber", "issue"):
+    if navigate_type not in ("nap", "subscriber", "issue", "service_request"):
         navigate_type = ""
 
     own_technician_id = None

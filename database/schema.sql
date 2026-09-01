@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS service_requests (
                           NOT NULL,
     subscriber_id     INT,
     requested_nap_id  INT,
-    status            ENUM('pending', 'approved', 'scheduled', 'completed', 'rejected')
+    status            ENUM('pending', 'approved', 'scheduled', 'completed', 'rejected', 'closed')
                           NOT NULL DEFAULT 'pending',
     -- Same low/medium/high/critical scale as technical_issues.priority
     -- below. Nullable -- only the GeoMap quick-create modal collects

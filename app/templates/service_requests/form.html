@@ -84,7 +84,7 @@
     read-only, still Approve/Reject as the only actions, still only
     offered while 'pending'.
 #}
-{% set status_colors = {'pending': '#8890a0', 'approved': '#2563eb', 'scheduled': '#7c3aed', 'completed': '#15803d', 'rejected': '#dc2626'} %}
+{% set status_colors = {'pending': '#8890a0', 'approved': '#2563eb', 'scheduled': '#7c3aed', 'completed': '#15803d', 'rejected': '#dc2626', 'closed': '#111827'} %}
 <div class="sr-doc-wrapper">
     <div class="sr-doc">
         <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-watermark" alt="" aria-hidden="true">
@@ -261,6 +261,34 @@
     </form>
 </div>
 <script src="{{ url_for('static', filename='js/service-request-approve.js') }}"></script>
+{% elif service_request.status == 'completed' %}
+{#
+    Phase 34: the installation/add_nap counterpart to issues/view.html's
+    "resolved -> Close Issue" block. A technician's own completion
+    (api_v1/technician.py's complete_assignment()) is what gets a
+    request to 'completed' in the first place; this is the
+    administrator's own deliberate sign-off on top of that, and the
+    "Navigate" link that sends the admin to the exact spot the job was
+    done at (see naps.geomap()'s navigate_type=service_request docs
+    and napmap.js's focusServiceRequestFromNavigate()). Navigate is
+    only offered when this request actually has coordinates on file —
+    same nullable-latitude/longitude guard issues/view.html uses.
+#}
+<div class="d-flex justify-content-center gap-2 mt-4">
+    {% if service_request.latitude is not none and service_request.longitude is not none %}
+    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=service_request.id) }}"
+       class="btn btn-outline-success">
+        <i class="bi bi-signpost-split me-1"></i>Navigate to Location
+    </a>
+    {% endif %}
+    <form method="post" action="{{ url_for('service_requests.close_request', request_id=service_request.id) }}"
+          onsubmit="return confirm('Close this service request? This confirms the work is complete and ends the workflow.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-dark">
+            <i class="bi bi-lock-fill me-1"></i>Close Request
+        </button>
+    </form>
+</div>
 {% endif %}
 
 {% else %}

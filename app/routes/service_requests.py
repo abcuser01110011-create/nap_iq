@@ -748,6 +748,32 @@ def reject_request(request_id):
     return redirect(request.referrer or url_for("service_requests.list_requests"))
 
 
+@service_requests_bp.route("/<int:request_id>/close", methods=["POST"])
+@role_required("administrator")
+def close_request(request_id):
+    """Completes the same Pending -> ... -> Completed -> Closed
+    workflow technical_issues already has (see issues.close_issue()).
+    Only valid once a request has already reached 'completed' — a
+    technician marking their assignment complete
+    (api_v1/technician.py's complete_assignment()) is what gets an
+    installation/add_nap request there in the first place; this is a
+    distinct, deliberate administrator sign-off on top of that, not
+    something a technician does themselves.
+    """
+    service_request = ServiceRequest.query.get_or_404(request_id)
+
+    if service_request.status != "completed":
+        flash("Only a completed service request can be closed.", "warning")
+        return redirect(request.referrer or url_for("service_requests.edit_request", request_id=service_request.id))
+
+    service_request.status = "closed"
+    _notify_status_change(service_request)
+    db.session.commit()
+
+    flash("Service request marked closed.", "success")
+    return redirect(url_for("service_requests.edit_request", request_id=service_request.id))
+
+
 @service_requests_bp.route("/<int:request_id>/recommend-nap")
 @role_required("administrator")
 def recommend_nap(request_id):

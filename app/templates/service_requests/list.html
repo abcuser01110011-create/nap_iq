@@ -50,7 +50,7 @@
                 <label class="form-label small text-muted mb-1">Status</label>
                 <select name="status" class="form-select">
                     <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in ['pending', 'approved', 'scheduled', 'completed', 'rejected'] %}
+                    {% for s in ['pending', 'approved', 'scheduled', 'completed', 'closed', 'rejected'] %}
                     <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
                     {% endfor %}
                 </select>
@@ -86,6 +86,7 @@
                     'approved': 'disp-badge-assigned',
                     'scheduled': 'disp-badge-medium',
                     'completed': 'disp-badge-resolved',
+                    'closed': 'disp-badge-closed',
                     'rejected': 'disp-badge-critical'
                 } %}
                 {% for r in requests %}

@@ -1752,11 +1752,13 @@
      * Phase 13 (65%, navigation destination panels): reads the
      * `?navigate_type=`/`?navigate_id=` pair naps.geomap() rendered
      * onto #napMap's data attributes (see map.html) — set by the
-     * "Navigate" button on naps/view.html, subscribers/view.html, and
-     * issues/view.html — and, if present, looks the real entity up in
-     * whichever in-memory dataset already holds it (allNaps/
-     * allIssues/allSubscribers), pans/opens its popup the same way a
-     * search result or a legacy `?issue_id=` link does, and — the
+     * "Navigate" button on naps/view.html, subscribers/view.html,
+     * issues/view.html, and (Phase 34) service_requests/form.html —
+     * and, if present, looks the real entity up in whichever
+     * in-memory dataset already holds it (allNaps/allIssues/
+     * allSubscribers; service_request is the one exception — see its
+     * branch below), pans/opens its popup the same way a search
+     * result or a legacy `?issue_id=` link does, and — the
      * part those two don't do — immediately arms it as the active
      * navigation destination via NapIQNavigation, using the exact
      * same buildDestinationFrom*() helper a "Set as destination"
@@ -1798,10 +1800,52 @@
                 focusSubscriber(subscriber);
                 destination = buildDestinationFromSubscriber(subscriber);
             }
+        } else if (navigateType === "service_request") {
+            // Service requests aren't preloaded into any in-memory
+            // dataset the way NAPs/issues/subscribers are (see this
+            // function's own docstring), so this branch fetches its
+            // location on demand instead of looking it up client-side,
+            // then falls through the same plot + setDestination path
+            // as focusNapRecommendationFromQueryParam() above.
+            focusServiceRequestFromNavigate(entityId);
+            return;
         }
 
         if (!destination || !window.NapIQNavigation) return;
         window.NapIQNavigation.setDestination(destination);
+    }
+
+    /**
+     * Phase 34: the `navigate_type=service_request` counterpart to the
+     * nap/issue/subscriber branches in focusNavigationFromQueryParam()
+     * above. Reuses the same GET /api/service-requests/<id>/
+     * recommend-nap endpoint focusNapRecommendationFromQueryParam()
+     * already calls (it returns customer_latitude/customer_longitude
+     * for any request that has a location on file, recommended NAP or
+     * not), plots the same single-marker "recommendationLayer" pin
+     * that flow already builds, and additionally arms it as the
+     * active NapIQNavigation destination — the one thing that fetch's
+     * original caller never needed to do.
+     */
+    async function focusServiceRequestFromNavigate(requestId) {
+        try {
+            const response = await fetch("/api/service-requests/" + requestId + "/recommend-nap");
+            if (!response.ok) throw new Error("Request failed: " + response.status);
+            const data = await response.json();
+            plotNapRecommendation(data);
+
+            if (!window.NapIQNavigation) return;
+            window.NapIQNavigation.setDestination({
+                id: "service_request-" + data.service_request_id,
+                type: "service_request",
+                label: "Service Request #" + data.service_request_id,
+                subtitle: "Customer location",
+                position: { lat: data.customer_latitude, lng: data.customer_longitude },
+            });
+        } catch (err) {
+            console.error("Failed to load service request location:", err);
+            showAlert("danger", "Could not load this service request's location.");
+        }
     }
 
     /**

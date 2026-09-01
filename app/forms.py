@@ -1185,6 +1185,7 @@ class ServiceRequestForm(FlaskForm):
             ("scheduled", "Scheduled"),
             ("completed", "Completed"),
             ("rejected", "Rejected"),
+            ("closed", "Closed"),
         ],
         default="pending",
         validators=[DataRequired()],

@@ -336,12 +336,20 @@ class ServiceRequest(db.Model):
     requested_nap_id = db.Column(db.Integer, db.ForeignKey("naps.id"), nullable=True)
     status = db.Column(
         db.Enum(
-            "pending", "approved", "scheduled", "completed", "rejected",
+            "pending", "approved", "scheduled", "completed", "rejected", "closed",
             name="service_request_status",
         ),
         nullable=False,
         default="pending",
     )
+    # "closed": the administrator sign-off step on top of "completed" —
+    # same two-step "technician finishes the work -> admin confirms and
+    # closes" pattern technical_issues already has (see that model's
+    # status comment, and issues.close_issue()). A technician's own
+    # completion (api_v1/technician.py's complete_assignment()) is what
+    # gets a request to "completed" in the first place; only an admin,
+    # from the Service Requests screen, can move it on to "closed" —
+    # see service_requests.close_request() below.
     # Same "low"/"medium"/"high"/"critical" scale as
     # TechnicalIssue.priority above -- nullable since only the GeoMap
     # "+ Tickets" quick-create modal (New Installation and Add NAP)
