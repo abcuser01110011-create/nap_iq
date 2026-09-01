@@ -5,61 +5,80 @@
 {% block extra_head %}
 {% if mode == 'edit' %}
 <style>
-    /* Phase 31: printable-document styling for the read-only Service
-       Request review screen — scoped entirely under .sr-doc-wrapper
-       so it never leaks into the rest of the (dark-themed) dashboard.
-       Sized to A4 proportions (210mm x 297mm, ~794x1123px at 96dpi)
-       and rendered as a light "paper" card regardless of the active
-       dashboard theme, since this is meant to read like a printed/
-       exportable record, not a themed app screen. */
-    .sr-doc-wrapper { display: flex; justify-content: center; }
+    /* Phase 32: the read-only Service Request review screen re-themed
+       to match the rest of the (dark-capable) dashboard — same
+       --napiq-* tokens the sidebar/cards/modals use (see
+       dashboard.css / theme-dark.css) instead of a hardcoded white
+       "paper" look, and sized as a full-width dashboard panel instead
+       of a fixed A4 column so it doesn't sit as a narrow card in a
+       sea of empty background on wide screens. Every field is now
+       rendered as a boxed value (like the app's own form inputs /
+       the Service Order modal) rather than a thin underline, so the
+       extra detail this screen carries reads clearly at this larger
+       size. Content/markup is unchanged — this is styling only. */
+    .sr-doc-wrapper { display: block; }
     .sr-doc {
         position: relative;
         width: 100%;
-        max-width: 794px;
-        min-height: 1123px;
-        background: #ffffff;
-        color: #1b1f28;
-        border-radius: 0;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
-        padding: 56px 60px 40px;
+        max-width: 1180px;
+        margin: 0 auto;
+        background: var(--napiq-surface);
+        color: inherit;
+        border: 1px solid var(--napiq-border);
+        border-radius: 1rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, .12);
+        padding: 2.5rem 2.75rem 2rem;
         overflow: hidden;
     }
+    [data-bs-theme="dark"] .sr-doc { box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
     .sr-doc-watermark {
         position: absolute;
-        top: 260px;
+        top: 220px;
         left: 50%;
         transform: translateX(-50%);
-        width: 480px;
+        width: 520px;
         height: auto;
         object-fit: contain;
         opacity: .035;
         z-index: 0;
         pointer-events: none;
     }
+    [data-bs-theme="dark"] .sr-doc-watermark { filter: invert(1) brightness(1.8); opacity: .05; }
     .sr-doc-header, .sr-doc-section, .sr-doc-footer { position: relative; z-index: 1; }
     .sr-doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #0d2182; font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: var(--napiq-primary); font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
     .sr-doc-brand-logo { height: 40px; width: auto; object-fit: contain; flex: none; }
-    .sr-doc-title { font-size: 1.9rem; font-weight: 800; color: #14171f; margin-bottom: 2px; }
-    .sr-doc-subtitle { font-size: .95rem; color: #6b7280; font-weight: 500; }
-    .sr-doc-statusbox { border: 1.5px solid #dcdee6; border-radius: 0; padding: 10px 20px; text-align: center; min-width: 130px; }
-    .sr-doc-statusbox .label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #8890a0; }
-    .sr-doc-statusbox .value { font-weight: 700; margin-top: 2px; font-size: .95rem; }
-    .sr-doc-section { margin-top: 28px; }
-    .sr-doc-section-bar { display: flex; align-items: center; gap: 10px; background: #f3effc; padding: 9px 14px; border-radius: 0; margin-bottom: 18px; position: relative; z-index: 2; }
-    .sr-doc-section-bar .bar { width: 4px; height: 16px; background: #7c3aed; border-radius: 0; flex: none; }
-    .sr-doc-section-bar .title { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #2b2f3a; }
-    .sr-doc-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 18px; }
+    .sr-doc-title { font-size: 2.1rem; font-weight: 800; color: inherit; margin-bottom: 2px; }
+    .sr-doc-subtitle { font-size: 1rem; color: var(--napiq-text-muted); font-weight: 500; }
+    .sr-doc-statusbox { border: 1.5px solid var(--napiq-border); background: var(--napiq-bg); border-radius: .6rem; padding: 12px 24px; text-align: center; min-width: 150px; }
+    .sr-doc-statusbox .label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--napiq-text-muted); }
+    .sr-doc-statusbox .value { font-weight: 700; margin-top: 2px; font-size: 1.05rem; }
+    .sr-doc-section { margin-top: 32px; }
+    .sr-doc-section-bar { display: flex; align-items: center; gap: 10px; background: rgba(139, 92, 246, .12); padding: 10px 16px; border-radius: .5rem; margin-bottom: 20px; position: relative; z-index: 2; }
+    [data-bs-theme="dark"] .sr-doc-section-bar { background: rgba(139, 92, 246, .18); }
+    .sr-doc-section-bar .bar { width: 4px; height: 16px; background: var(--napiq-primary); border-radius: 2px; flex: none; }
+    .sr-doc-section-bar .title { font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: inherit; }
+    .sr-doc-row { display: flex; flex-wrap: wrap; gap: 28px; margin-bottom: 20px; }
     .sr-doc-row:last-child { margin-bottom: 0; }
-    .sr-doc-field { flex: 1 1 0; min-width: 160px; }
+    .sr-doc-field { flex: 1 1 0; min-width: 220px; }
     .sr-doc-field.full { flex: 1 1 100%; }
-    .sr-doc-field .flabel { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #8890a0; margin-bottom: 4px; }
-    .sr-doc-field .fvalue { font-size: .92rem; font-weight: 600; color: #1b1f28; padding-bottom: 8px; border-bottom: 1px solid #e3e5ea; min-height: 1.4em; }
-    .sr-doc-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e3e5ea; font-size: .72rem; color: #8890a0; font-style: italic; }
+    .sr-doc-field .flabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--napiq-text-muted); margin-bottom: 6px; }
+    .sr-doc-field .fvalue {
+        font-size: 1rem;
+        font-weight: 600;
+        color: inherit;
+        background: var(--napiq-bg);
+        border: 1px solid var(--napiq-border);
+        border-radius: .5rem;
+        padding: .7rem 1rem;
+        min-height: 2.6em;
+        display: flex;
+        align-items: center;
+    }
+    .sr-doc-footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--napiq-border); font-size: .78rem; color: var(--napiq-text-muted); font-style: italic; }
     @media (max-width: 820px) {
-        .sr-doc { padding: 36px 24px 28px; min-height: 0; }
-        .sr-doc-watermark { width: 300px; top: 260px; }
+        .sr-doc { padding: 1.75rem 1.25rem 1.5rem; }
+        .sr-doc-watermark { width: 300px; top: 220px; }
         .sr-doc-row { gap: 16px; }
     }
 </style>
