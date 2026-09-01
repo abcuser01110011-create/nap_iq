@@ -164,7 +164,7 @@
                             <a href="{{ url_for('service_requests.edit_request', request_id=req.id) }}" class="disp-primary-link">
                                 #{{ req.id }}
                             </a>
-                            <div class="disp-subtext">{{ req.request_type|replace('_', ' ')|capitalize }}</div>
+                            <div class="disp-subtext">{{ 'Nap Installation' if req.request_type == 'add_nap' else req.request_type|replace('_', ' ')|capitalize }}</div>
                         </td>
                         <td class="small">
                             {% if req.subscriber %}

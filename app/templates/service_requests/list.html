@@ -42,7 +42,7 @@
                 <select name="type" class="form-select">
                     <option value="" {% if not type_filter %}selected{% endif %}>All Types</option>
                     {% for t in ['new_installation', 'relocation', 'upgrade', 'disconnection', 'add_nap'] %}
-                    <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t|replace('_',' ')|capitalize }}</option>
+                    <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ 'Nap Installation' if t == 'add_nap' else t|replace('_',' ')|capitalize }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -93,7 +93,7 @@
                 <tr class="disp-row disp-row-clickable"
                     onclick="window.location='{{ url_for('service_requests.edit_request', request_id=r.id) }}';">
                     <td>
-                        <span class="disp-primary-link text-capitalize">{{ r.request_type|replace('_', ' ') }}</span>
+                        <span class="disp-primary-link text-capitalize">{{ 'Nap Installation' if r.request_type == 'add_nap' else r.request_type|replace('_', ' ') }}</span>
                     </td>
                     <td class="small">
                         {% if r.subscriber %}
