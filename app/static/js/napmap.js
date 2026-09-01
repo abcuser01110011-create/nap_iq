@@ -21,11 +21,34 @@
         pending: "#0d6efd",
     };
 
+    // "low" is tea green (#D0F0C0) rather than gray -- still reads as
+    // calm/low-urgency, but no longer visually disappears against the
+    // gray "inactive"/pending-work UI chrome around it the way a gray
+    // dot used to. STATUS_COLORS above is untouched (that's NAP
+    // status, a separate legend from issue priority).
     const PRIORITY_COLORS = {
-        low: "#6c757d",
+        low: "#d0f0c0",
         medium: "#ffc107",
         high: "#fd7e14",
         critical: "#dc3545",
+    };
+
+    // Display text for each priority value -- kept distinct from the
+    // raw value/PRIORITY_COLORS key (which stay "critical" everywhere
+    // else: filter checkboxes' `value`, the priority <select>s'
+    // `value`, and the database enum all still use "critical") so
+    // nothing but the label shown to a person needs to change.
+    // "critical" reads as "Urgent" everywhere a priority is shown as
+    // text on the map (marker labels, popups, the ticket details
+    // panel) -- same wording the Issues list/Dispatch Board/Reports
+    // pages and the mobile field-assistant app now use (see
+    // mobile/apps/app/src/screens/technician/statusLabels.ts's
+    // matching PRIORITY_LABELS).
+    const PRIORITY_LABELS = {
+        low: "Low",
+        medium: "Medium",
+        high: "High",
+        critical: "Urgent",
     };
 
     // How fast a priority-colored marker pulses, in seconds per pulse
@@ -1256,7 +1279,7 @@
         // deliberately fixed (not multiplied by the zoom-based icon
         // `scale`) so labels stay a constant, small on-screen size and
         // don't grow/overlap each other when zoomed in.
-        const labelText = priority ? String(priority).toUpperCase() : "";
+        const labelText = priority ? (PRIORITY_LABELS[priority] || String(priority)).toUpperCase() : "";
         const label = labelText
             ? '<div class="issue-marker-label" style="color:' + color + ';">' + labelText + "</div>"
             : "";
@@ -1402,7 +1425,7 @@
         setText("ticketDetailsCode", "TN " + String(issue.id).padStart(5, "0"));
         setText("ticketDetailsType", issue.issue_type);
         setText("ticketDetailsNap", issue.nap_code);
-        setText("ticketDetailsPriority", formatStatusLabel(issue.priority));
+        setText("ticketDetailsPriority", PRIORITY_LABELS[issue.priority] || formatStatusLabel(issue.priority));
         setText("ticketDetailsStatus", formatStatusLabel(issue.status));
         setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam);
         setText("ticketDetailsTechnicians", parsed.extras.technicians);
