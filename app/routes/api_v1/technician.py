@@ -972,6 +972,53 @@ def complete_assignment(assignment_id):
         subscriber = service_request.subscriber
         service_request.status = "completed"
 
+        # Bug fix: an "Add NAP" ("Nap Installation") ticket never had
+        # its actual Nap row created anywhere in the mobile completion
+        # flow, even though QuickAddNapRequestForm's and
+        # quick_add_nap_request()'s own docstrings say this is exactly
+        # where it's supposed to happen ("the real Nap row still gets
+        # created ... once the field assistant has actually installed
+        # it on site"). Without it, a mobile-completed add_nap
+        # assignment never became a real, mappable Nap, so it could
+        # never show up on the admin's GeoMap no matter how correctly
+        # everything else here ran -- same class of gap Phase 38 fixes
+        # for walk-in New Installation subscribers just below.
+        if service_request.request_type == "add_nap":
+            # planned_nap_code is only ever a display preview (see
+            # quick_add_nap_request()'s docstring) -- never reserved,
+            # so another NAP may have taken it by now. Fall back to
+            # freshly minting a free code rather than trusting it
+            # blindly, same "never trust a stale preview" reasoning as
+            # every other auto-increment code in this app.
+            nap_code = service_request.planned_nap_code
+            if not nap_code or Nap.query.filter_by(nap_code=nap_code).first() is not None:
+                candidate_number = Nap.query.count() + 1
+                nap_code = f"N-{candidate_number:03d}"
+                while Nap.query.filter_by(nap_code=nap_code).first() is not None:
+                    candidate_number += 1
+                    nap_code = f"N-{candidate_number:03d}"
+
+            total_ports = service_request.port_capacity or 8
+            nap = Nap(
+                nap_code=nap_code,
+                name=service_request.full_name or f"NAP {nap_code}",
+                address=service_request.address,
+                # This ticket type never collects its own lat/lng (see
+                # quick_add_nap_request()'s docstring) -- the
+                # technician's on-site pin, already required before
+                # completion (Phase 28), is the only real coordinate
+                # this NAP ever gets. Same fallback reasoning the
+                # walk-in-subscriber branch below uses for the same
+                # pin.
+                latitude=assignment.pin_latitude or service_request.latitude,
+                longitude=assignment.pin_longitude or service_request.longitude,
+                total_ports=total_ports,
+                used_ports=0,  # brand-new NAP, nothing connected yet
+                available_ports=total_ports,
+                status="active",
+            )
+            db.session.add(nap)
+
         # Phase 38: a walk-in "New Installation" ticket — created via
         # the GeoMap "+ Tickets" quick-create modal, or the full Add
         # Service Request page's walk-in path — is deliberately
