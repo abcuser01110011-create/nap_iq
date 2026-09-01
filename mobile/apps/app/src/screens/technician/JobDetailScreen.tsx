@@ -16,10 +16,11 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import { ApiError, type Assignment } from "@nap-iq/api-client";
+import { ApiError, type Assignment, type NearbyNap } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
+import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
 import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
@@ -103,6 +104,20 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const isInstallation = assignment.job_type === "installation";
   const [pinCapturing, setPinCapturing] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+
+  // NAP linking — install-only, and only relevant when this
+  // assignment's service request was dispatched with no NAP already
+  // set (assignment.nap is null; see nearby_naps()/link_nap() in
+  // api_v1/technician.py). Surfaced automatically right after a
+  // successful pin (see handlePinLocation below) so the technician
+  // doesn't have to hunt for it, but napModalVisible/handleFindNearbyNaps
+  // also let them reopen the list on demand (e.g. after dismissing it,
+  // or to pick a different NAP before completing).
+  const [napModalVisible, setNapModalVisible] = useState(false);
+  const [nearbyNapsList, setNearbyNapsList] = useState<NearbyNap[]>([]);
+  const [nearbyNapsLoading, setNearbyNapsLoading] = useState(false);
+  const [nearbyNapsError, setNearbyNapsError] = useState<string | null>(null);
+  const [linkingNapId, setLinkingNapId] = useState<number | null>(null);
 
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
@@ -227,6 +242,13 @@ export default function JobDetailScreen({ route, navigation }: any) {
 
       const result = await client.technician.pinAssignmentLocation(assignment.id, latitude, longitude);
       applyAssignmentUpdate(result.assignment);
+      // Dispatched with no NAP set (see the module-level note above)?
+      // Now that we have a location, go straight to "here's what's
+      // nearby" instead of leaving the technician to find that
+      // themselves.
+      if (isInstallation && result.assignment.nap == null) {
+        handleFindNearbyNaps();
+      }
     } catch (err: any) {
       if (err?.message === "TIMEOUT") {
         setPinError("Timed out waiting for a location fix. Try again, ideally outdoors with a clear view of the sky.");
@@ -237,6 +259,47 @@ export default function JobDetailScreen({ route, navigation }: any) {
       }
     } finally {
       setPinCapturing(false);
+    }
+  };
+
+  // Fetches nearest-suitable NAPs for this assignment's pinned
+  // location (see nearby_naps() in api_v1/technician.py) and opens
+  // the picker modal. Called automatically right after a pin when
+  // there's no NAP linked yet (see handlePinLocation above), and also
+  // wired to a manual "Find nearby NAPs" / "Change NAP" button so the
+  // technician can reopen or refresh the list on demand.
+  const handleFindNearbyNaps = async () => {
+    setNearbyNapsError(null);
+    setNearbyNapsLoading(true);
+    setNapModalVisible(true);
+    try {
+      const result = await client.technician.nearbyNaps(assignment.id);
+      setNearbyNapsList(result.naps);
+    } catch (err: any) {
+      setNearbyNapsError(
+        err instanceof ApiError ? err.body.error ?? "Couldn't load nearby NAPs." : "Couldn't load nearby NAPs."
+      );
+    } finally {
+      setNearbyNapsLoading(false);
+    }
+  };
+
+  // Links the tapped candidate to this assignment's service request
+  // (see link_nap() in api_v1/technician.py). The response's
+  // assignment.nap is what makes the Port number card below appear.
+  const handleLinkNap = async (nap: NearbyNap) => {
+    setLinkingNapId(nap.id);
+    setNearbyNapsError(null);
+    try {
+      const result = await client.technician.linkNap(assignment.id, nap.id);
+      applyAssignmentUpdate(result.assignment);
+      setNapModalVisible(false);
+    } catch (err: any) {
+      setNearbyNapsError(
+        err instanceof ApiError ? err.body.error ?? "Couldn't link that NAP. Try again." : "Couldn't link that NAP. Try again."
+      );
+    } finally {
+      setLinkingNapId(null);
     }
   };
 
@@ -548,7 +611,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Pin location</Text>
             {assignment.pin_latitude != null && assignment.pin_longitude != null ? (
-              <JobLocationMap
+              <PinLocationMap
                 latitude={assignment.pin_latitude}
                 longitude={assignment.pin_longitude}
                 label="Pinned location"
@@ -589,6 +652,79 @@ export default function JobDetailScreen({ route, navigation }: any) {
             )}
           </View>
         )}
+
+        {/* Only relevant when the pin is set but this installation
+            has no NAP linked yet (assignment.nap null) — once one's
+            linked, this card disappears and the Port number card
+            below takes over. Not shown for a closed job with no NAP
+            ever linked (nothing left to do). */}
+        {isInstallation &&
+          canEditNotes &&
+          assignment.pin_latitude != null &&
+          assignment.pin_longitude != null &&
+          !assignment.nap && (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>NAP</Text>
+              <Text style={styles.notesText}>No NAP linked yet for this installation.</Text>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handleFindNearbyNaps}
+                disabled={nearbyNapsLoading}
+              >
+                <Text style={styles.secondaryButtonText}>Find nearby NAPs</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+        <Modal
+          visible={napModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setNapModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setNapModalVisible(false)}
+          >
+            <View style={styles.portModalCard}>
+              <Text style={styles.modalTitle}>Nearby NAPs</Text>
+              {nearbyNapsLoading ? (
+                <View style={styles.photoUploadingRow}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.photoUploadingText}>Looking up nearby NAPs…</Text>
+                </View>
+              ) : nearbyNapsList.length === 0 ? (
+                <Text style={styles.notesText}>
+                  No active NAP with a free port was found near your pinned location.
+                </Text>
+              ) : (
+                <ScrollView style={styles.portList}>
+                  {nearbyNapsList.map((nap) => (
+                    <TouchableOpacity
+                      key={nap.id}
+                      style={styles.napOption}
+                      onPress={() => handleLinkNap(nap)}
+                      disabled={linkingNapId != null}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.portOptionText}>
+                          {nap.nap_code} — {nap.name}
+                          {nap.is_recommended ? "  ★ Nearest" : ""}
+                        </Text>
+                        <Text style={styles.napOptionSubtext}>
+                          {nap.distance_km.toFixed(2)} km away · {nap.available_ports}/{nap.total_ports} ports free
+                        </Text>
+                      </View>
+                      {linkingNapId === nap.id && <ActivityIndicator size="small" color={colors.primary} />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+              {nearbyNapsError && <Text style={styles.error}>{nearbyNapsError}</Text>}
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Only shown once the technician has pinned their on-site
             location above — a port pick doesn't make sense before
@@ -746,6 +882,15 @@ const styles = StyleSheet.create({
   },
   portOptionText: { color: colors.textMuted, fontSize: 15 },
   portOptionTextSelected: { color: colors.primary, fontSize: 15, fontWeight: "700" },
+  napOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  napOptionSubtext: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
   portClearRow: { paddingVertical: 12, alignItems: "center" },
   portClearText: { color: colors.danger, fontSize: 14, fontWeight: "600" },
   secondaryButton: {

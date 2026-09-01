@@ -83,8 +83,9 @@ except ImportError:  # pragma: no cover - exercised only if the dep is missing
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
-from app.models import Assignment, Technician
-from app.nap_status import sync_nap_status
+from app.models import Assignment, Nap, Technician
+from app.nap_recommendation import recommend_naps
+from app.nap_status import slot_usage, sync_nap_status
 from app.notifications_utils import notify, notify_issue_status_change
 
 api_v1_technician_bp = Blueprint(
@@ -708,6 +709,125 @@ def pin_assignment_location(assignment_id):
 
     assignment.pin_latitude = latitude
     assignment.pin_longitude = longitude
+    db.session.commit()
+
+    return jsonify(assignment=_serialize_assignment(assignment)), 200
+
+
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/nearby-naps", methods=["GET"])
+@jwt_role_required("field_assistant")
+def nearby_naps(assignment_id):
+    """Nearest-suitable-NAP candidates for the technician's own pinned
+    on-site location, so they can link the right NAP themselves on an
+    installation the office dispatched with none set (see
+    link_nap() below). Reuses the same recommend_naps() engine the
+    admin's "Recommend NAP" page (app/routes/service_requests.py's
+    recommend_nap()) already uses — active status, a free port, and
+    (if configured) within Settings > App Settings' Max Connection
+    Radius — just measured from the technician's GPS pin instead of
+    the service request's original customer-location field, since the
+    technician is the one actually standing at the install site right
+    now.
+
+    Requires a location already pinned (pin_assignment_location()
+    above) — there's nothing to measure distance from otherwise, so
+    this 409s rather than silently falling back to some other
+    coordinate.
+    """
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.service_request_id is None:
+        return jsonify(error="Linking a NAP only applies to an installation assignment."), 409
+
+    if assignment.pin_latitude is None or assignment.pin_longitude is None:
+        return jsonify(error="Pin your location before looking up nearby NAPs."), 409
+
+    recommendations = recommend_naps(float(assignment.pin_latitude), float(assignment.pin_longitude))
+
+    return (
+        jsonify(
+            naps=[
+                {
+                    "id": row["nap"].id,
+                    "nap_code": row["nap_code"],
+                    "name": row["name"],
+                    "distance_km": row["distance_km"],
+                    "available_ports": row["available_ports"],
+                    "total_ports": row["total_ports"],
+                    "is_recommended": row["is_recommended"],
+                }
+                for row in recommendations
+            ]
+        ),
+        200,
+    )
+
+
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/link-nap", methods=["POST"])
+@jwt_role_required("field_assistant")
+def link_nap(assignment_id):
+    """Lets the technician set `service_request.requested_nap_id`
+    themselves, from the nearby_naps() list above — the field
+    counterpart to the admin's assign_nap()
+    (app/routes/service_requests.py), for an installation that was
+    dispatched with no NAP linked yet. Same field, same "the only
+    thing this route does" contract as that one; doesn't touch
+    service_request.status (assign_nap() advances 'approved' ->
+    'scheduled', but this request is already scheduled/dispatched by
+    the time a technician has an assignment for it, so there's no
+    status step to auto-advance here).
+
+    Only valid once a location has been pinned (same reasoning as
+    nearby_naps() above), and only while the assignment is still
+    'accepted'/'in_progress' — same window save_notes()/
+    pin_assignment_location() already use.
+    """
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.service_request_id is None:
+        return jsonify(error="Linking a NAP only applies to an installation assignment."), 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return jsonify(error="A NAP can only be linked on an assignment you've accepted or started."), 409
+
+    if assignment.pin_latitude is None or assignment.pin_longitude is None:
+        return jsonify(error="Pin your location before linking a NAP."), 409
+
+    data = request.get_json(silent=True) or {}
+    nap_id = data.get("nap_id")
+    nap = Nap.query.get(nap_id) if nap_id else None
+    if nap is None:
+        return jsonify(error="nap_id is required and must reference a real NAP."), 400
+
+    # Re-checked here rather than trusted from the nearby_naps() list
+    # the app fetched a moment ago — same "never trust a stale
+    # client-side snapshot of a NAP's status/ports" reasoning the
+    # admin's assign_nap() route already documents.
+    _used, live_available = slot_usage(nap)
+    if nap.status != "active" or live_available <= 0:
+        return (
+            jsonify(
+                error=(
+                    f"NAP '{nap.nap_code}' is no longer active with available "
+                    "ports — refresh nearby NAPs and try again."
+                )
+            ),
+            409,
+        )
+
+    assignment.service_request.requested_nap_id = nap.id
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
