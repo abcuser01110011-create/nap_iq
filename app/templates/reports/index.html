@@ -5,6 +5,24 @@
 
 {% block content %}
 
+{# Priority display class/label -- "low" gets its own tea-green badge
+   class (disp-badge-priority-low, app/static/css/dashboard.css)
+   rather than the generic disp-badge-low, and "critical" reads as
+   "Urgent" everywhere a priority is shown as text, matching the
+   GeoMap and the Issues list (app/templates/issues/list.html). #}
+{% set priority_badge_classes = {
+    'low': 'disp-badge-priority-low',
+    'medium': 'disp-badge-medium',
+    'high': 'disp-badge-high',
+    'critical': 'disp-badge-critical',
+} %}
+{% set priority_labels = {
+    'low': 'Low',
+    'medium': 'Medium',
+    'high': 'High',
+    'critical': 'Urgent',
+} %}
+
 {# ---------------------------------------------------------------- #}
 {# Tab nav — plain GET links to ?report=<key>. Deliberately NOT      #}
 {# Bootstrap's JS tab-pane toggling: only the active report's data   #}
@@ -163,8 +181,8 @@
                             <div class="disp-subtext">{{ issue.issue_type|replace('_', ' ')|capitalize }}</div>
                         </td>
                         <td>
-                            <span class="disp-badge disp-badge-{{ issue.priority }}">
-                                {{ issue.priority|capitalize }}
+                            <span class="disp-badge {{ priority_badge_classes.get(issue.priority, 'disp-badge-priority-low') }}">
+                                {{ priority_labels.get(issue.priority, issue.priority|capitalize) }}
                             </span>
                         </td>
                         <td class="small">{% if issue.subscriber %}<span class="disp-code-pill">{{ issue.subscriber.subscriber_code }}</span> {{ issue.subscriber.full_name }}{% else %}<span class="disp-subtext">—</span>{% endif %}</td>

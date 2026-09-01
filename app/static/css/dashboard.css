@@ -18,6 +18,16 @@
     --napiq-warning: #fd7e14;
     --napiq-danger: #dc3545;
     --napiq-info: #0dcaf0;
+
+    /* "Low" issue priority: tea green, matching the GeoMap's
+       PRIORITY_COLORS.low (app/static/js/napmap.js) -- kept as its own
+       token (not the shared --napiq-text-muted gray) so it doesn't
+       double as the generic neutral/inactive/offline color the way
+       .disp-badge-low is reused elsewhere (technician status, role
+       badges, etc.). --napiq-tea-green-text is a darker shade of the
+       same hue for legible text against the pale badge background. */
+    --napiq-tea-green: #d0f0c0;
+    --napiq-tea-green-text: #4f7942;
 }
 
 .dash-body {
@@ -1388,6 +1398,27 @@
 .disp-badge-inactive {
     background: rgba(107, 114, 128, 0.15);
     color: var(--napiq-text-muted);
+}
+
+/* Issue priority "Low" specifically (issues/list.html, issues/view.html)
+   -- deliberately its own class rather than reusing .disp-badge-low
+   above, since that shared class also backs several unrelated
+   neutral/gray badges (technician "offline" status, generic role
+   badges, etc.) that should stay gray. */
+.disp-badge-priority-low {
+    background: rgba(208, 240, 192, 0.45);
+    color: var(--napiq-tea-green-text);
+}
+
+/* Bootstrap-style utility for issues/view.html's priority badge (a
+   plain Bootstrap .badge, not the .disp-badge system above) -- same
+   tea-green treatment as .disp-badge-priority-low, just matching
+   Bootstrap's .text-bg-* naming convention since that's what the rest
+   of that badge already uses (text-bg-secondary/-primary/-warning/
+   -danger). */
+.text-bg-tea-green {
+    background-color: var(--napiq-tea-green) !important;
+    color: var(--napiq-tea-green-text) !important;
 }
 
 .disp-badge-medium,

@@ -29,7 +29,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+                    {% set priority_classes = {'low': 'text-bg-tea-green', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+                    {% set priority_labels = {'low': 'Low', 'medium': 'Medium', 'high': 'High', 'critical': 'Urgent'} %}
                     {% set issue_status_classes = {
                         'pending': 'text-bg-secondary',
                         'assigned': 'text-bg-info',
@@ -42,8 +43,8 @@
                         <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
                         <td>{{ issue.issue_type }}</td>
                         <td>
-                            <span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
-                                {{ issue.priority|capitalize }}
+                            <span class="badge {{ priority_classes.get(issue.priority, 'text-bg-tea-green') }}">
+                                {{ priority_labels.get(issue.priority, issue.priority|capitalize) }}
                             </span>
                         </td>
                         <td>
