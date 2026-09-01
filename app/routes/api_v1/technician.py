@@ -932,6 +932,20 @@ def complete_assignment(assignment_id):
         message, status = error
         return jsonify(error=message), status
 
+    # Phase 36: a "New Installation" ticket connects a subscriber into
+    # a physical port on the linked NAP, so — unlike a repair, an
+    # "Add NAP" ticket, or any other service_request type, none of
+    # which have a subscriber port to record — the port actually used
+    # is no longer optional here. Checked after _validate_port_number()
+    # above so an out-of-range/already-occupied port still reports
+    # that specific error first, rather than a generic "required" one.
+    is_new_installation = (
+        assignment.service_request is not None
+        and assignment.service_request.request_type == "new_installation"
+    )
+    if is_new_installation and port_number is None:
+        return jsonify(error="A port number is required before this installation can be marked complete."), 400
+
     assignment.resolution_notes = notes or None
     assignment.port_number = port_number
     assignment.status = "completed"

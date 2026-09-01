@@ -328,6 +328,10 @@ export default function JobDetailScreen({ route, navigation }: any) {
       setError("Pin your location before marking this installation complete.");
       return;
     }
+    if (isNewInstallationTicket && portNumber == null) {
+      setError("Select a port before marking this installation complete.");
+      return;
+    }
     Alert.alert("Complete this job?", "This marks the issue resolved and can't be undone.", [
       { text: "Cancel", style: "cancel" },
       {
@@ -435,7 +439,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           </View>
         )}
-        {error && <Text style={styles.error}>{error}</Text>}
 
         {/* Ticket Details — mirrors the admin's ticket view (issues/view.html
             / service_requests/form.html): ticket identity, priority/status,
@@ -808,7 +811,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
                   activeOpacity={0.7}
                 >
                   <Text style={portNumber != null ? styles.dropdownValue : styles.dropdownPlaceholder}>
-                    {portNumber != null ? `Port ${portNumber}` : "Select a port (optional)"}
+                    {portNumber != null ? `Port ${portNumber}` : "Select a port"}
                   </Text>
                   <Text style={styles.dropdownChevron}>{"\u25BE"}</Text>
                 </TouchableOpacity>
@@ -817,8 +820,20 @@ export default function JobDetailScreen({ route, navigation }: any) {
                   {portNumber != null ? `Port ${portNumber}` : "No port recorded."}
                 </Text>
               )}
+              {canEditNotes && portNumber == null && (
+                <Text style={styles.notesText}>
+                  No port selected yet — required before completing this installation.
+                </Text>
+              )}
             </View>
           )}
+
+        {/* Moved here (right above the action buttons) rather than
+            fixed at the top of the screen — every message this state
+            ever holds (see handleComplete above) is about completing
+            THIS job, for any ticket type, so it reads more clearly
+            sitting right next to the button it's blocking. */}
+        {error && <Text style={[styles.error, styles.completeError]}>{error}</Text>}
 
         <View style={styles.actions}>
           {canAccept && (
@@ -868,6 +883,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 22, fontWeight: "800", marginTop: 2 },
   subtitle: { color: colors.textFaint, fontSize: 14, marginTop: 2, marginBottom: 16 },
   error: { color: colors.danger, marginBottom: 12 },
+  completeError: { marginTop: 4, marginBottom: 8, textAlign: "center" },
   queuedBanner: {
     backgroundColor: colors.primaryLight,
     borderRadius: 10,
