@@ -124,34 +124,96 @@
                     <div class="flabel">Priority</div>
                     <div class="fvalue text-capitalize">{{ service_request.priority }}</div>
                 </div>
+                {% if service_request.request_type == 'new_installation' and service_request.scheduled_date %}
+                <div class="sr-doc-field">
+                    <div class="flabel">Scheduled Installation</div>
+                    <div class="fvalue">{{ service_request.scheduled_date.strftime('%B %d, %Y') }}</div>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Requested NAP</div>
-                    <div class="fvalue">
-                        {% if service_request.requested_nap %}
-                            {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
-                        {% elif service_request.suggested_nap %}
-                            Suggested: {{ service_request.suggested_nap.nap_code }} ({{ service_request.suggested_nap.distance_km }} km away)
-                        {% else %}
-                            Not yet assigned
-                        {% endif %}
+
+            {% if service_request.request_type == 'new_installation' %}
+                {% if service_request.plan_label %}
+                <div class="sr-doc-row">
+                    <div class="sr-doc-field full">
+                        <div class="flabel">Plan</div>
+                        <div class="fvalue">{{ service_request.plan_label }}</div>
                     </div>
                 </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Service Location</div>
-                    <div class="fvalue">
-                        {% if service_request.latitude is not none and service_request.longitude is not none %}
-                            {{ service_request.latitude }}, {{ service_request.longitude }}
-                        {% else %}
-                            Not provided
-                        {% endif %}
+                {% endif %}
+                <div class="sr-doc-row">
+                    <div class="sr-doc-field full">
+                        <div class="flabel">Requested NAP</div>
+                        <div class="fvalue">
+                            {% if service_request.requested_nap %}
+                                {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
+                            {% elif service_request.suggested_nap %}
+                                Suggested: {{ service_request.suggested_nap.nap_code }} ({{ service_request.suggested_nap.distance_km }} km away)
+                            {% else %}
+                                Not yet assigned
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-            </div>
+                <div class="sr-doc-row">
+                    <div class="sr-doc-field full">
+                        <div class="flabel">Service Location</div>
+                        <div class="fvalue">
+                            {% if service_request.latitude is not none and service_request.longitude is not none %}
+                                {{ service_request.latitude }}, {{ service_request.longitude }}
+                            {% else %}
+                                Not provided
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+            {% elif service_request.request_type == 'add_nap' %}
+                <div class="sr-doc-row">
+                    <div class="sr-doc-field">
+                        <div class="flabel">Planned NAP Code</div>
+                        <div class="fvalue">{{ service_request.planned_nap_code or "—" }}</div>
+                    </div>
+                    <div class="sr-doc-field">
+                        <div class="flabel">Port Capacity</div>
+                        <div class="fvalue">{{ service_request.port_capacity or "—" }}{% if service_request.port_capacity %} ports{% endif %}</div>
+                    </div>
+                </div>
+
+            {% else %}
+            {# relocation / upgrade / disconnection: these three only ever
+               come from the full Add Service Request page, which never
+               collects priority/plan/scheduled — same Requested NAP /
+               Service Location fields as new_installation above, minus
+               the fields that page's form doesn't have. #}
+                <div class="sr-doc-row">
+                    <div class="sr-doc-field full">
+                        <div class="flabel">Requested NAP</div>
+                        <div class="fvalue">
+                            {% if service_request.requested_nap %}
+                                {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
+                            {% elif service_request.suggested_nap %}
+                                Suggested: {{ service_request.suggested_nap.nap_code }} ({{ service_request.suggested_nap.distance_km }} km away)
+                            {% else %}
+                                Not yet assigned
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="sr-doc-row">
+                    <div class="sr-doc-field full">
+                        <div class="flabel">Service Location</div>
+                        <div class="fvalue">
+                            {% if service_request.latitude is not none and service_request.longitude is not none %}
+                                {{ service_request.latitude }}, {{ service_request.longitude }}
+                            {% else %}
+                                Not provided
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
         </div>
 
         <div class="sr-doc-section">
@@ -170,7 +232,13 @@
                 </div>
             </div>
             {% else %}
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Customer Information</span></div>
+            {% set section_titles = {
+                'new_installation': 'Customer Information',
+                'relocation': 'Relocation Details',
+                'upgrade': 'Upgrade Details',
+                'disconnection': 'Disconnection Details'
+            } %}
+            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">{{ section_titles.get(service_request.request_type, 'Customer Information') }}</span></div>
             {% if service_request.subscriber %}
             <div class="sr-doc-row">
                 <div class="sr-doc-field">
@@ -226,6 +294,70 @@
             {% endif %}
             {% endif %}
         </div>
+
+        {% if dispatch_assignment and service_request.request_type in ('new_installation', 'add_nap') %}
+        {#
+            Phase 35: only new_installation/add_nap tickets are ever
+            dispatched to a field assistant at all (relocation/upgrade/
+            disconnection have no Assignment path — see
+            _dispatch_field_assistant()'s own docstring), so this
+            section only renders for those two, and only once a
+            dispatch actually exists. Shows who was sent and, once
+            they've gone through the mobile "Mark complete" flow, the
+            same completion evidence that flow required (photo,
+            pinned GPS location, port serviced, resolution notes) —
+            see api_v1/technician.py's complete_assignment().
+        #}
+        <div class="sr-doc-section">
+            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Assigned Field Technician</span></div>
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Technician</div>
+                    <div class="fvalue">{{ dispatch_assignment.technician.full_name if dispatch_assignment.technician else "—" }}</div>
+                </div>
+                <div class="sr-doc-field">
+                    <div class="flabel">Assignment Status</div>
+                    <div class="fvalue text-capitalize">{{ dispatch_assignment.status|replace('_', ' ') }}</div>
+                </div>
+            </div>
+            {% if dispatch_assignment.status == 'completed' %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field">
+                    <div class="flabel">Completed On</div>
+                    <div class="fvalue">{{ dispatch_assignment.completed_at.strftime('%B %d, %Y %I:%M %p') if dispatch_assignment.completed_at else "—" }}</div>
+                </div>
+                <div class="sr-doc-field">
+                    <div class="flabel">Port Serviced</div>
+                    <div class="fvalue">{{ ("Port " ~ dispatch_assignment.port_number) if dispatch_assignment.port_number is not none else "—" }}</div>
+                </div>
+            </div>
+            {% if dispatch_assignment.pin_latitude is not none and dispatch_assignment.pin_longitude is not none %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Technician's Pinned Location</div>
+                    <div class="fvalue">{{ dispatch_assignment.pin_latitude }}, {{ dispatch_assignment.pin_longitude }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if dispatch_assignment.resolution_notes %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Technician's Notes</div>
+                    <div class="fvalue" style="border-bottom: none; font-weight: 500;">{{ dispatch_assignment.resolution_notes }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if dispatch_assignment.photo_filename %}
+            <div class="sr-doc-row">
+                <div class="sr-doc-field full">
+                    <div class="flabel">Completion Photo</div>
+                    <img src="{{ dispatch_assignment.photo_filename }}" alt="Completion photo" style="max-width: 100%; max-height: 320px; border-radius: 4px; margin-top: 4px;">
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
 
         <div class="sr-doc-section">
             <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Notes</span></div>

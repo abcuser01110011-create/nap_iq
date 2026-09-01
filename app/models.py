@@ -382,6 +382,28 @@ class ServiceRequest(db.Model):
     address = db.Column(db.String(255), nullable=True)
     contact_number = db.Column(db.String(20), nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    # Phase 35 (type-specific ticket detail view): fields the GeoMap
+    # "+ Tickets" quick-create modal already collected but, until now,
+    # only ever folded into `notes` as plain text (see
+    # quick_add_request()/quick_add_nap_request() in
+    # app/routes/service_requests.py) — pulled out into their own
+    # columns so service_requests/form.html's read-only detail view
+    # can show each ticket type's actual fields as clean labeled
+    # fields instead of a single free-text blob. All nullable/type-
+    # scoped: `plan_label`/`scheduled_date` are only ever set for a
+    # 'new_installation' request; `port_capacity`/`planned_nap_code`
+    # only for an 'add_nap' request. A request created through the
+    # full Add Service Request page (ServiceRequestForm, which has no
+    # equivalent fields) simply leaves all four NULL. `notes` above
+    # keeps holding only what an admin actually typed from here on —
+    # "Assigned Team"/"Technician(s) requested" still fold into it as
+    # before, since those are dispatch-preference text, not a fixed
+    # field this table already models (the real dispatched technician
+    # is available via this request's Assignment, shown separately).
+    plan_label = db.Column(db.String(150), nullable=True)
+    scheduled_date = db.Column(db.Date, nullable=True)
+    port_capacity = db.Column(db.Integer, nullable=True)
+    planned_nap_code = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

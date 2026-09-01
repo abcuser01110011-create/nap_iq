@@ -67,6 +67,8 @@ Routes:
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
+from datetime import datetime
+
 from app.extensions import db
 from app.auth import role_required
 from app.models import ServiceRequest, Subscriber, Nap, Assignment, Technician
@@ -404,24 +406,22 @@ def quick_add_request():
     if not form.validate_on_submit():
         return jsonify({"status": "error", "errors": form.errors}), 400
 
-    # Fields the modal collects that service_requests has no column
-    # for yet -- folded into notes as plain text rather than dropped,
-    # so nothing the admin typed disappears. None of this creates a
-    # real technician Assignment; dispatch that from the Dispatch
-    # Board once the request is scheduled, same as any other install.
+    # Fields the modal collects that have their own columns now (Phase
+    # 35) — Plan/Scheduled Date go straight onto the request instead
+    # of being folded into `notes` as text, so the detail view can
+    # show them as their own labeled fields. Assigned Team/
+    # Technician(s) requested still fold into notes as before (see
+    # this route's own docstring) — those are dispatch-preference
+    # text, not a fixed field this table already models, and the real
+    # dispatched technician (once assigned below) is shown separately
+    # on the detail view via this request's Assignment.
     extra_lines = []
-    plan_label = (request.form.get("plan_label") or "").strip()
-    if plan_label:
-        extra_lines.append(f"Plan: {plan_label}")
     assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
     if assigned_team_label:
         extra_lines.append(f"Assigned Team: {assigned_team_label}")
     technicians_label = (request.form.get("technicians_label") or "").strip()
     if technicians_label:
         extra_lines.append(f"Technician(s) requested: {technicians_label}")
-    scheduled_label = (request.form.get("scheduled") or "").strip()
-    if scheduled_label:
-        extra_lines.append(f"Scheduled: {scheduled_label}")
 
     notes_parts = []
     if extra_lines:
@@ -429,6 +429,15 @@ def quick_add_request():
     if (form.notes.data or "").strip():
         notes_parts.append(form.notes.data.strip())
     notes = "\n\n".join(notes_parts) or None
+
+    plan_label = (request.form.get("plan_label") or "").strip() or None
+    scheduled_raw = (request.form.get("scheduled") or "").strip()
+    scheduled_date = None
+    if scheduled_raw:
+        try:
+            scheduled_date = datetime.strptime(scheduled_raw, "%Y-%m-%d").date()
+        except ValueError:
+            scheduled_date = None
 
     service_request = ServiceRequest(
         request_type=form.request_type.data,
@@ -439,6 +448,8 @@ def quick_add_request():
         full_name=form.full_name.data.strip(),
         contact_number=(form.contact_number.data or "").strip() or None,
         notes=notes,
+        plan_label=plan_label,
+        scheduled_date=scheduled_date,
     )
     db.session.add(service_request)
     _sync_subscriber_nap(service_request)
@@ -490,13 +501,13 @@ def quick_add_nap_request():
     # trust a client-supplied code" reasoning as every other
     # auto-increment preview in this app (see tickets_next_code_json
     # in app/routes/api.py). One ahead of the current NAP count, same
-    # zero-padded shape naps.py's own NAP codes use elsewhere.
+    # zero-padded shape naps.py's own NAP codes use elsewhere. Now
+    # persisted onto the request itself (planned_nap_code, Phase 35)
+    # rather than only ever existing in the JSON response and a
+    # `notes` text line, so the detail view can still show it later.
     nap_code_preview = f"N-{Nap.query.count() + 1:03d}"
 
-    extra_lines = [
-        f"Planned NAP Code: {nap_code_preview}",
-        f"Port Capacity: {form.port_capacity.data} ports",
-    ]
+    extra_lines = []
     assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
     if assigned_team_label:
         extra_lines.append(f"Assigned Team: {assigned_team_label}")
@@ -504,10 +515,9 @@ def quick_add_nap_request():
     if technicians_label:
         extra_lines.append(f"Technician(s) requested: {technicians_label}")
 
-    notes_parts = ["\n".join(extra_lines)]
-    if (form.notes.data or "").strip():
-        notes_parts.append(form.notes.data.strip())
-    notes = "\n\n".join(notes_parts)
+    notes = (form.notes.data or "").strip() or None
+    if extra_lines:
+        notes = "\n".join(extra_lines) + (f"\n\n{notes}" if notes else "")
 
     service_request = ServiceRequest(
         request_type="add_nap",
@@ -517,6 +527,8 @@ def quick_add_nap_request():
         address=form.barangay.data.strip(),
         full_name=form.nap_name.data.strip(),
         notes=notes,
+        port_capacity=form.port_capacity.data,
+        planned_nap_code=nap_code_preview,
     )
     db.session.add(service_request)
     db.session.flush()  # service_request.id is needed below before commit
@@ -567,6 +579,25 @@ def edit_request(request_id):
     if request.method == "GET":
         form.subscriber_id.data = service_request.subscriber_id or 0
         form.requested_nap_id.data = service_request.requested_nap_id or 0
+
+    # Phase 35 (type-specific ticket detail view): the most recent
+    # Assignment ever dispatched for this request (any status), so the
+    # read-only detail view can show who was actually sent — and, once
+    # they've completed the job, the same completion photo/pin-
+    # location/resolution-notes/port-number their mobile "Mark
+    # complete" step recorded (see api_v1/technician.py's
+    # complete_assignment()) — rather than only the dispatch-
+    # preference text ("Assigned Team: ...") a quick-create ticket
+    # folds into `notes`. Mirrors issues.view_issue()'s own
+    # assignment/assignment_history lookup for the same reason. A
+    # request created through the full Add Service Request page (no
+    # dispatch step at all) simply has none, and the template section
+    # doesn't render.
+    dispatch_assignment = (
+        Assignment.query.filter_by(service_request_id=service_request.id)
+        .order_by(Assignment.assigned_at.desc())
+        .first()
+    )
 
     if form.validate_on_submit():
         old_status = service_request.status
@@ -634,7 +665,8 @@ def edit_request(request_id):
         return redirect(url_for("service_requests.list_requests"))
 
     return render_template(
-        "service_requests/form.html", form=form, mode="edit", service_request=service_request
+        "service_requests/form.html", form=form, mode="edit", service_request=service_request,
+        dispatch_assignment=dispatch_assignment,
     )
 
 

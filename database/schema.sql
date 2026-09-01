@@ -182,6 +182,14 @@ CREATE TABLE IF NOT EXISTS service_requests (
     address           VARCHAR(255),
     contact_number    VARCHAR(20),
     notes             TEXT,
+    -- Phase 35 (type-specific ticket detail view) — see the matching
+    -- comment on app/models.py's ServiceRequest. plan_label/
+    -- scheduled_date only ever set for 'new_installation';
+    -- port_capacity/planned_nap_code only ever set for 'add_nap'.
+    plan_label        VARCHAR(150),
+    scheduled_date    DATE,
+    port_capacity     INT,
+    planned_nap_code  VARCHAR(20),
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                           ON UPDATE CURRENT_TIMESTAMP,
