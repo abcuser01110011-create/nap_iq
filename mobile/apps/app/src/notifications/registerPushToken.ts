@@ -1,17 +1,29 @@
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import type { ApiClient } from "@nap-iq/api-client";
 
-// SDK 53+ removed Android remote-push support from Expo Go entirely --
-// touching expo-notifications' listener/token APIs there throws
-// synchronously (see docs.expo.dev/push-notifications/faq). Detect
-// "running inside the Expo Go client app" so callers can no-op instead
-// of crashing; push still works normally in a development build or a
-// production build, where executionEnvironment is Standalone.
+// SDK 53+ removed Android remote-push support from Expo Go entirely.
+// Critically, the throw doesn't wait for a specific API call --
+// expo-notifications registers a push-token listener as a *module-level*
+// side effect, so merely `import`-ing the package on Android inside Expo
+// Go throws synchronously and crashes the app before any of our own
+// guard checks below ever get a chance to run (see the "runtime not
+// ready" / warnOfExpoGoPushUsage stack trace). A static top-level
+// `import * as Notifications from "expo-notifications"` would trigger
+// that immediately, every time this file loads -- so instead we only
+// `require` it lazily, and only when we've already confirmed we're not
+// inside Expo Go.
+type NotificationsModule = typeof import("expo-notifications");
+
 export function isRunningInExpoGo(): boolean {
   return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
+
+function getNotifications(): NotificationsModule | null {
+  if (isRunningInExpoGo()) return null;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require("expo-notifications") as NotificationsModule;
 }
 
 function getProjectId(): string | undefined {
@@ -23,7 +35,8 @@ async function resolveExpoPushToken(): Promise<string | null> {
   // Push tokens don't resolve on simulators/emulators — only real
   // devices have an APNs/FCM identity to hand back. Also unavailable
   // in Expo Go on Android as of SDK 53+ (see isRunningInExpoGo above).
-  if (!Device.isDevice || isRunningInExpoGo()) return null;
+  const Notifications = getNotifications();
+  if (!Device.isDevice || !Notifications) return null;
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -73,7 +86,8 @@ export async function registerPushToken(client: ApiClient, role?: "technician" |
 export async function unregisterPushToken(client: ApiClient, role?: "technician" | "customer" | null): Promise<void> {
   if (role !== "technician") return;
   try {
-    if (isRunningInExpoGo()) return;
+    const Notifications = getNotifications();
+    if (!Notifications) return;
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted" || !Device.isDevice) return;
     const projectId = getProjectId();
