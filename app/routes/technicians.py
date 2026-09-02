@@ -10,14 +10,18 @@ SQL / seed data — same gap PHASE10_NOTES.md flagged for Subscribers.
 Two kinds of profile share this one roster table, distinguished by
 `technicians.personnel_type`:
 
-  * "technician"      — a dispatch-facing profile with no mobile-app
-                          access at all. Never has a linked `users` row.
-  * "field_assistant" — the role that actually logs into the mobile
-                          app. Its `users` login (role='field_assistant')
-                          is created right here, inline, via the
-                          username/password fields on the Add form —
-                          there's no separate "link an existing account"
-                          step the way earlier phases did it.
+  * "technician"      — logs into the mobile Technician app. Its
+                          `users` login (role='technician') is created
+                          right here, inline, via the username/password
+                          fields on the Add Technician form — there's
+                          no separate "link an existing account" step
+                          the way earlier phases did it.
+  * "field_assistant" — also logs into the mobile app, the same way,
+                          but with role='field_assistant'. There's no
+                          "Add Field Assistant" entry point on the
+                          Personnel list anymore, but existing Field
+                          Assistant profiles (and this route's
+                          ?type=field_assistant param) still work.
 
 Records are never physically deleted — a profile that's no longer
 active is set `offline` via the existing `status` column rather than
@@ -86,16 +90,18 @@ def list_technicians():
 @technicians_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_technician():
-    """Shows and processes the Add Technician / Add Field Assistant
-    form. The "Add Personnel" split button on the list page links here
-    with ?type=technician or ?type=field_assistant to preselect which
-    kind of profile is being created; the type itself stays editable
-    on the form either way.
+    """Shows and processes the Add Technician form.
 
-    Adding a Field Assistant also creates their mobile-app login
-    (role='field_assistant') from the username/password fields on the
-    same form — Technicians never get a login at all, so those fields
-    are ignored entirely when personnel_type == 'technician'.
+    The list page's "Add Technician" button links here with
+    ?type=technician; personnel_type/status are no longer editable on
+    this form (the template renders them as hidden fields carrying
+    their default values) — every profile created here is
+    personnel_type='technician', status='available'.
+
+    Adding a Technician also creates their mobile-app login
+    (role='technician') from the username/password fields on the same
+    form, since the mobile Technician app authenticates against
+    accounts with that role (see app/jwt_auth.py's MOBILE_API_ROLES).
     """
     form = TechnicianForm()
     form.technician_id_value = None
@@ -103,27 +109,27 @@ def add_technician():
     requested_type = request.args.get("type", "").strip()
     if request.method == "GET" and requested_type in ("technician", "field_assistant"):
         form.personnel_type.data = requested_type
+    elif request.method == "GET":
+        form.personnel_type.data = "technician"
 
-    needs_credentials = form.personnel_type.data == "field_assistant"
+    needs_credentials = True
     if form.validate_on_submit() and form.validate_credentials_if_needed(needs_credentials=needs_credentials):
-        new_user_id = None
-        if needs_credentials:
-            login = User(
-                username=form.username.data.strip(),
-                full_name=form.full_name.data.strip(),
-                role="field_assistant",
-            )
-            login.set_password(form.password.data)
-            db.session.add(login)
-            db.session.flush()  # assign login.id without a separate round trip
-            new_user_id = login.id
+        login_role = "technician" if form.personnel_type.data == "technician" else "field_assistant"
+        login = User(
+            username=form.username.data.strip(),
+            full_name=form.full_name.data.strip(),
+            role=login_role,
+        )
+        login.set_password(form.password.data)
+        db.session.add(login)
+        db.session.flush()  # assign login.id without a separate round trip
 
         technician = Technician(
             full_name=form.full_name.data.strip(),
             contact_number=(form.contact_number.data or "").strip() or None,
             personnel_type=form.personnel_type.data,
             status=form.status.data,
-            user_id=new_user_id,
+            user_id=login.id,
         )
         db.session.add(technician)
         db.session.commit()
@@ -139,7 +145,7 @@ def add_technician():
 @role_required("administrator")
 def view_technician(technician_id):
     """Read-only detail view: personnel info, linked mobile login (if
-    any — field assistants only), and current open assignments."""
+    any), and current open assignments."""
     technician = Technician.query.get_or_404(technician_id)
     open_assignments = [
         a for a in technician.assignments
@@ -154,34 +160,29 @@ def view_technician(technician_id):
 @role_required("administrator")
 def edit_technician(technician_id):
     """Shows and processes the Edit Technician / Edit Field Assistant
-    form. If this profile is a Field Assistant that doesn't have a
-    mobile login yet (e.g. it was switched over from Technician), the
-    same inline username/password fields from the Add form appear here
-    to create one. An already-linked login is shown read-only — a
+    form. If this profile doesn't have a mobile login yet, the same
+    inline username/password fields from the Add form appear here to
+    create one (role='technician' or role='field_assistant', matching
+    personnel_type). An already-linked login is shown read-only — a
     password change is a Manage Users action, not this form's job."""
     technician = Technician.query.get_or_404(technician_id)
 
     form = TechnicianForm(obj=technician)
     form.technician_id_value = technician.id
 
-    needs_credentials = (
-        form.personnel_type.data == "field_assistant" and technician.user_id is None
-    )
+    needs_credentials = technician.user_id is None
     if form.validate_on_submit() and form.validate_credentials_if_needed(needs_credentials=needs_credentials):
         technician.full_name = form.full_name.data.strip()
         technician.contact_number = (form.contact_number.data or "").strip() or None
         technician.personnel_type = form.personnel_type.data
         technician.status = form.status.data
 
-        if form.personnel_type.data != "field_assistant":
-            # Technicians never keep a linked login, even if one was
-            # set before the type was switched away from Field Assistant.
-            technician.user_id = None
-        elif needs_credentials:
+        if needs_credentials:
+            login_role = "technician" if form.personnel_type.data == "technician" else "field_assistant"
             login = User(
                 username=form.username.data.strip(),
                 full_name=technician.full_name,
-                role="field_assistant",
+                role=login_role,
             )
             login.set_password(form.password.data)
             db.session.add(login)

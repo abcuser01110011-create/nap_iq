@@ -5,23 +5,9 @@
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
-    <div class="dropdown">
-        <button type="button" class="btn btn-primary rounded-pill px-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-person-plus me-1"></i>Add Personnel
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li>
-                <a class="dropdown-item" href="{{ url_for('technicians.add_technician', type='technician') }}">
-                    <i class="bi bi-person-badge me-2"></i>Technician
-                </a>
-            </li>
-            <li>
-                <a class="dropdown-item" href="{{ url_for('technicians.add_technician', type='field_assistant') }}">
-                    <i class="bi bi-person-lines-fill me-2"></i>Field Assistant
-                </a>
-            </li>
-        </ul>
-    </div>
+    <a href="{{ url_for('technicians.add_technician', type='technician') }}" class="btn btn-primary rounded-pill px-3">
+        <i class="bi bi-person-plus me-1"></i>Add Technician
+    </a>
 </div>
 
 <div class="subs-table-card mb-3">
@@ -84,9 +70,7 @@
                     </td>
                     <td class="disp-subtext">{{ technician.contact_number or "—" }}</td>
                     <td>
-                        {% if technician.personnel_type != 'field_assistant' %}
-                            <span class="disp-subtext">—</span>
-                        {% elif technician.user %}
+                        {% if technician.user %}
                             <span class="disp-code-pill">{{ technician.user.username }}</span>
                         {% else %}
                             <span class="disp-subtext">Not set up</span>

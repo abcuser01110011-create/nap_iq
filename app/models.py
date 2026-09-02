@@ -30,13 +30,17 @@ from app.extensions import db
 # Phase 7 — Authentication & RBAC
 # ---------------------------------------------------------------------
 # 'user' (Customer) was added in Phase 7 for subscriber-facing logins.
+# 'technician' was added so the Personnel > Add Technician form can
+# create a mobile-app login directly (see app/jwt_auth.py's
+# MOBILE_API_ROLES, which already expected this role name for the
+# mobile JWT API before any UI created accounts with it).
 # 'payment_collector' predates Phase 7 and is kept for backward
 # compatibility with existing seeded/production data — it is not one
 # of the three roles this phase's login system builds interfaces for
 # (Administrator / Technician / User), so any account still carrying
 # that role should be migrated to one of the three, or the RBAC rules
 # in app/auth.py extended for it, in a future phase.
-USER_ROLES = ("administrator", "field_assistant", "payment_collector", "user")
+USER_ROLES = ("administrator", "technician", "field_assistant", "payment_collector", "user")
 
 # ---------------------------------------------------------------------
 # Phase 17 — users.status (replaces users.is_active)

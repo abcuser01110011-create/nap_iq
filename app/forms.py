@@ -927,13 +927,20 @@ class TechnicianForm(FlaskForm):
     """Form used for both creating and editing a personnel profile (the
     dispatch-facing record in the `technicians` table).
 
-    Only Field Assistants get mobile-app access. A Technician profile
-    never has a linked login at all. When adding a Field Assistant,
+    Both Technicians and Field Assistants get mobile-app access.
     `username`/`password`/`confirm_password` create that login account
     inline (see `validate_credentials_if_needed` below, called
     manually by the route since these fields are only required
     conditionally — a plain `DataRequired()` here would also block
-    Technician submissions, which never fill them in).
+    submissions for a profile that already has a linked login).
+
+    The Add Technician form no longer exposes `personnel_type` or
+    `status` as editable fields — new personnel added via that form
+    are always created as `personnel_type='technician'` with
+    `status='available'`, so these two fields keep server-side
+    defaults/values even though the template stops rendering them as
+    a select box for the add flow. The edit flow still renders and
+    uses them normally.
     """
 
     technician_id_value = None  # set manually by the route; not a real form field
@@ -947,7 +954,10 @@ class TechnicianForm(FlaskForm):
     )
     contact_number = StringField(
         "Contact Number",
-        validators=[Optional(), Length(max=20, message="Contact number must be at most 20 characters.")],
+        validators=[
+            DataRequired(message="Contact number is required."),
+            Length(max=20, message="Contact number must be at most 20 characters."),
+        ],
     )
     personnel_type = SelectField(
         "Personnel Type",
@@ -968,10 +978,12 @@ class TechnicianForm(FlaskForm):
         default="available",
         validators=[DataRequired()],
     )
-    # Only used (and only required) when personnel_type == 'field_assistant'
-    # and there's no login account linked yet -- enforced manually by the
-    # route via validate_credentials_if_needed(), not by field validators,
-    # since a Technician submission legitimately leaves these blank.
+    # Required whenever a new login account needs to be created for
+    # this submission (both Technician and Field Assistant profiles
+    # can get one) -- enforced manually by the route via
+    # validate_credentials_if_needed(), not by field validators, since
+    # a submission for a profile that already has a linked login
+    # legitimately leaves these blank.
     username = StringField(
         "Username",
         validators=[Optional(), Length(min=3, max=50, message="Username must be between 3 and 50 characters.")],
@@ -1002,14 +1014,14 @@ class TechnicianForm(FlaskForm):
         confirm = self.confirm_password.data or ""
 
         if not username:
-            self.username.errors.append("Username is required for a field assistant login.")
+            self.username.errors.append("Username is required for mobile login.")
             ok = False
         elif User.query.filter_by(username=username).first() is not None:
             self.username.errors.append("This username is already taken. Choose a different one.")
             ok = False
 
         if not password:
-            self.password.errors.append("Password is required for a field assistant login.")
+            self.password.errors.append("Password is required for mobile login.")
             ok = False
         elif len(password) < 8:
             self.password.errors.append("Password must be at least 8 characters.")

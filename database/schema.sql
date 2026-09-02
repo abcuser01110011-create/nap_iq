@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
     username        VARCHAR(50)  NOT NULL UNIQUE,
     password_hash   VARCHAR(255) NOT NULL,
     full_name       VARCHAR(100) NOT NULL,
-    role            ENUM('administrator', 'field_assistant', 'payment_collector', 'user') NOT NULL,
+    role            ENUM('administrator', 'technician', 'field_assistant', 'payment_collector', 'user') NOT NULL,
     email           VARCHAR(100) UNIQUE,
     phone_number    VARCHAR(20),
     status          ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS users (
 -- won't retrofit an existing install):
 --   ALTER TABLE users
 --       ADD COLUMN theme_preference ENUM('light', 'dark') NOT NULL DEFAULT 'light' AFTER status;
+--
+-- Add Technician mobile login support (Personnel > Add Technician now
+-- creates a role='technician' account):
+--   ALTER TABLE users
+--       MODIFY COLUMN role ENUM('administrator', 'technician', 'field_assistant', 'payment_collector', 'user') NOT NULL;
 
 -- ---------------------------------------------------------------------
 -- naps: Network Access Points plotted on the GeoMap

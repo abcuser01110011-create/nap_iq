@@ -2,7 +2,8 @@
 {% set is_field_assistant = form.personnel_type.data == 'field_assistant' %}
 {% set noun = 'Field Assistant' if is_field_assistant else 'Technician' %}
 {% set has_existing_login = mode == 'edit' and technician and technician.user_id %}
-{% set show_credentials_fields = is_field_assistant and not has_existing_login %}
+{% set show_credentials_fields = not has_existing_login %}
+{% set show_type_and_status = mode == 'edit' %}
 {% block title %}{{ 'Edit ' ~ noun if mode == 'edit' else 'Add ' ~ noun }}{% endblock %}
 {% block page_title %}{{ 'Edit ' ~ noun if mode == 'edit' else 'Add New ' ~ noun }}{% endblock %}
 
@@ -29,13 +30,14 @@
                             {% endfor %}
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">{{ form.contact_number.label }} <span class="text-muted small">(optional)</span></label>
-                            {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else "")) }}
+                            <label class="form-label">{{ form.contact_number.label }}</label>
+                            {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else ""), required=true) }}
                             {% for error in form.contact_number.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                         </div>
 
+                        {% if show_type_and_status %}
                         <div class="col-md-6">
                             <label class="form-label">{{ form.personnel_type.label }}</label>
                             {{ form.personnel_type(class="form-select" ~ (" is-invalid" if form.personnel_type.errors else "")) }}
@@ -50,9 +52,13 @@
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                         </div>
+                        {% else %}
+                            {{ form.personnel_type(style="display:none;") }}
+                            {{ form.status(style="display:none;") }}
+                        {% endif %}
 
                         {% if has_existing_login %}
-                        <div class="col-12" id="existing-login-field" style="{{ '' if is_field_assistant else 'display:none;' }}">
+                        <div class="col-12" id="existing-login-field">
                             <label class="form-label">Mobile Login</label>
                             <div>
                                 <span class="badge text-bg-light border">{{ technician.user.username }}</span>
@@ -65,12 +71,12 @@
                         <div class="col-12" id="credentials-fields" style="{{ '' if show_credentials_fields else 'display:none;' }}">
                             <hr class="my-2">
                             <p class="text-muted small mb-2">
-                                <i class="bi bi-phone me-1"></i>Field assistants log in with these credentials on the mobile app.
+                                <i class="bi bi-phone me-1"></i>{{ noun }}s log in with these credentials on the mobile app.
                             </p>
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label">{{ form.username.label }}</label>
-                                    {{ form.username(class="form-control" ~ (" is-invalid" if form.username.errors else ""), placeholder="e.g. fa.rcruz", autocomplete="off") }}
+                                    {{ form.username(class="form-control" ~ (" is-invalid" if form.username.errors else ""), placeholder="e.g. rcruz", autocomplete="off") }}
                                     {% for error in form.username.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
                                     {% endfor %}
@@ -110,25 +116,4 @@
         </div>
     </div>
 </div>
-
-<script>
-    (function () {
-        var typeSelect = document.getElementById('{{ form.personnel_type.id }}');
-        var credentialsFields = document.getElementById('credentials-fields');
-        var existingLoginField = document.getElementById('existing-login-field');
-        if (!typeSelect) return;
-
-        function sync() {
-            var isFieldAssistant = typeSelect.value === 'field_assistant';
-            if (credentialsFields) {
-                credentialsFields.style.display = isFieldAssistant ? '' : 'none';
-            }
-            if (existingLoginField) {
-                existingLoginField.style.display = isFieldAssistant ? '' : 'none';
-            }
-        }
-
-        typeSelect.addEventListener('change', sync);
-    })();
-</script>
 {% endblock %}
