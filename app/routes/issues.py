@@ -465,12 +465,6 @@ def report_fiber_break():
         time the GeoMap refreshes (it already polls
         `refreshLiveData()` on an interval and on tab focus; nothing
         new needed here).
-      - Every one of those per-subscriber rows shares the exact same
-        `issue_code` -- one NAP-wide outage should read as one ticket
-        no matter which affected subscriber's page an admin opens it
-        from. `technical_issues.issue_code` is intentionally not
-        unique in the schema for this reason (see app/models.py's
-        TechnicalIssue.issue_code comment).
 
     Dispatch is deliberately NOT one Assignment per subscriber,
     though: what needs fixing is the NAP's fiber, not each individual
@@ -525,39 +519,10 @@ def report_fiber_break():
     )
     assigned_team_id = request.form.get("assigned_team_id")
 
-    # A Fiber Break is one NAP-wide outage even though it's stored as
-    # one TechnicalIssue row per still-connected subscriber (see this
-    # function's docstring above) -- so every one of those rows shares
-    # this single issue_code, and opening any affected subscriber's
-    # ticket shows the exact same code. Reuses an already-assigned
-    # code from one of the affected subscribers' *existing* open
-    # issues if one's found below (so re-reporting against an
-    # in-progress outage doesn't mint a second code); otherwise one is
-    # minted from the first TechnicalIssue row actually created in the
-    # loop further down.
-    shared_issue_code = None
-    for subscriber in affected_subscribers:
-        existing = (
-            TechnicalIssue.query.filter(
-                TechnicalIssue.subscriber_id == subscriber.id,
-                TechnicalIssue.status.in_(_OPEN_ISSUE_STATUSES),
-            )
-            .order_by(TechnicalIssue.created_at.desc())
-            .first()
-        )
-        if existing is not None and existing.issue_code:
-            shared_issue_code = existing.issue_code
-            break
-
     created_count = 0
     updated_count = 0
     skipped_no_location = 0
     dispatched = False  # only the first affected subscriber's issue gets an Assignment
-    # Existing issues folded into this outage before shared_issue_code
-    # was known (no pre-existing code found above, and no new issue
-    # minted one yet) -- backfilled with it the moment one exists, so
-    # nobody's ticket is left showing a different (or no) code.
-    pending_code_backfill = []
 
     for subscriber in affected_subscribers:
         if subscriber.latitude is None or subscriber.longitude is None:
@@ -581,10 +546,6 @@ def report_fiber_break():
             existing_issue.latitude = subscriber.latitude
             existing_issue.longitude = subscriber.longitude
             existing_issue.nap_id = nap.id
-            if shared_issue_code:
-                existing_issue.issue_code = shared_issue_code
-            else:
-                pending_code_backfill.append(existing_issue)
             notify_issue_updated(existing_issue)
             db.session.commit()
             if not dispatched and assigned_team_id:
@@ -613,18 +574,7 @@ def report_fiber_break():
             db.session.add(issue)
             db.session.commit()  # issue.id is now populated by MySQL
 
-            if shared_issue_code:
-                issue.issue_code = shared_issue_code
-            else:
-                # First row of this outage to actually need a code --
-                # mint it here and retroactively stamp it onto every
-                # already-processed sibling that was waiting on it.
-                shared_issue_code = f"ISS-{issue.id:04d}"
-                issue.issue_code = shared_issue_code
-                for backfilled in pending_code_backfill:
-                    backfilled.issue_code = shared_issue_code
-                pending_code_backfill = []
-
+            issue.issue_code = f"ISS-{issue.id:04d}"
             notify_new_issue_reported(issue)
             if not dispatched and assigned_team_id:
                 issue.address = nap.address

@@ -280,7 +280,7 @@
                         <div class="form-check">
                             <input class="form-check-input issue-priority-filter" type="checkbox" value="low" id="issuePriorityLow" checked>
                             <label class="form-check-label" for="issuePriorityLow">
-                                <span class="legend-dot" style="background:#22c55e"></span> Low
+                                <span class="legend-dot" style="background:#6c757d"></span> Low
                             </label>
                         </div>
                         <div class="form-check">
@@ -298,7 +298,7 @@
                         <div class="form-check mb-0">
                             <input class="form-check-input issue-priority-filter" type="checkbox" value="critical" id="issuePriorityCritical" checked>
                             <label class="form-check-label" for="issuePriorityCritical">
-                                <span class="legend-dot" style="background:#dc3545"></span> Urgent
+                                <span class="legend-dot" style="background:#dc3545"></span> Critical
                             </label>
                         </div>
                     </div>
@@ -308,46 +308,35 @@
         </div>
     </div>
 
-    <!-- Small collapsible bottom-left legend: starts collapsed to a
-         single compact toggle button so it doesn't sit over the map
-         as a wide bar; clicking it expands a small card with the same
-         legend content as before (unchanged ids: #mapResultCount).
-         Expanded/collapsed state is remembered per-browser via
-         localStorage, same pattern as the Layers/Filters controls
-         above (see napmap.js's GeoMap filter persistence). -->
+    <!-- Floating bottom-left legend: small, horizontal, no background
+         (legend items sit directly over the map instead of inside a
+         card). Same content/ids as before (#mapResultCount unchanged)
+         plus two new connection-line swatches for the subscriber↔NAP
+         and issue↔NAP link lines. -->
     <div class="napmap-float napmap-float-bottom-left">
-        <div class="napmap-legend-panel is-collapsed" id="napmapLegendPanel">
-            <button type="button" class="napmap-legend-toggle" id="napmapLegendToggle"
-                    aria-expanded="false" aria-controls="napmapLegendBody">
-                <i class="bi bi-map"></i>
-                <span>Legend</span>
-                <i class="bi bi-chevron-up napmap-legend-chevron"></i>
-            </button>
-            <div class="napmap-legend-body" id="napmapLegendBody">
-                <div class="napmap-legend-list">
-                    <span><span class="legend-dot" style="background:#198754"></span>Active</span>
-                    <span><span class="legend-dot" style="background:#6c757d"></span>Inactive</span>
-                    <span><span class="legend-dot" style="background:#fd7e14"></span>Full</span>
-                    <span><span class="legend-dot" style="background:#dc3545"></span>Maintenance</span>
-                    <span class="napmap-legend-sep-h"></span>
-                    <span><span class="legend-dot legend-dot-square" style="background:#22c55e"></span>Low</span>
-                    <span><span class="legend-dot legend-dot-square" style="background:#ffc107"></span>Medium</span>
-                    <span><span class="legend-dot legend-dot-square" style="background:#fd7e14"></span>High</span>
-                    <span><span class="legend-dot legend-dot-square" style="background:#dc3545"></span>Urgent</span>
-                    <span class="napmap-legend-sep-h"></span>
-                    <span><span class="legend-dot" style="background:#6f42c1"></span>Subscribers</span>
-                    <span><span class="legend-line" style="background:#198754"></span>Subscriber→NAP (green = no open issue, else worst issue's priority color)</span>
-                    <span><span class="legend-line" style="background:#dc3545"></span>Issue→NAP (colored by issue priority)</span>
-                    {% if geomap_settings.nap_connection_radius_meters and geomap_settings.nap_connection_radius_meters > 0 %}
-                    <span class="napmap-legend-sep-h"></span>
-                    <span><span class="legend-ring"></span>Max connection radius ({{ geomap_settings.nap_connection_radius_meters }}m)</span>
-                    {% endif %}
-                </div>
-                <div id="mapResultCount" class="napmap-legend-count"></div>
+        <div class="napmap-legend-panel">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span><span class="legend-dot" style="background:#198754"></span>Active</span>
+                <span><span class="legend-dot" style="background:#6c757d"></span>Inactive</span>
+                <span><span class="legend-dot" style="background:#fd7e14"></span>Full</span>
+                <span><span class="legend-dot" style="background:#dc3545"></span>Maintenance</span>
+                <span class="napmap-legend-sep"></span>
+                <span><span class="legend-dot legend-dot-square" style="background:#6c757d"></span>Low</span>
+                <span><span class="legend-dot legend-dot-square" style="background:#ffc107"></span>Medium</span>
+                <span><span class="legend-dot legend-dot-square" style="background:#fd7e14"></span>High</span>
+                <span><span class="legend-dot legend-dot-square" style="background:#dc3545"></span>Critical</span>
+                <span class="napmap-legend-sep"></span>
+                <span><span class="legend-dot" style="background:#6f42c1"></span>Subscribers</span>
+                <span><span class="legend-line" style="background:#198754"></span>Subscriber→NAP (green = no open issue, else worst issue's priority color)</span>
+                <span><span class="legend-line" style="background:#dc3545"></span>Issue→NAP (colored by issue priority)</span>
+                {% if geomap_settings.nap_connection_radius_meters and geomap_settings.nap_connection_radius_meters > 0 %}
+                <span class="napmap-legend-sep"></span>
+                <span><span class="legend-ring"></span>Max connection radius ({{ geomap_settings.nap_connection_radius_meters }}m)</span>
+                {% endif %}
             </div>
+            <div id="mapResultCount" class="napmap-legend-count"></div>
         </div>
     </div>
-
 
     {# Installation Planning, Phase 4 (55%): Installation Planner
        suggestion panel. Shares the exact same bottom-right slot as

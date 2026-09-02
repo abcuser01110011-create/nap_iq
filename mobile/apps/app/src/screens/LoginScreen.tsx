@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Text,
@@ -23,38 +22,6 @@ import type { AuthStackParamList } from "../navigation/RootNavigator";
  * time the overlay needs a number (see handleSubmit) — matches
  * AuthTransitionOverlay's own default. */
 const FALLBACK_TRANSITION_MS = 3000;
-
-/**
- * Dismisses the soft keyboard and waits for it to actually finish
- * closing before resolving. Needed right before opening
- * AuthTransitionOverlay's full-screen <Modal>: on Android, showing a
- * Modal while the keyboard is still open (or mid-close) can leave the
- * Modal's native window pinned to the keyboard-shrunk screen height
- * even after the keyboard finishes closing — the overlay then only
- * covers the top portion of the screen, with this form visible
- * underneath the rest of it, instead of covering edge-to-edge.
- * Username/password are the only fields on this screen that can ever
- * have the keyboard open, so this is only needed here (and not on the
- * sign-out overlay in ProfileScreen, which has no text inputs).
- * Falls back to a short fixed delay if "keyboardDidHide" never fires
- * (keyboard was already closed, so there's nothing to wait for).
- */
-function dismissKeyboardAndWaitForClose(): Promise<void> {
-  if (!Keyboard.isVisible()) return Promise.resolve();
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      subscription.remove();
-      clearTimeout(fallback);
-      resolve();
-    };
-    const subscription = Keyboard.addListener("keyboardDidHide", finish);
-    const fallback = setTimeout(finish, 200);
-    Keyboard.dismiss();
-  });
-}
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -103,12 +70,6 @@ export default function LoginScreen({ navigation }: Props) {
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-
-    // See dismissKeyboardAndWaitForClose()'s docstring above -- must
-    // happen before the overlay's Modal opens, not after, or the
-    // Modal can still capture the keyboard-shrunk window size.
-    await dismissKeyboardAndWaitForClose();
-
     // Show the overlay the instant the button is pressed, using the
     // fallback duration as a placeholder — *before* touching
     // getNetworkQualityDuration(). That call goes through NetInfo's

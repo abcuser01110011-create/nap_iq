@@ -31,19 +31,13 @@
                     </div>
                     <div class="d-flex gap-2">
                         {% set priority_classes = {
-                            'low': 'text-bg-tea-green',
+                            'low': 'text-bg-secondary',
                             'medium': 'text-bg-primary',
                             'high': 'text-bg-warning',
                             'critical': 'text-bg-danger'
                         } %}
-                        {% set priority_labels = {
-                            'low': 'Low',
-                            'medium': 'Medium',
-                            'high': 'High',
-                            'critical': 'Urgent'
-                        } %}
-                        <span class="badge fs-6 {{ priority_classes.get(issue.priority, 'text-bg-tea-green') }}">
-                            {{ priority_labels.get(issue.priority, issue.priority|capitalize) }} Priority
+                        <span class="badge fs-6 {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
+                            {{ issue.priority|capitalize }} Priority
                         </span>
                         {% set status_classes = {
                             'pending': 'text-bg-secondary',

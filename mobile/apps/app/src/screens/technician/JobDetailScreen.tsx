@@ -22,7 +22,7 @@ import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
 import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, PRIORITY_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
+import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // How long we'll wait for a GPS fix before treating it as a timeout —
 // same value/reasoning as the customer app's "Track My Location" step
@@ -458,15 +458,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
                 : undefined)
             }
           />
-          <InfoRow
-            label="Priority"
-            value={
-              (() => {
-                const priority = assignment.issue?.priority ?? assignment.service_request?.priority;
-                return priority ? PRIORITY_LABELS[priority] ?? priority : undefined;
-              })()
-            }
-          />
+          <InfoRow label="Priority" value={assignment.issue?.priority ?? assignment.service_request?.priority} />
           <InfoRow label="Status" value={STATUS_LABELS[assignment.status] ?? assignment.status} />
           {/* A walk-in Service Order (GeoMap "+ Tickets" modal, free-text
               Customer field) has no linked Subscriber -- fall back to the

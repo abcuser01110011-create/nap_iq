@@ -22,22 +22,10 @@
     };
 
     const PRIORITY_COLORS = {
-        low: "#22c55e",
+        low: "#6c757d",
         medium: "#ffc107",
         high: "#fd7e14",
         critical: "#dc3545",
-    };
-
-    // Display text shown for each priority key -- separate from the
-    // underlying key itself (still "low"/"medium"/"high"/"critical"
-    // everywhere in the data/filtering logic) so relabeling here never
-    // touches filter values, API payloads, or PRIORITY_RANK/COLORS
-    // lookups keyed by the original names.
-    const PRIORITY_LABELS = {
-        low: "LOW",
-        medium: "MEDIUM",
-        high: "HIGH",
-        critical: "URGENT",
     };
 
     // How fast a priority-colored marker pulses, in seconds per pulse
@@ -345,47 +333,6 @@
     }
 
     document.addEventListener("DOMContentLoaded", init);
-    document.addEventListener("DOMContentLoaded", setupLegendCollapse);
-
-    // ------------------------------------------------------------------
-    // Legend collapse/expand (small collapsible card, bottom-left of the
-    // map -- see naps/map.html's #napmapLegendPanel). Registered as its
-    // own DOMContentLoaded listener, separate from init() above, since
-    // it has nothing to do with the map/marker data init() loads and
-    // should keep working even if that async init is still in flight.
-    // ------------------------------------------------------------------
-    const GEOMAP_LEGEND_STORAGE_KEY = "napiq:geomapLegendCollapsed";
-
-    function setupLegendCollapse() {
-        const panel = document.getElementById("napmapLegendPanel");
-        const toggle = document.getElementById("napmapLegendToggle");
-        if (!panel || !toggle) return;
-
-        let collapsed = true; // default: small/collapsed until a person opens it
-        try {
-            const saved = localStorage.getItem(GEOMAP_LEGEND_STORAGE_KEY);
-            if (saved !== null) collapsed = saved === "true";
-        } catch (err) {
-            // Ignore -- localStorage can throw (private browsing, etc.);
-            // just fall back to the default collapsed state above.
-        }
-        applyLegendCollapsedState(panel, toggle, collapsed);
-
-        toggle.addEventListener("click", () => {
-            const nowCollapsed = !panel.classList.contains("is-collapsed");
-            applyLegendCollapsedState(panel, toggle, nowCollapsed);
-            try {
-                localStorage.setItem(GEOMAP_LEGEND_STORAGE_KEY, String(nowCollapsed));
-            } catch (err) {
-                // Ignore -- see comment above.
-            }
-        });
-    }
-
-    function applyLegendCollapsedState(panel, toggle, collapsed) {
-        panel.classList.toggle("is-collapsed", collapsed);
-        toggle.setAttribute("aria-expanded", String(!collapsed));
-    }
 
     async function init() {
         // Phase 33 (default GeoMap focus, instant version): if
@@ -1309,7 +1256,7 @@
         // deliberately fixed (not multiplied by the zoom-based icon
         // `scale`) so labels stay a constant, small on-screen size and
         // don't grow/overlap each other when zoomed in.
-        const labelText = priority ? (PRIORITY_LABELS[priority] || String(priority).toUpperCase()) : "";
+        const labelText = priority ? String(priority).toUpperCase() : "";
         const label = labelText
             ? '<div class="issue-marker-label" style="color:' + color + ';">' + labelText + "</div>"
             : "";
@@ -1363,18 +1310,6 @@
             .split("_")
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
             .join(" ");
-    }
-
-    /** Same idea as formatStatusLabel(), but for priority values --
-     * routes through PRIORITY_LABELS first so relabeled priorities
-     * (e.g. "critical" -> "Urgent") show consistently anywhere a
-     * priority is displayed as text, not just on the map badge. */
-    function formatPriorityLabel(value) {
-        const mapped = PRIORITY_LABELS[value];
-        if (mapped) {
-            return mapped.charAt(0).toUpperCase() + mapped.slice(1).toLowerCase();
-        }
-        return formatStatusLabel(value);
     }
 
     /** Builds the popup HTML shown when an issue marker is clicked.
@@ -1467,7 +1402,7 @@
         setText("ticketDetailsCode", "TN " + String(issue.id).padStart(5, "0"));
         setText("ticketDetailsType", issue.issue_type);
         setText("ticketDetailsNap", issue.nap_code);
-        setText("ticketDetailsPriority", formatPriorityLabel(issue.priority));
+        setText("ticketDetailsPriority", formatStatusLabel(issue.priority));
         setText("ticketDetailsStatus", formatStatusLabel(issue.status));
         setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam);
         setText("ticketDetailsTechnicians", parsed.extras.technicians);

@@ -47,7 +47,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, g
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Technician, Assignment, TechnicalIssue
+from app.models import Technician, Assignment
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify_issue_status_change
 
@@ -253,33 +253,6 @@ def complete_assignment(assignment_id):
     assignment.completed_at = datetime.utcnow()
     assignment.technical_issue.status = "resolved"
     profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
-
-    # Bug fix: report_fiber_break() (app/routes/issues.py) fans a single
-    # NAP-wide outage out into one TechnicalIssue per still-connected
-    # subscriber, but only the *first* affected subscriber's issue is
-    # the one actually dispatched (see that function's docstring) --
-    # assignment.technical_issue above is only ever that one row.
-    # Without this, completing the job here only resolved that single
-    # dispatched issue while every other connected subscriber's own
-    # "shadow" issue stayed pending/critical forever, which is what
-    # kept their GeoMap alert marker pulsing (and their subscriber pin
-    # red) even though the fiber break was actually fixed. Mirrors the
-    # same fix already applied to the mobile completion path
-    # (complete_assignment() in app/routes/api_v1/technician.py).
-    if (
-        assignment.technical_issue.issue_type == "Fiber Break"
-        and assignment.technical_issue.nap_id is not None
-    ):
-        siblings = TechnicalIssue.query.filter(
-            TechnicalIssue.nap_id == assignment.technical_issue.nap_id,
-            TechnicalIssue.issue_type == "Fiber Break",
-            TechnicalIssue.id != assignment.technical_issue.id,
-            TechnicalIssue.status != "resolved",
-            TechnicalIssue.status != "closed",
-        ).all()
-        for sibling in siblings:
-            sibling.status = "resolved"
-            notify_issue_status_change(sibling)
 
     still_has_open_work = (
         Assignment.query.filter(

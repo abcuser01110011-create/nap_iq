@@ -31,11 +31,7 @@ const PRIORITIES: Array<{ value: NonNullable<ReportIssueInput["priority"]>; labe
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
-  // Raw value stays "critical" (API/database enum, unchanged) --
-  // only the label shown to the customer reads "Urgent", matching the
-  // wording used everywhere else a priority is shown as text (GeoMap,
-  // field-assistant app -- see statusLabels.ts's PRIORITY_LABELS).
-  { value: "critical", label: "Urgent" },
+  { value: "critical", label: "Critical" },
 ];
 
 export default function ReportIssueScreen({ navigation }: any) {

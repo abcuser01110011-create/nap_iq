@@ -23,10 +23,8 @@ from app.extensions import db
 from app.auth import role_required
 from app.models import (
     Nap,
-    Subscriber,
     Technician,
     TechnicalIssue,
-    ServiceRequest,
     Assignment,
 )
 from app.nap_status import slot_usage
@@ -43,56 +41,12 @@ OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
 NAP_STATUS_ORDER = ["active", "full", "maintenance", "inactive"]
 
 # Fixed colors for each NAP status, shared by the status-distribution
-# bars and legend on the dashboard's NAP Status Summary panel.
+# donut and its legend on the dashboard's NAP Status Summary panel.
 NAP_STATUS_COLORS = {
     "active": "#22c55e",
     "full": "#f59e0b",
     "maintenance": "#f87171",
     "inactive": "#9aa2ad",
-}
-
-# TechnicalIssue.status values that count as still "open" for the
-# top-row "Open Technical Issues" stat card and the priority breakdown
-# underneath the Technical Issue Status Summary panel.
-OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
-
-# Fixed display order + labels/colors for the Technical Issue Status
-# Summary panel's status bars.
-ISSUE_STATUS_ORDER = ["pending", "assigned", "in_progress", "resolved", "closed"]
-ISSUE_STATUS_LABELS = {
-    "pending": "Pending",
-    "assigned": "Assigned",
-    "in_progress": "In Progress",
-    "resolved": "Resolved",
-    "closed": "Closed",
-}
-ISSUE_STATUS_COLORS = {
-    "pending": "#94a3b8",
-    "assigned": "#38bdf8",
-    "in_progress": "#8b5cf6",
-    "resolved": "#22c55e",
-    "closed": "#6b7280",
-}
-
-# Fixed display order + labels/colors for the "Open issues by
-# priority" badges under the Technical Issue Status Summary panel.
-# Matches the same PRIORITY_COLORS palette and "critical" -> "Urgent"
-# label used everywhere else a priority is shown as text (GeoMap /
-# napmap.js, issues/list.html, dispatch/index.html, reports/index.html,
-# the mobile field-assistant app) so this panel doesn't introduce a
-# second, inconsistent color/label scheme for the same four values.
-ISSUE_PRIORITY_ORDER = ["critical", "high", "medium", "low"]
-ISSUE_PRIORITY_LABELS = {
-    "critical": "Urgent",
-    "high": "High",
-    "medium": "Medium",
-    "low": "Low",
-}
-ISSUE_PRIORITY_COLORS = {
-    "critical": "#dc3545",
-    "high": "#fd7e14",
-    "medium": "#ffc107",
-    "low": "#22c55e",
 }
 
 
@@ -182,76 +136,6 @@ def index():
     else:
         port_health_label, port_health_class = "Healthy", "nap-health-good"
 
-    # Bar widths for the redesigned NAP Status Summary panel are drawn
-    # relative to whichever status has the highest count (not as a
-    # share of the 100%-stacked donut this panel used to be), so a
-    # single dominant status doesn't make the others invisible.
-    max_nap_status_count = max((row["count"] for row in nap_status_summary), default=0)
-    nap_status_bars = [
-        {
-            "status": row["status"].replace("_", " ").title(),
-            "count": row["count"],
-            "color": NAP_STATUS_COLORS[row["status"]],
-            "bar_pct": round((row["count"] / max_nap_status_count) * 100, 1)
-            if max_nap_status_count
-            else 0,
-        }
-        for row in nap_status_summary
-    ]
-
-    # ---------------------------------------------------------------
-    # TOP-ROW STAT CARDS (Total NAPs / Available Ports / Active
-    # Subscribers / Open Technical Issues / Available Technicians /
-    # Pending Service Requests)
-    # ---------------------------------------------------------------
-
-    active_subscribers = Subscriber.query.filter_by(status="active").count()
-    available_technicians = Technician.query.filter_by(status="available").count()
-    pending_service_requests = ServiceRequest.query.filter_by(status="pending").count()
-
-    # ---------------------------------------------------------------
-    # TECHNICAL ISSUE STATUS SUMMARY (+ open-issues-by-priority)
-    # ---------------------------------------------------------------
-
-    issue_status_rows = db.session.execute(
-        db.select(TechnicalIssue.status, func.count(TechnicalIssue.id)).group_by(
-            TechnicalIssue.status
-        )
-    ).all()
-    issue_status_counts = {status: count for status, count in issue_status_rows}
-    total_technical_issues = sum(issue_status_counts.values())
-    open_technical_issues = sum(
-        issue_status_counts.get(status, 0) for status in OPEN_ISSUE_STATUSES
-    )
-
-    max_issue_status_count = max(issue_status_counts.values(), default=0)
-    issue_status_bars = [
-        {
-            "status": ISSUE_STATUS_LABELS[status],
-            "count": issue_status_counts.get(status, 0),
-            "color": ISSUE_STATUS_COLORS[status],
-            "bar_pct": round((issue_status_counts.get(status, 0) / max_issue_status_count) * 100, 1)
-            if max_issue_status_count
-            else 0,
-        }
-        for status in ISSUE_STATUS_ORDER
-    ]
-
-    priority_rows = db.session.execute(
-        db.select(TechnicalIssue.priority, func.count(TechnicalIssue.id))
-        .where(TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES))
-        .group_by(TechnicalIssue.priority)
-    ).all()
-    priority_counts = {priority: count for priority, count in priority_rows}
-    open_issues_by_priority = [
-        {
-            "priority": ISSUE_PRIORITY_LABELS[priority],
-            "count": priority_counts.get(priority, 0),
-            "color": ISSUE_PRIORITY_COLORS[priority],
-        }
-        for priority in ISSUE_PRIORITY_ORDER
-    ]
-
     # ---------------------------------------------------------------
     # RECENT REPORTED ISSUES (latest 5)
     # ---------------------------------------------------------------
@@ -329,7 +213,6 @@ def index():
         nap_status_summary=nap_status_summary,
         nap_status_segments=nap_status_segments,
         nap_status_conic_gradient=nap_status_conic_gradient,
-        nap_status_bars=nap_status_bars,
         total_naps=total_naps,
         total_ports=total_ports,
         used_ports=used_ports,
@@ -337,13 +220,6 @@ def index():
         port_utilization_pct=port_utilization_pct,
         port_health_label=port_health_label,
         port_health_class=port_health_class,
-        active_subscribers=active_subscribers,
-        available_technicians=available_technicians,
-        pending_service_requests=pending_service_requests,
-        total_technical_issues=total_technical_issues,
-        open_technical_issues=open_technical_issues,
-        issue_status_bars=issue_status_bars,
-        open_issues_by_priority=open_issues_by_priority,
         recent_issues=recent_issues,
         recent_naps=recent_naps,
         technician_workload=technician_workload,

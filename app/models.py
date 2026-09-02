@@ -270,14 +270,7 @@ class TechnicalIssue(db.Model):
     __tablename__ = "technical_issues"
 
     id = db.Column(db.Integer, primary_key=True)
-    # Not unique: a Fiber Break is a single NAP-wide outage fanned out
-    # into one row per still-connected subscriber (report_fiber_break()
-    # in app/routes/issues.py), and every one of those rows
-    # deliberately shares the exact same issue_code -- opening any
-    # affected subscriber's ticket should show the same code as every
-    # other subscriber hit by that same outage. A plain (non-unique)
-    # index is kept below for the issues list's issue_code search.
-    issue_code = db.Column(db.String(20), nullable=True, index=True)
+    issue_code = db.Column(db.String(20), unique=True, nullable=True)
     issue_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=True)
     priority = db.Column(

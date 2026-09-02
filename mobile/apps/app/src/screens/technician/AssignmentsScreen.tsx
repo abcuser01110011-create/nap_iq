@@ -4,7 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import SyncBanner from "../../offline/SyncBanner";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, PRIORITY_RANK, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
+import { JOB_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_RANK, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // Company's home service area — the same default the admin's Barangay
 // picker already falls back to when nothing is typed (see
@@ -114,7 +114,7 @@ export default function AssignmentsScreen({ navigation }: any) {
               <View style={styles.cardFooter}>
                 {priority && (
                   <Text style={[styles.priority, { color: PRIORITY_COLORS[priority] ?? colors.textFaint }]}>
-                    Priority: {PRIORITY_LABELS[priority] ?? priority}
+                    Priority: {priority}
                   </Text>
                 )}
                 {pending > 0 && <Text style={styles.pendingTag}>Queued — will sync</Text>}
