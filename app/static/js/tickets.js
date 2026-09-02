@@ -189,7 +189,7 @@
             });
     }
 
-    function loadPersonnel(personnelType, selectEl, placeholder) {
+    function loadPersonnel(personnelType, selectEl, placeholder, onLoaded) {
         selectEl.innerHTML = '<option value="">Loading…</option>';
         fetch("/api/personnel?type=" + encodeURIComponent(personnelType))
             .then((r) => r.json())
@@ -202,10 +202,45 @@
                     );
                 });
                 selectEl.innerHTML = options.join("");
+                if (typeof onLoaded === "function") onLoaded();
             })
             .catch(() => {
                 selectEl.innerHTML = '<option value="">-- Could not load --</option>';
             });
+    }
+
+    // Keeps "Assisted By" from offering (or keeping) whoever is
+    // already picked as the primary "Technician" -- one person
+    // shouldn't be assignable to both roles on the same ticket. Runs
+    // once each dropdown finishes loading, and again every time the
+    // "Technician" selection changes.
+    function applyAssistedByExclusion() {
+        const assignedSelect = document.getElementById("ticketFormAssignedTeam");
+        const techSelect = document.getElementById("ticketFormTechnicianSelect");
+        if (!assignedSelect || !techSelect) return;
+        const excludedId = assignedSelect.value;
+
+        Array.from(techSelect.options).forEach((opt) => {
+            if (!opt.value) return; // always keep the placeholder visible
+            const isExcluded = !!excludedId && String(opt.value) === String(excludedId);
+            opt.hidden = isExcluded;
+            opt.disabled = isExcluded;
+        });
+
+        // Already-selected-but-not-yet-added value in the dropdown
+        // itself just became invalid -- clear it.
+        if (excludedId && String(techSelect.value) === String(excludedId)) {
+            techSelect.value = "";
+        }
+
+        // Already added as an "Assisted By" chip, then picked as the
+        // primary Technician afterwards -- drop the chip, since they
+        // can't be both.
+        if (excludedId) {
+            const before = addedTechnicians.length;
+            addedTechnicians = addedTechnicians.filter((t) => String(t.id) !== String(excludedId));
+            if (addedTechnicians.length !== before) renderTechnicianChips();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -496,6 +531,8 @@
         const option = select.options[select.selectedIndex];
         if (!option || !option.value) return;
         const id = option.value;
+        const assignedId = document.getElementById("ticketFormAssignedTeam").value;
+        if (assignedId && String(id) === String(assignedId)) return; // already the primary Technician
         if (addedTechnicians.some((t) => String(t.id) === String(id))) return;
         addedTechnicians.push({ id, full_name: option.getAttribute("data-name") || option.textContent });
         renderTechnicianChips();
@@ -620,8 +657,8 @@
         // any admin who'd only added personnel_type='technician' rows
         // via Technician Management -- pass "" (no type filter) so
         // every technician AND field assistant shows up here.
-        loadPersonnel("", document.getElementById("ticketFormAssignedTeam"), "-- None --");
-        loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --");
+        loadPersonnel("", document.getElementById("ticketFormAssignedTeam"), "-- None --", applyAssistedByExclusion);
+        loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --", applyAssistedByExclusion);
     }
 
     function openTicketForm(category, typeValue, typeLabel) {
@@ -1023,6 +1060,7 @@
             }
         });
 
+        document.getElementById("ticketFormAssignedTeam").addEventListener("change", applyAssistedByExclusion);
         document.getElementById("ticketFormAddTechnicianBtn").addEventListener("click", addTechnicianFromSelect);
         document.getElementById("ticketFormTechnicianChips").addEventListener("click", (event) => {
             const btn = event.target.closest("[data-remove-tech]");
