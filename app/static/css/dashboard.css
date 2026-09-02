@@ -1489,6 +1489,23 @@
     color: #1f2937;
 }
 
+/* Dispatch panel (app/templates/issues/view.html,
+   issues/view_service_order.html) -- was Bootstrap's .bg-light
+   utility, which hardcodes a near-white background with !important
+   regardless of theme. That's fine in light mode, but in dark mode
+   the surrounding page text stays light-on-dark (see body's dark
+   override in theme-dark.css) while this one box stayed stuck light,
+   so its text rendered light-on-near-white -- unreadable. Using the
+   app's own --napiq-bg/--napiq-border tokens instead means this panel
+   re-themes for free exactly like every other .disp-* surface already
+   does, with no separate [data-bs-theme="dark"] override needed. */
+.disp-dispatch-panel {
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background: var(--napiq-bg);
+}
+
 .disp-assignment-meta {
     font-size: 0.76rem;
     color: var(--napiq-text-muted);

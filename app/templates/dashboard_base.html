@@ -89,7 +89,7 @@
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('issues.') else '' }}"
                        href="{{ url_for('issues.list_issues') }}">
-                        <i class="bi bi-exclamation-triangle"></i><span>Tickets</span>
+                        <i class="bi bi-ticket-perforated"></i><span>Tickets</span>
                         {% if sidebar_badges.get('issues') %}
                             <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.issues }}</span>
                         {% endif %}
