@@ -806,7 +806,15 @@ def close_request(request_id):
     db.session.commit()
 
     flash("Service request marked closed.", "success")
-    return redirect(url_for("service_requests.edit_request", request_id=service_request.id))
+    # Phase 36: was previously a hard redirect to the Service Requests
+    # edit page regardless of where the POST came from — the only
+    # close_request/approve_request/reject_request-style route in this
+    # file that didn't already honor `request.referrer` (see those two
+    # just above). Now consistent with them, so triggering this from
+    # the Tickets tab's own Service Order detail page
+    # (issues.view_service_order) lands back there instead of forcing
+    # a jump to this module's screen.
+    return redirect(request.referrer or url_for("service_requests.edit_request", request_id=service_request.id))
 
 
 @service_requests_bp.route("/<int:request_id>/recommend-nap")

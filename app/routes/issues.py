@@ -193,7 +193,7 @@ def _ticket_row_from_service_request(service_request, assignment):
         "status_badge_class": _SERVICE_REQUEST_STATUS_BADGE_CLASSES.get(service_request.status, "disp-badge-low"),
         "assigned_name": assigned_name,
         "created_at": service_request.created_at,
-        "detail_url": url_for("service_requests.edit_request", request_id=service_request.id),
+        "detail_url": url_for("issues.view_service_order", request_id=service_request.id),
         "search_blob": " ".join(
             filter(
                 None,
@@ -829,3 +829,65 @@ def close_issue(issue_id):
     issue_label = issue.issue_code or f"#{issue.id}"
     flash(f"{issue_label} marked closed.", "success")
     return redirect(url_for("issues.view_issue", issue_id=issue.id))
+
+
+# Phase 36: kept in sync by hand with dispatch.py's own
+# DISPATCHABLE_REQUEST_STATUSES — same duplication tradeoff already
+# used throughout this module (see _OPEN_ASSIGNMENT_STATUSES /
+# _OPEN_ISSUE_STATUSES above). Only used here to decide whether to
+# show the "Assign a Technician" control on view_service_order below.
+_DISPATCHABLE_REQUEST_STATUSES = ("scheduled",)
+
+
+@issues_bp.route("/service-order/<int:request_id>")
+@role_required("administrator")
+def view_service_order(request_id):
+    """Displays full details for a single Service Order ticket
+    (service_requests row) — the Tickets tab's own detail page for
+    that ticket type, so opening a Service Order from the Tickets
+    table (issues/list.html) never has to leave for the separate
+    Service Requests screen. Mirrors view_issue() above: same
+    "current open assignment + full technician + full assignment
+    history" data shape, just sourced from ServiceRequest/its
+    Assignment rows (service_request_id) instead of TechnicalIssue's
+    (technical_issue_id).
+
+    Administrator-only, matching every other route in this module that
+    manages dispatch (view_issue's own admin-only sections, close_issue
+    above) — a field assistant already sees their own dispatched
+    service orders on the mobile app's Assignments list and has no
+    separate reason to browse this admin page.
+    """
+    service_request = ServiceRequest.query.get_or_404(request_id)
+
+    current_assignment = (
+        Assignment.query.filter(
+            Assignment.service_request_id == service_request.id,
+            Assignment.status.in_(_OPEN_ASSIGNMENT_STATUSES),
+        )
+        .order_by(Assignment.assigned_at.desc())
+        .first()
+    )
+    technicians = Technician.query.order_by(Technician.full_name).all()
+
+    # Every assignment ever routed to this request, newest first --
+    # same "full reassignment/resolution trail" reasoning as
+    # view_issue()'s own assignment_history above.
+    assignment_history = (
+        Assignment.query.filter(Assignment.service_request_id == service_request.id)
+        .order_by(Assignment.assigned_at.desc())
+        .all()
+    )
+
+    request_type = service_request.request_type or ""
+    type_label = "NAP Installation" if request_type == "add_nap" else request_type.replace("_", " ").title()
+
+    return render_template(
+        "issues/view_service_order.html",
+        service_request=service_request,
+        type_label=type_label,
+        assignment=current_assignment,
+        technicians=technicians,
+        assignment_history=assignment_history,
+        dispatchable=service_request.status in _DISPATCHABLE_REQUEST_STATUSES,
+    )
