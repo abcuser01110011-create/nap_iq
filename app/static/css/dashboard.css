@@ -18,6 +18,16 @@
     --napiq-warning: #fd7e14;
     --napiq-danger: #dc3545;
     --napiq-info: #0dcaf0;
+
+    /* "Low" issue priority: tea green, matching the GeoMap's
+       PRIORITY_COLORS.low (app/static/js/napmap.js) -- kept as its own
+       token (not the shared --napiq-text-muted gray) so it doesn't
+       double as the generic neutral/inactive/offline color the way
+       .disp-badge-low is reused elsewhere (technician status, role
+       badges, etc.). --napiq-tea-green-text is a darker shade of the
+       same hue for legible text against the pale badge background. */
+    --napiq-tea-green: #d0f0c0;
+    --napiq-tea-green-text: #4f7942;
 }
 
 .dash-body {
@@ -1390,6 +1400,27 @@
     color: var(--napiq-text-muted);
 }
 
+/* Issue priority "Low" specifically (issues/list.html, issues/view.html)
+   -- deliberately its own class rather than reusing .disp-badge-low
+   above, since that shared class also backs several unrelated
+   neutral/gray badges (technician "offline" status, generic role
+   badges, etc.) that should stay gray. */
+.disp-badge-priority-low {
+    background: rgba(208, 240, 192, 0.45);
+    color: var(--napiq-tea-green-text);
+}
+
+/* Bootstrap-style utility for issues/view.html's priority badge (a
+   plain Bootstrap .badge, not the .disp-badge system above) -- same
+   tea-green treatment as .disp-badge-priority-low, just matching
+   Bootstrap's .text-bg-* naming convention since that's what the rest
+   of that badge already uses (text-bg-secondary/-primary/-warning/
+   -danger). */
+.text-bg-tea-green {
+    background-color: var(--napiq-tea-green) !important;
+    color: var(--napiq-tea-green-text) !important;
+}
+
 .disp-badge-medium,
 .disp-badge-in_progress,
 .disp-badge-scheduled {
@@ -1568,5 +1599,223 @@
 
     .dash-brand-name {
         font-size: 0.95rem;
+    }
+}
+
+/* ====================================================================
+   ADMIN DASHBOARD REDESIGN — TOP STAT CARDS + STATUS SUMMARY PANELS
+   --------------------------------------------------------------------
+   Replaces the old single-panel "NAP Status Summary" donut + gauge
+   with a row of top-line stat cards plus two side-by-side bar-chart
+   summary panels (NAP status, Technical Issue status). Uses the same
+   --napiq-* tokens as the rest of dashboard.css, so it re-themes for
+   free under [data-bs-theme="dark"] (see theme-dark.css).
+   ==================================================================== */
+
+/* ---------------- Top stat cards ---------------- */
+
+.dash-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.75rem;
+    padding: 0.9rem 1rem;
+    height: 100%;
+}
+
+.dash-stat-icon {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 0.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: #fff;
+}
+
+.stat-icon-purple { background: #8b5cf6; }
+.stat-icon-blue   { background: #0ea5e9; }
+.stat-icon-green  { background: #22c55e; }
+.stat-icon-red    { background: #f87171; }
+.stat-icon-orange { background: #f59e0b; }
+
+.dash-stat-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.dash-stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.dash-stat-label {
+    font-size: 0.78rem;
+    color: var(--napiq-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---------------- Summary panels (NAP status / Issue status) ---------------- */
+
+.summary-panel {
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.75rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--napiq-border);
+}
+
+.summary-panel-header h5 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-panel-header h5 i {
+    color: var(--napiq-text-muted);
+}
+
+.summary-total-badge {
+    font-size: 0.78rem;
+    color: var(--napiq-text-muted);
+}
+
+.summary-panel-body {
+    padding: 1rem 1.1rem 1.1rem;
+    flex: 1;
+}
+
+.summary-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.65rem;
+}
+
+.summary-row:last-of-type {
+    margin-bottom: 0;
+}
+
+.summary-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.summary-label {
+    flex: 0 0 auto;
+    width: 92px;
+    font-size: 0.82rem;
+    color: var(--napiq-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.summary-track {
+    flex: 1 1 auto;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--napiq-bg);
+    overflow: hidden;
+}
+
+.summary-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+.summary-count {
+    flex: 0 0 auto;
+    width: 28px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* ---------------- Port utilization strip (bottom of NAP panel) ---------------- */
+
+.port-util-block {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--napiq-border);
+}
+
+.port-util-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    margin-bottom: 0.45rem;
+}
+
+.port-util-track {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--napiq-bg);
+    overflow: hidden;
+}
+
+.port-util-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--napiq-primary);
+    transition: width 0.3s ease;
+}
+
+/* ---------------- Open issues by priority (bottom of Issue panel) ---------------- */
+
+.issue-priority-block {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--napiq-border);
+}
+
+.issue-priority-title {
+    font-size: 0.82rem;
+    color: var(--napiq-text-muted);
+    margin-bottom: 0.55rem;
+}
+
+.issue-priority-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.issue-priority-badge {
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+    .summary-label {
+        width: 74px;
     }
 }
