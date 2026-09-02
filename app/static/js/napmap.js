@@ -345,6 +345,47 @@
     }
 
     document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", setupLegendCollapse);
+
+    // ------------------------------------------------------------------
+    // Legend collapse/expand (small collapsible card, bottom-left of the
+    // map -- see naps/map.html's #napmapLegendPanel). Registered as its
+    // own DOMContentLoaded listener, separate from init() above, since
+    // it has nothing to do with the map/marker data init() loads and
+    // should keep working even if that async init is still in flight.
+    // ------------------------------------------------------------------
+    const GEOMAP_LEGEND_STORAGE_KEY = "napiq:geomapLegendCollapsed";
+
+    function setupLegendCollapse() {
+        const panel = document.getElementById("napmapLegendPanel");
+        const toggle = document.getElementById("napmapLegendToggle");
+        if (!panel || !toggle) return;
+
+        let collapsed = true; // default: small/collapsed until a person opens it
+        try {
+            const saved = localStorage.getItem(GEOMAP_LEGEND_STORAGE_KEY);
+            if (saved !== null) collapsed = saved === "true";
+        } catch (err) {
+            // Ignore -- localStorage can throw (private browsing, etc.);
+            // just fall back to the default collapsed state above.
+        }
+        applyLegendCollapsedState(panel, toggle, collapsed);
+
+        toggle.addEventListener("click", () => {
+            const nowCollapsed = !panel.classList.contains("is-collapsed");
+            applyLegendCollapsedState(panel, toggle, nowCollapsed);
+            try {
+                localStorage.setItem(GEOMAP_LEGEND_STORAGE_KEY, String(nowCollapsed));
+            } catch (err) {
+                // Ignore -- see comment above.
+            }
+        });
+    }
+
+    function applyLegendCollapsedState(panel, toggle, collapsed) {
+        panel.classList.toggle("is-collapsed", collapsed);
+        toggle.setAttribute("aria-expanded", String(!collapsed));
+    }
 
     async function init() {
         // Phase 33 (default GeoMap focus, instant version): if

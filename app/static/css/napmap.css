@@ -138,40 +138,88 @@
     font-size: 0.83rem;
 }
 
-/* Legend redesign: "make the legend small or make it horizontal with
-   no background and small" -- dropped the card/shadow wrapper
-   entirely so the legend has no background at all, just small text
-   sitting directly over the map, laid out as one horizontal wrapping
-   row instead of three stacked rows. */
+/* Legend redesign: small collapsible card docked bottom-left, instead
+   of a wide always-visible horizontal bar. Collapsed state shows only
+   a compact toggle button; expanding it reveals the same legend
+   content as before, now stacked as a vertical list so the card stays
+   narrow rather than stretching across the map. Toggle state is
+   remembered per-browser via localStorage (see napmap.js). */
 .napmap-legend-panel {
-    background: transparent;
-    border: none;
-    box-shadow: none;
+    background: var(--napiq-surface, #ffffff);
+    border: 1px solid var(--napiq-border, #e6e9ef);
+    border-radius: 0.6rem;
+    box-shadow: 0 6px 20px -6px rgba(15, 23, 42, 0.25), 0 2px 6px -2px rgba(15, 23, 42, 0.1);
     padding: 0;
-    font-size: 0.72rem;
-    color: #495057;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85), 0 0 6px rgba(255, 255, 255, 0.85);
+    font-size: 0.74rem;
+    color: var(--napiq-text-muted, #495057);
+    width: 220px;
+    max-width: calc(100vw - 48px);
+    overflow: hidden;
+}
+
+.napmap-legend-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.45rem 0.6rem;
+    cursor: pointer;
+}
+
+.napmap-legend-toggle span {
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+.napmap-legend-chevron {
+    transition: transform 0.15s ease;
+}
+
+.napmap-legend-panel.is-collapsed .napmap-legend-chevron {
+    transform: rotate(180deg);
+}
+
+.napmap-legend-panel.is-collapsed .napmap-legend-body {
+    display: none;
+}
+
+.napmap-legend-body {
+    border-top: 1px solid var(--napiq-border, #e6e9ef);
+    padding: 0.55rem 0.65rem 0.6rem;
+    max-height: 45vh;
+    overflow-y: auto;
+}
+
+.napmap-legend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
 }
 
 .napmap-legend-panel .legend-dot {
     width: 8px;
     height: 8px;
-    margin-right: 3px;
+    margin-right: 4px;
 }
 
 .napmap-legend-panel .legend-line {
     display: inline-block;
     width: 14px;
     height: 2px;
-    margin-right: 3px;
+    margin-right: 4px;
     vertical-align: middle;
 }
 
-.napmap-legend-sep {
-    width: 1px;
-    height: 11px;
-    background: rgba(73, 80, 87, 0.35);
-    display: inline-block;
+.napmap-legend-sep-h {
+    display: block;
+    height: 1px;
+    margin: 0.15rem 0;
+    background: var(--napiq-border, rgba(73, 80, 87, 0.35));
 }
 
 /* Coverage-radius legend swatch: a small dashed ring instead of a
@@ -184,23 +232,27 @@
     display: inline-block;
     width: 10px;
     height: 10px;
-    margin-right: 3px;
+    margin-right: 4px;
     vertical-align: middle;
     border-radius: 50%;
     border: 1.5px dashed var(--napiq-primary, #0f5fa6);
 }
 
 .napmap-legend-count {
-    margin-top: 2px;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--napiq-border, #e6e9ef);
     font-size: 0.72rem;
     opacity: 0.85;
 }
 
 @media (max-width: 575.98px) {
     .napmap-legend-panel {
-        font-size: 0.68rem;
+        width: 190px;
+        font-size: 0.7rem;
     }
 }
+
 
 /* Topbar search override (rich NAP/Subscriber/Complaint search
    moved from its own card into the shared shell's topbar search

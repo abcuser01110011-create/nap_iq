@@ -74,14 +74,25 @@ ISSUE_STATUS_COLORS = {
     "closed": "#6b7280",
 }
 
-# Fixed display order + colors for the "Open issues by priority"
-# badges under the Technical Issue Status Summary panel.
+# Fixed display order + labels/colors for the "Open issues by
+# priority" badges under the Technical Issue Status Summary panel.
+# Matches the same PRIORITY_COLORS palette and "critical" -> "Urgent"
+# label used everywhere else a priority is shown as text (GeoMap /
+# napmap.js, issues/list.html, dispatch/index.html, reports/index.html,
+# the mobile field-assistant app) so this panel doesn't introduce a
+# second, inconsistent color/label scheme for the same four values.
 ISSUE_PRIORITY_ORDER = ["critical", "high", "medium", "low"]
+ISSUE_PRIORITY_LABELS = {
+    "critical": "Urgent",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+}
 ISSUE_PRIORITY_COLORS = {
-    "critical": "#f87171",
-    "high": "#f59e0b",
-    "medium": "#38bdf8",
-    "low": "#9aa2ad",
+    "critical": "#dc3545",
+    "high": "#fd7e14",
+    "medium": "#ffc107",
+    "low": "#22c55e",
 }
 
 
@@ -234,7 +245,7 @@ def index():
     priority_counts = {priority: count for priority, count in priority_rows}
     open_issues_by_priority = [
         {
-            "priority": priority.title(),
+            "priority": ISSUE_PRIORITY_LABELS[priority],
             "count": priority_counts.get(priority, 0),
             "color": ISSUE_PRIORITY_COLORS[priority],
         }
