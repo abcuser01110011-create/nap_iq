@@ -616,7 +616,11 @@
         statusSelect.disabled = category === "TN";
         if (category === "TN") statusSelect.value = "pending";
 
-        loadPersonnel("field_assistant", document.getElementById("ticketFormAssignedTeam"), "-- None --");
+        // Was "field_assistant" only, which left this list empty for
+        // any admin who'd only added personnel_type='technician' rows
+        // via Technician Management -- pass "" (no type filter) so
+        // every technician AND field assistant shows up here.
+        loadPersonnel("", document.getElementById("ticketFormAssignedTeam"), "-- None --");
         loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --");
     }
 

@@ -185,14 +185,17 @@ def _dispatch_field_assistant(service_request, assigned_team_id):
     Board's own `assign_request()` (app/routes/dispatch.py), since the
     admin already picked someone in the same form. Silently does
     nothing if no assigned team was chosen, or if the id doesn't match
-    a real field_assistant Technician -- the request itself still
-    gets created either way.
+    a real Technician -- the request itself still gets created either
+    way.
+
+    The dropdown now lists every technician *and* field assistant (not
+    just field assistants), so the match below is no longer restricted
+    to personnel_type="field_assistant" -- any valid Technician id
+    picked in that dropdown gets dispatched.
     """
     if not assigned_team_id:
         return
-    technician = Technician.query.filter_by(
-        id=assigned_team_id, personnel_type="field_assistant"
-    ).first()
+    technician = Technician.query.filter_by(id=assigned_team_id).first()
     if technician is None:
         return
     db.session.add(

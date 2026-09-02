@@ -163,13 +163,16 @@ def _dispatch_field_assistant(issue, assigned_team_id):
     assistant's mobile Assignments dashboard, instead of only being
     dispatchable later from the Dispatch Board. Silently does nothing
     if no assigned team was chosen, or if the id doesn't resolve to a
-    real field_assistant Technician.
+    real Technician.
+
+    The dropdown now lists every technician *and* field assistant (not
+    just field assistants), so the match below is no longer restricted
+    to personnel_type="field_assistant" -- any valid Technician id
+    picked in that dropdown gets dispatched.
     """
     if not assigned_team_id:
         return
-    technician = Technician.query.filter_by(
-        id=assigned_team_id, personnel_type="field_assistant"
-    ).first()
+    technician = Technician.query.filter_by(id=assigned_team_id).first()
     if technician is None:
         return
     db.session.add(
