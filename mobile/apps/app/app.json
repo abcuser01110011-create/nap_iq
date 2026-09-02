@@ -51,7 +51,10 @@
         {
           "locationWhenInUsePermission": "PG Networks uses your device's current location to verify your installation address when you apply for service."
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-status-bar"
     ],
     "extra": {
       "apiBaseUrl": "https://napiq-production.up.railway.app",

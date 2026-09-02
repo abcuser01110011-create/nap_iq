@@ -1,8 +1,18 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import type { ApiClient } from "@nap-iq/api-client";
+
+// SDK 53+ removed Android remote-push support from Expo Go entirely --
+// touching expo-notifications' listener/token APIs there throws
+// synchronously (see docs.expo.dev/push-notifications/faq). Detect
+// "running inside the Expo Go client app" so callers can no-op instead
+// of crashing; push still works normally in a development build or a
+// production build, where executionEnvironment is Standalone.
+export function isRunningInExpoGo(): boolean {
+  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
 
 function getProjectId(): string | undefined {
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
@@ -11,8 +21,9 @@ function getProjectId(): string | undefined {
 
 async function resolveExpoPushToken(): Promise<string | null> {
   // Push tokens don't resolve on simulators/emulators — only real
-  // devices have an APNs/FCM identity to hand back.
-  if (!Device.isDevice) return null;
+  // devices have an APNs/FCM identity to hand back. Also unavailable
+  // in Expo Go on Android as of SDK 53+ (see isRunningInExpoGo above).
+  if (!Device.isDevice || isRunningInExpoGo()) return null;
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -62,6 +73,7 @@ export async function registerPushToken(client: ApiClient, role?: "technician" |
 export async function unregisterPushToken(client: ApiClient, role?: "technician" | "customer" | null): Promise<void> {
   if (role !== "technician") return;
   try {
+    if (isRunningInExpoGo()) return;
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted" || !Device.isDevice) return;
     const projectId = getProjectId();
