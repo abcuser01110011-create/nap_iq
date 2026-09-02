@@ -37,14 +37,14 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
 // markers (app/static/js/napmap.js's PRIORITY_COLORS / PRIORITY_LABELS
 // / PRIORITY_RANK) — kept in sync so a priority reads the same color,
 // wording, and rank everywhere in the app, not just on the map.
-// "low" is tea green rather than gray (matches napmap.js's comment on
-// why: it no longer visually disappears against gray UI chrome), and
+// "low" is green rather than gray (matches napmap.js's comment on why:
+// it no longer visually disappears against gray UI chrome), and
 // "critical" displays as "Urgent" everywhere a priority is shown as
 // text -- the raw value ("critical") is unchanged everywhere else
 // (API payloads, PRIORITY_RANK, filtering), only the label shown to a
 // person differs.
 export const PRIORITY_COLORS: Record<string, string> = {
-  low: "#d0f0c0",
+  low: "#22c55e",
   medium: "#ffc107",
   high: "#fd7e14",
   critical: "#dc3545",
