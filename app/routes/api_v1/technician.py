@@ -337,7 +337,7 @@ def _serialize_assignment(assignment: Assignment) -> dict:
 
 
 @api_v1_technician_bp.route("/assignments", methods=["GET"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def list_assignments():
     """The signed-in technician's current (open) workload."""
     profile = _get_own_profile_or_404()
@@ -356,7 +356,7 @@ def list_assignments():
 
 
 @api_v1_technician_bp.route("/assignments/history", methods=["GET"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def assignment_history():
     """The signed-in technician's past (completed/cancelled) assignments."""
     profile = _get_own_profile_or_404()
@@ -375,7 +375,7 @@ def assignment_history():
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/accept", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def accept_assignment(assignment_id):
     """assigned -> accepted. See technician.py's version for the same
     status-machine rule this mirrors."""
@@ -397,7 +397,7 @@ def accept_assignment(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def start_assignment(assignment_id):
     """accepted -> in_progress. Marks the technician 'busy' either
     way; mirrors the status onto the linked issue only for a repair,
@@ -436,7 +436,7 @@ def start_assignment(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def save_notes(assignment_id):
     """Saves/updates resolution notes (and, optionally, the serviced
     port_number — see _validate_port_number()) without changing
@@ -469,7 +469,7 @@ def save_notes(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/photo", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def upload_assignment_photo(assignment_id):
     """Uploads (or replaces) the required completion photo for an
     assignment. Valid from the same statuses as save_notes() —
@@ -609,7 +609,7 @@ def _scan_signature_image(file_storage):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/signature", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def upload_assignment_signature(assignment_id):
     """Phase 28: uploads (or replaces) the customer's sign-off for an
     *installation* assignment — the install-only counterpart to
@@ -703,7 +703,7 @@ def upload_assignment_signature(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/pin-location", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def pin_assignment_location(assignment_id):
     """Records the technician's own on-site GPS fix for an
     *installation* assignment — the replacement for the old customer
@@ -757,7 +757,7 @@ def pin_assignment_location(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/nearby-naps", methods=["GET"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def nearby_naps(assignment_id):
     """Nearest-suitable-NAP candidates for the technician's own pinned
     on-site location, so they can link the right NAP themselves on an
@@ -812,7 +812,7 @@ def nearby_naps(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/link-nap", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def link_nap(assignment_id):
     """Lets the technician set `service_request.requested_nap_id`
     themselves, from the nearby_naps() list above — the field
@@ -887,7 +887,7 @@ def link_nap(assignment_id):
 
 
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
-@jwt_role_required("field_assistant")
+@jwt_role_required("technician")
 def complete_assignment(assignment_id):
     """in_progress -> completed (a repair's issue -> resolved).
     Resolution notes are optional -- if given, they're saved before
