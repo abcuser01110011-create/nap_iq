@@ -9,7 +9,15 @@ function getProjectId(): string | undefined {
   return typeof projectId === "string" && projectId.length > 0 ? projectId : undefined;
 }
 
+// Expo Go (SDK 53+) no longer supports remote push notifications at all —
+// getExpoPushTokenAsync throws instead of resolving. Guard on the runtime
+// so the app still works in Expo Go; push registration only actually runs
+// in a development build or a standalone/store build.
+const isExpoGo = Constants.executionEnvironment === "storeClient";
+
 async function resolveExpoPushToken(): Promise<string | null> {
+  if (isExpoGo) return null;
+
   // Push tokens don't resolve on simulators/emulators — only real
   // devices have an APNs/FCM identity to hand back.
   if (!Device.isDevice) return null;
@@ -60,7 +68,7 @@ export async function registerPushToken(client: ApiClient, role?: "technician" |
 /** Best-effort unregister on logout — mirrors registerPushToken's
  * failure posture and the same technician-only gate. */
 export async function unregisterPushToken(client: ApiClient, role?: "technician" | "customer" | null): Promise<void> {
-  if (role !== "technician") return;
+  if (role !== "technician" || isExpoGo) return;
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted" || !Device.isDevice) return;

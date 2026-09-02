@@ -1,7 +1,13 @@
 import { useEffect } from "react";
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { useOffline } from "../offline/OfflineContext";
 import { navigationRef } from "../navigation/navigationRef";
+
+// Expo Go (SDK 53+) dropped remote push support entirely; avoid wiring up
+// push listeners there so this component is a no-op in Expo Go instead of
+// throwing, and only listens for real in a dev/standalone build.
+const isExpoGo = Constants.executionEnvironment === "storeClient";
 
 /** Mounted inside OfflineProvider (signed-in tree only) so it always
  * has a live `refresh`. New assignment / status change → Expo push
@@ -14,6 +20,8 @@ export default function NotificationRouter() {
   const { refresh, isOnline } = useOffline();
 
   useEffect(() => {
+    if (isExpoGo) return;
+
     const receivedSub = Notifications.addNotificationReceivedListener(() => {
       if (isOnline) refresh();
     });
