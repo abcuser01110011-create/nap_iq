@@ -39,6 +39,30 @@ view_issue()/issues/view.html — every Assignment row for the issue,
 not just the current open one, so an administrator can see the whole
 reassignment/resolution trail including resolution_notes.
 
+Phase 36 — Tickets tab was showing trouble tickets (technical_issues,
+created from the GeoMap's "Report Issue" / "+ Tickets" > Trouble
+Ticket flow) only. A Service Order created from the same "+ Tickets"
+modal (New Installation / Relocation / Upgrade / Disconnection / Add
+NAP) already got dispatched to a field assistant's mobile Assignments
+list via `_dispatch_field_assistant()` in
+app/routes/service_requests.py, but never showed up anywhere in this
+admin-facing Tickets table — the *only* place it was visible besides
+the technician's phone was the separate Service Requests screen. Admin
+had no single list confirming "yes, that ticket I just created is in
+the system". `list_issues()` below now merges `service_requests` rows
+into the same table alongside `technical_issues` rows, normalized into
+a plain-dict "ticket row" shape (`_ticket_row_from_issue()` /
+`_ticket_row_from_service_request()`) so issues/list.html can render
+both kinds with one loop. Search/status/priority filtering is done in
+Python over the merged, already-small admin ticket list rather than
+two separate SQL queries, since the two source tables don't share a
+status vocabulary (see `_SERVICE_REQUEST_STATUS_BADGE_CLASSES` below).
+Each ticket's row still links to its own real detail page — the
+existing issues.view_issue() for a trouble ticket, or the existing
+service_requests.edit_request() (already used as a read-only detail
+view elsewhere) for a service order — nothing about those pages
+changes.
+
 Routes:
     GET  /issues/                  -> list_issues  (Administrator: full issue list, search + filters)
     POST /issues/report            -> report_issue  (create an issue from a map click, JSON)
@@ -52,7 +76,7 @@ from decimal import Decimal
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician
+from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician, ServiceRequest
 from app.forms import IssueReportForm
 from app.notifications_utils import notify_issue_status_change, notify_new_issue_reported, notify_issue_updated
 
@@ -87,6 +111,105 @@ _OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
 # up until it's resolved/closed).
 _OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 
+# Phase 36: same status -> badge-class mapping service_requests/list.html
+# already uses for its own status pills, reused here so a Service Order
+# row shown in the merged Tickets table gets the exact same color
+# treatment it already has on the Service Requests screen. Kept as its
+# own dict (rather than importing one from service_requests.py) since
+# that module doesn't expose it as a shared constant today.
+_SERVICE_REQUEST_STATUS_BADGE_CLASSES = {
+    "pending": "disp-badge-high",
+    "approved": "disp-badge-assigned",
+    "scheduled": "disp-badge-medium",
+    "completed": "disp-badge-resolved",
+    "closed": "disp-badge-closed",
+    "rejected": "disp-badge-critical",
+}
+
+
+def _ticket_row_from_issue(issue, assignment):
+    """Normalizes a TechnicalIssue (+ its current open Assignment, if
+    any) into the plain-dict "ticket row" shape issues/list.html loops
+    over. See this module's Phase 36 docstring note for why this
+    exists."""
+    subscriber_name = issue.subscriber.full_name if issue.subscriber else ""
+    subscriber_code = issue.subscriber.subscriber_code if issue.subscriber else ""
+    assigned_name = assignment.technician.full_name if assignment and assignment.technician else None
+
+    return {
+        "kind": "trouble_ticket",
+        "code": issue.issue_code or f"#{issue.id}",
+        "type_label": issue.issue_type,
+        "priority": issue.priority,
+        "status": issue.status,
+        "status_label": issue.status.replace("_", " ").capitalize(),
+        "status_badge_class": f"disp-badge-{issue.status}",
+        "assigned_name": assigned_name,
+        "created_at": issue.created_at,
+        "detail_url": url_for("issues.view_issue", issue_id=issue.id),
+        "search_blob": " ".join(
+            filter(
+                None,
+                [
+                    issue.issue_code,
+                    issue.issue_type,
+                    subscriber_name,
+                    subscriber_code,
+                    issue.nap.nap_code if issue.nap else "",
+                    issue.status.replace("_", " "),
+                    issue.priority,
+                    assigned_name or "",
+                ],
+            )
+        ).lower(),
+    }
+
+
+def _ticket_row_from_service_request(service_request, assignment):
+    """Same as `_ticket_row_from_issue()` above but for a ServiceRequest
+    (a "Service Order" ticket — New Installation / Relocation / Upgrade
+    / Disconnection / Add NAP). ServiceRequest has no persisted ticket
+    code column (see models.py), so one is derived from its real id --
+    same "SO"-prefixed style the "+ Tickets" modal's next-code preview
+    already uses (app/routes/api.py's tickets_next_code_json), just
+    hyphenated to match TechnicalIssue.issue_code's "ISS-0004" look.
+    """
+    request_type = service_request.request_type or ""
+    type_label = "NAP Installation" if request_type == "add_nap" else request_type.replace("_", " ").title()
+
+    subscriber_name = (
+        service_request.subscriber.full_name if service_request.subscriber else (service_request.full_name or "")
+    )
+    subscriber_code = service_request.subscriber.subscriber_code if service_request.subscriber else ""
+    assigned_name = assignment.technician.full_name if assignment and assignment.technician else None
+
+    return {
+        "kind": "service_order",
+        "code": f"SO-{service_request.id:04d}",
+        "type_label": type_label,
+        "priority": service_request.priority,
+        "status": service_request.status,
+        "status_label": service_request.status.capitalize(),
+        "status_badge_class": _SERVICE_REQUEST_STATUS_BADGE_CLASSES.get(service_request.status, "disp-badge-low"),
+        "assigned_name": assigned_name,
+        "created_at": service_request.created_at,
+        "detail_url": url_for("service_requests.edit_request", request_id=service_request.id),
+        "search_blob": " ".join(
+            filter(
+                None,
+                [
+                    f"SO-{service_request.id:04d}",
+                    type_label,
+                    subscriber_name,
+                    subscriber_code,
+                    service_request.status,
+                    service_request.priority or "",
+                    assigned_name or "",
+                ],
+            )
+        ).lower(),
+    }
+
 
 def _populate_dynamic_choices(form):
     """Fills in the Subscriber and NAP dropdown options from the
@@ -105,49 +228,64 @@ def _populate_dynamic_choices(form):
 @issues_bp.route("/")
 @role_required("administrator")
 def list_issues():
-    """Full technical-issues list for an Administrator: every issue
-    regardless of status (unlike the Dispatch Board, which only shows
-    open ones), with search (issue code, subscriber name/code, issue
-    type) and status/priority filtering via query string parameters
-    (?q=...&status=...&priority=...) — same pattern as
-    subscribers.list_subscribers.
+    """Full ticket list for an Administrator: every trouble ticket
+    (technical_issues) *and* every service order (service_requests) —
+    i.e. everything ever created from the GeoMap's "Report Issue" /
+    "+ Tickets" flows — regardless of status (unlike the Dispatch
+    Board, which only shows open trouble tickets), with search (ticket
+    code, subscriber name/code, ticket type) and status/priority
+    filtering via query string parameters (?q=...&status=...&priority=...)
+    — same pattern as subscribers.list_subscribers.
+
+    Phase 36: previously only queried TechnicalIssue, so a Service
+    Order created via the "+ Tickets" modal was dispatched to a field
+    assistant's mobile app but never showed up here — see this
+    module's Phase 36 docstring note above for the full reasoning. The
+    two source tables don't share a status vocabulary (technical_issues:
+    pending/assigned/in_progress/resolved/closed vs. service_requests:
+    pending/approved/scheduled/completed/rejected/closed), so both are
+    fetched in full and filtering is done in Python over the merged,
+    already-small admin ticket list rather than as two divergent SQL
+    WHERE clauses.
     """
     search_term = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
     priority_filter = request.args.get("priority", "").strip()
 
-    query = TechnicalIssue.query
+    issues = TechnicalIssue.query.order_by(TechnicalIssue.created_at.desc()).all()
+    service_requests = ServiceRequest.query.order_by(ServiceRequest.created_at.desc()).all()
 
-    if search_term:
-        like_pattern = f"%{search_term}%"
-        query = query.join(Subscriber).filter(
-            db.or_(
-                TechnicalIssue.issue_code.ilike(like_pattern),
-                TechnicalIssue.issue_type.ilike(like_pattern),
-                Subscriber.full_name.ilike(like_pattern),
-                Subscriber.subscriber_code.ilike(like_pattern),
-            )
-        )
-
-    if status_filter:
-        query = query.filter(TechnicalIssue.status == status_filter)
-
-    if priority_filter:
-        query = query.filter(TechnicalIssue.priority == priority_filter)
-
-    issues = query.order_by(TechnicalIssue.created_at.desc()).all()
-
-    # One query for all open assignments rather than N+1 per issue row
-    # — same approach dispatch.index() already uses.
+    # One query for all open assignments rather than N+1 per row --
+    # same approach dispatch.index() already uses. Split by which
+    # source column is set (Assignment always sets exactly one of the
+    # two -- see models.py's Assignment docstring).
     open_assignments = Assignment.query.filter(
         Assignment.status.in_(_OPEN_ASSIGNMENT_STATUSES)
     ).all()
-    assignment_by_issue = {a.technical_issue_id: a for a in open_assignments}
+    assignment_by_issue = {a.technical_issue_id: a for a in open_assignments if a.technical_issue_id}
+    assignment_by_request = {a.service_request_id: a for a in open_assignments if a.service_request_id}
+
+    tickets = [
+        _ticket_row_from_issue(issue, assignment_by_issue.get(issue.id)) for issue in issues
+    ] + [
+        _ticket_row_from_service_request(sr, assignment_by_request.get(sr.id)) for sr in service_requests
+    ]
+
+    if search_term:
+        term = search_term.lower()
+        tickets = [t for t in tickets if term in t["search_blob"]]
+
+    if status_filter:
+        tickets = [t for t in tickets if t["status"] == status_filter]
+
+    if priority_filter:
+        tickets = [t for t in tickets if t["priority"] == priority_filter]
+
+    tickets.sort(key=lambda t: t["created_at"], reverse=True)
 
     return render_template(
         "issues/list.html",
-        issues=issues,
-        assignment_by_issue=assignment_by_issue,
+        tickets=tickets,
         search_term=search_term,
         status_filter=status_filter,
         priority_filter=priority_filter,

@@ -3,7 +3,7 @@
 {% block page_title %}Tickets{% endblock %}
 {% block page_subtitle %}
 <p class="text-muted small mb-0" id="issuesRecordCount">
-    {{ issues|length }} ticket{{ '' if issues|length == 1 else 's' }} shown &middot;
+    {{ tickets|length }} ticket{{ '' if tickets|length == 1 else 's' }} shown &middot;
     full history — see the <a href="{{ url_for('dispatch.index') }}">Dispatch Board</a> for open work only
 </p>
 {% endblock %}
@@ -73,46 +73,39 @@
                 </tr>
             </thead>
             <tbody id="issuesTableBody">
-                {% for issue in issues %}
-                {% set assignment = assignment_by_issue.get(issue.id) %}
-                {% set search_blob = [
-                    issue.issue_code,
-                    issue.issue_type,
-                    issue.subscriber.full_name if issue.subscriber else "",
-                    issue.subscriber.subscriber_code if issue.subscriber else "",
-                    issue.nap.nap_code if issue.nap else "",
-                    issue.status|replace('_', ' '),
-                    issue.priority,
-                    assignment.technician.full_name if assignment and assignment.technician else "",
-                ]|select|join(' ')|lower %}
-                <tr class="disp-row disp-row-clickable" data-search="{{ search_blob }}" onclick="window.location='{{ url_for('issues.view_issue', issue_id=issue.id) }}';">
+                {% for ticket in tickets %}
+                <tr class="disp-row disp-row-clickable" data-search="{{ ticket.search_blob }}" onclick="window.location='{{ ticket.detail_url }}';">
                     <td>
-                        <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="disp-primary-link">
-                            {{ issue.issue_code or ('#' ~ issue.id) }}
+                        <a href="{{ ticket.detail_url }}" class="disp-primary-link">
+                            {{ ticket.code }}
                         </a>
                     </td>
-                    <td>{{ issue.issue_type }}</td>
+                    <td>{{ ticket.type_label }}</td>
                     <td>
-                        <span class="disp-badge disp-badge-{{ issue.priority }}">
-                            {{ issue.priority|capitalize }}
+                        {% if ticket.priority %}
+                        <span class="disp-badge disp-badge-{{ ticket.priority }}">
+                            {{ ticket.priority|capitalize }}
                         </span>
+                        {% else %}
+                        <span class="disp-subtext">—</span>
+                        {% endif %}
                     </td>
                     <td>
-                        <span class="disp-badge disp-badge-{{ issue.status }}">
-                            {{ issue.status|replace('_', ' ')|capitalize }}
+                        <span class="disp-badge {{ ticket.status_badge_class }}">
+                            {{ ticket.status_label }}
                         </span>
                     </td>
                     <td class="disp-assignment">
-                        {% if assignment %}
-                            <div class="disp-assignment-name">{{ assignment.technician.full_name if assignment.technician else "—" }}</div>
+                        {% if ticket.assigned_name %}
+                            <div class="disp-assignment-name">{{ ticket.assigned_name }}</div>
                         {% else %}
                             <span class="disp-subtext">Unassigned</span>
                         {% endif %}
                     </td>
-                    <td class="disp-subtext">{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td class="disp-subtext">{{ ticket.created_at.strftime('%Y-%m-%d') }}</td>
                     <td class="text-end">
                         <div class="subs-row-actions">
-                            <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}"
+                            <a href="{{ ticket.detail_url }}"
                                class="subs-edit-btn" title="View" onclick="event.stopPropagation();">
                                 <i class="bi bi-eye"></i>
                             </a>
@@ -128,7 +121,7 @@
                     </td>
                 </tr>
                 {% endfor %}
-                {% if issues %}
+                {% if tickets %}
                 <tr id="issuesNoMatchRow" class="d-none">
                     <td colspan="7" class="disp-empty">
                         <i class="bi bi-search display-6 d-block mb-2"></i>
