@@ -1,9 +1,9 @@
 {% extends "dashboard_base.html" %}
-{% block title %}Issues{% endblock %}
-{% block page_title %}Issues{% endblock %}
+{% block title %}Tickets{% endblock %}
+{% block page_title %}Tickets{% endblock %}
 {% block page_subtitle %}
 <p class="text-muted small mb-0" id="issuesRecordCount">
-    {{ issues|length }} issue{{ '' if issues|length == 1 else 's' }} shown &middot;
+    {{ issues|length }} ticket{{ '' if issues|length == 1 else 's' }} shown &middot;
     full history — see the <a href="{{ url_for('dispatch.index') }}">Dispatch Board</a> for open work only
 </p>
 {% endblock %}
@@ -32,9 +32,9 @@
         <i class="bi bi-search"></i>
         <input
             type="text" name="q" id="issuesSearchInput"
-            placeholder="Issue code, type, or subscriber..."
+            placeholder="Ticket code, type, or subscriber..."
             value="{{ search_term }}"
-            aria-label="Search issues"
+            aria-label="Search tickets"
             autocomplete="off"
         >
     </form>
@@ -63,14 +63,13 @@
         <table class="table disp-table align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Issue</th>
+                    <th>Ticket Code</th>
+                    <th>Type</th>
                     <th>Priority</th>
-                    <th>Subscriber</th>
-                    <th>NAP</th>
                     <th>Status</th>
                     <th>Assigned To</th>
-                    <th>Reported</th>
-                    <th class="text-end">Actions</th>
+                    <th>Created</th>
+                    <th class="text-end">Action</th>
                 </tr>
             </thead>
             <tbody id="issuesTableBody">
@@ -91,22 +90,13 @@
                         <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="disp-primary-link">
                             {{ issue.issue_code or ('#' ~ issue.id) }}
                         </a>
-                        <div class="disp-subtext">{{ issue.issue_type }}</div>
                     </td>
+                    <td>{{ issue.issue_type }}</td>
                     <td>
                         <span class="disp-badge disp-badge-{{ issue.priority }}">
                             {{ issue.priority|capitalize }}
                         </span>
                     </td>
-                    <td class="small">
-                        {% if issue.subscriber %}
-                            <span class="disp-code-pill">{{ issue.subscriber.subscriber_code }}</span>
-                            {{ issue.subscriber.full_name }}
-                        {% else %}
-                            <span class="disp-subtext">—</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ issue.nap.nap_code if issue.nap else "—" }}</td>
                     <td>
                         <span class="disp-badge disp-badge-{{ issue.status }}">
                             {{ issue.status|replace('_', ' ')|capitalize }}
@@ -132,17 +122,17 @@
                 </tr>
                 {% else %}
                 <tr id="issuesEmptyRow">
-                    <td colspan="8" class="disp-empty">
+                    <td colspan="7" class="disp-empty">
                         <i class="bi bi-exclamation-triangle display-6 d-block mb-2"></i>
-                        No issues found{% if search_term or status_filter or priority_filter %} matching your filters{% endif %}.
+                        No tickets found{% if search_term or status_filter or priority_filter %} matching your filters{% endif %}.
                     </td>
                 </tr>
                 {% endfor %}
                 {% if issues %}
                 <tr id="issuesNoMatchRow" class="d-none">
-                    <td colspan="8" class="disp-empty">
+                    <td colspan="7" class="disp-empty">
                         <i class="bi bi-search display-6 d-block mb-2"></i>
-                        No issues match "<span id="issuesNoMatchQuery"></span>".
+                        No tickets match "<span id="issuesNoMatchQuery"></span>".
                     </td>
                 </tr>
                 {% endif %}
@@ -190,7 +180,7 @@
             }
 
             if (recordCount) {
-                recordCount.textContent = visibleCount + (visibleCount === 1 ? ' issue shown' : ' issues shown');
+                recordCount.textContent = visibleCount + (visibleCount === 1 ? ' ticket shown' : ' tickets shown');
             }
         }
 
