@@ -38,10 +38,23 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
 // in sync so a priority reads the same color and ranks the same way
 // everywhere in the app, not just on the map.
 export const PRIORITY_COLORS: Record<string, string> = {
-  low: "#6c757d",
+  low: "#22c55e",
   medium: "#ffc107",
   high: "#fd7e14",
   critical: "#dc3545",
+};
+
+// Display text shown for each priority key -- separate from the
+// underlying key itself (still "low"/"medium"/"high"/"critical"
+// everywhere in the data/filtering/API logic) so relabeling here
+// never touches PRIORITY_RANK/COLORS lookups keyed by the original
+// names. Mirrors the GeoMap's PRIORITY_LABELS (napmap.js), where
+// "critical" reads "URGENT" on the map/legend.
+export const PRIORITY_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Urgent",
 };
 
 export const PRIORITY_RANK: Record<string, number> = {

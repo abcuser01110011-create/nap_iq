@@ -27,11 +27,15 @@ const ISSUE_TYPES = [
   "Other",
 ];
 
+// Labels mirror the GeoMap's PRIORITY_LABELS (app/static/js/napmap.js)
+// and the field assistant's technician/statusLabels.ts, where
+// "critical" reads "Urgent" everywhere it's shown to a person -- the
+// underlying value sent to the API stays "critical".
 const PRIORITIES: Array<{ value: NonNullable<ReportIssueInput["priority"]>; label: string }> = [
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
-  { value: "critical", label: "Critical" },
+  { value: "critical", label: "Urgent" },
 ];
 
 export default function ReportIssueScreen({ navigation }: any) {

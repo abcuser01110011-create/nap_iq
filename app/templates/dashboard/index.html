@@ -16,58 +16,58 @@
 {# ------------------------------------------------------------------ #}
 <div class="row g-3 mb-3">
     <div class="col-6 col-lg">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('naps.list_naps') }}">
             <span class="dash-stat-icon stat-icon-purple"><i class="bi bi-hdd-network"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ total_naps }}</span>
                 <span class="dash-stat-label">Total NAPs</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('naps.list_naps') }}">
             <span class="dash-stat-icon stat-icon-blue"><i class="bi bi-ethernet"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ ports_available }}</span>
                 <span class="dash-stat-label">Available Ports</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('subscribers.list_subscribers', status='active') }}">
             <span class="dash-stat-icon stat-icon-green"><i class="bi bi-people-fill"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ active_subscribers }}</span>
                 <span class="dash-stat-label">Active Subscribers</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('dispatch.index') }}">
             <span class="dash-stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ open_technical_issues }}</span>
                 <span class="dash-stat-label">Open Technical Issues</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('technicians.list_technicians', status='available') }}">
             <span class="dash-stat-icon stat-icon-purple"><i class="bi bi-person-badge-fill"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ available_technicians }}</span>
                 <span class="dash-stat-label">Available Technicians</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('service_requests.list_requests', status='pending') }}">
             <span class="dash-stat-icon stat-icon-orange"><i class="bi bi-clipboard-check-fill"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ pending_service_requests }}</span>
                 <span class="dash-stat-label">Pending Service Requests</span>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 

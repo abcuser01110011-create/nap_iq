@@ -1625,6 +1625,35 @@
     height: 100%;
 }
 
+/* Stat cards double as shortcuts into the relevant list/board page
+   (Total NAPs -> NAP Management, Open Technical Issues -> Dispatch
+   Board, etc.) -- reset the <a> defaults and add a hover/focus state
+   so that's discoverable without changing the card's own layout. */
+.dash-stat-card-link {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.dash-stat-card-link:hover,
+.dash-stat-card-link:focus-visible {
+    color: inherit;
+    text-decoration: none;
+    border-color: var(--napiq-primary, #8b5cf6);
+    background: var(--napiq-surface-hover, rgba(139, 92, 246, 0.08));
+    transform: translateY(-2px);
+}
+
+.dash-stat-card-link:focus-visible {
+    outline: 2px solid var(--napiq-primary, #8b5cf6);
+    outline-offset: 2px;
+}
+
+.dash-stat-card-link:active {
+    transform: translateY(0);
+}
+
 .dash-stat-icon {
     flex: 0 0 auto;
     width: 42px;

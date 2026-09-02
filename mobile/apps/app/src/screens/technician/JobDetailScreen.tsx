@@ -22,7 +22,7 @@ import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
 import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
+import { JOB_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // How long we'll wait for a GPS fix before treating it as a timeout —
 // same value/reasoning as the customer app's "Track My Location" step
@@ -37,12 +37,20 @@ const LOCATION_FIX_TIMEOUT_MS = 20000;
 // instead of a blank row.
 const DEFAULT_ADDRESS = "Sta. Cruz, Laguna";
 
-function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
+function InfoRow({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string | null | undefined;
+  valueColor?: string;
+}) {
   if (!value) return null;
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+      <Text style={[styles.infoValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
   );
 }
@@ -458,7 +466,16 @@ export default function JobDetailScreen({ route, navigation }: any) {
                 : undefined)
             }
           />
-          <InfoRow label="Priority" value={assignment.issue?.priority ?? assignment.service_request?.priority} />
+          {(() => {
+            const priority = assignment.issue?.priority ?? assignment.service_request?.priority;
+            return (
+              <InfoRow
+                label="Priority"
+                value={priority ? PRIORITY_LABELS[priority] ?? priority : priority}
+                valueColor={priority ? PRIORITY_COLORS[priority] : undefined}
+              />
+            );
+          })()}
           <InfoRow label="Status" value={STATUS_LABELS[assignment.status] ?? assignment.status} />
           {/* A walk-in Service Order (GeoMap "+ Tickets" modal, free-text
               Customer field) has no linked Subscriber -- fall back to the
