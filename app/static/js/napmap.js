@@ -21,34 +21,23 @@
         pending: "#0d6efd",
     };
 
-    // "low" is tea green (#D0F0C0) rather than gray -- still reads as
-    // calm/low-urgency, but no longer visually disappears against the
-    // gray "inactive"/pending-work UI chrome around it the way a gray
-    // dot used to. STATUS_COLORS above is untouched (that's NAP
-    // status, a separate legend from issue priority).
     const PRIORITY_COLORS = {
-        low: "#d0f0c0",
+        low: "#22c55e",
         medium: "#ffc107",
         high: "#fd7e14",
         critical: "#dc3545",
     };
 
-    // Display text for each priority value -- kept distinct from the
-    // raw value/PRIORITY_COLORS key (which stay "critical" everywhere
-    // else: filter checkboxes' `value`, the priority <select>s'
-    // `value`, and the database enum all still use "critical") so
-    // nothing but the label shown to a person needs to change.
-    // "critical" reads as "Urgent" everywhere a priority is shown as
-    // text on the map (marker labels, popups, the ticket details
-    // panel) -- same wording the Issues list/Dispatch Board/Reports
-    // pages and the mobile field-assistant app now use (see
-    // mobile/apps/app/src/screens/technician/statusLabels.ts's
-    // matching PRIORITY_LABELS).
+    // Display text shown for each priority key -- separate from the
+    // underlying key itself (still "low"/"medium"/"high"/"critical"
+    // everywhere in the data/filtering logic) so relabeling here never
+    // touches filter values, API payloads, or PRIORITY_RANK/COLORS
+    // lookups keyed by the original names.
     const PRIORITY_LABELS = {
-        low: "Low",
-        medium: "Medium",
-        high: "High",
-        critical: "Urgent",
+        low: "LOW",
+        medium: "MEDIUM",
+        high: "HIGH",
+        critical: "URGENT",
     };
 
     // How fast a priority-colored marker pulses, in seconds per pulse
@@ -1279,7 +1268,7 @@
         // deliberately fixed (not multiplied by the zoom-based icon
         // `scale`) so labels stay a constant, small on-screen size and
         // don't grow/overlap each other when zoomed in.
-        const labelText = priority ? (PRIORITY_LABELS[priority] || String(priority)).toUpperCase() : "";
+        const labelText = priority ? (PRIORITY_LABELS[priority] || String(priority).toUpperCase()) : "";
         const label = labelText
             ? '<div class="issue-marker-label" style="color:' + color + ';">' + labelText + "</div>"
             : "";
@@ -1333,6 +1322,18 @@
             .split("_")
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
             .join(" ");
+    }
+
+    /** Same idea as formatStatusLabel(), but for priority values --
+     * routes through PRIORITY_LABELS first so relabeled priorities
+     * (e.g. "critical" -> "Urgent") show consistently anywhere a
+     * priority is displayed as text, not just on the map badge. */
+    function formatPriorityLabel(value) {
+        const mapped = PRIORITY_LABELS[value];
+        if (mapped) {
+            return mapped.charAt(0).toUpperCase() + mapped.slice(1).toLowerCase();
+        }
+        return formatStatusLabel(value);
     }
 
     /** Builds the popup HTML shown when an issue marker is clicked.
@@ -1425,7 +1426,7 @@
         setText("ticketDetailsCode", "TN " + String(issue.id).padStart(5, "0"));
         setText("ticketDetailsType", issue.issue_type);
         setText("ticketDetailsNap", issue.nap_code);
-        setText("ticketDetailsPriority", PRIORITY_LABELS[issue.priority] || formatStatusLabel(issue.priority));
+        setText("ticketDetailsPriority", formatPriorityLabel(issue.priority));
         setText("ticketDetailsStatus", formatStatusLabel(issue.status));
         setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam);
         setText("ticketDetailsTechnicians", parsed.extras.technicians);
