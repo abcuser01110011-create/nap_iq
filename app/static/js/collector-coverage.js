@@ -6,9 +6,10 @@
  * but a collector often covers more than one barangay. This adds the
  * same barangay search the ticket form uses for its Location field
  * (see the BARANGAY_API_URL comment in static/js/tickets.js -- same
- * public PSGC-style API, same city/municipality code), plus a "+ Add"
- * button next to it (mirroring the ticket form's "Assisted By"
- * picker) so an admin can add several barangays as removable chips.
+ * public PSGC-style API, same city/municipality code) so an admin can
+ * add several barangays as removable chips. A barangay is added
+ * automatically -- no separate "+ Add" button -- by picking a result
+ * from the dropdown or by typing a name and pressing Enter.
  *
  * The visible search input/button/chips are just UI -- the field
  * that's actually submitted is the hidden #coverageAreaValue input
@@ -22,14 +23,13 @@
     "use strict";
 
     const input = document.getElementById("coverageAreaInput");
-    const addBtn = document.getElementById("coverageAreaAddBtn");
     const resultsBox = document.getElementById("coverageAreaResults");
     const chipsBox = document.getElementById("coverageAreaChips");
     const hiddenField = document.getElementById("coverageAreaValue");
 
     // The field only exists on the Add/Edit User form; bail out
     // quietly anywhere else this script might get bundled/loaded.
-    if (!input || !addBtn || !resultsBox || !chipsBox || !hiddenField) return;
+    if (!input || !resultsBox || !chipsBox || !hiddenField) return;
 
     // Santa Cruz, Laguna's PSGC city/municipality code, same host and
     // endpoint tickets.js's barangay picker uses -- see that file for
@@ -167,8 +167,6 @@
             addBarangay(input.value);
         }
     });
-    addBtn.addEventListener("click", () => addBarangay(input.value));
-
     resultsBox.addEventListener("click", (event) => {
         const btn = event.target.closest("button");
         if (!btn) return;

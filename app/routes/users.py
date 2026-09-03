@@ -147,6 +147,16 @@ def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     linked_subscriber = Subscriber.query.filter_by(user_id=user.id).first()
 
+    # Where to return to after a successful save (or Cancel/Back).
+    # Populated from the ?next=... query string on the link that led
+    # here (see app/templates/collectors/list.html), and re-threaded
+    # through as a hidden form field so it survives the POST too —
+    # `request.values` checks both, so this line covers GET and POST.
+    # Currently the only recognized value is 'collectors'; anything
+    # else (including no value at all) falls back to Manage Users, so
+    # this can't be used to redirect anywhere off-site.
+    next_page = "collectors" if request.values.get("next") == "collectors" else ""
+
     # On GET, `obj=user` pre-fills the form with the account's current
     # values. On POST, submitted form data automatically takes precedence.
     form = UserForm(obj=user)
@@ -166,7 +176,7 @@ def edit_user(user_id):
         # page) with no other admin necessarily around to undo it.
         if user.id == g.user.id and form.role.data != "administrator":
             flash("You can't change your own role away from Administrator.", "danger")
-            return render_template("users/form.html", form=form, mode="edit", user=user)
+            return render_template("users/form.html", form=form, mode="edit", user=user, next_page=next_page)
 
         user.username = form.username.data.strip()
         user.full_name = form.full_name.data.strip()
@@ -199,9 +209,11 @@ def edit_user(user_id):
 
         db.session.commit()
         flash(f"Account '{user.username}' was updated successfully.", "success")
+        if next_page == "collectors":
+            return redirect(url_for("collectors.list_collectors"))
         return redirect(url_for("users.list_users"))
 
-    return render_template("users/form.html", form=form, mode="edit", user=user)
+    return render_template("users/form.html", form=form, mode="edit", user=user, next_page=next_page)
 
 
 @users_bp.route("/<int:user_id>/deactivate", methods=["POST"])

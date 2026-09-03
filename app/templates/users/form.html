@@ -36,9 +36,14 @@
 
 {% block content %}
 <div class="mb-3">
-    <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Manage Users
-    </a>
+    {# Plain back icon -- returns to whatever page linked here (Collectors
+       tab, Manage Users tab, etc.) via browser history instead of always
+       hardcoding Manage Users. Falls back to Manage Users only in the rare
+       case there's no history to go back to (e.g. page opened directly). #}
+    <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Back"
+            onclick="if (document.referrer) { history.back(); } else { window.location.href = '{{ url_for('users.list_users') }}'; }">
+        <i class="bi bi-arrow-left"></i>
+    </button>
 </div>
 
 <div class="row justify-content-center">
@@ -47,6 +52,11 @@
             <div class="card-body p-4">
                 <form method="post" novalidate>
                     {{ form.hidden_tag() }}
+                    {# Carries where this edit was opened from (e.g. the
+                       Collectors list) through the POST, so a successful
+                       save can return there instead of always landing on
+                       Manage Users. See app/routes/users.py's edit_user(). #}
+                    <input type="hidden" name="next" value="{{ next_page|default('', true) }}">
 
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -112,16 +122,9 @@
                                added or removed. See that file's header comment. #}
                             {{ form.coverage_area(type="hidden", id="coverageAreaValue", class=("is-invalid" if form.coverage_area.errors else "")) }}
                             <div class="position-relative">
-                                <div class="d-flex gap-2">
-                                    <div class="position-relative flex-grow-1">
-                                        <input type="text" class="form-control" id="coverageAreaInput"
-                                               placeholder="Search barangay (Santa Cruz, Laguna)…" autocomplete="off">
-                                        <div id="coverageAreaResults" class="list-group shadow-sm coverage-area-dropdown d-none"></div>
-                                    </div>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="coverageAreaAddBtn">
-                                        <i class="bi bi-plus-lg"></i> Add
-                                    </button>
-                                </div>
+                                <input type="text" class="form-control" id="coverageAreaInput"
+                                       placeholder="Search barangay (Santa Cruz, Laguna)…" autocomplete="off">
+                                <div id="coverageAreaResults" class="list-group shadow-sm coverage-area-dropdown d-none"></div>
                                 <div id="coverageAreaChips" class="d-flex flex-wrap gap-1 mt-2"></div>
                             </div>
                             {% for error in form.coverage_area.errors %}
@@ -179,7 +182,7 @@
                     <hr class="my-4">
 
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ url_for('users.list_users') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="{{ url_for('collectors.list_collectors') if next_page|default('', true) == 'collectors' else url_for('users.list_users') }}" class="btn btn-outline-secondary">Cancel</a>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i>
                             {{ 'Save Changes' if mode == 'edit' else 'Create Account' }}

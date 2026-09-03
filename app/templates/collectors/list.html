@@ -45,7 +45,7 @@
                     </td>
                     <td class="text-end">
                         <div class="subs-row-actions">
-                            <a href="{{ url_for('users.edit_user', user_id=row.user.id) }}"
+                            <a href="{{ url_for('users.edit_user', user_id=row.user.id, next='collectors') }}"
                                class="subs-edit-btn" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
