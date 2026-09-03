@@ -477,6 +477,16 @@ export default function JobDetailScreen({ route, navigation }: any) {
             value={assignment.subscriber?.address ?? assignment.service_request?.address}
           />
           <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
+          {/* The ticket form's "Technician" (who this ticket is
+              dispatched to) and, beneath it, "Assisted By" -- the
+              other technicians picked in the ticket form's own
+              "Assisted By" field, listed out in full when there's
+              more than one. Mirrors the admin GeoMap's read-only
+              "View Ticket" modal (naps/map.html) exactly. */}
+          <InfoRow label="Technician (Assigned)" value={assignment.assigned_technician} />
+          {assignment.assisted_by.length > 0 && (
+            <InfoRow label="Assisted By" value={assignment.assisted_by.join(", ")} />
+          )}
           {/* Recorded by a technician on-site (own or a prior visit) via
               the port picker below for a new installation, or via
               saveNotes'/completeJob's optional port_number for every
@@ -513,7 +523,13 @@ export default function JobDetailScreen({ route, navigation }: any) {
               </Text>
             )}
           {assignment.issue && <InfoRow label="Description" value={assignment.issue.description} />}
-          {assignment.service_request && <InfoRow label="Plan / notes" value={assignment.service_request.notes} />}
+          {/* Relabeled from "Plan / notes" -- this is the exact same
+              field the ticket form itself labels "Description" (see
+              QuickServiceRequestForm.notes in app/forms.py), just
+              still stored on the `notes` column. Empty/undefined
+              (nothing typed on the ticket form) hides the row, same
+              as the repair Description above. */}
+          {assignment.service_request && <InfoRow label="Description" value={assignment.service_request.notes} />}
           {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
           {lat != null && lng != null && (
             <TouchableOpacity style={styles.mapLink} onPress={openMaps}>

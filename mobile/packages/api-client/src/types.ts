@@ -47,6 +47,11 @@ export interface AssignmentIssue {
   id: number;
   issue_code: string;
   issue_type: string;
+  /** The ticket form's own free-typed Description field only — never
+   * the "Assigned Team: .../Technician(s) requested: ..." lines the
+   * GeoMap "+ Tickets" modal folds onto the front of the underlying
+   * column, and never that flow's own filler text. "" if nothing was
+   * actually typed there. */
   description: string;
   priority: string;
   status: string;
@@ -85,6 +90,9 @@ export interface AssignmentServiceRequest {
   request_type: string;
   status: string;
   priority: "low" | "medium" | "high" | "critical" | null;
+  /** Same "ticket form's own free-typed field only" rule as
+   * AssignmentIssue.description above — "" if the admin left the
+   * modal's Description textarea blank. */
   notes: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -118,6 +126,17 @@ export interface Assignment {
   job_type: "repair" | "installation";
   assigned_at: string | null;
   completed_at: string | null;
+  /** The technician this assignment is dispatched to — the Ticket
+   * Details "Technician (Assigned)" label. Always the signed-in
+   * technician for their own assignments; included explicitly for
+   * parity with the admin GeoMap's ticket details. */
+  assigned_technician: string | null;
+  /** The ticket form's "Assisted By" picks (parsed back out of the
+   * "Technician(s) requested" line the GeoMap "+ Tickets" modal folds
+   * into description/notes — see _parse_ticket_extras() in
+   * api_v1/technician.py). [] when none were added at ticket
+   * creation. */
+  assisted_by: string[];
   resolution_notes: string | null;
   /** The NAP port the field assistant serviced, chosen from the Job
    * Detail screen's dropdown (1..nap.total_ports). Null until set;

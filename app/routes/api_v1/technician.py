@@ -243,6 +243,64 @@ def _subscriber_installed_port_number(subscriber):
     return row.port_number if row else None
 
 
+# The GeoMap "+ Tickets" quick-create modal (app/static/js/tickets.js)
+# folds a few fields with no dedicated column -- Assigned Team,
+# Technician(s) requested ("Assisted By" in the modal), Barangay,
+# Scheduled -- onto the front of `description`/`notes` as "Label: "
+# lines, separated from whatever the admin actually typed into the
+# modal's own Description textarea by a blank line. Kept in sync by
+# hand with napmap.js's own TICKET_EXTRA_LABELS/parseTicketExtras(),
+# which reverses this same fold for the read-only "View Ticket" modal
+# on the GeoMap -- this is that same reversal, for the mobile Job
+# Detail screen.
+_TICKET_EXTRA_LABELS = ["Assigned Team", "Technician(s) requested", "Barangay", "Scheduled"]
+
+# tickets.js's submitTN() falls back to this exact literal when an
+# admin submits a Trouble Ticket with no extras AND nothing typed into
+# the Description textarea (see that function's `|| "Reported via..."`
+# fallback) -- treated as "nothing was actually entered" here too, so
+# the mobile app never shows this filler text as if it were a real
+# typed description.
+_TN_NO_DESCRIPTION_FALLBACK = "Reported via the GeoMap Tickets menu."
+
+
+def _parse_ticket_extras(text):
+    """Python port of napmap.js's parseTicketExtras() -- see
+    _TICKET_EXTRA_LABELS above. Returns (extras, description):
+    `extras` is a dict with 'assigned_team'/'barangay'/'scheduled'
+    (strings, "" if absent) and 'technicians' (list[str], the
+    "Assisted By" names, [] if absent); `description` is only the
+    free-typed remainder -- "" if the admin left the ticket form's own
+    Description field blank, never a placeholder.
+    """
+    extras = {"assigned_team": "", "technicians": [], "barangay": "", "scheduled": ""}
+    if not text:
+        return extras, ""
+
+    lines = str(text).split("\n")
+    split_at = 0
+    while split_at < len(lines):
+        line = lines[split_at]
+        matched_label = next((l for l in _TICKET_EXTRA_LABELS if line.startswith(l + ": ")), None)
+        if matched_label is None:
+            break
+        value = line[len(matched_label) + 2:].strip()
+        if matched_label == "Assigned Team":
+            extras["assigned_team"] = value
+        elif matched_label == "Technician(s) requested":
+            extras["technicians"] = [t.strip() for t in value.split(",") if t.strip()]
+        elif matched_label == "Barangay":
+            extras["barangay"] = value
+        elif matched_label == "Scheduled":
+            extras["scheduled"] = value
+        split_at += 1
+
+    description = "\n".join(lines[split_at:]).strip()
+    if description == _TN_NO_DESCRIPTION_FALLBACK:
+        description = ""
+    return extras, description
+
+
 def _serialize_assignment(assignment: Assignment) -> dict:
     """The fields the mobile app needs per assignment — including
     enough of the linked issue-or-request/subscriber/NAP to show a
@@ -266,6 +324,20 @@ def _serialize_assignment(assignment: Assignment) -> dict:
     subscriber = issue.subscriber if issue else (service_request.subscriber if service_request else None)
     nap = _assignment_nap(assignment)
 
+    # Reverse the "Label: value" fold tickets.js applies to
+    # description/notes at ticket-creation time (see
+    # _parse_ticket_extras() above) so the mobile Job Detail screen
+    # can show the ticket form's own "Assisted By" picks and free-typed
+    # Description as their own fields, same as the GeoMap's read-only
+    # "View Ticket" modal already does. Exactly one of issue/
+    # service_request is ever set, so exactly one of these actually
+    # runs the real parse; the other stays at the all-empty default.
+    ticket_extras, clean_description = _parse_ticket_extras(issue.description if issue else None)
+    if service_request is not None:
+        ticket_extras, clean_notes = _parse_ticket_extras(service_request.notes)
+    else:
+        clean_notes = ""
+
     return {
         "id": assignment.id,
         "status": assignment.status,
@@ -276,6 +348,19 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         "job_type": "repair" if issue is not None else "installation",
         "assigned_at": assignment.assigned_at.isoformat() if assignment.assigned_at else None,
         "completed_at": assignment.completed_at.isoformat() if assignment.completed_at else None,
+        # The technician this assignment is actually dispatched to —
+        # the Ticket Details "Technician (Assigned)" label. Always
+        # this signed-in technician for their own assignments, but
+        # included explicitly (rather than left implicit) for parity
+        # with the admin GeoMap's ticket details, and in case this
+        # response is ever read for someone other than the assignee.
+        "assigned_technician": assignment.technician.full_name if assignment.technician else None,
+        # The ticket form's "Assisted By" picks (Technician(s)
+        # requested) — see _parse_ticket_extras() above. [] when the
+        # ticket was created with none added, same "empty means
+        # nothing was entered" rule as clean_description/clean_notes
+        # below.
+        "assisted_by": ticket_extras["technicians"],
         # The port chosen from the mobile Job Detail screen's dropdown
         # (1..nap.total_ports below) — see _validate_port_number().
         "port_number": assignment.port_number,
@@ -302,7 +387,13 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "id": issue.id,
             "issue_code": issue.issue_code,
             "issue_type": issue.issue_type,
-            "description": issue.description,
+            # The ticket form's own free-typed Description field only
+            # -- see _parse_ticket_extras() above. "" (not
+            # issue.description's raw value) when nothing was actually
+            # typed there, even though the column itself may still
+            # hold "Assigned Team: .../Technician(s) requested: ..."
+            # lines or the create-flow's own filler text.
+            "description": clean_description,
             "priority": issue.priority,
             "status": issue.status,
             "address": issue.address,
@@ -326,7 +417,12 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "request_type": service_request.request_type,
             "status": service_request.status,
             "priority": service_request.priority,
-            "notes": service_request.notes,
+            # Same "ticket form's own free-typed field only" rule as
+            # issue.description above (see _parse_ticket_extras()) --
+            # "" when the admin left the modal's Description textarea
+            # blank, even if `notes` itself still holds folded
+            # "Assigned Team: .../Technician(s) requested: ..." lines.
+            "notes": clean_notes,
             "latitude": float(service_request.latitude) if service_request.latitude is not None else None,
             "longitude": float(service_request.longitude) if service_request.longitude is not None else None,
             "full_name": service_request.full_name,
