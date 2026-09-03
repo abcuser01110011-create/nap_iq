@@ -16,12 +16,17 @@ Two kinds of profile share this one roster table, distinguished by
                           fields on the Add Technician form — there's
                           no separate "link an existing account" step
                           the way earlier phases did it.
-  * "field_assistant" — also logs into the mobile app, the same way,
-                          but with role='field_assistant'. There's no
-                          "Add Field Assistant" entry point on the
-                          Personnel list anymore, but existing Field
-                          Assistant profiles (and this route's
-                          ?type=field_assistant param) still work.
+  * "field_assistant" — admin web dashboard only, no mobile access.
+                          Its `users` login (role='field_assistant')
+                          is created the same inline way, but
+                          MOBILE_API_ROLES (app/jwt_auth.py) only
+                          issues mobile tokens to role='technician',
+                          so this login can't sign into the mobile
+                          app. There's no "Add Field Assistant" entry
+                          point on the Personnel list anymore, but
+                          existing Field Assistant profiles (and this
+                          route's ?type=field_assistant param) still
+                          work.
 
 Records are never physically deleted — a profile that's no longer
 active is set `offline` via the existing `status` column rather than
@@ -164,7 +169,19 @@ def edit_technician(technician_id):
     inline username/password fields from the Add form appear here to
     create one (role='technician' or role='field_assistant', matching
     personnel_type). An already-linked login is shown read-only — a
-    password change is a Manage Users action, not this form's job."""
+    password change is a Manage Users action, not this form's job.
+
+    BUGFIX: switching an existing profile's Personnel Type here (e.g.
+    Field Assistant -> Technician, to grant mobile-app access — see
+    MOBILE_API_ROLES in app/jwt_auth.py, which only issues mobile
+    tokens to role='technician') previously only updated
+    technicians.personnel_type. An already-linked login's users.role
+    was left exactly as it was when first created, so the profile
+    looked like the right type on this page while the actual login
+    still carried the old role and mobile sign-in kept failing with
+    "This account type isn't supported in this app." This now keeps
+    the two in sync whenever personnel_type changes.
+    """
     technician = Technician.query.get_or_404(technician_id)
 
     form = TechnicianForm(obj=technician)
@@ -177,8 +194,9 @@ def edit_technician(technician_id):
         technician.personnel_type = form.personnel_type.data
         technician.status = form.status.data
 
+        login_role = "technician" if form.personnel_type.data == "technician" else "field_assistant"
+
         if needs_credentials:
-            login_role = "technician" if form.personnel_type.data == "technician" else "field_assistant"
             login = User(
                 username=form.username.data.strip(),
                 full_name=technician.full_name,
@@ -188,6 +206,14 @@ def edit_technician(technician_id):
             db.session.add(login)
             db.session.flush()
             technician.user_id = login.id
+        elif technician.user.role in ("technician", "field_assistant"):
+            # Existing login, type changed on this edit -- keep its
+            # role (and therefore its mobile-app access) matching
+            # what the page now shows. The `in (...)` guard leaves
+            # any account somehow linked with a different role
+            # (administrator/payment_collector) untouched rather than
+            # silently downgrading it.
+            technician.user.role = login_role
 
         db.session.commit()
         label = "Field assistant" if technician.personnel_type == "field_assistant" else "Technician"

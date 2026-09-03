@@ -927,12 +927,15 @@ class TechnicianForm(FlaskForm):
     """Form used for both creating and editing a personnel profile (the
     dispatch-facing record in the `technicians` table).
 
-    Both Technicians and Field Assistants get mobile-app access.
-    `username`/`password`/`confirm_password` create that login account
-    inline (see `validate_credentials_if_needed` below, called
-    manually by the route since these fields are only required
-    conditionally — a plain `DataRequired()` here would also block
-    submissions for a profile that already has a linked login).
+    Only a Technician profile's login gets mobile-app access — a Field
+    Assistant's login (role='field_assistant') is web-dashboard-only;
+    see MOBILE_API_ROLES in app/jwt_auth.py and the personnel_type
+    comment on technicians_bp above. `username`/`password`/
+    `confirm_password` create that login account inline either way
+    (see `validate_credentials_if_needed` below, called manually by
+    the route since these fields are only required conditionally — a
+    plain `DataRequired()` here would also block submissions for a
+    profile that already has a linked login).
 
     The Add Technician form no longer exposes `personnel_type` or
     `status` as editable fields — new personnel added via that form
