@@ -33,12 +33,46 @@ from app.notifications_utils import notify_payment_overdue, notify_payment_pendi
 collector_bp = Blueprint("collector", __name__, url_prefix="/collector")
 
 
+def _coverage_barangays():
+    """Splits the signed-in collector's `users.coverage_area` (a
+    comma-separated string of barangay names, e.g. "Alipit,
+    Bagumbayan" -- see the chip picker in app/templates/users/form.html)
+    into a clean list. Returns an empty list if no coverage area has
+    been set yet."""
+    coverage_area = (g.user.coverage_area or "").strip()
+    if not coverage_area:
+        return []
+    return [b.strip() for b in coverage_area.split(",") if b.strip()]
+
+
+def _coverage_subscribers_query(barangays):
+    """Active subscribers whose free-text `address` mentions one of the
+    given barangay names. A subscriber's address is always built as
+    "Street, Barangay, City/Municipality, Province" (see the cascading
+    Province/City/Barangay picker in service_requests.py /
+    naps/map.html), so the barangay name is reliably present as a
+    substring even though there's no dedicated barangay column on
+    `subscribers` to filter on directly."""
+    query = Subscriber.query.filter_by(status="active")
+    if barangays:
+        query = query.filter(
+            db.or_(*[Subscriber.address.ilike(f"%{b}%") for b in barangays])
+        )
+    return query
+
+
 def _populate_subscriber_choices(form):
     """Fills in the Subscriber dropdown from active subscribers, same
-    pattern as issues.py's _populate_dynamic_choices."""
-    subscribers = (
-        Subscriber.query.filter_by(status="active").order_by(Subscriber.full_name).all()
-    )
+    pattern as issues.py's _populate_dynamic_choices.
+
+    Scoped to the signed-in collector's Coverage Area when one is set
+    (see _coverage_barangays() above) -- a collector only records
+    payments for subscribers in the barangay(s) an administrator
+    assigned them. A collector with no coverage area configured yet
+    still sees every active subscriber, so this can't lock an account
+    out before an admin has set it up."""
+    barangays = _coverage_barangays()
+    subscribers = _coverage_subscribers_query(barangays).order_by(Subscriber.full_name).all()
     form.subscriber_id.choices = [(0, "-- Select Subscriber --")] + [
         (s.id, f"{s.subscriber_code} — {s.full_name}") for s in subscribers
     ]
@@ -48,7 +82,8 @@ def _populate_subscriber_choices(form):
 @role_required("payment_collector")
 def index():
     """Landing page: the signed-in collector's own recent payments,
-    plus the record-a-payment form."""
+    the record-a-payment form, and the subscriber roster for their
+    assigned Coverage Area (see _coverage_barangays() above)."""
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
 
@@ -59,10 +94,18 @@ def index():
         .all()
     )
 
+    coverage_barangays = _coverage_barangays()
+    coverage_subscribers = (
+        _coverage_subscribers_query(coverage_barangays).order_by(Subscriber.full_name).all()
+        if coverage_barangays else []
+    )
+
     return render_template(
         "collector/index.html",
         form=form,
         recent_payments=recent_payments,
+        coverage_barangays=coverage_barangays,
+        coverage_subscribers=coverage_subscribers,
     )
 
 

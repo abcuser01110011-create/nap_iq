@@ -5,6 +5,57 @@
 
 {% block content %}
 
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-geo-alt me-1"></i>My Coverage Area</span>
+        {% if coverage_barangays %}
+            <span class="text-muted small">{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if not coverage_barangays %}
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-geo display-6 d-block mb-2"></i>
+            No coverage area has been assigned to your account yet. Ask an administrator
+            to set one from the Collectors tab.
+        </div>
+        {% else %}
+        <div class="p-3 pb-0 d-flex flex-wrap gap-1">
+            {% for barangay in coverage_barangays %}
+                <span class="badge text-bg-light border">{{ barangay }}</span>
+            {% endfor %}
+        </div>
+        {% if coverage_subscribers %}
+        <div class="table-responsive mt-2">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Subscriber</th>
+                        <th>Address</th>
+                        <th>Contact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subscriber in coverage_subscribers %}
+                    <tr>
+                        <td>{{ subscriber.subscriber_code }} — {{ subscriber.full_name }}</td>
+                        <td class="text-muted small">{{ subscriber.address or "—" }}</td>
+                        <td class="text-muted small">{{ subscriber.contact_number or "—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-people display-6 d-block mb-2"></i>
+            No active subscribers found in your assigned barangay(s) yet.
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+
 <div class="row g-3">
     <div class="col-lg-5">
         <div class="card shadow-sm">
@@ -21,6 +72,9 @@
                         {% for error in form.subscriber_id.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
+                        {% if coverage_barangays %}
+                            <div class="form-text">Scoped to your assigned coverage area: {{ coverage_barangays|join(', ') }}.</div>
+                        {% endif %}
                     </div>
 
                     <div class="row g-2">
