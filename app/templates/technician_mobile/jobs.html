@@ -1,0 +1,42 @@
+{% extends "technician_mobile/base.html" %}
+{% block title %}My Jobs{% endblock %}
+
+{% block content %}
+<div class="tm-header">
+    <p class="tm-greeting">Hi, {{ current_user.full_name }}</p>
+    <p class="tm-subcount">{{ jobs|length }} open job(s)</p>
+</div>
+
+{% if not profile %}
+<div class="tm-card">
+    <p class="tm-notes-text mb-0">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Your login isn't linked to a technician profile yet. Ask an administrator to link one
+        so jobs can be routed to you.
+    </p>
+</div>
+{% elif jobs %}
+    {% for job in jobs %}
+    <a href="{{ url_for('technician.mobile_job_detail', assignment_id=job.assignment.id) }}" class="tm-job-card">
+        <div class="tm-job-card-header">
+            <span class="tm-job-title">{{ job.ticket_code }}</span>
+            <span class="tm-chip">{{ job.status_label }}</span>
+        </div>
+        <span class="tm-job-type">{{ job.type_label }}</span>
+        <div class="tm-job-address">{{ job.address }}</div>
+        <div class="tm-job-footer">
+            {% if job.priority %}
+                <span class="tm-priority tm-priority-{{ job.priority }}">Priority: {{ job.priority_label }}</span>
+            {% else %}
+                <span></span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+{% else %}
+<div class="tm-empty">
+    <i class="bi bi-inbox"></i>
+    No open assignments right now.
+</div>
+{% endif %}
+{% endblock %}

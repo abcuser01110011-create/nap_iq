@@ -1,0 +1,172 @@
+{% extends "technician_mobile/base.html" %}
+{% block title %}{{ job.ticket_code }}{% endblock %}
+
+{% block content %}
+<div class="tm-header-row">
+    <a href="{{ url_for('technician.mobile_jobs') }}" class="tm-back">&lsaquo; Back</a>
+    <span class="tm-chip">{{ job.status_label }}</span>
+</div>
+
+{# ---- Ticket Details -------------------------------------------- #}
+<div class="tm-card">
+    <div class="tm-card-header-row">
+        <p class="tm-card-label mb-0">Ticket Details</p>
+        {% if job.priority %}
+            <span class="tm-priority tm-priority-{{ job.priority }}">{{ job.priority_label }}</span>
+        {% endif %}
+    </div>
+
+    <div class="tm-info-row">
+        <div class="tm-info-label">Ticket ID</div>
+        <div class="tm-info-value">{{ job.ticket_code }}</div>
+    </div>
+    <div class="tm-info-row">
+        <div class="tm-info-label">Type</div>
+        <div class="tm-info-value">{{ job.type_label }}</div>
+    </div>
+    {% if job.subscriber_name %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">{{ job.subscriber_label }}</div>
+        <div class="tm-info-value">{{ job.subscriber_name }}</div>
+    </div>
+    {% endif %}
+    {% if job.address %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">Address</div>
+        <div class="tm-info-value">{{ job.address }}</div>
+    </div>
+    {% endif %}
+    {% if job.plan_label %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">Plan</div>
+        <div class="tm-info-value">{{ job.plan_label }}</div>
+    </div>
+    {% endif %}
+    {% if job.contact_number %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">Contact</div>
+        <div class="tm-info-value">{{ job.contact_number }}</div>
+    </div>
+    {% endif %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">Technician (Assigned)</div>
+        <div class="tm-info-value">{{ current_user.full_name }}</div>
+    </div>
+    {% if job.port_number %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">Port Number</div>
+        <div class="tm-info-value">Port {{ job.port_number }}</div>
+    </div>
+    {% endif %}
+    {% if job.description %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">Description</div>
+        <div class="tm-info-value">{{ job.description }}</div>
+    </div>
+    {% endif %}
+    {% if job.nap_label %}
+    <div class="tm-info-row">
+        <div class="tm-info-label">NAP</div>
+        <div class="tm-info-value">{{ job.nap_label }}</div>
+    </div>
+    {% endif %}
+    {% if job.lat is not none and job.lng is not none %}
+    <a class="tm-map-link" target="_blank" rel="noopener"
+       href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}">Open in Maps</a>
+    {% endif %}
+</div>
+
+{# ---- Resolution Notes -------------------------------------------- #}
+{% if job.can_edit or job.is_closed %}
+<div class="tm-card">
+    <p class="tm-card-label">Resolution notes</p>
+    {% if job.can_edit %}
+        <textarea class="tm-textarea" disabled
+                  placeholder="What did you find, and what did you do? (optional)">{{ job.assignment.resolution_notes or "" }}</textarea>
+    {% else %}
+        <p class="tm-notes-text mb-0">{{ job.assignment.resolution_notes or "No notes recorded." }}</p>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ---- Completion Photo -------------------------------------------- #}
+{% if job.show_photo_card %}
+<div class="tm-card">
+    <p class="tm-card-label">Completion photo</p>
+    {% if job.assignment.photo_filename %}
+        <img class="tm-photo-preview" src="{{ job.assignment.photo_filename }}" alt="Completion photo">
+    {% else %}
+        <p class="tm-notes-text mb-0">
+            {{ "No photo added yet — required before completing this job." if job.can_edit else "No photo was attached." }}
+        </p>
+    {% endif %}
+    {% if job.can_edit %}
+    <div class="tm-btn-row" style="margin-top: 10px;">
+        <button type="button" class="tm-btn-secondary" disabled>Take photo</button>
+        <button type="button" class="tm-btn-secondary" disabled>Choose from library</button>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ---- Pin Location (installation jobs only) ------------------------ #}
+{% if job.is_installation and job.show_photo_card %}
+<div class="tm-card">
+    <p class="tm-card-label">Pin location</p>
+    {% if job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none %}
+        <p class="tm-notes-text">Pinned at {{ job.assignment.pin_latitude }}, {{ job.assignment.pin_longitude }}</p>
+        <a class="tm-map-link" target="_blank" rel="noopener"
+           href="https://maps.google.com/?q={{ job.assignment.pin_latitude }},{{ job.assignment.pin_longitude }}">Open in Maps</a>
+    {% else %}
+        <p class="tm-notes-text mb-0">
+            {{ "No location pinned yet — required before completing this installation." if job.can_edit else "No location was pinned." }}
+        </p>
+    {% endif %}
+    {% if job.can_edit %}
+    <button type="button" class="tm-btn-secondary" style="margin-top: 10px;" disabled>
+        {{ "Update My Location" if job.assignment.pin_latitude is not none else "Pin My Location" }}
+    </button>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ---- NAP / Port (new-installation jobs only) ----------------------- #}
+{% if job.is_new_installation and job.can_edit %}
+<div class="tm-card">
+    <p class="tm-card-label">NAP</p>
+    {% if job.nap_label %}
+        <div class="tm-dropdown-field">
+            <span style="color: var(--tm-text); font-weight: 600;">{{ job.nap_label }}</span>
+            <span>&#9662;</span>
+        </div>
+        <p class="tm-card-label tm-card-label-spaced">Port number</p>
+        <div class="tm-dropdown-field">
+            <span style="color: var(--tm-text); font-weight: 600;">{{ ("Port " ~ job.port_number) if job.port_number else "Select a port" }}</span>
+            <span>&#9662;</span>
+        </div>
+    {% else %}
+        <p class="tm-notes-text">No NAP linked yet for this installation.</p>
+        <button type="button" class="tm-btn-secondary" disabled>Find nearby NAPs</button>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ---- Actions -------------------------------------------------------- #}
+<div class="tm-actions">
+    {% if job.can_accept %}
+        <button type="button" class="tm-btn-primary" disabled>Accept job</button>
+    {% endif %}
+    {% if job.can_start %}
+        <button type="button" class="tm-btn-primary" disabled>Start job</button>
+    {% endif %}
+    {% if job.can_complete %}
+        <button type="button" class="tm-btn-primary tm-btn-success" disabled>Mark complete</button>
+    {% endif %}
+    {% if job.can_accept or job.can_start or job.can_complete %}
+        <p class="tm-ui-only-note">
+            This is the web UI preview — actions aren't wired up yet.
+            Use <a href="{{ url_for('technician.index') }}" style="color: var(--tm-primary);">My Work</a> to actually update this job for now.
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

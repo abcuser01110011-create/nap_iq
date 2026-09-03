@@ -4,6 +4,12 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">Accept, start, and complete your assignments</p>{% endblock %}
 
 {% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('technician.mobile_jobs') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-phone me-1"></i>Open Mobile-style Web View
+    </a>
+</div>
+
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h5 mb-3">Welcome, {{ current_user.full_name }}</h2>

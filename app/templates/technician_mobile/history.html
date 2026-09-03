@@ -1,0 +1,29 @@
+{% extends "technician_mobile/base.html" %}
+{% block title %}History{% endblock %}
+
+{% block content %}
+<div class="tm-header">
+    <p class="tm-title">History</p>
+</div>
+
+{% if jobs %}
+    {% for job in jobs %}
+    <a href="{{ url_for('technician.mobile_job_detail', assignment_id=job.assignment.id) }}" class="tm-job-card">
+        <div class="tm-job-card-header">
+            <span class="tm-job-title">{{ job.ticket_code }}</span>
+            <span class="tm-chip {{ 'tm-chip-danger' if job.assignment.status == 'cancelled' else '' }}">{{ job.status_label }}</span>
+        </div>
+        <span class="tm-job-type">{{ job.type_label }}</span>
+        <div class="tm-job-subtitle">{{ job.subscriber_name or "—" }}</div>
+        {% if job.assignment.completed_at %}
+            <div class="tm-job-date">Completed {{ job.assignment.completed_at.strftime('%Y-%m-%d') }}</div>
+        {% endif %}
+    </a>
+    {% endfor %}
+{% else %}
+<div class="tm-empty">
+    <i class="bi bi-clock-history"></i>
+    No completed jobs yet.
+</div>
+{% endif %}
+{% endblock %}

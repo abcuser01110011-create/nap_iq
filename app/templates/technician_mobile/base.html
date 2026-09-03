@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}NAP-IQ Technician{% endblock %}</title>
+
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/technician-mobile.css') }}" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="tm-body">
+<div class="tm-shell">
+    <div class="tm-content{{ ' tm-content-notabs' if hide_tabbar else '' }}">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="tm-flash tm-flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    {% if not hide_tabbar %}
+    <nav class="tm-tabbar">
+        <a href="{{ url_for('technician.mobile_jobs') }}" class="tm-tab {{ 'tm-tab-active' if active_tab == 'jobs' else '' }}">
+            <i class="bi bi-briefcase{{ '-fill' if active_tab == 'jobs' else '' }}"></i>
+            <span>Jobs</span>
+        </a>
+        <a href="{{ url_for('technician.mobile_history') }}" class="tm-tab {{ 'tm-tab-active' if active_tab == 'history' else '' }}">
+            <i class="bi bi-clock-history"></i>
+            <span>History</span>
+        </a>
+        <a href="{{ url_for('technician.mobile_profile') }}" class="tm-tab {{ 'tm-tab-active' if active_tab == 'profile' else '' }}">
+            <i class="bi bi-person{{ '-fill' if active_tab == 'profile' else '' }}"></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+    {% endif %}
+</div>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

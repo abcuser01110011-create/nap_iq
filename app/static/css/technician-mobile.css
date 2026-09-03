@@ -1,0 +1,470 @@
+/* =====================================================================
+   NAP-IQ Technician — Web version of the field-assistant mobile app
+   -----------------------------------------------------------------
+   Deliberately NOT the admin dashboard's light theme (dashboard.css) —
+   this mirrors the React Native app's own dark navy palette
+   (mobile/apps/app/src/theme/technician.ts) 1:1, so a technician sees
+   the exact same look whether they're on the phone app or open this
+   page in a browser. UI only for now: no JS wiring for the
+   accept/start/complete actions, notes editing, photo upload, GPS pin,
+   or NAP linking yet -- see app/routes/technician.py's mobile_* view
+   docstrings.
+   ===================================================================== */
+
+:root {
+    --tm-bg: #0B1F3A;
+    --tm-card: #122A4D;
+    --tm-card-alt: #1F3A63;
+    --tm-border: #1F3A63;
+    --tm-text: #FFFFFF;
+    --tm-text-muted: #C7D0DE;
+    --tm-text-faint: #8896AB;
+    --tm-primary: #2E7DFF;
+    --tm-primary-light: #1F3A63;
+    --tm-primary-chip-text: #8FB6FF;
+    --tm-danger: #FF6B6B;
+    --tm-danger-light: #3A1F2A;
+    --tm-success: #3DDC97;
+
+    --tm-priority-low: #22c55e;
+    --tm-priority-medium: #ffc107;
+    --tm-priority-high: #fd7e14;
+    --tm-priority-critical: #dc3545;
+
+    --tm-shell-width: 430px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+}
+
+body.tm-body {
+    margin: 0;
+    background: #060f20; /* letterbox behind the phone frame on wide screens */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+/* ---------------------------------------------------------------- */
+/* PHONE-FRAME SHELL                                                 */
+/* ---------------------------------------------------------------- */
+
+.tm-shell {
+    width: 100%;
+    max-width: var(--tm-shell-width);
+    min-height: 100vh;
+    background: var(--tm-bg);
+    color: var(--tm-text);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.45);
+}
+
+@media (min-width: 500px) {
+    body.tm-body { padding: 24px 0; }
+    .tm-shell {
+        min-height: calc(100vh - 48px);
+        border-radius: 28px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+}
+
+.tm-content {
+    flex: 1 1 auto;
+    padding: 20px 20px calc(96px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+}
+
+/* Job Detail is pushed on top of the tab bar (matches the mobile
+   app's native-stack "JobDetail" screen sitting above its bottom
+   tabs), so it doesn't reserve space for one. */
+.tm-content-notabs {
+    padding-bottom: 32px;
+}
+
+/* ---------------------------------------------------------------- */
+/* SCREEN HEADERS                                                    */
+/* ---------------------------------------------------------------- */
+
+.tm-header {
+    padding: 8px 0 20px;
+}
+
+.tm-greeting {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.tm-subcount {
+    color: var(--tm-text-faint);
+    font-size: 0.82rem;
+    margin: 2px 0 0;
+}
+
+.tm-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+.tm-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.tm-back {
+    color: var(--tm-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.tm-back:hover { color: var(--tm-primary); text-decoration: underline; }
+
+/* ---------------------------------------------------------------- */
+/* CHIP / BADGE                                                      */
+/* ---------------------------------------------------------------- */
+
+.tm-chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--tm-primary-light);
+    color: var(--tm-primary-chip-text);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tm-chip-danger {
+    background: var(--tm-danger-light);
+    color: var(--tm-danger);
+}
+
+.tm-priority {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.tm-priority-low { color: var(--tm-priority-low); }
+.tm-priority-medium { color: var(--tm-priority-medium); }
+.tm-priority-high { color: var(--tm-priority-high); }
+.tm-priority-critical { color: var(--tm-priority-critical); }
+
+/* ---------------------------------------------------------------- */
+/* CARDS                                                             */
+/* ---------------------------------------------------------------- */
+
+.tm-card {
+    background: var(--tm-card);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.tm-card-label {
+    color: var(--tm-text-faint);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    margin: 0 0 10px;
+}
+
+.tm-card-label-spaced { margin-top: 18px; }
+
+.tm-card-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* Job list / history cards (tappable) */
+.tm-job-card {
+    display: block;
+    background: var(--tm-card);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.12s ease, transform 0.12s ease;
+}
+
+.tm-job-card:hover {
+    background: var(--tm-card-alt);
+    color: inherit;
+    transform: translateY(-1px);
+}
+
+.tm-job-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tm-job-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--tm-text);
+}
+
+.tm-job-type {
+    color: var(--tm-text-faint);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+    display: block;
+}
+
+.tm-job-address {
+    color: var(--tm-text-faint);
+    font-size: 0.82rem;
+    margin-top: 6px;
+}
+
+.tm-job-subtitle {
+    color: var(--tm-text-muted);
+    font-size: 0.88rem;
+    margin-top: 4px;
+}
+
+.tm-job-date {
+    color: var(--tm-text-faint);
+    font-size: 0.76rem;
+    margin-top: 8px;
+}
+
+.tm-job-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------- */
+/* INFO ROWS (job detail)                                            */
+/* ---------------------------------------------------------------- */
+
+.tm-info-row { margin-bottom: 8px; }
+.tm-info-label { color: var(--tm-text-faint); font-size: 0.76rem; }
+.tm-info-value { color: var(--tm-text); font-size: 0.88rem; font-weight: 600; margin-top: 2px; }
+
+.tm-notes-text { color: var(--tm-text-muted); font-size: 0.88rem; line-height: 1.4; }
+
+.tm-map-link {
+    color: var(--tm-primary);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 4px;
+}
+.tm-map-link:hover { color: var(--tm-primary); text-decoration: underline; }
+
+.tm-photo-preview {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: var(--tm-bg);
+    margin-bottom: 10px;
+}
+
+.tm-textarea {
+    width: 100%;
+    background: var(--tm-bg);
+    border: 1px solid var(--tm-border);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--tm-text);
+    min-height: 90px;
+    font-size: 0.88rem;
+    resize: vertical;
+}
+.tm-textarea::placeholder { color: var(--tm-text-faint); }
+.tm-textarea:disabled { opacity: 0.7; }
+
+.tm-dropdown-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--tm-bg);
+    border: 1px solid var(--tm-border);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--tm-text-faint);
+    font-size: 0.88rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* BUTTONS                                                           */
+/* ---------------------------------------------------------------- */
+
+.tm-btn-primary {
+    display: block;
+    width: 100%;
+    background: var(--tm-primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    text-decoration: none;
+}
+.tm-btn-primary:hover { color: #fff; opacity: 0.92; }
+
+.tm-btn-success { background: var(--tm-success); color: #06281c; }
+.tm-btn-success:hover { color: #06281c; }
+
+.tm-btn-secondary {
+    display: block;
+    width: 100%;
+    background: transparent;
+    color: var(--tm-primary);
+    border: 1px solid var(--tm-primary);
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    text-decoration: none;
+}
+.tm-btn-secondary:hover { color: var(--tm-primary); opacity: 0.9; }
+
+.tm-btn-danger-soft {
+    display: block;
+    width: 100%;
+    background: var(--tm-danger-light);
+    color: var(--tm-danger);
+    border: none;
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+}
+
+.tm-btn-row { display: flex; gap: 10px; }
+.tm-btn-row > * { flex: 1; }
+
+.tm-actions { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
+
+.tm-ui-only-note {
+    font-size: 0.72rem;
+    color: var(--tm-text-faint);
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ---------------------------------------------------------------- */
+/* EMPTY STATES                                                      */
+/* ---------------------------------------------------------------- */
+
+.tm-empty {
+    text-align: center;
+    color: var(--tm-text-faint);
+    padding: 48px 12px;
+    font-size: 0.88rem;
+}
+
+.tm-empty i { font-size: 2rem; display: block; margin-bottom: 10px; }
+
+/* ---------------------------------------------------------------- */
+/* PROFILE ROWS                                                      */
+/* ---------------------------------------------------------------- */
+
+.tm-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-top: 1px solid var(--tm-border);
+}
+.tm-row:first-of-type { border-top: none; }
+.tm-row-label { color: var(--tm-text-faint); font-size: 0.85rem; }
+.tm-row-value { color: var(--tm-text); font-size: 0.85rem; font-weight: 600; }
+
+/* ---------------------------------------------------------------- */
+/* BOTTOM TAB BAR                                                    */
+/* ---------------------------------------------------------------- */
+
+.tm-tabbar {
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background: var(--tm-card);
+    border-top: 1px solid var(--tm-border);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+.tm-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--tm-text-faint);
+    text-decoration: none;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 4px 0;
+}
+
+.tm-tab i { font-size: 1.25rem; }
+
+.tm-tab:hover { color: var(--tm-text-muted); }
+
+.tm-tab-active { color: var(--tm-primary); }
+.tm-tab-active:hover { color: var(--tm-primary); }
+
+/* ---------------------------------------------------------------- */
+/* SMALL UTILITIES (this shell doesn't load Bootstrap's CSS, only    */
+/* its icon font, so a handful of the utility classes used inline    */
+/* in the templates below are defined here instead)                  */
+/* ---------------------------------------------------------------- */
+
+.mb-0 { margin-bottom: 0 !important; }
+.me-1 { margin-right: 0.25rem !important; }
+.text-capitalize { text-transform: capitalize; }
+
+/* ---------------------------------------------------------------- */
+/* FLASH MESSAGES                                                    */
+/* ---------------------------------------------------------------- */
+
+.tm-flash {
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.tm-flash-success { background: rgba(61, 220, 151, 0.15); color: var(--tm-success); }
+.tm-flash-danger  { background: var(--tm-danger-light); color: var(--tm-danger); }
+.tm-flash-warning { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
+.tm-flash-info,
+.tm-flash-message { background: var(--tm-primary-light); color: var(--tm-primary-chip-text); }

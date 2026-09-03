@@ -39,6 +39,26 @@ Routes:
                                                         (in_progress -> completed;
                                                         issue -> resolved;
                                                         resolution_notes required)
+
+Web version of the mobile app (UI only)
+----------------------------------------
+mobile_jobs() / mobile_history() / mobile_profile() / mobile_job_detail()
+below are a from-scratch web equivalent of the field-assistant React
+Native app's own screens (mobile/apps/app/src/screens/technician/*.tsx)
+-- same dark navy theme, same card layouts, same bottom tab bar (Jobs /
+History / Profile) -- so a technician sees a near-identical experience
+opening this in a browser instead of the phone app. Read-only for now:
+they reuse the exact same queries as index()/history() above (no new
+business logic), and the action buttons (Accept/Start/Complete, notes
+editing, photo upload, GPS pin, NAP linking) are rendered but disabled
+placeholders -- wiring those up to actually mutate an assignment is a
+deliberate follow-up, not done here.
+
+Routes:
+    GET  /technician/mobile                         -> mobile_jobs
+    GET  /technician/mobile/history                 -> mobile_history
+    GET  /technician/mobile/profile                 -> mobile_profile
+    GET  /technician/mobile/jobs/<assignment_id>     -> mobile_job_detail
 """
 
 from datetime import datetime
@@ -50,6 +70,40 @@ from app.auth import role_required
 from app.models import Technician, Assignment
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify_issue_status_change
+
+# Mirrors mobile/apps/app/src/screens/technician/statusLabels.ts exactly
+# -- both the web and mobile UI should read the same everywhere.
+STATUS_LABELS = {
+    "assigned": "Assigned",
+    "accepted": "Accepted",
+    "in_progress": "In progress",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+}
+
+REQUEST_TYPE_LABELS = {
+    "new_installation": "New installation",
+    "disconnection": "Disconnection",
+    "relocation": "Relocation",
+    "upgrade": "Upgrade",
+    "add_nap": "Nap Installation",
+}
+
+JOB_TYPE_LABELS = {
+    "repair": "Repair",
+    "installation": "Installation",
+}
+
+PRIORITY_LABELS = {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Urgent",
+}
+
+# Same default home-service-area fallback as the mobile app's
+# AssignmentsScreen.DEFAULT_ADDRESS.
+DEFAULT_ADDRESS = "Sta. Cruz, Laguna"
 
 technician_bp = Blueprint("technician", __name__, url_prefix="/technician")
 
@@ -271,4 +325,190 @@ def complete_assignment(assignment_id):
     issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
     flash(f"{issue_label} marked complete. Nice work!", "success")
     return redirect(url_for("technician.index"))
+
+
+# ------------------------------------------------------------------ #
+# Web version of the mobile app (UI only) -- see module docstring     #
+# ------------------------------------------------------------------ #
+
+def _job_source(assignment):
+    """Returns whichever of (technical_issue, service_request) this
+    assignment actually links to (see Assignment's own docstring:
+    exactly one of the two is ever set)."""
+    return assignment.technical_issue, assignment.service_request
+
+
+def _ticket_code(assignment):
+    """Mirrors statusLabels.ts's ticketCode() exactly: 'TN 00006' for a
+    repair, 'SO 00001' for an installation, zero-padded to 5 digits."""
+    issue, request = _job_source(assignment)
+    if issue:
+        return f"TN {issue.id:05d}"
+    if request:
+        return f"SO {request.id:05d}"
+    return f"Job #{assignment.id}"
+
+
+def _serialize_job(assignment):
+    """Builds the flat, template-friendly view of an Assignment that
+    every mobile_* screen below renders from -- one place computing
+    ticket code / type label / address / priority / etc. so the Jobs
+    list, History list, and Job Detail screens all agree with each
+    other (and with the mobile app's own statusLabels.ts helpers)."""
+    issue, request = _job_source(assignment)
+    is_installation = assignment.service_request_id is not None
+    is_new_installation = is_installation and request and request.request_type == "new_installation"
+
+    subscriber = issue.subscriber if issue else (request.subscriber if request else None)
+
+    if issue:
+        type_label = issue.issue_type
+    elif request:
+        type_label = REQUEST_TYPE_LABELS.get(request.request_type, request.request_type)
+    else:
+        type_label = JOB_TYPE_LABELS.get("installation" if is_installation else "repair")
+
+    if subscriber and subscriber.address:
+        address = subscriber.address
+    elif issue and issue.address:
+        address = issue.address
+    elif request and request.address:
+        address = request.address
+    else:
+        address = DEFAULT_ADDRESS
+
+    priority = (issue.priority if issue else None) or (request.priority if request else None)
+
+    lat = (subscriber.latitude if subscriber else None) or (issue.latitude if issue else None) or (request.latitude if request else None)
+    lng = (subscriber.longitude if subscriber else None) or (issue.longitude if issue else None) or (request.longitude if request else None)
+
+    can_accept = assignment.status == "assigned"
+    can_start = assignment.status == "accepted"
+    can_edit = assignment.status in ("accepted", "in_progress")
+    can_complete = assignment.status == "in_progress"
+    is_closed = assignment.status in CLOSED_ASSIGNMENT_STATUSES
+
+    return {
+        "assignment": assignment,
+        "ticket_code": _ticket_code(assignment),
+        "status_label": STATUS_LABELS.get(assignment.status, assignment.status),
+        "type_label": type_label,
+        "address": address,
+        "priority": priority,
+        "priority_label": PRIORITY_LABELS.get(priority, priority),
+        "subscriber_label": "NAP" if (request and request.request_type == "add_nap") else "Subscriber",
+        "subscriber_name": (
+            f"{subscriber.subscriber_code} — {subscriber.full_name}" if subscriber
+            else (request.full_name if request else None)
+        ),
+        "plan_label": request.plan_label if request else None,
+        "contact_number": subscriber.contact_number if subscriber else (request.contact_number if request else None),
+        "port_number": assignment.port_number,
+        "description": issue.description if issue else (request.notes if request else None),
+        "nap_label": f"{assignment.technical_issue.nap.nap_code} — {assignment.technical_issue.nap.name}" if (issue and issue.nap) else None,
+        "lat": lat,
+        "lng": lng,
+        "is_installation": is_installation,
+        "is_new_installation": is_new_installation,
+        "can_accept": can_accept,
+        "can_start": can_start,
+        "can_edit": can_edit,
+        "can_complete": can_complete,
+        "is_closed": is_closed,
+        "show_photo_card": can_edit or is_closed or bool(assignment.photo_filename),
+    }
+
+
+@technician_bp.route("/mobile")
+@role_required("field_assistant")
+def mobile_jobs():
+    """Web equivalent of the mobile app's Jobs (Assignments) tab --
+    same open-assignments query as index() above, sorted the same way
+    (critical first, ties keeping most-recent-first order)."""
+    profile = Technician.query.filter_by(user_id=g.user.id).first()
+
+    assignments = []
+    if profile is not None:
+        assignments = (
+            Assignment.query.filter(
+                Assignment.technician_id == profile.id,
+                Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
+            )
+            .order_by(Assignment.assigned_at.desc())
+            .all()
+        )
+
+    priority_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    jobs = sorted(
+        (_serialize_job(a) for a in assignments),
+        key=lambda job: priority_rank.get(job["priority"], 0),
+        reverse=True,
+    )
+
+    return render_template(
+        "technician_mobile/jobs.html",
+        profile=profile,
+        jobs=jobs,
+        active_tab="jobs",
+    )
+
+
+@technician_bp.route("/mobile/history")
+@role_required("field_assistant")
+def mobile_history():
+    """Web equivalent of the mobile app's History tab -- same closed-
+    assignments query as history() above."""
+    profile = Technician.query.filter_by(user_id=g.user.id).first()
+
+    assignments = []
+    if profile is not None:
+        assignments = (
+            Assignment.query.filter(
+                Assignment.technician_id == profile.id,
+                Assignment.status.in_(CLOSED_ASSIGNMENT_STATUSES),
+            )
+            .order_by(Assignment.assigned_at.desc())
+            .all()
+        )
+
+    jobs = [_serialize_job(a) for a in assignments]
+
+    return render_template(
+        "technician_mobile/history.html",
+        profile=profile,
+        jobs=jobs,
+        active_tab="history",
+    )
+
+
+@technician_bp.route("/mobile/profile")
+@role_required("field_assistant")
+def mobile_profile():
+    """Web equivalent of the mobile app's Profile tab. Unlike the
+    mobile app, there's no offline sync queue to report here (that's a
+    mobile-only concern -- see OfflineContext.tsx), so this shows
+    account + work-status info only."""
+    profile = Technician.query.filter_by(user_id=g.user.id).first()
+    return render_template(
+        "technician_mobile/profile.html",
+        profile=profile,
+        active_tab="profile",
+    )
+
+
+@technician_bp.route("/mobile/jobs/<int:assignment_id>")
+@role_required("field_assistant")
+def mobile_job_detail(assignment_id):
+    """Web equivalent of the mobile app's Job Detail screen. Read-only
+    for now -- see this module's docstring for what's intentionally
+    not wired up yet (accept/start/complete, notes, photo, GPS pin,
+    NAP linking)."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    return render_template(
+        "technician_mobile/job_detail.html",
+        job=_serialize_job(assignment),
+        hide_tabbar=True,
+    )
 
