@@ -478,8 +478,6 @@ def quick_add_nap():
     return jsonify({"status": "error", "errors": form.errors}), 400
 
 
-@naps_bp.route("/<int:nap_id>")
-@role_required(*_VIEW_ROLES)
 def _nap_port_assignments(nap):
     """Maps port_number -> Subscriber for this NAP's occupied slots,
     using each subscriber's actual technician-recorded port_number
@@ -538,6 +536,8 @@ def _nap_port_assignments(nap):
     return assignments
 
 
+@naps_bp.route("/<int:nap_id>")
+@role_required(*_VIEW_ROLES)
 def view_nap(nap_id):
     """Displays full details for a single NAP.
 
