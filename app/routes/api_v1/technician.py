@@ -212,6 +212,37 @@ def _validate_port_number(assignment: Assignment, data: dict):
     return port_number, None
 
 
+def _subscriber_installed_port_number(subscriber):
+    """The NAP port recorded on this subscriber's own completed
+    'new_installation' Assignment (set by whichever field assistant
+    connected them — see the port picker in JobDetailScreen.tsx and
+    _validate_port_number() above). Used so a Repair ticket's Job
+    Detail screen can show the port that was actually recorded at
+    install time, for the technician to check the port they're
+    servicing against — separate from this assignment's own
+    port_number, which a repair only ever gets if a technician
+    explicitly re-enters one via saveNotes/completeJob.
+
+    None if this subscriber has no completed install assignment with a
+    port recorded (e.g. added directly by an admin, never installed
+    through the mobile flow).
+    """
+    if subscriber is None:
+        return None
+    row = (
+        Assignment.query
+        .join(ServiceRequest, ServiceRequest.id == Assignment.service_request_id)
+        .filter(
+            ServiceRequest.subscriber_id == subscriber.id,
+            ServiceRequest.request_type == "new_installation",
+            Assignment.port_number.isnot(None),
+        )
+        .order_by(Assignment.completed_at.desc(), Assignment.id.desc())
+        .first()
+    )
+    return row.port_number if row else None
+
+
 def _serialize_assignment(assignment: Assignment) -> dict:
     """The fields the mobile app needs per assignment — including
     enough of the linked issue-or-request/subscriber/NAP to show a
@@ -312,6 +343,13 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "contact_number": subscriber.contact_number,
             "latitude": float(subscriber.latitude) if subscriber.latitude is not None else None,
             "longitude": float(subscriber.longitude) if subscriber.longitude is not None else None,
+            # The port recorded when this subscriber was originally
+            # installed — see _subscriber_installed_port_number()
+            # above. Lets a Repair ticket show/compare against the
+            # port actually on file for this subscriber, instead of
+            # only this assignment's own (separately re-entered)
+            # port_number.
+            "installed_port_number": _subscriber_installed_port_number(subscriber),
         }
         if subscriber
         else None,

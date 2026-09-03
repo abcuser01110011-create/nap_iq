@@ -63,6 +63,14 @@ export interface AssignmentSubscriber {
   contact_number: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** The NAP port recorded when this subscriber was originally
+   * installed (their completed 'new_installation' Assignment's own
+   * port_number — see _subscriber_installed_port_number() in
+   * api_v1/technician.py). Null if this subscriber has no completed
+   * install assignment with a port recorded. Shown on a Repair
+   * ticket's Job Detail screen so the technician can check the port
+   * they're servicing against the one on file. */
+  installed_port_number: number | null;
 }
 
 // Phase 28 (installation dispatch) + GeoMap "+ Tickets" walk-in Service

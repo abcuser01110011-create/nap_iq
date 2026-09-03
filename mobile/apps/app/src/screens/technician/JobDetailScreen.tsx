@@ -485,6 +485,33 @@ export default function JobDetailScreen({ route, navigation }: any) {
               entirely (InfoRow returns null) until a port's actually
               been recorded. */}
           <InfoRow label="Port Number" value={assignment.port_number != null ? `Port ${assignment.port_number}` : undefined} />
+          {/* Repair-only: the port actually recorded on this
+              subscriber's original installation (see
+              _subscriber_installed_port_number() in
+              api_v1/technician.py), so the technician can check the
+              port they're servicing on-site against the one on file.
+              Flagged in red if this assignment's own port_number
+              (entered above/below) has been set but doesn't match. */}
+          {!isInstallation && assignment.subscriber?.installed_port_number != null && (
+            <InfoRow
+              label="Installed Port"
+              value={`Port ${assignment.subscriber.installed_port_number}`}
+              valueColor={
+                assignment.port_number != null &&
+                assignment.port_number !== assignment.subscriber.installed_port_number
+                  ? colors.danger
+                  : undefined
+              }
+            />
+          )}
+          {!isInstallation &&
+            assignment.port_number != null &&
+            assignment.subscriber?.installed_port_number != null &&
+            assignment.port_number !== assignment.subscriber.installed_port_number && (
+              <Text style={[styles.notesText, { color: colors.danger }]}>
+                This doesn't match the port recorded at installation — double-check before completing.
+              </Text>
+            )}
           {assignment.issue && <InfoRow label="Description" value={assignment.issue.description} />}
           {assignment.service_request && <InfoRow label="Plan / notes" value={assignment.service_request.notes} />}
           {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
