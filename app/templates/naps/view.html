@@ -9,14 +9,12 @@
     </a>
 </div>
 
-{# Phase: ports are not individually tracked in the DB (Subscriber has
-   no port_number column) -- only a total_ports count and each linked
-   subscriber's status. So the per-port table below assigns port
-   numbers 1..N by simply lining up every non-disconnected subscriber
-   (oldest first) against the open slots, the same "occupied" rule
-   app/nap_status.py already uses everywhere else (GeoMap, Dashboard,
-   sync_nap_status). It's a display-only numbering, not a stored one. #}
-{% set occupied_subs = nap.subscribers|selectattr('status', 'ne', 'disconnected')|sort(attribute='id')|list %}
+{# Port numbers below come from naps.view_nap()'s port_assignments —
+   each subscriber's actual technician-recorded port_number where one
+   was ever saved during install, otherwise (legacy/no install record)
+   the next free slot. Used/Available Ports are also computed live
+   there (slot_usage()) rather than the stale nap.used_ports /
+   nap.available_ports columns. #}
 
 <div class="row justify-content-center">
     <div class="col-lg-8">
@@ -47,12 +45,12 @@
                     <dd class="col-sm-8">{{ nap.total_ports }}</dd>
 
                     <dt class="col-sm-4 text-muted fw-normal">Used Ports</dt>
-                    <dd class="col-sm-8">{{ nap.used_ports }}</dd>
+                    <dd class="col-sm-8">{{ used_ports }}</dd>
 
                     <dt class="col-sm-4 text-muted fw-normal">Available Ports</dt>
                     <dd class="col-sm-8">
-                        <span class="badge {{ 'text-bg-success' if nap.available_ports > 0 else 'text-bg-secondary' }}">
-                            {{ nap.available_ports }}
+                        <span class="badge {{ 'text-bg-success' if available_ports > 0 else 'text-bg-secondary' }}">
+                            {{ available_ports }}
                         </span>
                     </dd>
 
@@ -78,7 +76,7 @@
                         </thead>
                         <tbody>
                             {% for port_num in range(1, nap.total_ports + 1) %}
-                                {% set sub = occupied_subs[port_num - 1] if port_num <= occupied_subs|length else None %}
+                                {% set sub = port_assignments.get(port_num) %}
                                 <tr>
                                     <td>{{ port_num }}</td>
                                     {% if sub %}

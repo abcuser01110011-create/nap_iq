@@ -30,9 +30,12 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from app.extensions import db
 from sqlalchemy import func
 from app.auth import role_required
-from app.models import Nap, AppSettings, Plan, Technician, Assignment, TechnicalIssue, Subscriber
+from app.models import (
+    Nap, AppSettings, Plan, Technician, Assignment, TechnicalIssue, Subscriber,
+    ServiceRequest,
+)
 from app.forms import NapForm, MapQuickAddNapForm
-from app.nap_status import sync_nap_status
+from app.nap_status import sync_nap_status, slot_usage
 
 naps_bp = Blueprint("naps", __name__, url_prefix="/naps")
 
@@ -477,6 +480,64 @@ def quick_add_nap():
 
 @naps_bp.route("/<int:nap_id>")
 @role_required(*_VIEW_ROLES)
+def _nap_port_assignments(nap):
+    """Maps port_number -> Subscriber for this NAP's occupied slots,
+    using each subscriber's actual technician-recorded port_number
+    (the value entered on the mobile Job Detail screen and saved to
+    Assignment.port_number when their installation was completed —
+    see api_v1/technician.py's _validate_port_number()) instead of a
+    display-only sequential guess.
+
+    Looked up via the subscriber's service_requests -> the most
+    recently assigned Assignment on each that actually recorded a
+    port_number (a subscriber can have more than one service request
+    over time -- e.g. a later upgrade/relocation -- so the newest
+    recorded port wins).
+
+    A subscriber with no recorded port_number at all (added directly
+    through Subscribers -> Add Subscriber, bypassing the technician
+    install flow entirely) falls back to the next free slot in id
+    order, same as this page's previous behavior, so every occupied
+    subscriber still shows up exactly once and two subscribers can
+    never collide on the same displayed port.
+    """
+    occupied_subs = [s for s in nap.subscribers if s.status != "disconnected"]
+    occupied_subs.sort(key=lambda s: s.id)
+
+    subscriber_ids = [s.id for s in occupied_subs]
+    recorded_ports = {}
+    if subscriber_ids:
+        rows = (
+            db.session.query(ServiceRequest.subscriber_id, Assignment.port_number)
+            .join(Assignment, Assignment.service_request_id == ServiceRequest.id)
+            .filter(
+                ServiceRequest.subscriber_id.in_(subscriber_ids),
+                Assignment.port_number.isnot(None),
+            )
+            .order_by(Assignment.assigned_at.desc())
+            .all()
+        )
+        # rows are newest-assignment-first; setdefault so each
+        # subscriber keeps only their most recently recorded port.
+        for subscriber_id, port_number in rows:
+            recorded_ports.setdefault(subscriber_id, port_number)
+
+    assignments = {}
+    unplaced = []
+    for sub in occupied_subs:
+        port = recorded_ports.get(sub.id)
+        if port is not None and 1 <= port <= nap.total_ports and port not in assignments:
+            assignments[port] = sub
+        else:
+            unplaced.append(sub)
+
+    free_slots = (p for p in range(1, nap.total_ports + 1) if p not in assignments)
+    for sub, port in zip(unplaced, free_slots):
+        assignments[port] = sub
+
+    return assignments
+
+
 def view_nap(nap_id):
     """Displays full details for a single NAP.
 
@@ -484,13 +545,31 @@ def view_nap(nap_id):
     own assignments — everything else 403s. Enforced here rather than
     by narrowing _VIEW_ROLES so an administrator's unrestricted access
     is untouched, same shape as issues.view_issue's Phase 14 check.
+
+    Used/Available Ports and the per-port table below are computed
+    live (slot_usage() + _nap_port_assignments()) rather than read off
+    the stored nap.used_ports/available_ports columns, which every
+    other page already treats as stale/unmaintained bookkeeping (see
+    app/nap_status.py's module docstring and the matching comment on
+    subscribers.py's assign_nap()) — this page was the one place still
+    trusting them, which is why it could show "Used Ports: 0" for a
+    NAP with subscribers already connected.
     """
     nap = Nap.query.get_or_404(nap_id)
 
     if g.user.role == "field_assistant" and nap.id not in _own_nap_ids_for(g.user):
         abort(403)
 
-    return render_template("naps/view.html", nap=nap)
+    used_ports, available_ports = slot_usage(nap)
+    port_assignments = _nap_port_assignments(nap)
+
+    return render_template(
+        "naps/view.html",
+        nap=nap,
+        used_ports=used_ports,
+        available_ports=available_ports,
+        port_assignments=port_assignments,
+    )
 
 
 @naps_bp.route("/resync-status", methods=["POST"])
