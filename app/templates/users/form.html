@@ -2,6 +2,38 @@
 {% block title %}{{ 'Edit User' if mode == 'edit' else 'Add User' }}{% endblock %}
 {% block page_title %}{{ 'Edit User' if mode == 'edit' else 'Add New User' }}{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Coverage Area barangay picker (Payment Collector accounts) --
+       same look as the ticket form's barangay/technician pickers in
+       naps/map.html (.ticket-subscriber-dropdown / #ticketFormTechnicianChips),
+       reproduced here since that page's CSS isn't loaded on this one. */
+    .coverage-area-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 1060;
+        border-radius: 0.4rem;
+    }
+    .coverage-area-dropdown .list-group-item {
+        cursor: pointer;
+    }
+    .coverage-area-dropdown .list-group-item:hover {
+        background-color: #f1f6fb;
+    }
+    [data-bs-theme="dark"] .coverage-area-dropdown .list-group-item:hover {
+        background-color: #1c2438;
+    }
+    #coverageAreaChips .badge {
+        font-weight: 500;
+        padding: 0.4rem 0.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
     <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">
@@ -75,12 +107,29 @@
 
                         <div class="col-md-6" id="coverageAreaField">
                             <label class="form-label">{{ form.coverage_area.label }}</label>
-                            {{ form.coverage_area(class="form-control" ~ (" is-invalid" if form.coverage_area.errors else ""), placeholder="e.g. San Jose") }}
+                            {# Actual submitted field -- kept in sync (comma-separated)
+                               by static/js/collector-coverage.js every time a chip is
+                               added or removed. See that file's header comment. #}
+                            {{ form.coverage_area(type="hidden", id="coverageAreaValue", class=("is-invalid" if form.coverage_area.errors else "")) }}
+                            <div class="position-relative">
+                                <div class="d-flex gap-2">
+                                    <div class="position-relative flex-grow-1">
+                                        <input type="text" class="form-control" id="coverageAreaInput"
+                                               placeholder="Search barangay (Santa Cruz, Laguna)…" autocomplete="off">
+                                        <div id="coverageAreaResults" class="list-group shadow-sm coverage-area-dropdown d-none"></div>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="coverageAreaAddBtn">
+                                        <i class="bi bi-plus-lg"></i> Add
+                                    </button>
+                                </div>
+                                <div id="coverageAreaChips" class="d-flex flex-wrap gap-1 mt-2"></div>
+                            </div>
                             {% for error in form.coverage_area.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                             <div class="form-text">
-                                Only used for Payment Collector accounts — shown as the
+                                Only used for Payment Collector accounts — search and add
+                                one or more barangays this collector covers. Shown as the
                                 "Coverage" column on the admin Collector list.
                             </div>
                         </div>
@@ -144,6 +193,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/collector-coverage.js') }}"></script>
 <script>
     // Shows the "Linked Subscriber" field only when the selected role is
     // 'user' (Customer) — the field is harmless to submit for any other

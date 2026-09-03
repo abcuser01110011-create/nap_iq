@@ -380,9 +380,15 @@ class UserForm(FlaskForm):
     # "Coverage" column on the admin Collector list (see
     # app/routes/collectors.py). Ignored for any other role, same
     # pattern as subscriber_id above.
+    # Widened from 100 -> 255: the field now accepts more than one
+    # barangay (added as chips in users/form.html, see
+    # static/js/collector-coverage.js), stored here as a single
+    # comma-separated string, e.g. "San Jose, San Roque, Bubukal".
+    # Matches the users.coverage_area column width in app/models.py
+    # and database/schema.sql -- keep all three in sync.
     coverage_area = StringField(
         "Coverage Area (Payment Collector accounts only)",
-        validators=[Optional(), Length(max=100, message="Coverage area must be at most 100 characters.")],
+        validators=[Optional(), Length(max=255, message="Coverage area must be at most 255 characters.")],
     )
 
     def validate_username(self, field):
