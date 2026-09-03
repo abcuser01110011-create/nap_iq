@@ -11,6 +11,7 @@ development phases.
 from flask import Flask, render_template, g, request, redirect, jsonify
 
 from flask_wtf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import Config
 from app.extensions import db, limiter, jwt
@@ -30,6 +31,22 @@ def create_app(config_class: type = Config) -> Flask:
     """
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Behind a TLS-terminating reverse proxy (Railway, Render, Heroku,
+    # nginx, etc.), Flask's own connection is plain HTTP even though
+    # the original client request was HTTPS. ProxyFix makes Flask read
+    # the proxy's X-Forwarded-Proto/Host headers and treat the request
+    # as if it arrived over HTTPS directly -- so request.scheme /
+    # request.is_secure (used below by _enforce_https, and by
+    # SESSION_COOKIE_SECURE) are correct without relying on a manual
+    # header check that's easy to leave misconfigured and causes an
+    # infinite http->https redirect loop (ERR_TOO_MANY_REDIRECTS) if
+    # it's ever wrong. Only trust these headers when the deployment's
+    # own config says a real proxy is in front (same flag that used to
+    # gate the manual check) -- never trust them with no proxy present,
+    # since a client could otherwise fake "already HTTPS" itself.
+    if app.config["TRUST_X_FORWARDED_PROTO"]:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     # ---- Initialize extensions ----
     db.init_app(app)
@@ -87,19 +104,12 @@ def create_app(config_class: type = Config) -> Flask:
 
         @app.before_request
         def _enforce_https():
-            # `request.is_secure` reflects the connection Flask itself
-            # sees. Behind a TLS-terminating reverse proxy, that
-            # connection is plain HTTP even though the original client
-            # request was HTTPS — TRUST_X_FORWARDED_PROTO opts into
-            # reading the proxy-set header instead, and must only be
-            # turned on when a proxy that actually sets this header
-            # honestly sits in front (see config.py's comment).
-            if app.config["TRUST_X_FORWARDED_PROTO"]:
-                scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-            else:
-                scheme = request.scheme
-
-            if scheme != "https":
+            # `request.is_secure` is now accurate even behind Railway's
+            # proxy: when TRUST_X_FORWARDED_PROTO is on, the ProxyFix
+            # middleware registered above has already rewritten the
+            # request's scheme from X-Forwarded-Proto before Flask
+            # (and this check) ever sees it.
+            if not request.is_secure:
                 https_url = request.url.replace("http://", "https://", 1)
                 return redirect(https_url, code=301)
 
