@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS users (
     role            ENUM('administrator', 'technician', 'field_assistant', 'payment_collector', 'user') NOT NULL,
     email           VARCHAR(100) UNIQUE,
     phone_number    VARCHAR(20),
+    -- Payment Collector admin view (Collector tab): the barangay/area a
+    -- payment_collector account is assigned to. Nullable and unused by
+    -- every other role -- set via Manage Users > Edit for a
+    -- payment_collector account, shown as "--" until filled in.
+    coverage_area   VARCHAR(100),
     status          ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
     -- Phase 24: Settings > Display Settings' Dark Mode toggle, saved per
     -- account (not per browser) so it follows the user across devices.
@@ -45,6 +50,12 @@ CREATE TABLE IF NOT EXISTS users (
 -- creates a role='technician' account):
 --   ALTER TABLE users
 --       MODIFY COLUMN role ENUM('administrator', 'technician', 'field_assistant', 'payment_collector', 'user') NOT NULL;
+
+-- Add the Collector admin view's Coverage Area column (for an
+-- already-provisioned database -- CREATE TABLE IF NOT EXISTS above
+-- won't retrofit an existing install):
+--   ALTER TABLE users
+--       ADD COLUMN coverage_area VARCHAR(100) AFTER phone_number;
 
 -- ---------------------------------------------------------------------
 -- naps: Network Access Points plotted on the GeoMap

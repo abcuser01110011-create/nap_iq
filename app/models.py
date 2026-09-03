@@ -87,6 +87,11 @@ class User(db.Model):
     )
     email = db.Column(db.String(100), unique=True, nullable=True)
     phone_number = db.Column(db.String(20), nullable=True)
+    # Collector admin view (Collector tab): the barangay/area this
+    # account covers. Only meaningful for role='payment_collector' —
+    # every other role just leaves this null. Set via Manage Users >
+    # Edit; shown as "—" on the Collector list until filled in.
+    coverage_area = db.Column(db.String(100), nullable=True)
     # Phase 17: replaces the original boolean `is_active` — see the
     # USER_STATUSES comment above. An account can log in only when
     # this is 'active' (checked in app/auth.py and routes/auth.py);

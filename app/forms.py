@@ -375,6 +375,16 @@ class UserForm(FlaskForm):
         validators=[Optional()],
     )
 
+    # ---- Coverage Area (Payment Collector accounts only) ----
+    # Only meaningful when role == 'payment_collector'; feeds the
+    # "Coverage" column on the admin Collector list (see
+    # app/routes/collectors.py). Ignored for any other role, same
+    # pattern as subscriber_id above.
+    coverage_area = StringField(
+        "Coverage Area (Payment Collector accounts only)",
+        validators=[Optional(), Length(max=100, message="Coverage area must be at most 100 characters.")],
+    )
+
     def validate_username(self, field):
         """Ensures username is unique, excluding the record being edited."""
         query = User.query.filter(User.username == field.data.strip())

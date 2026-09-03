@@ -73,6 +73,18 @@
                             </div>
                         </div>
 
+                        <div class="col-md-6" id="coverageAreaField">
+                            <label class="form-label">{{ form.coverage_area.label }}</label>
+                            {{ form.coverage_area(class="form-control" ~ (" is-invalid" if form.coverage_area.errors else ""), placeholder="e.g. San Jose") }}
+                            {% for error in form.coverage_area.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">
+                                Only used for Payment Collector accounts — shown as the
+                                "Coverage" column on the admin Collector list.
+                            </div>
+                        </div>
+
                         {% if mode == 'add' %}
                         <div class="col-md-6">
                             <label class="form-label">{{ form.password.label }}</label>
@@ -140,10 +152,14 @@
     (function () {
         const roleSelect = document.getElementById('roleSelect');
         const linkField = document.getElementById('subscriberLinkField');
+        const coverageField = document.getElementById('coverageAreaField');
         if (!roleSelect || !linkField) return;
 
         function syncVisibility() {
             linkField.style.display = roleSelect.value === 'user' ? '' : 'none';
+            if (coverageField) {
+                coverageField.style.display = roleSelect.value === 'payment_collector' ? '' : 'none';
+            }
         }
 
         roleSelect.addEventListener('change', syncVisibility);

@@ -1,0 +1,68 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Collectors{% endblock %}
+{% block page_title %}Collectors{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ collectors|length }} collector{{ '' if collectors|length == 1 else 's' }} shown</p>{% endblock %}
+
+{% block content %}
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Collector</th>
+                    <th>Coverage</th>
+                    <th class="text-end">Subscribers</th>
+                    <th class="text-end">Collected Today</th>
+                    <th class="text-end">Collection Rate</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in collectors %}
+                <tr class="disp-row">
+                    <td><span class="disp-primary-link">{{ row.user.full_name }}</span></td>
+                    <td class="disp-subtext">{{ row.user.coverage_area or "—" }}</td>
+                    <td class="text-end">{{ row.subscribers }}</td>
+                    <td class="text-end">₱{{ "{:,.2f}".format(row.collected_today) }}</td>
+                    <td class="text-end">
+                        {% if row.rate is not none %}{{ row.rate }}%{% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% set collector_status_classes = {
+                            'active': 'disp-badge-active',
+                            'behind': 'disp-badge-high',
+                            'no_activity': 'disp-badge-low'
+                        } %}
+                        {% set collector_status_labels = {
+                            'active': 'Active',
+                            'behind': 'Behind',
+                            'no_activity': 'No Activity'
+                        } %}
+                        <span class="disp-badge {{ collector_status_classes.get(row.status, 'disp-badge-low') }}">
+                            {{ collector_status_labels.get(row.status, row.status|capitalize) }}
+                        </span>
+                    </td>
+                    <td class="text-end">
+                        <div class="subs-row-actions">
+                            <a href="{{ url_for('users.edit_user', user_id=row.user.id) }}"
+                               class="subs-edit-btn" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="disp-empty">
+                        <i class="bi bi-cash-coin display-6 d-block mb-2"></i>
+                        No collector accounts found. Create one from Manage Users with the
+                        "Payment Collector" role.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -201,6 +201,7 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.profile import profile_bp
     from app.routes.subscribers import subscribers_bp
     from app.routes.technicians import technicians_bp
+    from app.routes.collectors import collectors_bp
     from app.routes.reports import reports_bp
     from app.routes.settings import settings_bp
     from app.routes.service_requests import service_requests_bp
@@ -222,6 +223,7 @@ def create_app(config_class: type = Config) -> Flask:
     app.register_blueprint(profile_bp)
     app.register_blueprint(subscribers_bp)
     app.register_blueprint(technicians_bp)
+    app.register_blueprint(collectors_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(service_requests_bp)

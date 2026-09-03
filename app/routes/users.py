@@ -117,6 +117,8 @@ def add_user():
             email=(form.email.data or "").strip() or None,
             phone_number=(form.phone_number.data or "").strip() or None,
             role=form.role.data,
+            coverage_area=(form.coverage_area.data or "").strip() or None
+            if form.role.data == "payment_collector" else None,
         )
         user.set_password(form.password.data)
         db.session.add(user)
@@ -154,6 +156,8 @@ def edit_user(user_id):
     )
     if request.method == "GET" and linked_subscriber is not None:
         form.subscriber_id.data = linked_subscriber.id
+    if request.method == "GET":
+        form.coverage_area.data = user.coverage_area
 
     if form.validate_on_submit():
         # Guard: an administrator can't demote their own account away
@@ -169,6 +173,14 @@ def edit_user(user_id):
         user.email = (form.email.data or "").strip() or None
         user.phone_number = (form.phone_number.data or "").strip() or None
         user.role = form.role.data
+
+        # Only a payment_collector account keeps a Coverage Area —
+        # same "drop it if the role changes away" reasoning as the
+        # Subscriber link below.
+        user.coverage_area = (
+            (form.coverage_area.data or "").strip() or None
+            if form.role.data == "payment_collector" else None
+        )
 
         # Phase 10: reconcile the Subscriber link against whatever was
         # submitted. Only a 'user'-role account can hold a link at
