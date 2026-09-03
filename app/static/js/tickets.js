@@ -78,6 +78,16 @@
         return currentCategory === "TN" && currentTypeValue === "Fiber Break";
     }
 
+    // Repair tickets are always tied to a real subscriber (selected
+    // above in ticketFormSubscriberWrapper), whose registered address
+    // is already submitted automatically -- see submitTN()'s
+    // `address` field -- and shown on the ticket details page. Used
+    // below to also drop the manual Barangay field for this type,
+    // same as Fiber Break drops it for a different reason.
+    function isRepairForm() {
+        return currentCategory === "TN" && currentTypeValue === "Repair";
+    }
+
     // "Add NAP" is the one SO type that isn't a customer application
     // -- see applyCategory()/submitAddNap() below for what that
     // changes in the form and on submit.
@@ -577,6 +587,7 @@
         currentTypeValue = typeValue;
         const isFiberBreak = isFiberBreakForm();
         const isAddNap = isAddNapForm();
+        const isRepair = isRepairForm();
 
         // Type is a fixed label now (set by whichever dropdown item
         // was clicked), not something the admin can change after the
@@ -618,18 +629,25 @@
         renderNapResults([]);
         if (isFiberBreak) loadNaps();
 
-        // Barangay applies to SO and every other TN type (it's the
-        // real submitted `barangay` for SO, and supplementary context
-        // folded into the description for TN) -- but Fiber Break
-        // drops it entirely: it's reported against a NAP, not a
-        // barangay-scoped address, and the pin for every affected
-        // ticket comes from each connected subscriber's own
-        // registered location instead (see report_fiber_break() in
-        // app/routes/issues.py).
-        document.getElementById("ticketFormBarangayWrapper").classList.toggle("d-none", isFiberBreak);
+        // Barangay applies to SO and most TN types (it's the real
+        // submitted `barangay` for SO, and supplementary context
+        // folded into the description for TN) -- but two TN types
+        // drop it entirely: Fiber Break, since it's reported against
+        // a NAP rather than a barangay-scoped address (the pin for
+        // every affected ticket comes from each connected
+        // subscriber's own registered location instead -- see
+        // report_fiber_break() in app/routes/issues.py); and Repair,
+        // since the subscriber picked above already has a registered
+        // address on file, which submitTN() submits automatically as
+        // the ticket's real `address` and which the ticket details
+        // page displays -- asking the admin to also type a barangay
+        // here would just be redundant manual entry for data that's
+        // already known.
+        const hideBarangay = isFiberBreak || isRepair;
+        document.getElementById("ticketFormBarangayWrapper").classList.toggle("d-none", hideBarangay);
         document.getElementById("ticketFormBarangayInput").value = "";
         renderBarangayResults([]);
-        if (!isFiberBreak) loadBarangays();
+        if (!hideBarangay) loadBarangays();
 
         if (category === "TN" && !isFiberBreak) {
             updateLocationForSubscriber();

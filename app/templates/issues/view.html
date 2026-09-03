@@ -76,6 +76,15 @@
                     <dt class="col-sm-4 text-muted fw-normal">Address</dt>
                     <dd class="col-sm-8">{{ issue.address or "—" }}</dd>
 
+                    {# Recorded by the technician on-site when they save notes/
+                       complete the assignment (app's SignaturePad/JobDetailScreen
+                       flow -> Assignment.port_number). Only ever set once a
+                       technician has actually been dispatched, so this falls
+                       back to "—" until then, same as every other not-yet-known
+                       field on this page. #}
+                    <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
+                    <dd class="col-sm-8">{{ assignment.port_number if assignment and assignment.port_number is not none else "—" }}</dd>
+
                     <dt class="col-sm-4 text-muted fw-normal">Coordinates</dt>
                     <dd class="col-sm-8">{{ issue.latitude }}, {{ issue.longitude }}</dd>
 
