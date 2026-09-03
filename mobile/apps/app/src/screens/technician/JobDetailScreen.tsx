@@ -22,7 +22,7 @@ import { useOffline } from "../../offline/OfflineContext";
 import JobLocationMap from "../../components/JobLocationMap";
 import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
-import { JOB_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
+import { PRIORITY_COLORS, PRIORITY_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
 
 // How long we'll wait for a GPS fix before treating it as a timeout —
 // same value/reasoning as the customer app's "Track My Location" step
@@ -30,12 +30,6 @@ import { JOB_TYPE_LABELS, PRIORITY_COLORS, PRIORITY_LABELS, REQUEST_TYPE_LABELS,
 // has no built-in timeout, so this is enforced by racing it against a
 // plain setTimeout below.
 const LOCATION_FIX_TIMEOUT_MS = 20000;
-
-// Company's home service area — same default the admin's Barangay
-// picker falls back to (see app/static/js/tickets.js). Used so a
-// ticket with no address on file still shows something sensible
-// instead of a blank row.
-const DEFAULT_ADDRESS = "Sta. Cruz, Laguna";
 
 function InfoRow({
   label,
@@ -411,21 +405,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        <Text style={styles.jobTypeLabel}>{JOB_TYPE_LABELS[assignment.job_type] ?? assignment.job_type}</Text>
-        <Text style={styles.title}>
-          {assignment.issue?.issue_code ??
-            (assignment.service_request
-              ? assignment.subscriber?.subscriber_code ??
-                `Installation #${assignment.service_request.id}`
-              : `Job #${assignment.id}`)}
-        </Text>
-        <Text style={styles.subtitle}>
-          {assignment.issue?.issue_type ??
-            (assignment.service_request
-              ? REQUEST_TYPE_LABELS[assignment.service_request.request_type] ?? assignment.service_request.request_type
-              : "")}
-        </Text>
-
         {!isOnline && pendingCount > 0 && (
           <View style={styles.queuedBanner}>
             <Text style={styles.queuedBannerText}>
@@ -495,15 +474,17 @@ export default function JobDetailScreen({ route, navigation }: any) {
           />
           <InfoRow
             label="Address"
-            value={
-              assignment.subscriber?.address ??
-              assignment.issue?.address ??
-              assignment.service_request?.address ??
-              DEFAULT_ADDRESS
-            }
+            value={assignment.subscriber?.address ?? assignment.service_request?.address}
           />
           <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
-          {lat != null && lng != null && <InfoRow label="Coordinates" value={`${lat.toFixed(6)}, ${lng.toFixed(6)}`} />}
+          {/* Recorded by a technician on-site (own or a prior visit) via
+              the port picker below for a new installation, or via
+              saveNotes'/completeJob's optional port_number for every
+              other job type -- shown here read-only so it's visible on
+              a Repair ticket too, not just while installing. Omitted
+              entirely (InfoRow returns null) until a port's actually
+              been recorded. */}
+          <InfoRow label="Port Number" value={assignment.port_number != null ? `Port ${assignment.port_number}` : undefined} />
           {assignment.issue && <InfoRow label="Description" value={assignment.issue.description} />}
           {assignment.service_request && <InfoRow label="Plan / notes" value={assignment.service_request.notes} />}
           {assignment.nap && <InfoRow label="NAP" value={`${assignment.nap.nap_code} — ${assignment.nap.name}`} />}
@@ -880,7 +861,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 20, paddingTop: 56, paddingBottom: 60 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   back: { color: colors.primary, fontSize: 15, fontWeight: "600" },
   statusBadge: {
     backgroundColor: colors.primaryLight,
@@ -889,16 +870,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   statusBadgeText: { color: "#8FB6FF", fontSize: 12, fontWeight: "700" },
-  jobTypeLabel: {
-    color: colors.textFaint,
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: 16,
-  },
-  title: { color: colors.text, fontSize: 22, fontWeight: "800", marginTop: 2 },
-  subtitle: { color: colors.textFaint, fontSize: 14, marginTop: 2, marginBottom: 16 },
   error: { color: colors.danger, marginBottom: 12 },
   completeError: { marginTop: 4, marginBottom: 8, textAlign: "center" },
   queuedBanner: {
