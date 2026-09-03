@@ -99,6 +99,11 @@ export interface AssignmentServiceRequest {
   full_name: string | null;
   address: string | null;
   contact_number: string | null;
+  /** The "Plan" dropdown on the GeoMap "+ Tickets" quick-create
+   * modal's New Installation ticket form (ServiceRequest.plan_label
+   * in app/models.py). Only ever set for a 'new_installation'
+   * request; null for every other Service Order type. */
+  plan_label: string | null;
 }
 
 export interface AssignmentNap {

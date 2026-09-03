@@ -19,7 +19,6 @@ import * as Location from "expo-location";
 import { ApiError, type Assignment, type NearbyNap } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
-import JobLocationMap from "../../components/JobLocationMap";
 import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
 import { PRIORITY_COLORS, PRIORITY_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
@@ -428,13 +427,34 @@ export default function JobDetailScreen({ route, navigation }: any) {
         )}
 
         {/* Ticket Details — mirrors the admin's ticket view (issues/view.html
-            / service_requests/form.html): ticket identity, priority/status,
+            / service_requests/form.html): ticket identity, priority,
             requester info, and description/notes all in one place, so the
             field assistant sees the same information an admin filled in
-            before deciding to accept. No map here — see "Live tracking"
-            below, which only appears once the job is accepted. */}
+            before deciding to accept. Status isn't repeated here — the
+            badge at the top of the screen already shows it. The
+            separate map preview card that used to sit below this one
+            was dropped for the same reason: address + "Open in Maps"
+            below already get the technician to the location, and
+            duplicating that as an inline map card was redundant. */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Ticket Details</Text>
+          {/* Priority moved up here (top-right of the card header)
+              instead of its own InfoRow below -- same "at a glance"
+              treatment the screen's own top status badge already
+              gets. Status's InfoRow was removed outright rather than
+              relocated: it's already shown by that same top badge, so
+              repeating it here was pure redundancy. */}
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardLabel}>Ticket Details</Text>
+            {(() => {
+              const priority = assignment.issue?.priority ?? assignment.service_request?.priority;
+              if (!priority) return null;
+              return (
+                <Text style={[styles.priorityBadge, { color: PRIORITY_COLORS[priority] }]}>
+                  {PRIORITY_LABELS[priority] ?? priority}
+                </Text>
+              );
+            })()}
+          </View>
           <InfoRow label="Ticket ID" value={ticketCode(assignment)} />
           <InfoRow
             label="Type"
@@ -445,17 +465,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
                 : undefined)
             }
           />
-          {(() => {
-            const priority = assignment.issue?.priority ?? assignment.service_request?.priority;
-            return (
-              <InfoRow
-                label="Priority"
-                value={priority ? PRIORITY_LABELS[priority] ?? priority : priority}
-                valueColor={priority ? PRIORITY_COLORS[priority] : undefined}
-              />
-            );
-          })()}
-          <InfoRow label="Status" value={STATUS_LABELS[assignment.status] ?? assignment.status} />
           {/* A walk-in Service Order (GeoMap "+ Tickets" modal, free-text
               Customer field) has no linked Subscriber -- fall back to the
               request's own full_name/address/contact_number, which the
@@ -476,6 +485,11 @@ export default function JobDetailScreen({ route, navigation }: any) {
             label="Address"
             value={assignment.subscriber?.address ?? assignment.service_request?.address}
           />
+          {/* New Installation only — the ticket form's own "Plan"
+              dropdown (ServiceRequest.plan_label). Never set for any
+              other Service Order type, so this simply never renders
+              for a repair or any other install sub-type. */}
+          <InfoRow label="Plan" value={assignment.service_request?.plan_label} />
           <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
           {/* The ticket form's "Technician" (who this ticket is
               dispatched to) and, beneath it, "Assisted By" -- the
@@ -537,27 +551,6 @@ export default function JobDetailScreen({ route, navigation }: any) {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Location — only shown once the technician has accepted the job
-            (status moves past "assigned"). Before that, the field
-            assistant only sees the ticket form above and the Accept
-            button below. Tapping the preview opens the device's Google
-            Maps (or Apple Maps on iOS) app for actual turn-by-turn
-            navigation, same as the "Open in Maps" link above. */}
-        {lat != null && lng != null && assignment.status !== "assigned" && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Location</Text>
-            <JobLocationMap
-              latitude={lat}
-              longitude={lng}
-              label={
-                assignment.subscriber?.full_name ?? assignment.service_request?.full_name ?? assignment.issue?.issue_code ?? "Job location"
-              }
-              isOnline={isOnline}
-              onOpenExternal={openMaps}
-            />
-          </View>
-        )}
 
         <Modal
           visible={portModalVisible}
@@ -939,6 +932,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardLabelSpaced: { marginTop: 18 },
+  // Ticket Details card header: label on the left, Priority badge
+  // pinned to the top-right — same "at a glance" placement as the
+  // screen's own top status badge (see styles.statusBadge).
+  cardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  priorityBadge: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   infoRow: { marginBottom: 8 },
   infoLabel: { color: colors.textFaint, fontSize: 12 },
   infoValue: { color: colors.text, fontSize: 14, fontWeight: "600", marginTop: 2 },

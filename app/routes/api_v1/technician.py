@@ -428,6 +428,12 @@ def _serialize_assignment(assignment: Assignment) -> dict:
             "full_name": service_request.full_name,
             "address": service_request.address,
             "contact_number": service_request.contact_number,
+            # Phase 35 column (see ServiceRequest.plan_label in
+            # app/models.py) — the "Plan" dropdown on the GeoMap
+            # "+ Tickets" quick-create modal for a New Installation
+            # ticket. Only ever set for that request type; None for
+            # every other Service Order.
+            "plan_label": service_request.plan_label,
         }
         if service_request
         else None,
