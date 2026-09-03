@@ -283,6 +283,21 @@
     border-bottom-color: rgba(139, 92, 246, 0.25);
 }
 
+/* Same !important-leak as the .nav-card fix above, but for the plain
+   `.card-header.bg-white` header markup used on ordinary dashboard
+   pages (e.g. Collector "Record a Payment" / "My Recent Collections",
+   also Customer/Technician/Profile/Settings cards). Bootstrap's
+   .bg-white utility carries !important, so it was winning over the
+   card's own (already dark-mode-aware) header background and leaving
+   a white header bar with light-on-dark text below it -- unreadable
+   icon/label and a jarring seam. Scoped to .dash-content so it only
+   touches cards inside the main dashboard area, not e.g. auth pages. */
+[data-bs-theme="dark"] .dash-content .card-header.bg-white {
+    background: linear-gradient(180deg, #171f33 0%, #121a2b 100%) !important;
+    border-bottom-color: rgba(139, 92, 246, 0.25) !important;
+    color: var(--bs-body-color);
+}
+
 /* Bootstrap's .bg-white / .bg-light utility classes are !important, so
    they silently override the card-header rule above and the plain
    .rounded.border.bg-light detail boxes nav-card.js /
