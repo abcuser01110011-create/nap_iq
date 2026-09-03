@@ -4,6 +4,12 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ collectors|length }} collector{{ '' if collectors|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
+<div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('users.add_user', role='payment_collector', next='collectors') }}" class="btn btn-primary rounded-pill px-3">
+        <i class="bi bi-person-plus me-1"></i>Add Collector
+    </a>
+</div>
+
 <div class="disp-table-card">
     <div class="table-responsive">
         <table class="table disp-table align-middle mb-0">

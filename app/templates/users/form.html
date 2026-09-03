@@ -91,7 +91,7 @@
 
                         <div class="col-md-6">
                             <label class="form-label">{{ form.role.label }}</label>
-                            {{ form.role(class="form-select" ~ (" is-invalid" if form.role.errors else ""), disabled=(mode == 'edit' and user and user.id == current_user.id), id="roleSelect") }}
+                            {{ form.role(class="form-select" ~ (" is-invalid" if form.role.errors else ""), disabled=(mode == 'edit' and user and user.id == current_user.id) or (mode == 'add' and locked_role), id="roleSelect") }}
                             {% for error in form.role.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
@@ -99,6 +99,10 @@
                                 <div class="form-text">You can't change your own role. Ask another administrator to do this.</div>
                                 {# Disabled selects aren't submitted by the browser, so resend the current value. #}
                                 <input type="hidden" name="role" value="{{ user.role }}">
+                            {% elif mode == 'add' and locked_role %}
+                                <div class="form-text">Creating this account from the Collectors tab, so the role is locked to Payment Collector.</div>
+                                {# Disabled selects aren't submitted by the browser, so resend the current value. #}
+                                <input type="hidden" name="role" value="{{ locked_role }}">
                             {% endif %}
                         </div>
 
@@ -165,19 +169,6 @@
                         </div>
                         {% endif %}
                     </div>
-
-                    {% if mode == 'edit' %}
-                    <hr class="my-4">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 bg-light rounded p-3">
-                        <div>
-                            <div class="fw-semibold small">Password</div>
-                            <div class="text-muted small">Passwords aren't shown or changed here.</div>
-                        </div>
-                        <a href="{{ url_for('users.reset_password', user_id=user.id) }}" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-key me-1"></i>Reset Password
-                        </a>
-                    </div>
-                    {% endif %}
 
                     <hr class="my-4">
 

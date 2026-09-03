@@ -105,10 +105,31 @@ def list_users():
 @users_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_user():
-    """Shows and processes the Add User form."""
+    """Shows and processes the Add User form.
+
+    Optional ``?role=<role>`` query string preselects and locks the
+    Role field — used by the "Add Collector" button on the Collectors
+    tab (see app/templates/collectors/list.html) so that flow always
+    creates a Payment Collector account without the admin needing to
+    pick the role themselves. Ignored if it isn't one of the valid
+    ROLE_CHOICES, so this can't be used to lock the form into an
+    invalid state.
+
+    Optional ``?next=collectors`` (re-threaded through the form via a
+    hidden field, same pattern as edit_user() below) sends a
+    successful save back to the Collectors tab instead of Manage
+    Users.
+    """
     form = AddUserForm()
     form.user_id = None  # no existing record to exclude during uniqueness checks
     _populate_subscriber_link_choices(form)
+
+    next_page = "collectors" if request.values.get("next") == "collectors" else ""
+    requested_role = request.values.get("role", "").strip()
+    locked_role = requested_role if requested_role in ROLE_LABELS else ""
+
+    if request.method == "GET" and locked_role:
+        form.role.data = locked_role
 
     if form.validate_on_submit():
         user = User(
@@ -134,9 +155,13 @@ def add_user():
                 db.session.commit()
 
         flash(f"Account '{user.username}' was created successfully.", "success")
+        if next_page == "collectors":
+            return redirect(url_for("collectors.list_collectors"))
         return redirect(url_for("users.list_users"))
 
-    return render_template("users/form.html", form=form, mode="add", user=None)
+    return render_template(
+        "users/form.html", form=form, mode="add", user=None, next_page=next_page, locked_role=locked_role
+    )
 
 
 @users_bp.route("/<int:user_id>/edit", methods=["GET", "POST"])
