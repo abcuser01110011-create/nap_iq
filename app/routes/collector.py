@@ -20,9 +20,10 @@ Routes:
     POST /collector/record    -> record_payment
 """
 
-from datetime import datetime
+from datetime import datetime, date
 
 from flask import Blueprint, render_template, redirect, url_for, flash, g
+from sqlalchemy import func, extract
 
 from app.extensions import db
 from app.auth import role_required
@@ -81,9 +82,10 @@ def _populate_subscriber_choices(form):
 @collector_bp.route("/")
 @role_required("payment_collector")
 def index():
-    """Landing page: the signed-in collector's own recent payments,
-    the record-a-payment form, and the subscriber roster for their
-    assigned Coverage Area (see _coverage_barangays() above)."""
+    """Landing page: KPI summary, the record-a-payment form, the
+    signed-in collector's own recent payments, and the subscriber
+    roster for their assigned Coverage Area (see _coverage_barangays()
+    above)."""
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
 
@@ -100,12 +102,34 @@ def index():
         if coverage_barangays else []
     )
 
+    # ---- KPI summary strip -------------------------------------------------
+    # All scoped to this collector's own `collector_id`, never anyone
+    # else's -- same "record and see your own work only" boundary the
+    # rest of this blueprint keeps (see module docstring above).
+    today = date.today()
+    own_payments = Payment.query.filter_by(collector_id=g.user.id)
+
+    collected_today = own_payments.filter(
+        Payment.payment_date == today, Payment.status == "confirmed"
+    ).with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
+
+    collected_this_month = own_payments.filter(
+        extract("year", Payment.payment_date) == today.year,
+        extract("month", Payment.payment_date) == today.month,
+        Payment.status == "confirmed",
+    ).with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
+
+    pending_count = own_payments.filter(Payment.status == "pending").count()
+
     return render_template(
         "collector/index.html",
         form=form,
         recent_payments=recent_payments,
         coverage_barangays=coverage_barangays,
         coverage_subscribers=coverage_subscribers,
+        collected_today=collected_today,
+        collected_this_month=collected_this_month,
+        pending_count=pending_count,
     )
 
 
