@@ -140,7 +140,7 @@ def _get_own_assignment_or_403(profile, assignment_id):
 
 
 @technician_bp.route("/")
-@role_required("field_assistant")
+@role_required("technician")
 def index():
     """Shows the signed-in technician's profile + current assignments.
 
@@ -172,7 +172,7 @@ def index():
 
 
 @technician_bp.route("/history")
-@role_required("field_assistant")
+@role_required("technician")
 def history():
     """View assignment history (phase_8.pdf technician item #10): every
     past assignment for the signed-in technician that's no longer
@@ -202,7 +202,7 @@ def history():
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/accept", methods=["POST"])
-@role_required("field_assistant")
+@role_required("technician")
 def accept_assignment(assignment_id):
     """Acknowledges a newly dispatched assignment. Only valid from
     'assigned' — this is the technician's first action on it, before
@@ -223,7 +223,7 @@ def accept_assignment(assignment_id):
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
-@role_required("field_assistant")
+@role_required("technician")
 def start_assignment(assignment_id):
     """Marks work as actually underway. Only valid from 'accepted'.
     Mirrors the status onto the linked technical_issue (so it shows as
@@ -248,7 +248,7 @@ def start_assignment(assignment_id):
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
-@role_required("field_assistant")
+@role_required("technician")
 def save_notes(assignment_id):
     """Saves (or updates) resolution notes on an assignment without
     changing its status — phase_8.pdf technician item #8, kept as its
@@ -278,7 +278,7 @@ def save_notes(assignment_id):
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
-@role_required("field_assistant")
+@role_required("technician")
 def complete_assignment(assignment_id):
     """Marks an assignment (and its linked issue) resolved. Only valid
     from 'in_progress'. Requires resolution notes (phase_8.pdf's
@@ -420,7 +420,7 @@ def _serialize_job(assignment):
 
 
 @technician_bp.route("/mobile")
-@role_required("field_assistant")
+@role_required("technician")
 def mobile_jobs():
     """Web equivalent of the mobile app's Jobs (Assignments) tab --
     same open-assignments query as index() above, sorted the same way
@@ -454,7 +454,7 @@ def mobile_jobs():
 
 
 @technician_bp.route("/mobile/history")
-@role_required("field_assistant")
+@role_required("technician")
 def mobile_history():
     """Web equivalent of the mobile app's History tab -- same closed-
     assignments query as history() above."""
@@ -482,7 +482,7 @@ def mobile_history():
 
 
 @technician_bp.route("/mobile/profile")
-@role_required("field_assistant")
+@role_required("technician")
 def mobile_profile():
     """Web equivalent of the mobile app's Profile tab. Unlike the
     mobile app, there's no offline sync queue to report here (that's a
@@ -497,7 +497,7 @@ def mobile_profile():
 
 
 @technician_bp.route("/mobile/jobs/<int:assignment_id>")
-@role_required("field_assistant")
+@role_required("technician")
 def mobile_job_detail(assignment_id):
     """Web equivalent of the mobile app's Job Detail screen. Read-only
     for now -- see this module's docstring for what's intentionally

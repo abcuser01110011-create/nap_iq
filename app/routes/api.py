@@ -53,7 +53,7 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 # Phase 7 RBAC: these endpoints exist to feed the internal GeoMap and
 # dashboard with subscriber/NAP/issue data, so they carry the same
 # staff-only restriction as the pages that call them.
-_STAFF_ROLES = ("administrator", "field_assistant")
+_STAFF_ROLES = ("administrator", "technician")
 
 
 @api_bp.route("/naps")
@@ -188,7 +188,7 @@ def issues_json():
     """
     query = TechnicalIssue.query
 
-    if g.user.role == "field_assistant":
+    if g.user.role == "technician":
         profile = Technician.query.filter_by(user_id=g.user.id).first()
         if profile is None:
             query = query.filter(TechnicalIssue.id.in_([]))  # no linked profile -> no issues are "theirs"
@@ -250,7 +250,7 @@ def subscribers_json():
     """
     query = Subscriber.query.filter_by(status="active")
 
-    if g.user.role == "field_assistant":
+    if g.user.role == "technician":
         profile = Technician.query.filter_by(user_id=g.user.id).first()
         if profile is None:
             query = query.filter(Subscriber.id.in_([]))  # no linked profile -> no subscribers are "theirs"
@@ -576,7 +576,7 @@ def technician_location_json_route(technician_id):
     """
     technician = Technician.query.get_or_404(technician_id)
 
-    if g.user.role == "field_assistant":
+    if g.user.role == "technician":
         own_profile = Technician.query.filter_by(user_id=g.user.id).first()
         if own_profile is None or own_profile.id != technician.id:
             abort(403)
