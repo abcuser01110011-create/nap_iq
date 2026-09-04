@@ -38,10 +38,15 @@ Routes:
                                                         issue -> in_progress)
     POST /technician/assignments/<id>/notes          -> save_notes
                                                         (resolution_notes only, no status change)
+    POST /technician/assignments/<id>/photo          -> upload_photo
+                                                        (required completion photo, uploaded to
+                                                        Cloudinary; valid from 'accepted' or
+                                                        'in_progress')
     POST /technician/assignments/<id>/complete       -> complete_assignment
                                                         (in_progress -> completed;
                                                         issue -> resolved;
-                                                        resolution_notes required)
+                                                        resolution_notes and a completion photo
+                                                        are both required)
 
 Web version of the mobile app (UI only)
 ----------------------------------------
@@ -64,15 +69,23 @@ Routes:
     GET  /technician/mobile/jobs/<assignment_id>     -> mobile_job_detail
 """
 
+import uuid
 from datetime import datetime
 
-from flask import Blueprint, render_template, redirect, url_for, flash, abort, g
+import cloudinary
+import cloudinary.uploader
+from flask import Blueprint, render_template, redirect, url_for, flash, abort, g, request
 
 from app.extensions import db
 from app.auth import role_required
 from app.models import Technician, Assignment
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify_issue_status_change
+
+# Mirrors app/routes/api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS exactly
+# -- same completion-photo requirement, just reachable from the desktop
+# web UI instead of the mobile app's JSON API.
+ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
 
 # Mirrors mobile/apps/app/src/screens/technician/statusLabels.ts exactly
 # -- both the web and mobile UI should read the same everywhere.
@@ -239,14 +252,14 @@ def accept_assignment(assignment_id):
 
     if assignment.status != "assigned":
         flash("That assignment isn't waiting to be accepted anymore.", "warning")
-        return redirect(url_for("technician.index"))
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "accepted"
     db.session.commit()
 
     issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
     flash(f"Assignment for {issue_label} accepted.", "success")
-    return redirect(url_for("technician.index"))
+    return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
@@ -261,7 +274,7 @@ def start_assignment(assignment_id):
 
     if assignment.status != "accepted":
         flash("That assignment needs to be accepted before you can start work on it.", "warning")
-        return redirect(url_for("technician.index"))
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "in_progress"
     assignment.technical_issue.status = "in_progress"
@@ -271,7 +284,7 @@ def start_assignment(assignment_id):
 
     issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
     flash(f"{issue_label} marked as in progress.", "success")
-    return redirect(url_for("technician.index"))
+    return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
@@ -289,7 +302,7 @@ def save_notes(assignment_id):
 
     if assignment.status not in ("accepted", "in_progress"):
         flash("Notes can only be saved on an assignment you've accepted or started.", "warning")
-        return redirect(url_for("technician.index"))
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     form = ResolutionNotesForm()
     if form.validate_on_submit():
@@ -301,7 +314,7 @@ def save_notes(assignment_id):
             for message in field_errors:
                 flash(message, "danger")
 
-    return redirect(url_for("technician.index"))
+    return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
@@ -312,6 +325,10 @@ def complete_assignment(assignment_id):
     workflow lists 'Save resolution notes' as part of a technician's
     update to an issue) — if notes were already saved via save_notes()
     above, the field is pre-filled here and this just confirms them.
+    Also requires a completion photo (uploaded separately via
+    upload_photo() below) to already be attached — mirrors the same
+    rule app/routes/api_v1/technician.py's complete_assignment()
+    enforces for the mobile app, now on the desktop web UI too.
     Also increments the technician's resolved_issues_count, and — if
     this was their last open assignment — sets them back to
     'available'."""
@@ -320,14 +337,18 @@ def complete_assignment(assignment_id):
 
     if assignment.status != "in_progress":
         flash("That assignment isn't in progress yet, so it can't be marked complete.", "warning")
-        return redirect(url_for("technician.index"))
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    if not assignment.photo_filename:
+        flash("A completion photo is required before this assignment can be marked complete.", "warning")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     form = ResolutionNotesForm()
     if not form.validate_on_submit():
         for field_errors in form.errors.values():
             for message in field_errors:
                 flash(message, "danger")
-        return redirect(url_for("technician.index"))
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.resolution_notes = form.resolution_notes.data.strip()
     assignment.status = "completed"
@@ -352,6 +373,62 @@ def complete_assignment(assignment_id):
     issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
     flash(f"{issue_label} marked complete. Nice work!", "success")
     return redirect(url_for("technician.index"))
+
+
+@technician_bp.route("/assignments/<int:assignment_id>/photo", methods=["POST"])
+@role_required("technician")
+def upload_photo(assignment_id):
+    """Uploads (or replaces) the required completion photo for an
+    assignment from the desktop web UI. Mirrors
+    app/routes/api_v1/technician.py's upload_assignment_photo() —
+    same allowed statuses ('accepted' or 'in_progress'), same
+    Cloudinary storage (its config is picked up automatically from the
+    CLOUDINARY_* environment variables), same best-effort cleanup of
+    the old image on a replacement — just reached via a regular
+    CSRF-protected form post instead of the mobile app's JSON API."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.status not in ("accepted", "in_progress"):
+        flash("A photo can only be added to an assignment you've accepted or started.", "warning")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    photo = request.files.get("photo")
+    if photo is None or photo.filename == "":
+        flash("Choose a photo file to upload first.", "warning")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else ""
+    if ext not in ALLOWED_PHOTO_EXTENSIONS:
+        flash("Unsupported photo format. Use JPG, PNG, HEIC, or WEBP.", "danger")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    public_id = f"assignment-photos/assignment-{assignment.id}-{uuid.uuid4().hex}"
+
+    try:
+        upload_result = cloudinary.uploader.upload(photo, public_id=public_id, overwrite=True)
+    except Exception:
+        flash("Photo upload failed. Please try again.", "danger")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    # The old image (if this is a replacement, e.g. the tech retakes
+    # the photo) is only removed after the new one uploads
+    # successfully and the DB commit succeeds — so a failed upload
+    # never leaves the assignment pointing at an image that's gone.
+    old_photo_url = assignment.photo_filename
+    assignment.photo_filename = upload_result["secure_url"]
+    db.session.commit()
+
+    if old_photo_url:
+        try:
+            old_public_id = old_photo_url.split("/upload/")[1].rsplit(".", 1)[0]
+            old_public_id = "/".join(old_public_id.split("/")[1:])  # drop the version segment
+            cloudinary.uploader.destroy(old_public_id)
+        except Exception:
+            pass
+
+    flash("Completion photo uploaded.", "success")
+    return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
 # ------------------------------------------------------------------ #

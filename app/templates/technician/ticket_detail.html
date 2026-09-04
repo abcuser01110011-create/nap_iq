@@ -85,6 +85,35 @@
 </div>
 {% endif %}
 
+{% if job.show_photo_card %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-2">Completion Photo</h2>
+
+        {% if job.assignment.photo_filename %}
+            <img src="{{ job.assignment.photo_filename }}" alt="Completion photo" class="tech-photo-preview mb-3">
+        {% else %}
+            <p class="small text-muted mb-3">
+                {{ "No photo added yet — required before this assignment can be marked complete."
+                   if job.can_edit else "No photo was attached." }}
+            </p>
+        {% endif %}
+
+        {% if job.can_edit %}
+        <form method="post" enctype="multipart/form-data"
+              action="{{ url_for('technician.upload_photo', assignment_id=job.assignment.id) }}"
+              class="d-flex flex-wrap align-items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="photo" accept=".jpg,.jpeg,.png,.heic,.webp" class="form-control form-control-sm" style="max-width: 260px;" required>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                {{ "Replace Photo" if job.assignment.photo_filename else "Upload Photo" }}
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="d-flex flex-wrap gap-2">
     {% if job.can_accept %}
         <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=job.assignment.id) }}">
@@ -115,6 +144,7 @@
                 data-notes-mode="save">
             <i class="bi bi-journal-plus me-1"></i>Notes
         </button>
+        {% if job.assignment.photo_filename %}
         <button type="button" class="btn btn-success"
                 data-bs-toggle="modal" data-bs-target="#notesModal"
                 data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=job.assignment.id) }}"
@@ -122,6 +152,11 @@
                 data-notes-mode="complete">
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
+        {% else %}
+        <button type="button" class="btn btn-success" disabled title="Add a completion photo first">
+            <i class="bi bi-check2-circle me-1"></i>Mark Complete
+        </button>
+        {% endif %}
     {% endif %}
 </div>
 
