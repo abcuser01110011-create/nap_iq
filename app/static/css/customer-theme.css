@@ -100,3 +100,57 @@
 .dash-theme-customer .modal-footer {
     border-color: var(--napiq-border);
 }
+
+/* ---------------------------------------------------------------- */
+/* CUSTOMER HOME "Account" / "Last payment" cards -- ported from the  */
+/* Customer mobile app's HomeScreen card styling (mobile/apps/app/    */
+/* src/screens/customer/HomeScreen.tsx: styles.card / .cardLabel /    */
+/* .cardValue / .row / .rowLabel / .rowValue) so the web portal home  */
+/* page reads the same way as the app's. Only used on customer/       */
+/* index.html; the shared .card rules above still apply for spacing/  */
+/* border/background, this just adds the label/value typography.     */
+/* ---------------------------------------------------------------- */
+
+.napiq-account-label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--napiq-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.napiq-account-code {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #101828;
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.napiq-account-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.napiq-account-row-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.napiq-account-row-label {
+    font-size: 0.75rem;
+    color: var(--napiq-text-muted);
+}
+
+.napiq-account-row-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #101828;
+    margin-top: 0.1rem;
+    text-transform: capitalize;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

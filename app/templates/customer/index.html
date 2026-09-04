@@ -24,126 +24,88 @@
 </div>
 
 {% else %}
-<div class="row g-3 mb-3 align-items-stretch">
-    <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white">
-                <i class="bi bi-person-vcard me-1"></i>My Service Account
+{#
+    Phase N (mobile parity): this home view is now a direct port of the
+    Customer mobile app's HomeScreen (mobile/apps/app/src/screens/
+    customer/HomeScreen.tsx) — same Account card, same two stat tiles
+    (Open issues / Pending requests, using the exact same status sets
+    the app filters on), same Last payment card — so a subscriber sees
+    one consistent "home" whether they're on the app or the website.
+    The old two-card (Service Account + Connected NAP) layout and the
+    inline technical-issues table it used to show here have been
+    dropped in favor of that: full detail for those already lives one
+    click away via the sidebar (My Issues / My Service Requests /
+    Payments), same as the app's own bottom tab bar, so nothing here
+    was actually removed, just relocated behind the nav that already
+    exists on both surfaces. The hamburger sidebar/topbar shell itself
+    is unchanged.
+#}
+{% set open_issue_statuses = ['pending', 'assigned', 'accepted', 'in_progress'] %}
+{% set pending_request_statuses = ['pending', 'approved', 'scheduled'] %}
+{% set open_issue_count = technical_issues|selectattr('status', 'in', open_issue_statuses)|list|length %}
+{% set pending_request_count = service_requests|selectattr('status', 'in', pending_request_statuses)|list|length %}
+
+<div class="card shadow-sm mb-3 napiq-account-card">
+    <div class="card-body">
+        <span class="napiq-account-label">Account</span>
+        <div class="napiq-account-code">{{ subscriber.subscriber_code }}</div>
+        <div class="napiq-account-row">
+            <div class="napiq-account-row-item">
+                <span class="napiq-account-row-label">Plan</span>
+                <span class="napiq-account-row-value">{{ subscriber.plan_type or "—" }}</span>
             </div>
-            <div class="card-body">
-                <dl class="row mb-0 small">
-                    <dt class="col-sm-4 text-muted fw-normal">Subscriber Code</dt>
-                    <dd class="col-sm-8">{{ subscriber.subscriber_code }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Plan</dt>
-                    <dd class="col-sm-8">{{ subscriber.plan_type or "—" }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
-                    <dd class="col-sm-8">
-                        {% set sub_status_classes = {'active': 'text-bg-success', 'inactive': 'text-bg-secondary', 'disconnected': 'text-bg-danger'} %}
-                        <span class="badge {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
-                            {{ subscriber.status|capitalize }}
-                        </span>
-                    </dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
-                    <dd class="col-sm-8">{{ subscriber.address or "—" }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Contact Number</dt>
-                    <dd class="col-sm-8">{{ subscriber.contact_number or "—" }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Installed</dt>
-                    <dd class="col-sm-8">{{ subscriber.installed_at.strftime('%B %d, %Y') if subscriber.installed_at else "—" }}</dd>
-                </dl>
+            <div class="napiq-account-row-item">
+                <span class="napiq-account-row-label">Status</span>
+                <span class="napiq-account-row-value">{{ subscriber.status|replace('_', ' ') }}</span>
             </div>
-        </div>
-    </div>
-
-    <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white">
-                <i class="bi bi-hdd-network me-1"></i>Connected NAP
-            </div>
-            <div class="card-body">
-                {% if subscriber.nap %}
-                <dl class="row mb-0 small">
-                    <dt class="col-sm-4 text-muted fw-normal">NAP Code</dt>
-                    <dd class="col-sm-8">{{ subscriber.nap.nap_code }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Name</dt>
-                    <dd class="col-sm-8">{{ subscriber.nap.name }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
-                    <dd class="col-sm-8">
-                        {% set nap_status_classes = {'active': 'text-bg-success', 'full': 'text-bg-warning', 'maintenance': 'text-bg-danger', 'inactive': 'text-bg-secondary'} %}
-                        <span class="badge {{ nap_status_classes.get(subscriber.nap.status, 'text-bg-secondary') }}">
-                            {{ subscriber.nap.status|capitalize }}
-                        </span>
-                    </dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
-                    <dd class="col-sm-8">{{ subscriber.nap.address or "—" }}</dd>
-                </dl>
-                {% else %}
-                <p class="text-muted mb-0">Not currently connected to a NAP.</p>
-                {% endif %}
+            <div class="napiq-account-row-item">
+                <span class="napiq-account-row-label">NAP</span>
+                <span class="napiq-account-row-value">{{ subscriber.nap.nap_code if subscriber.nap else "—" }}</span>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-exclamation-triangle me-1"></i>My Technical Issues</span>
-        <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small">{{ technical_issues|length }} total</span>
-            <a href="{{ url_for('customer.report_issue') }}" class="btn btn-sm btn-primary">
-                <i class="bi bi-plus-lg me-1"></i>Report an Issue
-            </a>
-        </div>
+<div class="row g-3 mb-3">
+    <div class="col-6">
+        <a class="dash-stat-card dash-stat-card-link h-100" href="{{ url_for('customer.my_issues') }}">
+            <span class="dash-stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            <div class="dash-stat-body">
+                <span class="dash-stat-value">{{ open_issue_count }}</span>
+                <span class="dash-stat-label">Open issues</span>
+            </div>
+        </a>
     </div>
-    <div class="card-body p-0">
-        {% if technical_issues %}
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead>
-                    <tr>
-                        <th>Issue</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Reported</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set issue_status_classes = {
-                        'pending': 'text-bg-secondary',
-                        'assigned': 'text-bg-info',
-                        'in_progress': 'text-bg-primary',
-                        'resolved': 'text-bg-success',
-                        'closed': 'text-bg-dark'
-                    } %}
-                    {% for issue in technical_issues %}
-                    <tr>
-                        <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
-                        <td>{{ issue.issue_type }}</td>
-                        <td>
-                            <span class="badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">
-                                {{ issue.status|replace('_', ' ')|capitalize }}
-                            </span>
-                        </td>
-                        <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="p-4 text-center text-muted">
-            <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
-            No technical issues reported for your account.
-        </div>
-        {% endif %}
+    <div class="col-6">
+        <a class="dash-stat-card dash-stat-card-link h-100" href="{{ url_for('customer.my_service_requests') }}">
+            <span class="dash-stat-icon stat-icon-blue"><i class="bi bi-clipboard-check-fill"></i></span>
+            <div class="dash-stat-body">
+                <span class="dash-stat-value">{{ pending_request_count }}</span>
+                <span class="dash-stat-label">Pending requests</span>
+            </div>
+        </a>
     </div>
+</div>
+
+{% if payments %}
+{% set last_payment = payments[0] %}
+<div class="card shadow-sm mb-3 napiq-account-card">
+    <div class="card-body">
+        <span class="napiq-account-label">Last payment</span>
+        <div class="napiq-account-code">
+            {% if last_payment.amount is not none %}&#8369;{{ '%.2f'|format(last_payment.amount) }}{% else %}—{% endif %}
+        </div>
+        <span class="napiq-account-row-label">
+            {{ last_payment.payment_method|replace('_', ' ')|capitalize }} &middot; {{ last_payment.status|capitalize }}
+        </span>
+    </div>
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="{{ url_for('customer.report_issue') }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Report an Issue
+    </a>
 </div>
 
 <div class="alert alert-info mb-0 small">
