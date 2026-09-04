@@ -1,0 +1,224 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ job.ticket_code }}{% endblock %}
+{% block body_class %}dash-theme-tech{% endblock %}
+{% block page_title %}{{ job.ticket_code }}{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ job.type_label }}</p>{% endblock %}
+
+{% block content %}
+{% set assignment_status_classes = {
+    'assigned': 'text-bg-secondary',
+    'accepted': 'text-bg-info',
+    'in_progress': 'text-bg-primary'
+} %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{{ url_for('technician.index') }}" class="small text-decoration-none">
+        <i class="bi bi-arrow-left me-1"></i>Back to My Work
+    </a>
+    <span class="badge rounded-pill {{ assignment_status_classes.get(job.assignment.status, 'text-bg-secondary') }}">
+        {{ job.status_label }}
+    </span>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-3">Ticket Details</h2>
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3">Type</dt>
+            <dd class="col-sm-9">{{ job.type_label }}</dd>
+
+            {% if job.subscriber_name %}
+            <dt class="col-sm-3">{{ job.subscriber_label }}</dt>
+            <dd class="col-sm-9">{{ job.subscriber_name }}</dd>
+            {% endif %}
+
+            <dt class="col-sm-3">Location</dt>
+            <dd class="col-sm-9">{{ job.address }}</dd>
+
+            {% if job.plan_label %}
+            <dt class="col-sm-3">Plan</dt>
+            <dd class="col-sm-9">{{ job.plan_label }}</dd>
+            {% endif %}
+
+            {% if job.contact_number %}
+            <dt class="col-sm-3">Contact</dt>
+            <dd class="col-sm-9">{{ job.contact_number }}</dd>
+            {% endif %}
+
+            {% if job.port_number %}
+            <dt class="col-sm-3">Port Number</dt>
+            <dd class="col-sm-9">Port {{ job.port_number }}</dd>
+            {% endif %}
+
+            {% if job.nap_label %}
+            <dt class="col-sm-3">NAP</dt>
+            <dd class="col-sm-9">{{ job.nap_label }}</dd>
+            {% endif %}
+
+            {% if job.priority %}
+            <dt class="col-sm-3">Priority</dt>
+            <dd class="col-sm-9 text-capitalize">{{ job.priority_label }}</dd>
+            {% endif %}
+
+            {% if job.description %}
+            <dt class="col-sm-3">Description</dt>
+            <dd class="col-sm-9">{{ job.description }}</dd>
+            {% endif %}
+
+            <dt class="col-sm-3">Assigned</dt>
+            <dd class="col-sm-9">{{ job.assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+        </dl>
+
+        {% if job.lat is not none and job.lng is not none %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            {% if job.assignment.technical_issue_id %}
+            <a href="{{ url_for('naps.geomap', issue_id=job.assignment.technical_issue_id) }}"
+               class="btn btn-outline-secondary btn-icon-only" title="View issue location on GeoMap"
+               aria-label="View issue location on GeoMap">
+                <i class="bi bi-geo-alt"></i>
+            </a>
+            <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=job.assignment.technical_issue_id) }}"
+               class="btn btn-outline-primary">
+                <i class="bi bi-signpost-split me-1"></i>Navigate
+            </a>
+            {% else %}
+            <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=job.assignment.service_request_id) }}"
+               class="btn btn-outline-secondary btn-icon-only" title="View request location on GeoMap"
+               aria-label="View request location on GeoMap">
+                <i class="bi bi-geo-alt"></i>
+            </a>
+            <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=job.assignment.service_request_id) }}"
+               class="btn btn-outline-primary">
+                <i class="bi bi-signpost-split me-1"></i>Navigate
+            </a>
+            {% endif %}
+
+            {% if job.assignment.status != 'assigned' %}
+            <a href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}"
+               target="_blank" rel="noopener"
+               class="btn btn-outline-secondary" title="Open in Maps">
+                <i class="bi bi-map me-1"></i>Open in Maps
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if job.assignment.resolution_notes %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-2">Resolution Notes</h2>
+        <p class="mb-0 small">{{ job.assignment.resolution_notes }}</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2">
+    {% if job.can_accept %}
+        <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=job.assignment.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="bi bi-check2 me-1"></i>Accept
+            </button>
+        </form>
+    {% elif job.can_start %}
+        <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=job.assignment.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-info">
+                <i class="bi bi-play-fill me-1"></i>Start Work
+            </button>
+        </form>
+        <button type="button" class="btn btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#notesModal"
+                data-notes-action="{{ url_for('technician.save_notes', assignment_id=job.assignment.id) }}"
+                data-notes-value="{{ job.assignment.resolution_notes or '' }}"
+                data-notes-mode="save">
+            <i class="bi bi-journal-plus me-1"></i>Notes
+        </button>
+    {% elif job.can_complete %}
+        <button type="button" class="btn btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#notesModal"
+                data-notes-action="{{ url_for('technician.save_notes', assignment_id=job.assignment.id) }}"
+                data-notes-value="{{ job.assignment.resolution_notes or '' }}"
+                data-notes-mode="save">
+            <i class="bi bi-journal-plus me-1"></i>Notes
+        </button>
+        <button type="button" class="btn btn-success"
+                data-bs-toggle="modal" data-bs-target="#notesModal"
+                data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=job.assignment.id) }}"
+                data-notes-value="{{ job.assignment.resolution_notes or '' }}"
+                data-notes-mode="complete">
+            <i class="bi bi-check2-circle me-1"></i>Mark Complete
+        </button>
+    {% endif %}
+</div>
+
+<!-- Shared modal for both "Save Notes" and "Mark Complete" — the form's
+     action/button label/wording swap based on which button opened it,
+     since both submit the same resolution_notes field to different
+     routes (save_notes keeps the assignment open; complete_assignment
+     also resolves the issue). -->
+<div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" id="notesModalForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notesModalTitle">Resolution Notes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted" id="notesModalHelp">
+                        Describe what was found and what was done. This is saved on the assignment record.
+                    </p>
+                    <textarea class="form-control" id="notesModalTextarea" name="resolution_notes"
+                              rows="5" maxlength="4000" required
+                              placeholder="e.g. Replaced damaged drop cable, verified signal levels back to normal..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="notesModalSubmit">Save Notes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var modalEl = document.getElementById("notesModal");
+    if (!modalEl) return;
+
+    modalEl.addEventListener("show.bs.modal", function (event) {
+        var button = event.relatedTarget;
+        if (!button) return;
+
+        var action = button.getAttribute("data-notes-action");
+        var value = button.getAttribute("data-notes-value") || "";
+        var mode = button.getAttribute("data-notes-mode");
+
+        document.getElementById("notesModalForm").setAttribute("action", action);
+        document.getElementById("notesModalTextarea").value = value;
+
+        var title = document.getElementById("notesModalTitle");
+        var help = document.getElementById("notesModalHelp");
+        var submitBtn = document.getElementById("notesModalSubmit");
+
+        if (mode === "complete") {
+            title.textContent = "Complete Assignment";
+            help.textContent = "Resolution notes are required to mark this issue resolved.";
+            submitBtn.textContent = "Mark Complete";
+            submitBtn.className = "btn btn-success";
+        } else {
+            title.textContent = "Resolution Notes";
+            help.textContent = "Describe what was found and what was done. This is saved on the assignment record.";
+            submitBtn.textContent = "Save Notes";
+            submitBtn.className = "btn btn-primary";
+        }
+    });
+});
+</script>
+{% endblock %}

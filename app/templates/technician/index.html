@@ -5,12 +5,6 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">Accept, start, and complete your assignments</p>{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('technician.mobile_jobs') }}" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-phone me-1"></i>Open Mobile-style Web View
-    </a>
-</div>
-
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h5 mb-3">Welcome, {{ current_user.full_name }}</h2>
@@ -40,178 +34,38 @@
         </a>
     </div>
     <div class="card-body p-0">
-        {% if assignments %}
+        {% if jobs %}
         {#
-            One card layout at every screen size (see .tech-assign-list /
-            .tech-assign-card in dashboard.css) -- a wide table only ever
-            scrolled and clipped the Accept/Start/Complete buttons on a
-            phone, which is what technicians actually use. The grid just
-            gains columns as the viewport grows instead of switching to
-            a different component on desktop.
+            Compact, tappable ticket cards (see .tech-ticket-list /
+            .tech-ticket-card in dashboard.css) -- each card is just a
+            summary (ticket code, status, type, location, priority);
+            tapping it opens the full ticket detail page
+            (technician/ticket_detail.html), which is where
+            Accept/Start/Notes/Complete and the Navigate/Open in Maps
+            links actually live now.
         #}
-        <div class="tech-assign-list">
+        <div class="tech-ticket-list">
             {% set assignment_status_classes = {
                 'assigned': 'text-bg-secondary',
                 'accepted': 'text-bg-info',
                 'in_progress': 'text-bg-primary'
             } %}
-            {% for a in assignments %}
-            <div class="tech-assign-card">
-                <div class="tech-assign-card-top">
-                    <div class="min-w-0">
-                        {#
-                            An assignment is either technical_issue-based (a
-                            repair) or service_request-based (an install/
-                            add-NAP job) — never both (see Assignment's
-                            docstring in models.py). technical_issue_id is
-                            None for the latter, so url_for('issues.view_issue',
-                            issue_id=None) used to raise a BuildError here
-                            (Werkzeug drops None kwargs, so the required
-                            issue_id param looked missing) the first time a
-                            technician had an installation job assigned.
-                        #}
-                        {% if a.technical_issue_id %}
-                        <a class="tech-assign-issue" href="{{ url_for('issues.view_issue', issue_id=a.technical_issue_id) }}">
-                            {{ a.technical_issue.issue_code or ('#' ~ a.technical_issue_id) }}
-                        </a>
-                        <div class="tech-assign-type">{{ a.technical_issue.issue_type }}</div>
-                        {% else %}
-                        <span class="tech-assign-issue">Request #{{ a.service_request_id }}</span>
-                        <div class="tech-assign-type">{{ a.service_request.request_type|replace('_', ' ')|capitalize }}</div>
-                        {% endif %}
-                    </div>
-                    <span class="badge {{ assignment_status_classes.get(a.status, 'text-bg-secondary') }}">
-                        {{ a.status|replace('_', ' ')|capitalize }}
+            {% for job in jobs %}
+            <a class="tech-ticket-card" href="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}">
+                <div class="tech-ticket-top">
+                    <span class="tech-ticket-code">{{ job.ticket_code }}</span>
+                    <span class="badge rounded-pill {{ assignment_status_classes.get(job.assignment.status, 'text-bg-secondary') }}">
+                        {{ job.status_label }}
                     </span>
                 </div>
-
-                <dl class="tech-assign-meta">
-                    <div>
-                        <dt>Subscriber</dt>
-                        <dd>
-                            {% if a.technical_issue_id %}
-                                {% if a.technical_issue.subscriber %}
-                                    {{ a.technical_issue.subscriber.subscriber_code }} —
-                                    {{ a.technical_issue.subscriber.full_name }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            {% else %}
-                                {% if a.service_request.subscriber %}
-                                    {{ a.service_request.subscriber.subscriber_code }} —
-                                    {{ a.service_request.subscriber.full_name }}
-                                {% elif a.service_request.full_name %}
-                                    {{ a.service_request.full_name }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            {% endif %}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>NAP</dt>
-                        <dd>
-                            {% if a.technical_issue_id %}
-                                {{ a.technical_issue.nap.nap_code if a.technical_issue.nap else '—' }}
-                            {% else %}
-                                {{ a.service_request.requested_nap.nap_code if a.service_request.requested_nap else '—' }}
-                            {% endif %}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt>Assigned</dt>
-                        <dd>{{ a.assigned_at.strftime('%Y-%m-%d %H:%M') }}</dd>
-                    </div>
-                </dl>
-
-                {% if a.resolution_notes %}
-                    <div class="tech-assign-notes-flag">
-                        <i class="bi bi-journal-text me-1"></i>Notes saved
-                    </div>
-                {% endif %}
-
-                <div class="tech-assign-actions">
-                    {% if a.technical_issue_id %}
-                    <a href="{{ url_for('naps.geomap', issue_id=a.technical_issue_id) }}"
-                       class="btn btn-outline-secondary btn-icon-only" title="View issue location on GeoMap"
-                       aria-label="View issue location on GeoMap">
-                        <i class="bi bi-geo-alt"></i>
-                    </a>
-
-                    {% if a.technical_issue.latitude is not none and a.technical_issue.longitude is not none %}
-                    <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=a.technical_issue_id) }}"
-                       class="btn btn-outline-primary">
-                        <i class="bi bi-signpost-split me-1"></i>Navigate
-                    </a>
-                    {% if a.status != 'assigned' %}
-                    <a href="https://maps.google.com/?q={{ a.technical_issue.latitude }},{{ a.technical_issue.longitude }}"
-                       target="_blank" rel="noopener"
-                       class="btn btn-outline-secondary" title="Open in Maps">
-                        <i class="bi bi-map me-1"></i>Open in Maps
-                    </a>
-                    {% endif %}
-                    {% endif %}
-                    {% else %}
-                    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=a.service_request_id) }}"
-                       class="btn btn-outline-secondary btn-icon-only" title="View request location on GeoMap"
-                       aria-label="View request location on GeoMap">
-                        <i class="bi bi-geo-alt"></i>
-                    </a>
-
-                    {% if a.service_request.latitude is not none and a.service_request.longitude is not none %}
-                    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=a.service_request_id) }}"
-                       class="btn btn-outline-primary">
-                        <i class="bi bi-signpost-split me-1"></i>Navigate
-                    </a>
-                    {% if a.status != 'assigned' %}
-                    <a href="https://maps.google.com/?q={{ a.service_request.latitude }},{{ a.service_request.longitude }}"
-                       target="_blank" rel="noopener"
-                       class="btn btn-outline-secondary" title="Open in Maps">
-                        <i class="bi bi-map me-1"></i>Open in Maps
-                    </a>
-                    {% endif %}
-                    {% endif %}
-                    {% endif %}
-
-                    {% if a.status == 'assigned' %}
-                        <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=a.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-primary">
-                                <i class="bi bi-check2 me-1"></i>Accept
-                            </button>
-                        </form>
-                    {% elif a.status == 'accepted' %}
-                        <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=a.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-outline-info">
-                                <i class="bi bi-play-fill me-1"></i>Start Work
-                            </button>
-                        </form>
-                        <button type="button" class="btn btn-outline-secondary"
-                                data-bs-toggle="modal" data-bs-target="#notesModal"
-                                data-notes-action="{{ url_for('technician.save_notes', assignment_id=a.id) }}"
-                                data-notes-value="{{ a.resolution_notes or '' }}"
-                                data-notes-mode="save">
-                            <i class="bi bi-journal-plus me-1"></i>Notes
-                        </button>
-                    {% elif a.status == 'in_progress' %}
-                        <button type="button" class="btn btn-outline-secondary"
-                                data-bs-toggle="modal" data-bs-target="#notesModal"
-                                data-notes-action="{{ url_for('technician.save_notes', assignment_id=a.id) }}"
-                                data-notes-value="{{ a.resolution_notes or '' }}"
-                                data-notes-mode="save">
-                            <i class="bi bi-journal-plus me-1"></i>Notes
-                        </button>
-                        <button type="button" class="btn btn-success"
-                                data-bs-toggle="modal" data-bs-target="#notesModal"
-                                data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=a.id) }}"
-                                data-notes-value="{{ a.resolution_notes or '' }}"
-                                data-notes-mode="complete">
-                            <i class="bi bi-check2-circle me-1"></i>Mark Complete
-                        </button>
-                    {% endif %}
+                <div class="tech-ticket-type">{{ job.type_label }}</div>
+                <div class="tech-ticket-location">{{ job.address }}</div>
+                {% if job.priority %}
+                <div class="tech-ticket-priority tech-ticket-priority-{{ job.priority }}">
+                    Priority: {{ job.priority_label }}
                 </div>
-            </div>
+                {% endif %}
+            </a>
             {% endfor %}
         </div>
         {% else %}
@@ -222,72 +76,4 @@
         {% endif %}
     </div>
 </div>
-
-<!-- Shared modal for both "Save Notes" and "Mark Complete" — the form's
-     action/button label/wording swap based on which button opened it,
-     since both submit the same resolution_notes field to different
-     routes (save_notes keeps the assignment open; complete_assignment
-     also resolves the issue). -->
-<div class="modal fade" id="notesModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <form method="post" id="notesModalForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="notesModalTitle">Resolution Notes</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="small text-muted" id="notesModalHelp">
-                        Describe what was found and what was done. This is saved on the assignment record.
-                    </p>
-                    <textarea class="form-control" id="notesModalTextarea" name="resolution_notes"
-                              rows="5" maxlength="4000" required
-                              placeholder="e.g. Replaced damaged drop cable, verified signal levels back to normal..."></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="notesModalSubmit">Save Notes</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    var modalEl = document.getElementById("notesModal");
-    if (!modalEl) return;
-
-    modalEl.addEventListener("show.bs.modal", function (event) {
-        var button = event.relatedTarget;
-        if (!button) return;
-
-        var action = button.getAttribute("data-notes-action");
-        var value = button.getAttribute("data-notes-value") || "";
-        var mode = button.getAttribute("data-notes-mode");
-
-        document.getElementById("notesModalForm").setAttribute("action", action);
-        document.getElementById("notesModalTextarea").value = value;
-
-        var title = document.getElementById("notesModalTitle");
-        var help = document.getElementById("notesModalHelp");
-        var submitBtn = document.getElementById("notesModalSubmit");
-
-        if (mode === "complete") {
-            title.textContent = "Complete Assignment";
-            help.textContent = "Resolution notes are required to mark this issue resolved.";
-            submitBtn.textContent = "Mark Complete";
-            submitBtn.className = "btn btn-success";
-        } else {
-            title.textContent = "Resolution Notes";
-            help.textContent = "Describe what was found and what was done. This is saved on the assignment record.";
-            submitBtn.textContent = "Save Notes";
-            submitBtn.className = "btn btn-primary";
-        }
-    });
-});
-</script>
 {% endblock %}

@@ -26,6 +26,9 @@ Phase 20 (phase_8.pdf, Technician module) adds:
 Routes:
     GET  /technician/                              -> index
                                                         (the technician's own current workload)
+    GET  /technician/tickets/<id>                    -> ticket_detail
+                                                        (full details + actions for one assignment,
+                                                        linked to from each card on index)
     GET  /technician/history                        -> history
                                                         (past assignments: completed/cancelled)
     POST /technician/assignments/<id>/accept        -> accept_assignment
@@ -163,10 +166,12 @@ def index():
             .all()
         )
 
+    jobs = [_serialize_job(a) for a in assignments]
+
     return render_template(
         "technician/index.html",
         profile=profile,
-        assignments=assignments,
+        jobs=jobs,
         notes_form=ResolutionNotesForm(),
     )
 
@@ -198,6 +203,28 @@ def history():
         "technician/history.html",
         profile=profile,
         assignments=assignments,
+    )
+
+
+@technician_bp.route("/tickets/<int:assignment_id>")
+@role_required("technician")
+def ticket_detail(assignment_id):
+    """Full detail page for a single assignment, linked to from each
+    card on the 'My Work' list (technician/index.html). Uses the same
+    `_serialize_job()` view-model as the mobile-style pages below so
+    the ticket code / type / address / priority labels always agree,
+    but — unlike mobile_job_detail() — this is the real thing: the
+    Accept/Start/Notes/Complete actions here are fully wired up (the
+    same actions that used to live inline on each card in the list).
+    """
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    return render_template(
+        "technician/ticket_detail.html",
+        profile=profile,
+        job=_serialize_job(assignment),
+        notes_form=ResolutionNotesForm(),
     )
 
 

@@ -215,3 +215,29 @@
 .dash-theme-tech .tech-assign-notes dd {
     color: #c7d0de;
 }
+
+/* ---------------------------------------------------------------- */
+/* TICKET LIST CARDS (technician/index.html -- see .tech-ticket-*    */
+/* in dashboard.css for the shared layout; only colors change here,  */
+/* matching the navy palette technician-mobile.css uses for its own  */
+/* job cards so the two look consistent.)                            */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-tech .tech-ticket-card {
+    background: var(--napiq-surface);
+    border-color: var(--napiq-border);
+}
+
+.dash-theme-tech .tech-ticket-card:hover {
+    background: #16315a;
+    border-color: #2e4d80;
+}
+
+.dash-theme-tech .tech-ticket-code {
+    color: #ffffff;
+}
+
+.dash-theme-tech .tech-ticket-priority-low { color: #3ddc97; }
+.dash-theme-tech .tech-ticket-priority-medium { color: #ffc107; }
+.dash-theme-tech .tech-ticket-priority-high { color: #fd7e14; }
+.dash-theme-tech .tech-ticket-priority-critical { color: #ff6b6b; }

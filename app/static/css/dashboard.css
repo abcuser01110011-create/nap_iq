@@ -2044,3 +2044,92 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ====================================================================
+   TECHNICIAN "MY WORK" -- compact clickable ticket cards
+   (app/templates/technician/index.html). Each card is just a summary
+   (code, status, type, location, priority); the whole card links to
+   technician/ticket_detail.html, which is where the actual actions
+   (Accept/Start/Notes/Complete, Navigate/Open in Maps) live. Colors
+   here are the neutral/light defaults; technician-theme.css re-skins
+   these to the shared navy palette for the technician role, the same
+   way it already does for .tech-assign-*.
+   ==================================================================== */
+
+.tech-ticket-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+    padding: 1rem;
+}
+
+@media (min-width: 768px) {
+    .tech-ticket-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+}
+
+@media (min-width: 1200px) {
+    .tech-ticket-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.tech-ticket-card {
+    display: block;
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.9rem;
+    padding: 1rem 1.1rem;
+    background: var(--napiq-surface);
+    min-width: 0;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+.tech-ticket-card:hover {
+    color: inherit;
+    transform: translateY(-1px);
+}
+
+.tech-ticket-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+
+.tech-ticket-code {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.tech-ticket-type {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--napiq-text-muted);
+}
+
+.tech-ticket-location {
+    font-size: 0.85rem;
+    color: var(--napiq-text-muted);
+    margin-top: 0.35rem;
+}
+
+.tech-ticket-priority {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 0.6rem;
+}
+
+.tech-ticket-priority-low { color: #22c55e; }
+.tech-ticket-priority-medium { color: #d39e00; }
+.tech-ticket-priority-high { color: #fd7e14; }
+.tech-ticket-priority-critical { color: #dc3545; }
