@@ -1,0 +1,102 @@
+/* =====================================================================
+   NAP-IQ Customer Web Theme
+   ---------------------------------------------------------------------
+   Only loaded for the "user" (Customer/Subscriber) role (see
+   dashboard_base.html, which links this file and adds the
+   "dash-theme-customer" class to <body> only for that role, on
+   customer/*.html pages). Re-skins the shared dashboard shell's accent
+   color to the same palette the Customer mobile app uses
+   (mobile/apps/app/src/theme/customer.ts), so a subscriber sees one
+   consistent brand color whether they're on their phone or on the
+   website — same idea as technician-theme.css does for the Technician
+   role/app.
+
+   Unlike technician-theme.css, this is NOT a light-to-dark re-skin —
+   the shared dashboard shell is already light by default (same
+   background as the mobile app's `colors.bg`), so this file only needs
+   to re-point the primary accent (and a couple of supporting tokens)
+   at the mobile app's blue, then force that light look regardless of
+   the user's personal dark-mode toggle — the Customer mobile app has
+   no dark mode, so the web portal shouldn't drift from it either.
+
+   This file is a pure re-skin: it doesn't change any layout/spacing
+   rules (those live in dashboard.css and stay shared with every other
+   role), only colors. It's loaded after dashboard.css and
+   theme-dark.css, and (like technician-theme.css) sets these
+   --napiq-* tokens directly on <body> via the .dash-theme-customer
+   class, which wins over the inherited [data-bs-theme="dark"] values
+   set on <html> regardless of toggle state, since a directly-matched
+   declaration on an element always beats an inherited one.
+   ===================================================================== */
+
+.dash-theme-customer {
+    /* Re-point the app's shared design tokens (style.css / dashboard.css)
+       at the same values theme/customer.ts uses on mobile, so every
+       component already built on var(--napiq-*) re-themes for free. */
+    --napiq-primary: #1849d6;
+    --napiq-primary-dark: #123aae;
+    --napiq-surface: #ffffff;
+    --napiq-bg: #f4f6fa;
+    --napiq-border: #e4e7ec;
+    --napiq-text-muted: #667085;
+
+    --napiq-success: #12b76a;
+    --napiq-warning: #f79009;
+    --napiq-danger: #d92d20;
+    --napiq-info: #1849d6;
+
+    color-scheme: light;
+}
+
+/* Force the light look regardless of the account's personal dark-mode
+   toggle (same reasoning as .dash-theme-tech forcing navy) — the
+   Customer mobile app only has this one theme, so the web portal
+   shouldn't offer a second look that the app can't match. */
+.dash-theme-customer.dash-body {
+    background-color: var(--napiq-bg);
+    color: #101828;
+}
+
+/* Nothing to toggle under a theme that's always light — hide the
+   control rather than leave one that visibly does nothing. */
+.dash-theme-customer #darkModeToggle {
+    display: none;
+}
+
+/* ---------------------------------------------------------------- */
+/* CARDS / TEXT -- explicit overrides for the handful of rules that   */
+/* theme-dark.css could otherwise still win on specificity for.       */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-customer .card {
+    background-color: var(--napiq-surface);
+    border-color: var(--napiq-border);
+    color: #101828;
+}
+
+.dash-theme-customer .card-header.bg-white {
+    background-color: var(--napiq-surface) !important;
+    border-bottom-color: var(--napiq-border);
+    color: #101828;
+}
+
+.dash-theme-customer .text-muted {
+    color: var(--napiq-text-muted) !important;
+}
+
+.dash-theme-customer .form-control,
+.dash-theme-customer .form-control:focus {
+    background-color: var(--napiq-surface);
+    border-color: var(--napiq-border);
+    color: #101828;
+}
+
+.dash-theme-customer .modal-content {
+    background-color: var(--napiq-surface);
+    color: #101828;
+}
+
+.dash-theme-customer .modal-header,
+.dash-theme-customer .modal-footer {
+    border-color: var(--napiq-border);
+}

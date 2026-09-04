@@ -28,14 +28,21 @@
     {% if current_user and current_user.role in ('technician', 'field_assistant') %}
     <link href="{{ url_for('static', filename='css/technician-theme.css') }}" rel="stylesheet">
     {% endif %}
+    {% if current_user and current_user.role == 'user' %}
+    <link href="{{ url_for('static', filename='css/customer-theme.css') }}" rel="stylesheet">
+    {% endif %}
     {% block extra_head %}{% endblock %}
 </head>
 {#
     body_class: an opt-in hook so specific pages under this shared shell
-    can request the navy technician skin (technician-theme.css) without
-    it bleeding into every other page a technician can reach (GeoMap,
-    NAP Management) that weren't designed against that palette. Only
-    technician/index.html and technician/history.html set this block.
+    can request a role-specific skin without it bleeding into every
+    other page that role can reach. Only technician/index.html and
+    technician/history.html set "dash-theme-tech" (navy, matching
+    technician-mobile.css). Only the customer/*.html pages set
+    "dash-theme-customer" (blue accent, matching the Customer mobile
+    app's theme in mobile/apps/app/src/theme/customer.ts) — GeoMap/NAP
+    Management aren't reachable by that role anyway, but Settings and
+    Profile are shared shell pages that intentionally stay unthemed.
 #}
 <body class="dash-body {% block body_class %}{% endblock %}">
 
