@@ -39,6 +39,15 @@
         >
     </form>
 
+    <div class="dropdown">
+        <button type="button" class="btn btn-primary rounded-pill px-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-plus-lg me-1"></i>Add Requests
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><span class="dropdown-item disabled" aria-disabled="true">No request</span></li>
+        </ul>
+    </div>
+
     <div class="subs-pill-group" role="group" aria-label="Filter by status">
         {% for value, label in status_options %}
             <a
