@@ -196,6 +196,7 @@ export interface CustomerIssue {
   description: string;
   priority: string;
   status: string;
+  photo_url: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -204,6 +205,10 @@ export interface ReportIssueInput {
   issue_type: string;
   priority?: "low" | "medium" | "high" | "critical";
   description: string;
+  // Required — the same { uri, name, type } shape
+  // technician.uploadAssignmentPhoto takes, straight from
+  // expo-image-picker's result.
+  photo: { uri: string; name: string; type: string };
 }
 
 export interface ServiceRequest {

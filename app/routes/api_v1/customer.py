@@ -22,7 +22,10 @@ Routes:
     GET  /api/v1/customer/payments           -> list_payments
 """
 import re
+import uuid
 
+import cloudinary
+import cloudinary.uploader
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import current_user
 
@@ -46,10 +49,14 @@ _APPLICATION_EMAIL_PURPOSE = "registration"
 
 # Kept in sync by hand with app/forms.py's CustomerIssueReportForm —
 # same validation rule, just enforced here instead of by WTForms since
-# this blueprint takes a JSON body, not a form post.
+# this blueprint doesn't use Flask-WTF forms.
 _VALID_ISSUE_TYPES = {value for value, _label in ISSUE_TYPE_CHOICES}
 _VALID_PRIORITIES = {"low", "medium", "high", "critical"}
 _DESCRIPTION_MAX_LENGTH = 2000
+# Same allow-list as api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS,
+# duplicated here rather than imported since the two blueprints don't
+# otherwise share code.
+_ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
 
 
 # Phase 26 — deliberately NOT behind @jwt_role_required: a prospective
@@ -186,6 +193,11 @@ def _serialize_issue(issue: TechnicalIssue) -> dict:
         "description": issue.description,
         "priority": issue.priority,
         "status": issue.status,
+        # issue.photo_filename stores the full Cloudinary secure_url
+        # (see the TechnicalIssue model), not a bare filename --
+        # same convention as Assignment.photo_filename /
+        # _serialize_assignment()'s "photo_url" in api_v1/technician.py.
+        "photo_url": issue.photo_filename,
         "created_at": issue.created_at.isoformat() if issue.created_at else None,
         "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
     }
@@ -345,15 +357,23 @@ def report_issue():
     customer's own linked subscriber, and always uses that
     subscriber's stored address/coordinates — exactly as
     customer.py's report_issue() does, since the mobile app has no map
-    for a customer to drop a pin on either."""
+    for a customer to drop a pin on either.
+
+    Expects multipart/form-data (issue_type, priority, description
+    fields plus a required "photo" file field) rather than a JSON
+    body, since a photo isn't JSON — mirrors
+    upload_assignment_photo()'s file handling in api_v1/technician.py.
+    This blueprint is already csrf-exempt as a whole (see this
+    module's docstring), so that isn't a concern here either.
+    """
     subscriber = _own_subscriber_or_none()
     if subscriber is None:
         return _no_subscriber_response()
 
-    data = request.get_json(silent=True) or {}
-    issue_type = str(data.get("issue_type") or "").strip()
-    priority = str(data.get("priority") or "medium").strip()
-    description = str(data.get("description") or "").strip()
+    issue_type = str(request.form.get("issue_type") or "").strip()
+    priority = str(request.form.get("priority") or "medium").strip()
+    description = str(request.form.get("description") or "").strip()
+    photo = request.files.get("photo")
 
     errors = {}
     if issue_type not in _VALID_ISSUE_TYPES:
@@ -365,8 +385,25 @@ def report_issue():
     elif len(description) > _DESCRIPTION_MAX_LENGTH:
         errors["description"] = "Description is too long."
 
+    if photo is None or photo.filename == "":
+        errors["photo"] = "Please attach or take a photo of the issue."
+    else:
+        ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else ""
+        if ext not in _ALLOWED_PHOTO_EXTENSIONS:
+            errors["photo"] = "Unsupported photo format. Use JPG, PNG, HEIC, or WEBP."
+
     if errors:
         return jsonify(errors=errors), 400
+
+    # Uploaded to Cloudinary before the issue row is created — same
+    # "serverless has no writable local disk" reasoning as
+    # upload_assignment_photo() — so a failed upload never leaves a
+    # half-reported issue behind.
+    public_id = f"issue-photos/issue-{uuid.uuid4().hex}"
+    try:
+        upload_result = cloudinary.uploader.upload(photo, public_id=public_id, overwrite=True)
+    except Exception:
+        return jsonify(error="Photo upload failed. Please try again."), 502
 
     issue = TechnicalIssue(
         issue_type=issue_type,
@@ -376,6 +413,7 @@ def report_issue():
         address=subscriber.address,
         latitude=subscriber.latitude,
         longitude=subscriber.longitude,
+        photo_filename=upload_result["secure_url"],
         subscriber_id=subscriber.id,
         nap_id=subscriber.nap_id,
     )

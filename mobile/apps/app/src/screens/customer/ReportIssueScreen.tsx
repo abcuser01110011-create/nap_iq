@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -10,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { ApiError } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme/customer";
@@ -17,15 +20,12 @@ import { colors } from "../../theme/customer";
 // Kept in sync by hand with app/forms.py's ISSUE_TYPE_CHOICES on the
 // backend — the mobile API validates against this exact same set
 // server-side (app/routes/api_v1/customer.py's _VALID_ISSUE_TYPES),
-// so a mismatch here would just surface as a 400 on submit.
-const ISSUE_TYPES = [
-  "No Internet",
-  "Slow Internet",
-  "Fiber/Cable Problem",
-  "NAP Problem",
-  "Connection Problem",
-  "Other",
-];
+// so a mismatch here would just surface as a 400 on submit. This is
+// deliberately a narrower list than the full backend set — "Fiber/
+// Cable Problem" and "NAP Problem" are left off here since they're
+// hard for a subscriber to self-diagnose from the customer app; both
+// remain valid choices on the staff/admin side.
+const ISSUE_TYPES = ["No Internet", "Slow Internet", "Connection Problem", "Other"];
 
 export default function ReportIssueScreen({ navigation }: any) {
   const { client } = useAuth();
@@ -35,10 +35,57 @@ export default function ReportIssueScreen({ navigation }: any) {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const canSubmit = issueType !== null && description.trim().length > 0 && !submitting;
+  // A photo is required to submit — same "attach before you can
+  // proceed" treatment as the technician app's completion photo (see
+  // JobDetailScreen). photo holds the { uri, name, type } shape
+  // expo-image-picker's result gives, ready to hand straight to
+  // client.customer.reportIssue.
+  const [photo, setPhoto] = useState<{ uri: string; name: string; type: string } | null>(null);
+
+  const canSubmit =
+    issueType !== null && description.trim().length > 0 && photo !== null && !submitting;
+
+  const pickPhotoFromResult = (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const extFromUri = asset.uri.split(".").pop()?.toLowerCase() || "jpg";
+    const type = asset.mimeType ?? `image/${extFromUri === "jpg" ? "jpeg" : extFromUri}`;
+    setPhoto({ uri: asset.uri, name: `issue-photo.${extFromUri}`, type });
+    setFieldErrors((prev) => ({ ...prev, photo: "" }));
+  };
+
+  const handleTakePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Camera access needed",
+        "Enable camera access for PG Networks in your device settings to take a photo of the issue."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
+    pickPhotoFromResult(result);
+  };
+
+  const handlePickFromLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Photo library access needed",
+        "Enable photo library access for PG Networks in your device settings to attach a photo of the issue."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: false,
+    });
+    pickPhotoFromResult(result);
+  };
 
   const handleSubmit = async () => {
-    if (!canSubmit || issueType === null) return;
+    if (!canSubmit || issueType === null || photo === null) return;
     setSubmitting(true);
     setError(null);
     setFieldErrors({});
@@ -46,6 +93,7 @@ export default function ReportIssueScreen({ navigation }: any) {
       await client.customer.reportIssue({
         issue_type: issueType,
         description: description.trim(),
+        photo,
       });
       navigation.goBack();
     } catch (err) {
@@ -109,6 +157,24 @@ export default function ReportIssueScreen({ navigation }: any) {
           <Text style={styles.fieldError}>{fieldErrors.description}</Text>
         )}
 
+        <Text style={styles.label}>Photo of the issue</Text>
+        {photo ? (
+          <Image source={{ uri: photo.uri }} style={styles.photoPreview} resizeMode="cover" />
+        ) : (
+          <Text style={styles.photoHint}>
+            A photo helps our technicians diagnose the problem faster.
+          </Text>
+        )}
+        {fieldErrors.photo && <Text style={styles.fieldError}>{fieldErrors.photo}</Text>}
+        <View style={styles.photoButtonRow}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleTakePhoto}>
+            <Text style={styles.secondaryButtonText}>Take photo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handlePickFromLibrary}>
+            <Text style={styles.secondaryButtonText}>Choose from library</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
           style={[styles.submit, !canSubmit && styles.submitDisabled]}
           onPress={handleSubmit}
@@ -151,6 +217,25 @@ const styles = StyleSheet.create({
   chipText: { color: colors.text, fontSize: 13, fontWeight: "600" },
   chipTextSelected: { color: "#FFFFFF" },
   fieldError: { color: colors.danger, fontSize: 12, marginTop: 6 },
+  photoHint: { color: colors.textFaint, fontSize: 13, marginBottom: 4 },
+  photoPreview: {
+    width: "100%",
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: colors.card,
+  },
+  photoButtonRow: { flexDirection: "row", gap: 10, marginTop: 8 },
+  secondaryButton: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  secondaryButtonText: { color: colors.text, fontSize: 13, fontWeight: "600" },
   textArea: {
     backgroundColor: colors.card,
     borderWidth: 1,

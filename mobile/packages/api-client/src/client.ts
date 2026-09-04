@@ -420,11 +420,43 @@ export class ApiClient {
 
     listIssues: () => this.request<{ issues: CustomerIssue[] }>("/api/v1/customer/issues"),
 
-    reportIssue: (input: ReportIssueInput) =>
-      this.request<{ issue: CustomerIssue }>("/api/v1/customer/issues", {
-        method: "POST",
-        body: input,
-      }),
+    /** Self-service issue reporting. Sent as multipart/form-data
+     * directly via fetch rather than through the shared request()
+     * helper above, since the required photo isn't JSON — mirrors
+     * technician.uploadAssignmentPhoto above: auth attached the same
+     * way, and a 401 here is likewise NOT silently retried after a
+     * refresh; the caller (ReportIssueScreen) is expected to just let
+     * the person retry the submit. */
+    reportIssue: async (input: ReportIssueInput): Promise<{ issue: CustomerIssue }> => {
+      const tokens = await this.tokenStorage.getTokens();
+      const form = new FormData();
+      form.append("issue_type", input.issue_type);
+      if (input.priority) form.append("priority", input.priority);
+      form.append("description", input.description);
+      // React Native's FormData accepts this { uri, name, type } shape
+      // directly — same as uploadAssignmentPhoto above.
+      form.append("photo", { uri: input.photo.uri, name: input.photo.name, type: input.photo.type } as unknown as Blob);
+
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}/api/v1/customer/issues`, {
+          method: "POST",
+          headers: tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : undefined,
+          // No Content-Type header here on purpose — see the same
+          // note in uploadAssignmentPhoto above.
+          body: form,
+        });
+      } catch {
+        throw new ApiError(0, { error: "Couldn't reach the server. Check your connection." });
+      }
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!response.ok) {
+        throw new ApiError(response.status, data as ApiErrorBody);
+      }
+      return data as { issue: CustomerIssue };
+    },
 
     listServiceRequests: () =>
       this.request<{ service_requests: ServiceRequest[] }>("/api/v1/customer/service-requests"),
