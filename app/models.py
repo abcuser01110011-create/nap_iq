@@ -304,6 +304,13 @@ class TechnicalIssue(db.Model):
     address = db.Column(db.String(255), nullable=True)
     latitude = db.Column(db.Numeric(10, 7), nullable=True)
     longitude = db.Column(db.Numeric(10, 7), nullable=True)
+    # Photo attached by the subscriber when self-reporting the issue
+    # (Phase — customer "Report an Issue" upload/take-a-photo
+    # requirement). Stores the Cloudinary secure_url, same storage
+    # approach as Assignment.photo_filename below. NULL for issues
+    # created by staff via the older issues.report_issue() route,
+    # which has no photo step.
+    photo_filename = db.Column(db.String(255), nullable=True)
     subscriber_id = db.Column(db.Integer, db.ForeignKey("subscribers.id"), nullable=False)
     nap_id = db.Column(db.Integer, db.ForeignKey("naps.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

@@ -148,6 +148,10 @@ CREATE TABLE IF NOT EXISTS technical_issues (
     address         VARCHAR(255),
     latitude        DECIMAL(10,7),
     longitude       DECIMAL(10,7),
+    -- Photo the subscriber uploads/takes when self-reporting via the
+    -- customer portal (Cloudinary secure_url). NULL for issues logged
+    -- by staff, which have no photo step.
+    photo_filename  VARCHAR(255) NULL,
     subscriber_id   INT NOT NULL,
     nap_id          INT,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -161,6 +165,11 @@ CREATE TABLE IF NOT EXISTS technical_issues (
         FOREIGN KEY (nap_id) REFERENCES naps(id)
         ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
+
+-- For an already-provisioned database (CREATE TABLE IF NOT EXISTS above
+-- won't retrofit an existing install):
+--   ALTER TABLE technical_issues
+--       ADD COLUMN photo_filename VARCHAR(255) NULL AFTER longitude;
 
 -- ---------------------------------------------------------------------
 -- service_requests: new installation / disconnection / relocation / upgrade / add_nap

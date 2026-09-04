@@ -7,19 +7,9 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-7">
-        <div class="card shadow-sm mb-3">
-            <div class="card-body">
-                <div class="text-muted small">
-                    Reporting an issue on behalf of
-                    <span class="fw-semibold">{{ subscriber.subscriber_code }} — {{ subscriber.full_name }}</span>.
-                    {% if subscriber.address %}Address on file: {{ subscriber.address }}.{% endif %}
-                </div>
-            </div>
-        </div>
-
         <div class="card shadow-sm">
             <div class="card-body p-4">
-                <form method="post" novalidate>
+                <form method="post" enctype="multipart/form-data" novalidate>
                     {{ form.hidden_tag() }}
 
                     <div class="mb-3">
@@ -36,7 +26,6 @@
                         {% for error in form.priority.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
-                        <div class="form-text">Not sure? "Medium" is fine — our team will re-triage as needed.</div>
                     </div>
 
                     <div class="mb-4">
@@ -45,6 +34,13 @@
                         {% for error in form.description.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Photo</label>
+                        <input type="file" name="photo" accept="image/*"
+                               class="form-control" required>
+                        <div class="form-text">Upload a photo from your device, or take one now — required so our team can see what's going on.</div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">

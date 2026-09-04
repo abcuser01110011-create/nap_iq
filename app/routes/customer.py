@@ -53,7 +53,11 @@ Routes:
     GET  /portal/payments            -> my_payments           (own payment history)
 """
 
-from flask import Blueprint, render_template, redirect, url_for, flash, g
+import uuid
+
+import cloudinary
+import cloudinary.uploader
+from flask import Blueprint, render_template, redirect, url_for, flash, g, request
 
 from app.extensions import db
 from app.auth import role_required
@@ -62,6 +66,10 @@ from app.forms import CustomerIssueReportForm
 from app.notifications_utils import notify_new_issue_reported
 
 customer_bp = Blueprint("customer", __name__, url_prefix="/portal")
+
+# Same allowed set as app/routes/technician.py's completion-photo upload —
+# kept as its own copy here since this is a separate self-service flow.
+ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
 
 
 def _own_subscriber_or_none():
@@ -118,6 +126,28 @@ def report_issue():
     form = CustomerIssueReportForm()
 
     if form.validate_on_submit():
+        # A photo is required (upload from the device's gallery, or
+        # take one on the spot — both come through this same file
+        # input). Handled as a plain `request.files` field rather than
+        # a WTForms FileField, same approach as
+        # app/routes/technician.py's upload_photo().
+        photo = request.files.get("photo")
+        if photo is None or photo.filename == "":
+            flash("Please attach a photo of the issue before submitting.", "warning")
+            return render_template("customer/report_issue.html", form=form, subscriber=subscriber)
+
+        ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else ""
+        if ext not in ALLOWED_PHOTO_EXTENSIONS:
+            flash("Unsupported photo format. Use JPG, PNG, HEIC, or WEBP.", "danger")
+            return render_template("customer/report_issue.html", form=form, subscriber=subscriber)
+
+        public_id = f"issue-photos/subscriber-{subscriber.id}-{uuid.uuid4().hex}"
+        try:
+            upload_result = cloudinary.uploader.upload(photo, public_id=public_id, overwrite=True)
+        except Exception:
+            flash("Photo upload failed. Please try again.", "danger")
+            return render_template("customer/report_issue.html", form=form, subscriber=subscriber)
+
         issue = TechnicalIssue(
             issue_type=form.issue_type.data,
             description=form.description.data.strip(),
@@ -126,6 +156,7 @@ def report_issue():
             address=subscriber.address,
             latitude=subscriber.latitude,
             longitude=subscriber.longitude,
+            photo_filename=upload_result["secure_url"],
             subscriber_id=subscriber.id,
             nap_id=subscriber.nap_id,
         )
