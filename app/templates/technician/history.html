@@ -21,7 +21,16 @@
                 </div>
             </div>
         {% elif assignments %}
-        <div class="table-responsive">
+        {% set outcome_classes = {
+            'completed': 'text-bg-success',
+            'cancelled': 'text-bg-secondary'
+        } %}
+        {#
+            Same table-vs-card split as technician/index.html: the 7-column
+            table is fine on desktop but unreadable on a phone, so below
+            md it's replaced by a stacked card per assignment instead.
+        #}
+        <div class="table-responsive tech-assign-table-wrap">
             <table class="table table-hover mb-0 align-middle">
                 <thead>
                     <tr>
@@ -59,10 +68,6 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% set outcome_classes = {
-                                'completed': 'text-bg-success',
-                                'cancelled': 'text-bg-secondary'
-                            } %}
                             <span class="badge {{ outcome_classes.get(a.status, 'text-bg-secondary') }}">
                                 {{ a.status|capitalize }}
                             </span>
@@ -86,6 +91,58 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Phone layout: one card per assignment, shown below md only. -->
+        <div class="tech-assign-list">
+            {% for a in assignments %}
+            <div class="tech-assign-card">
+                <div class="tech-assign-card-top">
+                    <div class="min-w-0">
+                        <a class="tech-assign-issue" href="{{ url_for('issues.view_issue', issue_id=a.technical_issue_id) }}">
+                            {{ a.technical_issue.issue_code or ('#' ~ a.technical_issue_id) }}
+                        </a>
+                        <div class="tech-assign-type">{{ a.technical_issue.issue_type }}</div>
+                    </div>
+                    <span class="badge {{ outcome_classes.get(a.status, 'text-bg-secondary') }}">
+                        {{ a.status|capitalize }}
+                    </span>
+                </div>
+
+                <dl class="tech-assign-meta">
+                    <div>
+                        <dt>Subscriber</dt>
+                        <dd>
+                            {% if a.technical_issue.subscriber %}
+                                {{ a.technical_issue.subscriber.subscriber_code }} —
+                                {{ a.technical_issue.subscriber.full_name }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>NAP</dt>
+                        <dd>{{ a.technical_issue.nap.nap_code if a.technical_issue.nap else '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt>Assigned</dt>
+                        <dd>{{ a.assigned_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    </div>
+                    <div>
+                        <dt>Completed</dt>
+                        <dd>{{ a.completed_at.strftime('%Y-%m-%d %H:%M') if a.completed_at else '—' }}</dd>
+                    </div>
+                </dl>
+
+                {% if a.resolution_notes %}
+                <div class="tech-assign-notes">
+                    <dt>Resolution Notes</dt>
+                    <dd>{{ a.resolution_notes }}</dd>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="p-4 text-center text-muted">

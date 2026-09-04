@@ -1865,3 +1865,167 @@
         width: 74px;
     }
 }
+
+/* ====================================================================
+   TECHNICIAN "MY WORK" / ASSIGNMENT HISTORY — responsive assignment
+   cards (app/templates/technician/index.html, technician/history.html)
+   --------------------------------------------------------------------
+   Both pages render the same assignments as a normal Bootstrap table
+   for desktop AND a stacked card list for phones. The table is the
+   primary device technicians actually work from is a phone, a wide
+   table that only horizontally scrolls left the Accept/Start/Complete
+   buttons clipped off-screen (the "table-responsive" scroll strip is
+   fine for glancing at data, not for reaching the action button). The
+   two layouts are togged with the same md breakpoint Bootstrap already
+   uses everywhere else in this app (767.98px) so it stays consistent
+   with how the sidebar/topbar already collapse.
+   ==================================================================== */
+
+.tech-assign-table-wrap {
+    display: none;
+}
+
+.tech-assign-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+}
+
+@media (min-width: 768px) {
+    .tech-assign-table-wrap {
+        display: block;
+    }
+
+    .tech-assign-list {
+        display: none;
+    }
+}
+
+.tech-assign-card {
+    border: 1px solid var(--napiq-border);
+    border-radius: 0.75rem;
+    padding: 0.9rem 1rem;
+    background: var(--napiq-surface);
+}
+
+.tech-assign-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.7rem;
+}
+
+.tech-assign-card-top .badge {
+    flex-shrink: 0;
+}
+
+.tech-assign-issue {
+    display: block;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+}
+
+.tech-assign-type {
+    font-size: 0.78rem;
+    color: var(--napiq-text-muted);
+}
+
+.tech-assign-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 0.75rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+}
+
+.tech-assign-meta > div {
+    min-width: 0;
+}
+
+.tech-assign-meta dt {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--napiq-text-muted);
+    font-weight: 700;
+    margin-bottom: 0.1rem;
+}
+
+.tech-assign-meta dd {
+    margin: 0;
+    color: #1f2937;
+    overflow-wrap: anywhere;
+}
+
+.tech-assign-notes-flag {
+    font-size: 0.8rem;
+    color: var(--napiq-text-muted);
+    margin: -0.35rem 0 0.75rem;
+}
+
+/* Resolution-notes block on the history card -- reuses the same
+   dt/dd label styling as .tech-assign-meta but stacked full-width
+   below the two-column grid, since notes are often too long to sit
+   comfortably in a half-width column. */
+.tech-assign-notes {
+    font-size: 0.85rem;
+    border-top: 1px solid var(--napiq-border);
+    padding-top: 0.6rem;
+    margin-top: 0.1rem;
+}
+
+.tech-assign-notes dt {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--napiq-text-muted);
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+}
+
+.tech-assign-notes dd {
+    margin: 0;
+    color: #4b5563;
+}
+
+.tech-assign-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tech-assign-actions form {
+    flex: 1 1 140px;
+    margin: 0;
+}
+
+.tech-assign-actions .btn {
+    width: 100%;
+    /* Slightly taller tap target than the desktop btn-sm equivalents --
+       this list only ever renders on touch-sized viewports. */
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+.tech-assign-actions a.btn,
+.tech-assign-actions button.btn {
+    flex: 1 1 140px;
+}
+
+/* The GeoMap pin button is icon-only, so it doesn't need to claim as
+   much width as the labeled actions sitting next to it. */
+.tech-assign-actions .btn-icon-only {
+    flex: 0 0 auto;
+    width: 46px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+@media (max-width: 400px) {
+    .tech-assign-meta {
+        grid-template-columns: 1fr;
+    }
+}
