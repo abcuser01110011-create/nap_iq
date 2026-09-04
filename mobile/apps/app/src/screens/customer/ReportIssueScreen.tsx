@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ApiError, type ReportIssueInput } from "@nap-iq/api-client";
+import { ApiError } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme/customer";
 
@@ -27,21 +27,9 @@ const ISSUE_TYPES = [
   "Other",
 ];
 
-// Labels mirror the GeoMap's PRIORITY_LABELS (app/static/js/napmap.js)
-// and the field assistant's technician/statusLabels.ts, where
-// "critical" reads "Urgent" everywhere it's shown to a person -- the
-// underlying value sent to the API stays "critical".
-const PRIORITIES: Array<{ value: NonNullable<ReportIssueInput["priority"]>; label: string }> = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "critical", label: "Urgent" },
-];
-
 export default function ReportIssueScreen({ navigation }: any) {
   const { client } = useAuth();
   const [issueType, setIssueType] = useState<string | null>(null);
-  const [priority, setPriority] = useState<NonNullable<ReportIssueInput["priority"]>>("medium");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +45,6 @@ export default function ReportIssueScreen({ navigation }: any) {
     try {
       await client.customer.reportIssue({
         issue_type: issueType,
-        priority,
         description: description.trim(),
       });
       navigation.goBack();
@@ -106,22 +93,6 @@ export default function ReportIssueScreen({ navigation }: any) {
           ))}
         </View>
         {fieldErrors.issue_type && <Text style={styles.fieldError}>{fieldErrors.issue_type}</Text>}
-
-        <Text style={styles.label}>Priority</Text>
-        <View style={styles.chipRow}>
-          {PRIORITIES.map((p) => (
-            <TouchableOpacity
-              key={p.value}
-              style={[styles.chip, priority === p.value && styles.chipSelected]}
-              onPress={() => setPriority(p.value)}
-            >
-              <Text style={[styles.chipText, priority === p.value && styles.chipTextSelected]}>
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {fieldErrors.priority && <Text style={styles.fieldError}>{fieldErrors.priority}</Text>}
 
         <Text style={styles.label}>Describe the issue</Text>
         <TextInput
