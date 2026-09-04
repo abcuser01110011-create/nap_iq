@@ -20,14 +20,6 @@
                         {% endfor %}
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">{{ form.priority.label }}</label>
-                        {{ form.priority(class="form-select" ~ (" is-invalid" if form.priority.errors else "")) }}
-                        {% for error in form.priority.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
                     <div class="mb-4">
                         <label class="form-label">{{ form.description.label }}</label>
                         {{ form.description(class="form-control" ~ (" is-invalid" if form.description.errors else ""), rows=5, placeholder="Describe what's happening — when it started, what you've already tried, etc.") }}
