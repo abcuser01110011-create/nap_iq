@@ -241,3 +241,8 @@
 .dash-theme-tech .tech-ticket-priority-medium { color: #ffc107; }
 .dash-theme-tech .tech-ticket-priority-high { color: #fd7e14; }
 .dash-theme-tech .tech-ticket-priority-critical { color: #ff6b6b; }
+
+.dash-theme-tech .tm-map-link,
+.dash-theme-tech .tm-map-link:hover {
+    color: #2e7dff;
+}

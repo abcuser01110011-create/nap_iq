@@ -2133,3 +2133,20 @@
 .tech-ticket-priority-medium { color: #d39e00; }
 .tech-ticket-priority-high { color: #fd7e14; }
 .tech-ticket-priority-critical { color: #dc3545; }
+
+/* Plain-text "Open in Maps" link (technician/ticket_detail.html) --
+   same class/markup as technician_mobile's own map link (tm-map-link
+   in technician-mobile.css), copied here so the desktop ticket detail
+   page matches it exactly without pulling in that whole stylesheet. */
+.tm-map-link {
+    color: var(--napiq-primary);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.tm-map-link:hover {
+    color: var(--napiq-primary);
+    text-decoration: underline;
+}

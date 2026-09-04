@@ -69,38 +69,9 @@
             <dd class="col-sm-9">{{ job.assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</dd>
         </dl>
 
-        {% if job.lat is not none and job.lng is not none %}
-        <div class="d-flex flex-wrap gap-2 mt-3">
-            {% if job.assignment.technical_issue_id %}
-            <a href="{{ url_for('naps.geomap', issue_id=job.assignment.technical_issue_id) }}"
-               class="btn btn-outline-secondary btn-icon-only" title="View issue location on GeoMap"
-               aria-label="View issue location on GeoMap">
-                <i class="bi bi-geo-alt"></i>
-            </a>
-            <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=job.assignment.technical_issue_id) }}"
-               class="btn btn-outline-primary">
-                <i class="bi bi-signpost-split me-1"></i>Navigate
-            </a>
-            {% else %}
-            <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=job.assignment.service_request_id) }}"
-               class="btn btn-outline-secondary btn-icon-only" title="View request location on GeoMap"
-               aria-label="View request location on GeoMap">
-                <i class="bi bi-geo-alt"></i>
-            </a>
-            <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=job.assignment.service_request_id) }}"
-               class="btn btn-outline-primary">
-                <i class="bi bi-signpost-split me-1"></i>Navigate
-            </a>
-            {% endif %}
-
-            {% if job.assignment.status != 'assigned' %}
-            <a href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}"
-               target="_blank" rel="noopener"
-               class="btn btn-outline-secondary" title="Open in Maps">
-                <i class="bi bi-map me-1"></i>Open in Maps
-            </a>
-            {% endif %}
-        </div>
+        {% if job.lat is not none and job.lng is not none and job.assignment.status != 'assigned' %}
+        <a class="tm-map-link mt-3" target="_blank" rel="noopener"
+           href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}">Open in Maps</a>
         {% endif %}
     </div>
 </div>
