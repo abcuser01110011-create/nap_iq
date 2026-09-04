@@ -143,6 +143,13 @@
                        class="btn btn-outline-primary">
                         <i class="bi bi-signpost-split me-1"></i>Navigate
                     </a>
+                    {% if a.status != 'assigned' %}
+                    <a href="https://maps.google.com/?q={{ a.technical_issue.latitude }},{{ a.technical_issue.longitude }}"
+                       target="_blank" rel="noopener"
+                       class="btn btn-outline-secondary" title="Open in Maps">
+                        <i class="bi bi-map me-1"></i>Open in Maps
+                    </a>
+                    {% endif %}
                     {% endif %}
                     {% else %}
                     <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=a.service_request_id) }}"
@@ -156,6 +163,13 @@
                        class="btn btn-outline-primary">
                         <i class="bi bi-signpost-split me-1"></i>Navigate
                     </a>
+                    {% if a.status != 'assigned' %}
+                    <a href="https://maps.google.com/?q={{ a.service_request.latitude }},{{ a.service_request.longitude }}"
+                       target="_blank" rel="noopener"
+                       class="btn btn-outline-secondary" title="Open in Maps">
+                        <i class="bi bi-map me-1"></i>Open in Maps
+                    </a>
+                    {% endif %}
                     {% endif %}
                     {% endif %}
 
