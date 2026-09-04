@@ -125,13 +125,24 @@ def home():
     """Sends a logged-in user to the interface for their role."""
     endpoint = ROLE_HOME_ENDPOINT.get(g.user.role)
     if endpoint is None:
-        # A role that exists in the database but isn't wired into a
-        # Phase 7 interface yet (currently just legacy
-        # 'payment_collector' accounts — see app/models.py).
+        # A role that exists in the database but has no web dashboard
+        # -- currently plain role='technician' accounts (mobile-app-only
+        # by design, see Technician.personnel_type / routes/technicians.py)
+        # and legacy 'payment_collector' accounts predating Phase 10.
+        #
+        # session.clear() here is required, not cosmetic: without it,
+        # the redirect below to /login lands on a page that still sees
+        # this same account as logged in, which immediately bounces
+        # back to /home -- and /home lands right back here -- an
+        # infinite redirect loop (ERR_TOO_MANY_REDIRECTS in the
+        # browser) that made the entire site unreachable for that
+        # account, including '/' itself. Clearing the session first
+        # means /login actually renders the sign-in form instead.
         flash(
             "Your account role doesn't have a dedicated dashboard yet. "
             "Please contact an administrator.",
             "warning",
         )
+        session.clear()
         return redirect(url_for("auth.login"))
     return redirect(url_for(endpoint))
