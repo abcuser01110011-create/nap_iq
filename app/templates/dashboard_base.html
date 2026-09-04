@@ -25,9 +25,19 @@
     <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/theme-dark.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/auth-transition.css') }}" rel="stylesheet">
+    {% if current_user and current_user.role == 'field_assistant' %}
+    <link href="{{ url_for('static', filename='css/technician-theme.css') }}" rel="stylesheet">
+    {% endif %}
     {% block extra_head %}{% endblock %}
 </head>
-<body class="dash-body">
+{#
+    body_class: an opt-in hook so specific pages under this shared shell
+    can request the navy technician skin (technician-theme.css) without
+    it bleeding into every other page a technician can reach (GeoMap,
+    NAP Management) that weren't designed against that palette. Only
+    technician/index.html and technician/history.html set this block.
+#}
+<body class="dash-body {% block body_class %}{% endblock %}">
 
 <div class="dash-shell">
 

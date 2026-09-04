@@ -1,5 +1,6 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Assignment History{% endblock %}
+{% block body_class %}dash-theme-tech{% endblock %}
 {% block page_title %}Assignment History{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">Your completed and cancelled assignments</p>{% endblock %}
 
@@ -26,74 +27,10 @@
             'cancelled': 'text-bg-secondary'
         } %}
         {#
-            Same table-vs-card split as technician/index.html: the 7-column
-            table is fine on desktop but unreadable on a phone, so below
-            md it's replaced by a stacked card per assignment instead.
+            One card layout at every screen size, matching
+            technician/index.html -- see .tech-assign-list /
+            .tech-assign-card in dashboard.css.
         #}
-        <div class="table-responsive tech-assign-table-wrap">
-            <table class="table table-hover mb-0 align-middle">
-                <thead>
-                    <tr>
-                        <th>Issue</th>
-                        <th>Subscriber</th>
-                        <th>NAP</th>
-                        <th>Outcome</th>
-                        <th>Assigned</th>
-                        <th>Completed</th>
-                        <th>Resolution Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in assignments %}
-                    <tr>
-                        <td>
-                            <a href="{{ url_for('issues.view_issue', issue_id=a.technical_issue_id) }}">
-                                {{ a.technical_issue.issue_code or ('#' ~ a.technical_issue_id) }}
-                            </a>
-                            <div class="small text-muted">{{ a.technical_issue.issue_type }}</div>
-                        </td>
-                        <td class="small">
-                            {% if a.technical_issue.subscriber %}
-                                {{ a.technical_issue.subscriber.subscriber_code }} —
-                                {{ a.technical_issue.subscriber.full_name }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td class="small">
-                            {% if a.technical_issue.nap %}
-                                {{ a.technical_issue.nap.nap_code }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span class="badge {{ outcome_classes.get(a.status, 'text-bg-secondary') }}">
-                                {{ a.status|capitalize }}
-                            </span>
-                        </td>
-                        <td class="small">{{ a.assigned_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td class="small">
-                            {% if a.completed_at %}
-                                {{ a.completed_at.strftime('%Y-%m-%d %H:%M') }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td class="small" style="max-width: 260px;">
-                            {% if a.resolution_notes %}
-                                <span class="text-muted">{{ a.resolution_notes }}</span>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Phone layout: one card per assignment, shown below md only. -->
         <div class="tech-assign-list">
             {% for a in assignments %}
             <div class="tech-assign-card">

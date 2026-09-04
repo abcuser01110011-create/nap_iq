@@ -1,0 +1,217 @@
+/* =====================================================================
+   NAP-IQ Technician Web Theme
+   ---------------------------------------------------------------------
+   Only loaded for the field_assistant (technician) role (see
+   dashboard_base.html, which links this file and adds the
+   "dash-theme-tech" class to <body> only for that role). Re-skins the
+   shared dashboard shell (sidebar/topbar/cards/buttons) with the same
+   navy palette used by technician-mobile.css, so a technician sees one
+   consistent look whether they're on their phone (technician_mobile/*
+   pages) or at a desktop (technician/index.html, technician/history.html,
+   and the rest of the shell they have access to -- GeoMap, NAP
+   Management, Settings, Profile).
+
+   This file is a pure re-skin: it doesn't change any layout/spacing
+   rules (those live in dashboard.css and stay shared with every other
+   role), only colors. It's loaded after dashboard.css and
+   theme-dark.css, and every rule below matches or exceeds their
+   selector specificity, so it wins regardless of whether the user's
+   personal light/dark toggle is on -- technicians always get the navy
+   theme, since (like the phone app) it doesn't have a separate light
+   mode.
+   ===================================================================== */
+
+.dash-theme-tech {
+    /* Re-point the app's shared design tokens (style.css / dashboard.css)
+       at the same values technician-mobile.css uses, so every component
+       already built on var(--napiq-*) re-themes for free. */
+    --napiq-primary: #2e7dff;
+    --napiq-primary-dark: #1f3a63;
+    --napiq-surface: #122a4d;
+    --napiq-bg: #0b1f3a;
+    --napiq-border: #1f3a63;
+    --napiq-text-muted: #c7d0de;
+
+    --napiq-success: #3ddc97;
+    --napiq-warning: #ffc107;
+    --napiq-danger: #ff6b6b;
+    --napiq-info: #2e7dff;
+
+    color-scheme: dark;
+}
+
+.dash-theme-tech.dash-body {
+    background-color: var(--napiq-bg);
+    color: #eef2fa;
+}
+
+/* ---------------------------------------------------------------- */
+/* SIDEBAR / TOPBAR                                                   */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-tech .dash-sidebar {
+    background: linear-gradient(180deg, #122a4d 0%, #08182e 100%);
+}
+
+.dash-theme-tech .dash-topbar {
+    background: var(--napiq-surface);
+    border-bottom-color: var(--napiq-border);
+}
+
+.dash-theme-tech .dash-sidebar-toggle {
+    color: #eef2fa;
+}
+
+.dash-theme-tech .dash-sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.dash-theme-tech .dash-topbar-title h1 {
+    color: #ffffff;
+}
+
+.dash-theme-tech .dash-icon-btn {
+    color: #d7deec;
+}
+
+.dash-theme-tech .dash-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Technicians don't get the notification bell (see the role check in
+   dashboard_base.html) -- just the disabled placeholder button. Hiding
+   it here rather than in the template keeps that conditional logic in
+   one place. */
+.dash-theme-tech .dash-icon-btn[disabled] {
+    display: none;
+}
+
+/* The light/dark toggle has nothing to toggle under a theme that's
+   always navy (same reasoning as the phone app, which has no light
+   mode) -- hide it rather than leave a control that visibly does
+   nothing. */
+.dash-theme-tech #darkModeToggle {
+    display: none;
+}
+
+.dash-theme-tech .dash-user-name {
+    color: #ffffff;
+}
+
+/* ---------------------------------------------------------------- */
+/* CARDS / ALERTS / MODALS (Bootstrap components used directly in the */
+/* technician templates -- these hardcode a white surface in          */
+/* bootstrap.min.css, so they need an explicit override here rather   */
+/* than relying on var(--napiq-*) alone.)                             */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-tech .card {
+    background-color: var(--napiq-surface);
+    border-color: var(--napiq-border);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .card-header.bg-white {
+    background-color: var(--napiq-surface) !important;
+    border-bottom-color: var(--napiq-border);
+    color: #ffffff;
+}
+
+.dash-theme-tech .text-muted {
+    color: var(--napiq-text-muted) !important;
+}
+
+.dash-theme-tech .alert-warning {
+    background-color: #3a2f1f;
+    border-color: #6b4f1f;
+    color: #ffd98a;
+}
+
+.dash-theme-tech .modal-content {
+    background-color: var(--napiq-surface);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .modal-header,
+.dash-theme-tech .modal-footer {
+    border-color: var(--napiq-border);
+}
+
+.dash-theme-tech .form-control,
+.dash-theme-tech .form-control:focus {
+    background-color: var(--napiq-bg);
+    border-color: var(--napiq-border);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .form-control::placeholder {
+    color: #8896ab;
+}
+
+.dash-theme-tech .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* ---------------------------------------------------------------- */
+/* OUTLINE BUTTONS -- bootstrap.min.css's own outline-* colors assume */
+/* a light surface behind them, so they lose contrast on navy cards.  */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-tech .btn-outline-primary {
+    color: #8fb6ff;
+    border-color: #2e7dff;
+}
+
+.dash-theme-tech .btn-outline-primary:hover {
+    background-color: #2e7dff;
+    color: #ffffff;
+}
+
+.dash-theme-tech .btn-outline-secondary {
+    color: #c7d0de;
+    border-color: var(--napiq-border);
+}
+
+.dash-theme-tech .btn-outline-secondary:hover {
+    background-color: var(--napiq-border);
+    color: #ffffff;
+}
+
+.dash-theme-tech .btn-outline-info {
+    color: #7fd6f2;
+    border-color: #38bdf8;
+}
+
+.dash-theme-tech .btn-outline-info:hover {
+    background-color: #38bdf8;
+    color: #06222c;
+}
+
+/* ---------------------------------------------------------------- */
+/* TECHNICIAN ASSIGNMENT CARDS (technician/index.html,                */
+/* technician/history.html -- see the .tech-assign-* rules in         */
+/* dashboard.css for the shared layout/grid; only colors change here) */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-tech .tech-assign-card {
+    background: var(--napiq-surface);
+    border-color: var(--napiq-border);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.dash-theme-tech .tech-assign-card:hover {
+    background: #16315a;
+    border-color: #2e4d80;
+}
+
+.dash-theme-tech .tech-assign-issue {
+    color: #8fb6ff;
+}
+
+.dash-theme-tech .tech-assign-meta dd {
+    color: #eef2fa;
+}
+
+.dash-theme-tech .tech-assign-notes dd {
+    color: #c7d0de;
+}
