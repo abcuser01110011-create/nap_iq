@@ -59,10 +59,26 @@
             <div class="tech-assign-card">
                 <div class="tech-assign-card-top">
                     <div class="min-w-0">
+                        {#
+                            An assignment is either technical_issue-based (a
+                            repair) or service_request-based (an install/
+                            add-NAP job) — never both (see Assignment's
+                            docstring in models.py). technical_issue_id is
+                            None for the latter, so url_for('issues.view_issue',
+                            issue_id=None) used to raise a BuildError here
+                            (Werkzeug drops None kwargs, so the required
+                            issue_id param looked missing) the first time a
+                            technician had an installation job assigned.
+                        #}
+                        {% if a.technical_issue_id %}
                         <a class="tech-assign-issue" href="{{ url_for('issues.view_issue', issue_id=a.technical_issue_id) }}">
                             {{ a.technical_issue.issue_code or ('#' ~ a.technical_issue_id) }}
                         </a>
                         <div class="tech-assign-type">{{ a.technical_issue.issue_type }}</div>
+                        {% else %}
+                        <span class="tech-assign-issue">Request #{{ a.service_request_id }}</span>
+                        <div class="tech-assign-type">{{ a.service_request.request_type|replace('_', ' ')|capitalize }}</div>
+                        {% endif %}
                     </div>
                     <span class="badge {{ assignment_status_classes.get(a.status, 'text-bg-secondary') }}">
                         {{ a.status|replace('_', ' ')|capitalize }}
@@ -73,17 +89,34 @@
                     <div>
                         <dt>Subscriber</dt>
                         <dd>
-                            {% if a.technical_issue.subscriber %}
-                                {{ a.technical_issue.subscriber.subscriber_code }} —
-                                {{ a.technical_issue.subscriber.full_name }}
+                            {% if a.technical_issue_id %}
+                                {% if a.technical_issue.subscriber %}
+                                    {{ a.technical_issue.subscriber.subscriber_code }} —
+                                    {{ a.technical_issue.subscriber.full_name }}
+                                {% else %}
+                                    —
+                                {% endif %}
                             {% else %}
-                                —
+                                {% if a.service_request.subscriber %}
+                                    {{ a.service_request.subscriber.subscriber_code }} —
+                                    {{ a.service_request.subscriber.full_name }}
+                                {% elif a.service_request.full_name %}
+                                    {{ a.service_request.full_name }}
+                                {% else %}
+                                    —
+                                {% endif %}
                             {% endif %}
                         </dd>
                     </div>
                     <div>
                         <dt>NAP</dt>
-                        <dd>{{ a.technical_issue.nap.nap_code if a.technical_issue.nap else '—' }}</dd>
+                        <dd>
+                            {% if a.technical_issue_id %}
+                                {{ a.technical_issue.nap.nap_code if a.technical_issue.nap else '—' }}
+                            {% else %}
+                                {{ a.service_request.requested_nap.nap_code if a.service_request.requested_nap else '—' }}
+                            {% endif %}
+                        </dd>
                     </div>
                     <div>
                         <dt>Assigned</dt>
@@ -98,6 +131,7 @@
                 {% endif %}
 
                 <div class="tech-assign-actions">
+                    {% if a.technical_issue_id %}
                     <a href="{{ url_for('naps.geomap', issue_id=a.technical_issue_id) }}"
                        class="btn btn-outline-secondary btn-icon-only" title="View issue location on GeoMap"
                        aria-label="View issue location on GeoMap">
@@ -109,6 +143,20 @@
                        class="btn btn-outline-primary">
                         <i class="bi bi-signpost-split me-1"></i>Navigate
                     </a>
+                    {% endif %}
+                    {% else %}
+                    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=a.service_request_id) }}"
+                       class="btn btn-outline-secondary btn-icon-only" title="View request location on GeoMap"
+                       aria-label="View request location on GeoMap">
+                        <i class="bi bi-geo-alt"></i>
+                    </a>
+
+                    {% if a.service_request.latitude is not none and a.service_request.longitude is not none %}
+                    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=a.service_request_id) }}"
+                       class="btn btn-outline-primary">
+                        <i class="bi bi-signpost-split me-1"></i>Navigate
+                    </a>
+                    {% endif %}
                     {% endif %}
 
                     {% if a.status == 'assigned' %}
