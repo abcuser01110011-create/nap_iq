@@ -1125,6 +1125,94 @@ class CustomerIssueReportForm(FlaskForm):
     )
 
 
+class CustomerApplyForInstallationForm(FlaskForm):
+    """Self-service "Apply for Installation" form for a signed-in
+    customer with no subscriber record yet — the web counterpart to
+    the mobile app's ApplyForServiceScreen / POST
+    /api/v1/customer/apply (Phase 30).
+
+    Unlike the mobile screen's three-step wizard (map + GPS consent,
+    then plan, then details), this is one page: latitude/longitude are
+    hidden fields filled in by static/js/apply-installation.js from
+    the browser's Geolocation API once the customer clicks "Detect my
+    location" — the same device-location-only rule
+    ApplyForServiceScreen enforces (no manually dropped/dragged pin),
+    just via `navigator.geolocation` instead of a native GPS fix.
+    """
+
+    full_name = StringField(
+        "Full Name",
+        validators=[
+            DataRequired(message="Full name is required."),
+            Length(max=100, message="Full name must be at most 100 characters."),
+        ],
+    )
+    address = StringField(
+        "Installation Address",
+        validators=[Optional(), Length(max=255, message="Address is too long.")],
+    )
+    contact_number = StringField(
+        "Phone Number",
+        validators=[Optional(), Length(max=20, message="Phone number is too long.")],
+    )
+    # `choices` populated dynamically by the route from the current
+    # `plans` table, same pattern as SubscriberForm.plan_type.
+    plan_name = SelectField(
+        "Plan",
+        validators=[Optional()],
+        validate_choice=False,
+    )
+    latitude = DecimalField(
+        "Latitude",
+        places=7,
+        validators=[
+            DataRequired(message="Please detect your installation location first."),
+            NumberRange(min=-90, max=90, message="Latitude must be between -90 and 90."),
+        ],
+    )
+    longitude = DecimalField(
+        "Longitude",
+        places=7,
+        validators=[
+            DataRequired(message="Please detect your installation location first."),
+            NumberRange(min=-180, max=180, message="Longitude must be between -180 and 180."),
+        ],
+    )
+
+
+class CustomerLinkAccountForm(FlaskForm):
+    """Self-service "Link Existing Account" form — lets a signed-in
+    login with no subscriber record yet attach itself to an existing
+    `subscribers` row it already owns (e.g. a long-time subscriber who
+    only just created a portal login).
+
+    Deliberately requires both the subscriber/account code AND the
+    phone number already on file to match before linking — knowing
+    just the code (often printed on a bill or read out to a
+    technician) isn't enough by itself, since that would reopen
+    exactly what routes/customer.py's module docstring describes Phase
+    10's staff-only linking model as having been designed to prevent.
+    The route additionally rate-limits attempts the same way login()
+    does, since this is now a credential-guessing-shaped surface
+    rather than a plain lookup.
+    """
+
+    subscriber_code = StringField(
+        "Subscriber / Account Number",
+        validators=[
+            DataRequired(message="Your subscriber account number is required."),
+            Length(max=20, message="Account number is too long."),
+        ],
+    )
+    contact_number = StringField(
+        "Phone Number on File",
+        validators=[
+            DataRequired(message="The phone number on your subscriber account is required."),
+            Length(max=20, message="Phone number is too long."),
+        ],
+    )
+
+
 # ---------------------------------------------------------------------
 # Phase 15 — Administrator "Settings" form
 # ---------------------------------------------------------------------

@@ -44,8 +44,22 @@ the URL or session, same as index()/report_issue() already do — a
 customer can only ever see their own record's data this way, never
 another subscriber's by guessing an id.
 
+Phase 31 adds two routes for the "no subscriber yet" empty state
+(customer/index.html) that self-registration (Phase 30) left with
+nothing to do besides "contact support": `apply` (the web counterpart
+to the mobile app's Apply for Service wizard) and `link_account` (new
+on both platforms — a self-registered login reconnecting to service it
+already has). `link_account` deliberately keeps this module's original
+Phase 10 "not just by knowing the code" rule intact by also requiring
+the phone number on file to match; see that route's own docstring.
+
 Routes:
     GET  /portal/                    -> index               (customer portal home)
+    GET  /portal/apply               -> apply                (show self-service "apply for installation" form)
+    POST /portal/apply               -> apply                (process it, create the subscriber + request)
+    POST /portal/apply/coverage-check -> apply_coverage_check (AJAX: is this point covered?)
+    GET  /portal/link-account        -> link_account          (show self-service "link existing account" form)
+    POST /portal/link-account        -> link_account          (process it, attach the subscriber record)
     GET  /portal/report-issue        -> report_issue         (show self-service report form)
     POST /portal/report-issue        -> report_issue         (process self-service report form)
     GET  /portal/issues              -> my_issues             (own technical issues, full list)
@@ -57,12 +71,13 @@ import uuid
 
 import cloudinary
 import cloudinary.uploader
-from flask import Blueprint, render_template, redirect, url_for, flash, g, request
+from flask import Blueprint, current_app, render_template, redirect, url_for, flash, g, request, jsonify
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.auth import role_required
-from app.models import Subscriber, TechnicalIssue
-from app.forms import CustomerIssueReportForm
+from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
+from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
+from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
 
 customer_bp = Blueprint("customer", __name__, url_prefix="/portal")
@@ -70,6 +85,16 @@ customer_bp = Blueprint("customer", __name__, url_prefix="/portal")
 # Same allowed set as app/routes/technician.py's completion-photo upload —
 # kept as its own copy here since this is a separate self-service flow.
 ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
+
+
+def _populate_plan_choices(form):
+    """Fills in the Apply-for-Installation form's "Plan" dropdown from
+    the current `plans` table (Settings > App Settings > Plans), same
+    dynamic-choices pattern as routes/subscribers.py's own
+    _populate_plan_choices() — duplicated here rather than imported
+    since the two forms/routes don't otherwise share code."""
+    plans = Plan.query.order_by(Plan.name).all()
+    form.plan_name.choices = [("", "-- No preference --")] + [(p.name, p.name) for p in plans]
 
 
 def _own_subscriber_or_none():
@@ -98,6 +123,193 @@ def index():
         service_requests=subscriber.service_requests if subscriber else [],
         payments=subscriber.payments if subscriber else [],
     )
+
+
+@customer_bp.route("/apply/coverage-check", methods=["POST"])
+@role_required("user")
+def apply_coverage_check():
+    """AJAX coverage check for the Apply-for-Installation page's
+    "Check coverage" step — thin wrapper around the same
+    app.nap_recommendation engine the mobile app's own pre-registration
+    coverage-check and the admin's install planner already use. Purely
+    a read (recommend_naps never writes), so it's safe to call as many
+    times as the customer re-detects their location, and it's re-run
+    server-side again at actual submit time in apply() below rather
+    than trusted from this call alone.
+    """
+    if _own_subscriber_or_none() is not None:
+        return jsonify(error="Your login is already linked to a subscriber record."), 409
+
+    data = request.get_json(silent=True) or {}
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return jsonify(error="Valid latitude and longitude are required."), 400
+
+    matches = recommend_naps(latitude, longitude, limit=1)
+    if not matches:
+        return jsonify(available=False), 200
+
+    return jsonify(available=True, distance_km=matches[0]["distance_km"]), 200
+
+
+@customer_bp.route("/apply", methods=["GET", "POST"])
+@role_required("user")
+# Same per-IP ceiling the mobile app's POST /api/v1/customer/apply and
+# POST /api/v1/auth/register use — applying for service is still the
+# spam/fake-application-prone step even on the web.
+@limiter.limit(lambda: current_app.config["REGISTER_RATE_LIMIT_PER_IP"], methods=["POST"])
+def apply():
+    """Self-service "Apply for Installation" — the web counterpart to
+    the mobile app's ApplyForServiceScreen / POST
+    /api/v1/customer/apply (Phase 30's "apply for service" step,
+    split out from registration itself). Reached from the portal home
+    page's "Apply for Installation" button, shown only when the
+    signed-in login has no subscriber record yet.
+
+    One page instead of mobile's three-step wizard: static/js/
+    apply-installation.js drives a "Detect my location" -> "Check
+    coverage" sequence (against apply_coverage_check() above) before
+    the rest of the form is even shown, but this route re-validates
+    coverage itself at submit time regardless of what that AJAX call
+    said — the browser-reported result is never trusted for the actual
+    write, same discipline apply() on the mobile API enforces.
+
+    Refuses outright if the signed-in account already has a subscriber
+    on file — one application per account, same rule as mobile.
+    """
+    if _own_subscriber_or_none() is not None:
+        flash("Your login is already linked to a subscriber record.", "info")
+        return redirect(url_for("customer.index"))
+
+    form = CustomerApplyForInstallationForm()
+    _populate_plan_choices(form)
+
+    if form.validate_on_submit():
+        latitude = float(form.latitude.data)
+        longitude = float(form.longitude.data)
+
+        if not recommend_naps(latitude, longitude, limit=1):
+            flash(
+                "Sorry, we don't currently have coverage at this location. "
+                "We'll notify you when service becomes available.",
+                "danger",
+            )
+            return render_template("customer/apply.html", form=form)
+
+        full_name = form.full_name.data.strip()
+        address = form.address.data.strip() if form.address.data else None
+        contact_number = form.contact_number.data.strip() if form.contact_number.data else None
+        plan_name = form.plan_name.data or None
+
+        # Same "this also completes the account's profile" reasoning
+        # apply() on the mobile API uses — pure registration never
+        # collected a real name or phone number.
+        g.user.full_name = full_name
+        if contact_number:
+            g.user.phone_number = contact_number
+
+        subscriber = Subscriber(
+            # Temporary unique placeholder, same trick apply() on the
+            # mobile API uses — overwritten with the real SUB-####
+            # code right after this row gets its own id.
+            subscriber_code=f"PENDING-{g.user.id}",
+            full_name=full_name,
+            address=address,
+            latitude=latitude,
+            longitude=longitude,
+            contact_number=contact_number,
+            plan_type=plan_name,
+            nap_id=None,  # set later by admin via the existing assign-nap flow
+            user_id=g.user.id,
+            status="pending_review",
+        )
+        db.session.add(subscriber)
+        db.session.flush()  # assigns subscriber.id
+        subscriber.subscriber_code = f"SUB-{subscriber.id:04d}"
+
+        service_request = ServiceRequest(
+            request_type="new_installation",
+            subscriber_id=subscriber.id,
+            latitude=latitude,
+            longitude=longitude,
+            status="pending",
+            notes=f"Self-registered via web portal. Plan requested: {plan_name or 'not specified'}.",
+        )
+        db.session.add(service_request)
+        db.session.commit()
+
+        flash(
+            f"Your application '{subscriber.subscriber_code}' has been submitted for review. "
+            "We'll notify you once it's approved.",
+            "success",
+        )
+        return redirect(url_for("customer.index"))
+
+    return render_template("customer/apply.html", form=form)
+
+
+@customer_bp.route("/link-account", methods=["GET", "POST"])
+@role_required("user")
+# Same two rate-limit values login() uses (per-IP here; this form is a
+# credential-guessing-shaped surface — account code + phone — not a
+# read-only lookup, now that it can change who a subscriber record
+# belongs to).
+@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"], methods=["POST"])
+def link_account():
+    """Self-service "Link Existing Account" — lets a signed-in login
+    with no subscriber record yet attach itself to an existing
+    `subscribers` row, for a customer who already has service from
+    before creating this portal login.
+
+    This module's docstring explains Phase 10's original decision to
+    make subscriber linking staff-only specifically so a customer
+    couldn't attach themselves to somebody else's record just by
+    knowing its code. Phase 30 later added self-registration on top of
+    that model without giving a self-registered-but-already-a-
+    subscriber customer any way to reconnect the two — this route
+    closes that gap without reopening the original one: it requires
+    both the subscriber code AND the phone number already on file to
+    match before linking, and gives the same generic failure message
+    whichever part was wrong (unknown code, mismatched phone, or a
+    code that's real but already linked to a different login) so this
+    form can't be used to enumerate which subscriber codes exist or
+    are already taken — the same reasoning login()'s own generic
+    "Invalid username or password" message follows.
+    """
+    if _own_subscriber_or_none() is not None:
+        flash("Your login is already linked to a subscriber record.", "info")
+        return redirect(url_for("customer.index"))
+
+    form = CustomerLinkAccountForm()
+
+    if form.validate_on_submit():
+        code = form.subscriber_code.data.strip().upper()
+        phone = form.contact_number.data.strip()
+
+        subscriber = Subscriber.query.filter_by(subscriber_code=code).first()
+
+        generic_error = (
+            "We couldn't find a subscriber record matching that account number "
+            "and phone number. Please double-check both, or contact PG Networks "
+            "support for help linking your account."
+        )
+
+        if subscriber is None or (subscriber.contact_number or "").strip() != phone:
+            flash(generic_error, "danger")
+        elif subscriber.user_id is not None:
+            flash(generic_error, "danger")
+        else:
+            subscriber.user_id = g.user.id
+            db.session.commit()
+            flash(
+                f"Your login is now linked to subscriber account {subscriber.subscriber_code}.",
+                "success",
+            )
+            return redirect(url_for("customer.index"))
+
+    return render_template("customer/link_account.html", form=form)
 
 
 @customer_bp.route("/report-issue", methods=["GET", "POST"])

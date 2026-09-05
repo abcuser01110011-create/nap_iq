@@ -1,0 +1,94 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Apply for Installation{% endblock %}
+{% block body_class %}dash-theme-customer{% endblock %}
+{% block page_title %}Apply for Installation{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Tell us where to install your PG Networks connection</p>{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+
+                <div id="applyLocationStep">
+                    <h2 class="h6 mb-2">Step 1 &mdash; Confirm your installation location</h2>
+                    <p class="text-muted small mb-3">
+                        We use your device's current location to check PG Networks coverage
+                        at your installation address. Your location is only used for this
+                        application and isn't tracked afterward.
+                    </p>
+
+                    <div id="applyMap" class="rounded mb-3 border" style="height: 260px;"></div>
+
+                    <div id="applyLocationError" class="alert alert-danger small d-none" role="alert"></div>
+                    <div id="applyCoverageResult" class="small mb-2"></div>
+
+                    <button type="button" id="applyDetectBtn" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-geo-alt me-1"></i>Detect my location
+                    </button>
+                    <button type="button" id="applyCheckCoverageBtn" class="btn btn-primary btn-sm d-none">
+                        Check coverage
+                    </button>
+                </div>
+
+                <form method="post" novalidate id="applyDetailsForm" class="d-none mt-4 pt-4 border-top">
+                    {{ form.hidden_tag() }}
+                    {{ form.latitude(id="applyLatitude") }}
+                    {{ form.longitude(id="applyLongitude") }}
+
+                    <h2 class="h6 mb-3">Step 2 &mdash; Your details</h2>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.full_name.label }}</label>
+                        {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else "")) }}
+                        {% for error in form.full_name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.address.label }}</label>
+                        {{ form.address(class="form-control" ~ (" is-invalid" if form.address.errors else "")) }}
+                        {% for error in form.address.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.contact_number.label }}</label>
+                        {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else "")) }}
+                        {% for error in form.contact_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">{{ form.plan_name.label }}</label>
+                        {{ form.plan_name(class="form-select" ~ (" is-invalid" if form.plan_name.errors else "")) }}
+                        {% for error in form.plan_name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('customer.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send me-1"></i>Submit Application
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/apply-installation.js') }}"></script>
+{% endblock %}

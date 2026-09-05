@@ -6,21 +6,28 @@
 
 {% block content %}
 {% if subscriber is none %}
-<div class="card shadow-sm">
+<div class="card shadow-sm napiq-account-card">
     <div class="card-body">
-        <h2 class="h5 mb-3">Welcome, {{ current_user.full_name }}</h2>
-        <p class="text-muted mb-0">
-            Your login isn't linked to a subscriber record yet, so we can't show your
-            specific service plan, connected NAP, or technical issues here. Please
-            contact PG Networks support/an administrator to have your account linked to
-            your subscriber record.
+        <span class="napiq-account-label">Service</span>
+        <div class="napiq-account-code">You're not subscribed yet</div>
+        <p class="text-muted mb-3">
+            Your account is all set, {{ current_user.full_name }} &mdash; apply for
+            installation whenever you're ready to get connected.
         </p>
+
+        <div class="d-flex flex-wrap gap-2 mb-4">
+            <a href="{{ url_for('customer.apply') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Apply for Installation
+            </a>
+        </div>
+
+        <div class="border-start border-4 border-primary ps-3 py-1 mb-3">
+            <strong>Already a PG Networks subscriber? Link your existing account.</strong>
+        </div>
+        <a href="{{ url_for('customer.link_account') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-link-45deg me-1"></i>Link Existing Account
+        </a>
     </div>
-</div>
-<div class="alert alert-info mt-4 mb-0 small">
-    <i class="bi bi-info-circle me-1"></i>
-    Need help now? Please contact PG Networks support directly — self-service issue
-    reporting requires your login to be linked to a subscriber record first.
 </div>
 
 {% else %}
