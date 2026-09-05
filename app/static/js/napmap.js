@@ -2172,21 +2172,45 @@
     /**
      * Called when a search result is chosen. Makes sure the matching
      * NAP's status/port filters are enabled (so its marker is
-     * guaranteed to be visible), re-renders, then zooms to it and
-     * opens its detail panel.
+     * guaranteed to be visible), then zooms to it and opens its
+     * detail panel.
+     *
+     * Only rebuilds the whole NAP marker layer (renderNapMarkers())
+     * when a filter actually had to change to reveal this NAP -- the
+     * common case is the NAP was already visible, and previously this
+     * unconditionally wiped/redrew every NAP marker on screen just to
+     * refocus one of them, which read as the whole map "blinking"
+     * instead of smoothly panning. When nothing needed to change,
+     * this now does exactly what a direct marker click
+     * (focusNapOnMap()) already does: pan, open the panel, move the
+     * coverage ring -- nothing else on the map is touched.
      */
     function selectNap(nap) {
         const statusCheckbox = document.querySelector(
             '.status-filter[value="' + nap.status + '"]'
         );
-        if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
-        document.getElementById("portsFilter").value = "all";
+        const portsFilter = document.getElementById("portsFilter");
 
-        // Set before renderNapMarkers() so its own
-        // renderCoverageRadiusForFocusedNap() call already draws the
-        // ring for this NAP instead of the previously-focused one.
+        let filtersChanged = false;
+        if (statusCheckbox && !statusCheckbox.checked) {
+            statusCheckbox.checked = true;
+            filtersChanged = true;
+        }
+        if (portsFilter && portsFilter.value !== "all") {
+            portsFilter.value = "all";
+            filtersChanged = true;
+        }
+
+        // Set before either render path so renderCoverageRadiusForFocusedNap()
+        // (called directly below, or indirectly via renderNapMarkers())
+        // already draws the ring for this NAP instead of the
+        // previously-focused one.
         focusedNapForRadius = nap;
-        renderNapMarkers();
+        if (filtersChanged || !markersById[nap.id]) {
+            renderNapMarkers();
+        } else {
+            renderCoverageRadiusForFocusedNap();
+        }
 
         focusMapOn(
             [nap.latitude, nap.longitude],
@@ -2273,27 +2297,47 @@
     /**
      * Makes sure `issue` will actually render (forcing its status and
      * priority filter checkboxes on if needed, same idea as
-     * selectNap() above for a NAP), re-renders, then pans/zooms to it
-     * and opens its popup.
+     * selectNap() above for a NAP), then pans/zooms to it and opens
+     * its popup.
+     *
+     * Only rebuilds the whole issue marker layer when a filter
+     * actually needed to change (or the marker isn't there yet) --
+     * otherwise this used to wipe/redraw every issue marker on screen
+     * just to refocus one of them. Also now shares focusMapOn() (the
+     * "only flyTo when the zoom actually needs to change" helper)
+     * instead of always calling flyTo() directly, which was causing a
+     * shake/glitch even on short hops between two already-zoomed-in
+     * issues -- see focusMapOn()'s own comment for why that happens.
      */
     function focusIssue(issue) {
         const statusCheckbox = document.querySelector(
             '.issue-status-filter[value="' + issue.status + '"]'
         );
-        if (statusCheckbox && !statusCheckbox.checked) statusCheckbox.checked = true;
-
         const priorityCheckbox = document.querySelector(
             '.issue-priority-filter[value="' + issue.priority + '"]'
         );
-        if (priorityCheckbox && !priorityCheckbox.checked) priorityCheckbox.checked = true;
-
         const showIssuesToggle = document.getElementById("showIssuesToggle");
-        if (showIssuesToggle && !showIssuesToggle.checked) showIssuesToggle.checked = true;
 
-        renderIssueMarkers();
+        let filtersChanged = false;
+        if (statusCheckbox && !statusCheckbox.checked) {
+            statusCheckbox.checked = true;
+            filtersChanged = true;
+        }
+        if (priorityCheckbox && !priorityCheckbox.checked) {
+            priorityCheckbox.checked = true;
+            filtersChanged = true;
+        }
+        if (showIssuesToggle && !showIssuesToggle.checked) {
+            showIssuesToggle.checked = true;
+            filtersChanged = true;
+        }
+
+        if (filtersChanged || !issueMarkersById[issue.id]) {
+            renderIssueMarkers();
+        }
 
         const marker = issueMarkersById[issue.id];
-        map.flyTo([issue.latitude, issue.longitude], 18);
+        focusMapOn([issue.latitude, issue.longitude], NAP_FOCUS_ZOOM, NAP_FOCUS_FLY_DURATION, NAP_FOCUS_PAN_DURATION);
         if (marker) {
             marker.openPopup();
         }
@@ -2309,11 +2353,22 @@
      */
     function focusSubscriber(subscriber) {
         const showSubscribersToggle = document.getElementById("showSubscribersToggle");
+        let toggleChanged = false;
         if (showSubscribersToggle && !showSubscribersToggle.checked) {
             showSubscribersToggle.checked = true;
+            toggleChanged = true;
         }
 
-        renderSubscriberMarkers();
+        // Only rebuild the whole subscriber marker layer when the
+        // layer wasn't already showing (or this subscriber's marker
+        // isn't in it yet for some other reason) -- otherwise every
+        // subscriber marker on screen would flicker off and back on
+        // just to refocus one of them, which reads as a glitch rather
+        // than a smooth pan (see focusMapOn() for the equivalent
+        // zoom/pan smoothing this pairs with).
+        if (toggleChanged || !subscriberMarkersById[subscriber.id]) {
+            renderSubscriberMarkers();
+        }
 
         const marker = subscriberMarkersById[subscriber.id];
         focusSubscriberOnMap(subscriber, marker);
