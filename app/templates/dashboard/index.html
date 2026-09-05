@@ -25,7 +25,7 @@
         </a>
     </div>
     <div class="col-6 col-lg">
-        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('naps.list_naps') }}">
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('naps.list_naps', status='active') }}">
             <span class="dash-stat-icon stat-icon-blue"><i class="bi bi-ethernet"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ ports_available }}</span>
