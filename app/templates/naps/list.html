@@ -4,55 +4,41 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ naps|length }} record{{ '' if naps|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end gap-2 mb-3">
-    <form method="post" action="{{ url_for('naps.resync_status') }}" class="d-inline">
-        <button type="submit" class="btn btn-outline-secondary rounded-pill px-3"
-                title="Recompute each NAP's Active/Full status from its actual connected subscribers">
-            <i class="bi bi-arrow-repeat me-1"></i>Resync Status
-        </button>
+{% set status_options = [
+    ('', 'All'),
+    ('active', 'Active'),
+    ('inactive', 'Inactive'),
+    ('full', 'Full'),
+    ('maintenance', 'Maintenance'),
+] %}
+
+<div class="subs-filterbar">
+    <form method="get" action="{{ url_for('naps.list_naps') }}" class="subs-search-form" id="napsSearchForm">
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        <i class="bi bi-search"></i>
+        <input
+            type="text" name="q" id="napsSearchInput"
+            placeholder="Search by NAP code or name..."
+            value="{{ search_term }}"
+            aria-label="Search NAPs"
+            autocomplete="off"
+        >
     </form>
+
     <a href="{{ url_for('naps.add_nap') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-plus-lg me-1"></i>Add NAP
     </a>
-</div>
 
-<div class="subs-table-card mb-3">
-    <div class="p-3">
-        <form method="get" action="{{ url_for('naps.list_naps') }}" class="row g-2 align-items-end">
-            <div class="col-sm-6 col-md-5">
-                <label class="form-label small text-muted mb-1">Search</label>
-                <div class="subs-search-form mb-0">
-                    <i class="bi bi-search"></i>
-                    <input
-                        type="text" name="q"
-                        placeholder="Search by NAP code or name..."
-                        value="{{ search_term }}"
-                        aria-label="Search NAPs"
-                        autocomplete="off"
-                    >
-                </div>
-            </div>
-            <div class="col-sm-4 col-md-3">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="status" class="form-select">
-                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
-                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
-                    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
-                    <option value="full" {% if status_filter == 'full' %}selected{% endif %}>Full</option>
-                    <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Maintenance</option>
-                </select>
-            </div>
-            <div class="col-sm-12 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary rounded-pill px-3">
-                    <i class="bi bi-funnel me-1"></i>Filter
-                </button>
-                {% if search_term or status_filter %}
-                    <a href="{{ url_for('naps.list_naps') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
+    <div class="subs-pill-group" role="group" aria-label="Filter by status">
+        {% for value, label in status_options %}
+            <a
+                class="subs-pill {{ 'subs-pill-active' if status_filter == value else '' }}"
+                href="{{ url_for('naps.list_naps', q=search_term, status=value) }}"
+            >{{ label }}</a>
+        {% endfor %}
     </div>
 </div>
+
 
 <div class="disp-table-card">
     <div class="table-responsive">
