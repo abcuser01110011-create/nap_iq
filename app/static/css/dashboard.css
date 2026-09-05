@@ -201,6 +201,60 @@
     margin: 0.75rem 0.25rem;
 }
 
+/* ---------------------------------------------------------------- */
+/* COLLAPSED SIDEBAR (icon-only rail)                                 */
+/* ---------------------------------------------------------------- */
+
+.dash-sidebar {
+    transition: transform 0.2s ease-in-out, width 0.2s ease-in-out;
+}
+
+.dash-main {
+    transition: margin-left 0.2s ease-in-out;
+}
+
+/* Overriding the width variable here (rather than a fixed width on
+   .dash-sidebar directly) means .dash-main's margin-left -- which
+   also reads this same variable -- shrinks to match automatically. */
+.dash-shell.dash-sidebar-collapsed {
+    --napiq-sidebar-width: 76px;
+}
+
+.dash-sidebar-collapsed .dash-sidebar-brand {
+    padding: 1.15rem 0.5rem;
+}
+
+.dash-sidebar-collapsed .dash-sidebar-brand a {
+    justify-content: center;
+}
+
+.dash-sidebar-collapsed .dash-brand-text,
+.dash-sidebar-collapsed .dash-nav-link span,
+.dash-sidebar-collapsed .dash-badge-count,
+.dash-sidebar-collapsed .dash-soon-badge {
+    display: none;
+}
+
+.dash-sidebar-collapsed .dash-nav-link {
+    justify-content: center;
+    gap: 0;
+    padding: 0.6rem;
+}
+
+.dash-nav-divider-push {
+    margin-top: auto;
+}
+
+@media (max-width: 991.98px) {
+    /* Icon-only collapse is a desktop affordance -- below this width
+       the sidebar is already off-canvas by default (see the mobile
+       slide-out rules further down), so the toggle would just be a
+       second, redundant/confusing way to hide the same panel. */
+    .dash-sidebar-collapse-list {
+        display: none;
+    }
+}
+
 .dash-sidebar-backdrop {
     display: none;
 }

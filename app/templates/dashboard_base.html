@@ -247,6 +247,21 @@
                     </form>
                 </li>
             </ul>
+
+            <div class="dash-nav-divider dash-nav-divider-push"></div>
+
+            {# Collapse/expand the whole sidebar down to just the icon
+               rail -- desktop-only (hidden below the same breakpoint the
+               mobile slide-out toggle takes over at, see dashboard.css).
+               State persists across pages via localStorage; see the
+               script at the bottom of this file for the toggle logic. #}
+            <ul class="dash-nav-list dash-sidebar-collapse-list">
+                <li>
+                    <button type="button" class="dash-nav-link w-100 text-start border-0 bg-transparent" id="dashSidebarCollapseToggle">
+                        <i class="bi bi-chevron-double-left"></i><span>Collapse</span>
+                    </button>
+                </li>
+            </ul>
         </nav>
     </aside>
 
@@ -437,6 +452,49 @@
         // Enable Bootstrap tooltips (used on disabled "coming soon" links).
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
             new bootstrap.Tooltip(el);
+        });
+    })();
+
+    // Sidebar collapse-to-icons (desktop only -- the mobile slide-out
+    // toggle above handles narrow widths). Persisted per-browser via
+    // localStorage so it survives navigating to a different page.
+    (function () {
+        const shell = document.querySelector('.dash-shell');
+        const collapseToggle = document.getElementById('dashSidebarCollapseToggle');
+        if (!shell || !collapseToggle) return;
+
+        const STORAGE_KEY = 'napiq-sidebar-collapsed';
+        const icon = collapseToggle.querySelector('i');
+        const label = collapseToggle.querySelector('span');
+
+        function applyCollapsed(collapsed) {
+            shell.classList.toggle('dash-sidebar-collapsed', collapsed);
+            if (icon) icon.className = collapsed ? 'bi bi-chevron-double-right' : 'bi bi-chevron-double-left';
+            if (label) label.textContent = collapsed ? 'Expand' : 'Collapse';
+            collapseToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        }
+
+        // Only restore the collapsed state on desktop widths -- on a
+        // narrow screen the sidebar is already off-canvas by default
+        // (see dashboard.css's mobile breakpoint), so forcing icon-only
+        // mode there too would just be confusing once it slides open.
+        applyCollapsed(window.localStorage.getItem(STORAGE_KEY) === '1' && window.innerWidth >= 992);
+
+        collapseToggle.addEventListener('click', function () {
+            const collapsed = !shell.classList.contains('dash-sidebar-collapsed');
+            applyCollapsed(collapsed);
+            window.localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+        });
+
+        // Icon-only nav links lose their visible label, so fall back to
+        // the browser's native title tooltip using that same text
+        // rather than leaving unlabeled icons once collapsed.
+        document.querySelectorAll('.dash-nav-link').forEach(function (link) {
+            if (link.hasAttribute('title')) return;
+            const span = link.querySelector('span');
+            if (span && span.textContent.trim()) {
+                link.setAttribute('title', span.textContent.trim());
+            }
         });
     })();
 
