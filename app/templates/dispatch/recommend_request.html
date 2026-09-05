@@ -15,9 +15,9 @@
 
 {% block content %}
 <div class="mb-3">
-    <a href="{{ url_for('service_requests.edit_request', request_id=service_request.id) }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Request
-    </a>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
+        <i class="bi bi-arrow-left"></i>
+    </button>
 </div>
 
 <div class="alert alert-secondary small mb-4">

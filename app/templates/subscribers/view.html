@@ -1,22 +1,12 @@
 {% extends "dashboard_base.html" %}
 {% block title %}{{ subscriber.subscriber_code }}{% endblock %}
-{% block page_title %}{{ subscriber.subscriber_code }} — {{ subscriber.full_name }}{% endblock %}
+{% block page_title %}{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-    <a href="{{ url_for('subscribers.list_subscribers') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Subscribers
-    </a>
-    <div class="d-flex gap-2">
-        {% if subscriber.latitude is not none and subscriber.longitude is not none %}
-        <a href="{{ url_for('naps.geomap', navigate_type='subscriber', navigate_id=subscriber.id) }}" class="btn btn-outline-success">
-            <i class="bi bi-signpost-split me-1"></i>Navigate
-        </a>
-        {% endif %}
-        <a href="{{ url_for('subscribers.edit_subscriber', subscriber_id=subscriber.id) }}" class="btn btn-outline-primary">
-            <i class="bi bi-pencil me-1"></i>Edit
-        </a>
-    </div>
+<div class="mb-3">
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
+        <i class="bi bi-arrow-left"></i>
+    </button>
 </div>
 
 {% set sub_status_classes = {
@@ -90,6 +80,9 @@
 
                     <dt class="col-sm-4 text-muted fw-normal">Name</dt>
                     <dd class="col-sm-8">{{ subscriber.nap.name }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
+                    <dd class="col-sm-8">{{ port_number if port_number is not none else "—" }}</dd>
                 </dl>
                 {% else %}
                 <p class="text-muted mb-0">Not currently connected to a NAP.</p>
@@ -98,7 +91,7 @@
                 <hr class="my-4">
 
                 <h6 class="text-muted mb-3">Technical Issues ({{ subscriber.technical_issues|length }})</h6>
-                <div class="table-responsive mb-0">
+                <div class="table-responsive mb-4">
                     <table class="table table-sm align-middle mb-0">
                         <thead>
                             <tr>
@@ -123,6 +116,17 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    {% if subscriber.latitude is not none and subscriber.longitude is not none %}
+                    <a href="{{ url_for('naps.geomap', navigate_type='subscriber', navigate_id=subscriber.id) }}" class="btn btn-outline-success">
+                        <i class="bi bi-signpost-split me-1"></i>Navigate
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('subscribers.edit_subscriber', subscriber_id=subscriber.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
                 </div>
 
             </div>

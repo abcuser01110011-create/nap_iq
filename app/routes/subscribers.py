@@ -44,6 +44,7 @@ from app.auth import role_required
 from app.models import Subscriber, Nap, Plan, ServiceRequest
 from app.forms import SubscriberForm, MapQuickInstallSubscriberForm
 from app.nap_status import sync_nap_status, slot_usage
+from app.routes.naps import _nap_port_assignments
 
 subscribers_bp = Blueprint("subscribers", __name__, url_prefix="/subscribers")
 
@@ -372,9 +373,25 @@ def view_subscriber(subscriber_id):
     """Read-only detail view: subscriber info, linked NAP, linked login
     account (if any), and a quick summary of related issues/payments/
     service requests (already ordered newest-first by the model
-    relationships)."""
+    relationships).
+
+    `port_number` reuses naps.py's `_nap_port_assignments()` (the same
+    technician-recorded-port-first, next-free-slot-fallback logic the
+    NAP Details page's port table is built from) so this page's single
+    "Port Number" field always agrees with what that table shows for
+    the same subscriber, instead of computing it a second, possibly
+    inconsistent way. None if the subscriber isn't currently occupying
+    a slot on their NAP (no NAP linked, or `status == 'disconnected'`
+    -- see `_nap_port_assignments()`'s own occupied-subscriber filter).
+    """
     subscriber = Subscriber.query.get_or_404(subscriber_id)
-    return render_template("subscribers/view.html", subscriber=subscriber)
+    port_number = None
+    if subscriber.nap:
+        for port, sub in _nap_port_assignments(subscriber.nap).items():
+            if sub.id == subscriber.id:
+                port_number = port
+                break
+    return render_template("subscribers/view.html", subscriber=subscriber, port_number=port_number)
 
 
 @subscribers_bp.route("/<int:subscriber_id>/edit", methods=["GET", "POST"])

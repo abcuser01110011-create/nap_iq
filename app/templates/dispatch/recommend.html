@@ -12,9 +12,9 @@
 
 {% block content %}
 <div class="mb-3">
-    <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Issue
-    </a>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
+        <i class="bi bi-arrow-left"></i>
+    </button>
 </div>
 
 <div class="alert alert-secondary small mb-4">

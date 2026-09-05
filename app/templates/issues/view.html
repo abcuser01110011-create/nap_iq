@@ -11,9 +11,9 @@
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <div class="d-flex flex-wrap gap-2">
-        <a href="{{ url_for('naps.geomap') }}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Back to GeoMap
-        </a>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
+            <i class="bi bi-arrow-left"></i>
+        </button>
     </div>
 </div>
 
