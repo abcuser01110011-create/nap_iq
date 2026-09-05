@@ -689,7 +689,7 @@
     // match) it just pre-fills the Customer name as a starting point,
     // except "Add NAP" where that field means something else
     // entirely and is left alone.
-    function openTicketForm(category, typeValue, typeLabel, presetSubscriber) {
+    function openTicketForm(category, typeValue, typeLabel, presetSubscriber, presetDescription) {
         resetForm();
         applyCategory(category, typeValue, typeLabel);
         if (presetSubscriber) {
@@ -698,6 +698,12 @@
             } else if (category === "SO" && !isAddNapForm()) {
                 document.getElementById("ticketFormCustomerName").value = presetSubscriber.full_name || "";
             }
+        }
+        // Pre-fills from the reported issue's own description (see
+        // issues/view.html's "Create Ticket" button) -- just a starting
+        // point, the field stays a normal editable textarea.
+        if (presetDescription) {
+            document.getElementById("ticketFormDescription").value = presetDescription;
         }
         modalInstance.show();
     }
@@ -721,6 +727,15 @@
             latitude: lat ? Number(lat) : null,
             longitude: lng ? Number(lng) : null,
         };
+    }
+
+    // Reads the optional data-preset-description attribute off a clicked
+    // ticket-type-option element (see issues/view.html's "Create Ticket"
+    // button). Returns null when absent, same as readPresetSubscriber()
+    // above -- so this changes nothing for the normal GeoMap dropdown
+    // items, which don't carry it.
+    function readPresetDescription(item) {
+        return item.getAttribute("data-preset-description") || null;
     }
 
     // ------------------------------------------------------------------
@@ -1065,7 +1080,7 @@
                 const category = item.getAttribute("data-category");
                 const typeValue = item.getAttribute("data-type-value");
                 const typeLabel = item.getAttribute("data-type-label");
-                openTicketForm(category, typeValue, typeLabel, readPresetSubscriber(item));
+                openTicketForm(category, typeValue, typeLabel, readPresetSubscriber(item), readPresetDescription(item));
             });
         });
 

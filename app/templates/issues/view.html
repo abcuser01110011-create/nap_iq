@@ -24,8 +24,12 @@
 
                 <div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
                     <div>
-                        <h3 class="mb-0">{{ issue.issue_code or ("Issue #" ~ issue.id) }}</h3>
-                        <div class="text-muted">{{ issue.issue_type }}</div>
+                        {# The issue code (ISS-0005 etc.) used to be the
+                           headline here, but that's a ticket-side identifier
+                           for a report that hasn't been turned into a ticket
+                           yet -- the issue type is what actually matters at
+                           this stage, so it's the headline now. #}
+                        <h3 class="mb-0">{{ issue.issue_type }}</h3>
                     </div>
                     <div class="d-flex gap-2">
                         {% set priority_classes = {
@@ -60,12 +64,13 @@
                         {% endif %}
                     </dd>
 
+                    {# Read-only: this is just showing which NAP the
+                       subscriber is on, not an action to take, so it's
+                       plain text rather than a link off this page. #}
                     <dt class="col-sm-4 text-muted fw-normal">NAP</dt>
                     <dd class="col-sm-8">
                         {% if issue.nap %}
-                            <a href="{{ url_for('naps.view_nap', nap_id=issue.nap.id) }}">
-                                {{ issue.nap.nap_code }} — {{ issue.nap.name }}
-                            </a>
+                            {{ issue.nap.nap_code }} — {{ issue.nap.name }}
                         {% else %}
                             Not linked to a specific NAP
                         {% endif %}
@@ -74,14 +79,13 @@
                     <dt class="col-sm-4 text-muted fw-normal">Address</dt>
                     <dd class="col-sm-8">{{ issue.address or "—" }}</dd>
 
-                    {# Port Number and Last Updated were dropped from this
-                       list: both are ticket-side details (technician
-                       on-site data, admin review activity) that don't
-                       exist yet for a raw, not-yet-reviewed report. Until
-                       an admin turns this into an actual ticket, all this
-                       page should claim is when the report came in. #}
-                    <dt class="col-sm-4 text-muted fw-normal">Coordinates</dt>
-                    <dd class="col-sm-8">{{ issue.latitude }}, {{ issue.longitude }}</dd>
+                    {# Recorded by the technician on-site when they save notes/
+                       complete the assignment (app's SignaturePad/JobDetailScreen
+                       flow -> Assignment.port_number). Only ever set once a
+                       technician has actually been dispatched, so this falls
+                       back to "No Port" until then. #}
+                    <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
+                    <dd class="col-sm-8">{{ assignment.port_number if assignment and assignment.port_number is not none else "No Port" }}</dd>
 
                     <dt class="col-sm-4 text-muted fw-normal">Reported</dt>
                     <dd class="col-sm-8">{{ issue.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
@@ -125,7 +129,14 @@
                             data-preset-subscriber-name="{{ issue.subscriber.full_name }}"
                             data-preset-subscriber-address="{{ issue.subscriber.address or '' }}"
                             data-preset-subscriber-lat="{{ issue.subscriber.latitude if issue.subscriber.latitude is not none else '' }}"
-                            data-preset-subscriber-lng="{{ issue.subscriber.longitude if issue.subscriber.longitude is not none else '' }}">
+                            data-preset-subscriber-lng="{{ issue.subscriber.longitude if issue.subscriber.longitude is not none else '' }}"
+                            {# Carries the reported issue's own description into
+                               the ticket form's (still freely editable) Description
+                               box, so the admin isn't retyping what the subscriber
+                               already said. Left off entirely when there's no
+                               description to avoid pre-filling an empty string
+                               over whatever placeholder behavior the field has. #}
+                            {% if issue.description %}data-preset-description="{{ issue.description }}"{% endif %}>
                         <i class="bi bi-plus-lg me-1"></i>Create Ticket
                     </button>
                     {% endif %}
