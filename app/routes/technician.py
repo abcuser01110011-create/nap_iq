@@ -483,6 +483,17 @@ def _serialize_job(assignment):
 
     priority = (issue.priority if issue else None) or (request.priority if request else None)
 
+    # Fiber Break's forced-critical priority is the whole NAP being
+    # down, not an individual complaint -- same "Critical" (not the
+    # usual "Urgent" label every other critical-priority ticket gets)
+    # exception napmap.js's formatPriorityLabel() already applies on
+    # the GeoMap, kept in sync here so the technician web dashboard
+    # and mobile app agree with it.
+    if issue and issue.issue_type == "Fiber Break" and priority == "critical":
+        priority_label = "Critical"
+    else:
+        priority_label = PRIORITY_LABELS.get(priority, priority)
+
     lat = (subscriber.latitude if subscriber else None) or (issue.latitude if issue else None) or (request.latitude if request else None)
     lng = (subscriber.longitude if subscriber else None) or (issue.longitude if issue else None) or (request.longitude if request else None)
 
@@ -499,7 +510,7 @@ def _serialize_job(assignment):
         "type_label": type_label,
         "address": address,
         "priority": priority,
-        "priority_label": PRIORITY_LABELS.get(priority, priority),
+        "priority_label": priority_label,
         "subscriber_label": "NAP" if (request and request.request_type == "add_nap") else "Subscriber",
         "subscriber_name": (
             f"{subscriber.subscriber_code} — {subscriber.full_name}" if subscriber

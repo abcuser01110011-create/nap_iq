@@ -57,6 +57,20 @@ export const PRIORITY_LABELS: Record<string, string> = {
   critical: "Urgent",
 };
 
+// Fiber Break's forced-critical priority is the whole NAP being down,
+// not an individual complaint, so it reads "Critical" instead of the
+// "Urgent" label every other critical-priority ticket gets -- same
+// exception napmap.js's formatPriorityLabel() applies on the admin
+// GeoMap and app/routes/technician.py's _serialize_job() applies on
+// the technician web dashboard. Kept here so the mobile app agrees
+// with both. `issueType` is optional: pass it whenever it's known
+// (an installation/service_request has no issue_type at all, so this
+// still falls back to the plain PRIORITY_LABELS lookup for those).
+export function priorityLabel(priority?: string | null, issueType?: string | null): string {
+  if (issueType === "Fiber Break" && priority === "critical") return "Critical";
+  return (priority && PRIORITY_LABELS[priority]) || priority || "";
+}
+
 export const PRIORITY_RANK: Record<string, number> = {
   critical: 4,
   high: 3,

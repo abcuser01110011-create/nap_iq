@@ -21,7 +21,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { useOffline } from "../../offline/OfflineContext";
 import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
-import { PRIORITY_COLORS, PRIORITY_LABELS, REQUEST_TYPE_LABELS, STATUS_LABELS, ticketCode } from "./statusLabels";
+import { PRIORITY_COLORS, REQUEST_TYPE_LABELS, STATUS_LABELS, priorityLabel, ticketCode } from "./statusLabels";
 
 // How long we'll wait for a GPS fix before treating it as a timeout —
 // same value/reasoning as the customer app's "Track My Location" step
@@ -450,7 +450,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
               if (!priority) return null;
               return (
                 <Text style={[styles.priorityBadge, { color: PRIORITY_COLORS[priority] }]}>
-                  {PRIORITY_LABELS[priority] ?? priority}
+                  {priorityLabel(priority, assignment.issue?.issue_type)}
                 </Text>
               );
             })()}
