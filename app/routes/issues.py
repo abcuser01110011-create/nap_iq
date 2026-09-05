@@ -72,6 +72,7 @@ Routes:
 
 from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, abort, g
 
+import re
 from decimal import Decimal
 
 from app.extensions import db
@@ -135,6 +136,46 @@ _SERVICE_REQUEST_STATUS_BADGE_CLASSES = {
     "closed": "disp-badge-closed",
     "rejected": "disp-badge-critical",
 }
+
+
+def _dedupe_fiber_break_tickets(issues):
+    """Collapses a Fiber Break outage down to one representative row.
+
+    report_fiber_break() fans one NAP-wide outage out into one
+    TechnicalIssue per connected subscriber, all sharing the same
+    issue_code — that's needed so each subscriber's own account/map
+    marker/history still works, but it means the Tickets table would
+    otherwise list what looks like the same ticket code 4-5 times in
+    a row (one per connected subscriber) for a single real-world
+    outage.
+
+    Grouped by issue_code, each group collapses to one row: the
+    "master" issue whose own id the shared issue_code was minted from
+    (see report_fiber_break()'s shared_ticket_code) — that's also the
+    one issue that actually has an Assignment, so picking it keeps
+    "Assigned To" accurate. Falls back to the earliest-created row in
+    the (normally impossible) case that issue is missing.
+
+    Every non-Fiber-Break issue, and any Fiber Break issue with no
+    issue_code at all, passes through untouched.
+    """
+    fiber_break = [i for i in issues if i.issue_type == "Fiber Break" and i.issue_code]
+    others = [i for i in issues if not (i.issue_type == "Fiber Break" and i.issue_code)]
+
+    groups = {}
+    for issue in fiber_break:
+        groups.setdefault(issue.issue_code, []).append(issue)
+
+    representatives = []
+    for issue_code, group in groups.items():
+        match = re.match(r"^ISS-(\d+)$", issue_code)
+        master_id = int(match.group(1)) if match else None
+        representative = next((i for i in group if i.id == master_id), None)
+        if representative is None:
+            representative = min(group, key=lambda i: i.created_at)
+        representatives.append(representative)
+
+    return others + representatives
 
 
 def _ticket_row_from_issue(issue, assignment):
@@ -276,7 +317,8 @@ def list_issues():
     assignment_by_request = {a.service_request_id: a for a in open_assignments if a.service_request_id}
 
     tickets = [
-        _ticket_row_from_issue(issue, assignment_by_issue.get(issue.id)) for issue in issues
+        _ticket_row_from_issue(issue, assignment_by_issue.get(issue.id))
+        for issue in _dedupe_fiber_break_tickets(issues)
     ] + [
         _ticket_row_from_service_request(sr, assignment_by_request.get(sr.id)) for sr in service_requests
     ]

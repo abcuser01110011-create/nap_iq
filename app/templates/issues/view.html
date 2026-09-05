@@ -118,22 +118,27 @@
 
                    "Create Ticket" opens the exact same "+ Tickets" quick-create
                    modal the GeoMap uses (see partials/ticket_form_modal.html) --
-                   admin-only. This is now a single plain button rather than a
-                   dropdown: since the point of this page is a report that
-                   hasn't been reviewed yet, the only sensible ticket to raise
-                   straight from here is a Repair TN against this issue's own
-                   subscriber, so it's opened directly with that type
-                   preselected. tickets.js's ticket-type-option click handler
-                   and readPresetSubscriber() need no changes for this -- they
-                   just read whatever element (dropdown item or plain button)
-                   carries these data-* attributes. #}
+                   admin-only, and only offered while the issue is still
+                   'pending': the point of this button is raising a ticket
+                   against a report that hasn't been reviewed/actioned yet, so
+                   once it's been assigned, is in progress, resolved, or
+                   closed, a ticket already exists for it and re-offering
+                   "Create Ticket" here would just invite a duplicate. This is
+                   a single plain button rather than a dropdown: the only
+                   sensible ticket to raise straight from here is a Repair TN
+                   against this issue's own subscriber, so it's opened
+                   directly with that type preselected. tickets.js's
+                   ticket-type-option click handler and readPresetSubscriber()
+                   need no changes for this -- they just read whatever element
+                   (dropdown item or plain button) carries these data-*
+                   attributes. #}
                 <div class="d-flex flex-wrap gap-2 mt-4">
                     {% if issue.latitude is not none and issue.longitude is not none %}
                     <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=issue.id) }}" class="btn btn-outline-success">
                         <i class="bi bi-signpost-split me-1"></i>Navigate
                     </a>
                     {% endif %}
-                    {% if current_user.role == 'administrator' %}
+                    {% if current_user.role == 'administrator' and issue.status == 'pending' %}
                     <button type="button" class="btn btn-primary ticket-type-option"
                             data-category="TN" data-type-value="Repair" data-type-label="Repair"
                             data-preset-subscriber-id="{{ issue.subscriber.id }}"
