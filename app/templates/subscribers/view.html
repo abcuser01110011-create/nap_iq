@@ -2,76 +2,6 @@
 {% block title %}{{ subscriber.subscriber_code }}{% endblock %}
 {% block page_title %}{{ subscriber.subscriber_code }} — {{ subscriber.full_name }}{% endblock %}
 
-{% block extra_head %}
-<style>
-    /* Printable-document styling for the read-only Subscriber detail
-       screen, matching service_requests/form.html's sr-doc pattern.
-       Scoped entirely under .sr-doc-wrapper so it never leaks into the
-       rest of the (dark-themed) dashboard. Sized to A4 proportions
-       (210mm x 297mm, ~794x1123px at 96dpi) and rendered as a light
-       "paper" card regardless of the active dashboard theme. */
-    .sr-doc-wrapper { display: flex; justify-content: center; }
-    .sr-doc {
-        position: relative;
-        width: 100%;
-        max-width: 794px;
-        min-height: 1123px;
-        background: #ffffff;
-        color: #1b1f28;
-        border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
-        padding: 56px 60px 40px;
-        overflow: hidden;
-    }
-    .sr-doc-watermark {
-        position: absolute;
-        top: 260px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 480px;
-        height: auto;
-        object-fit: contain;
-        opacity: .035;
-        z-index: 0;
-        pointer-events: none;
-    }
-    .sr-doc-header, .sr-doc-section, .sr-doc-footer { position: relative; z-index: 1; }
-    .sr-doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #0d2182; font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
-    .sr-doc-brand-logo { height: 40px; width: auto; object-fit: contain; flex: none; }
-    .sr-doc-title { font-size: 1.9rem; font-weight: 800; color: #14171f; margin-bottom: 2px; }
-    .sr-doc-subtitle { font-size: .95rem; color: #6b7280; font-weight: 500; }
-    .sr-doc-statusbox { border: 1.5px solid #dcdee6; border-radius: 6px; padding: 10px 20px; text-align: center; min-width: 130px; }
-    .sr-doc-statusbox .label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #8890a0; }
-    .sr-doc-statusbox .value { font-weight: 700; margin-top: 2px; font-size: .95rem; }
-    .sr-doc-section { margin-top: 28px; }
-    .sr-doc-section-bar { display: flex; align-items: center; gap: 10px; background: #f3effc; padding: 9px 14px; border-radius: 4px; margin-bottom: 18px; position: relative; z-index: 2; }
-    .sr-doc-section-bar .bar { width: 4px; height: 16px; background: #7c3aed; border-radius: 2px; flex: none; }
-    .sr-doc-section-bar .title { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #2b2f3a; }
-    .sr-doc-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 18px; }
-    .sr-doc-row:last-child { margin-bottom: 0; }
-    .sr-doc-field { flex: 1 1 0; min-width: 160px; }
-    .sr-doc-field.full { flex: 1 1 100%; }
-    .sr-doc-field .flabel { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #8890a0; margin-bottom: 4px; }
-    .sr-doc-field .fvalue { font-size: .92rem; font-weight: 600; color: #1b1f28; padding-bottom: 8px; border-bottom: 1px solid #e3e5ea; min-height: 1.4em; }
-    .sr-doc-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e3e5ea; font-size: .72rem; color: #8890a0; font-style: italic; }
-    /* Technical Issues table rendered inside the paper doc — light
-       styling so it matches the document rather than the dashboard's
-       dark theme. */
-    .sr-doc-table-wrap { position: relative; z-index: 2; border: 1px solid #e3e5ea; border-radius: 6px; overflow: hidden; }
-    .sr-doc-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin: 0; background: #fff; }
-    .sr-doc-table thead th { background: #f7f7fa; color: #6b7280; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; padding: 10px 14px; border-bottom: 1px solid #e3e5ea; text-align: left; }
-    .sr-doc-table tbody td { padding: 10px 14px; border-bottom: 1px solid #eef0f3; color: #1b1f28; }
-    .sr-doc-table tbody tr:last-child td { border-bottom: none; }
-    .sr-doc-empty { padding: 24px; text-align: center; color: #8890a0; font-size: .85rem; }
-    @media (max-width: 820px) {
-        .sr-doc { padding: 36px 24px 28px; min-height: 0; }
-        .sr-doc-watermark { width: 300px; top: 260px; }
-        .sr-doc-row { gap: 16px; }
-    }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
     <a href="{{ url_for('subscribers.list_subscribers') }}" class="btn btn-sm btn-outline-secondary">
@@ -89,60 +19,47 @@
     </div>
 </div>
 
-{% set sub_status_colors = {'active': '#15803d', 'inactive': '#6b7280', 'disconnected': '#dc2626', 'pending_review': '#b45309'} %}
-<div class="sr-doc-wrapper">
-    <div class="sr-doc">
-        <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-watermark" alt="" aria-hidden="true">
+{% set sub_status_classes = {
+    'active': 'text-bg-success',
+    'inactive': 'text-bg-secondary',
+    'disconnected': 'text-bg-danger',
+    'pending_review': 'text-bg-warning'
+} %}
 
-        <div class="sr-doc-header">
-            <div>
-                <div class="sr-doc-brand">
-                    <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-brand-logo" alt="PG Networks logo">
-                    <span>PG Networks</span>
-                </div>
-                <div class="sr-doc-title">{{ subscriber.subscriber_code }} — {{ subscriber.full_name }}</div>
-                <div class="sr-doc-subtitle">Subscriber Record</div>
-            </div>
-            <div class="sr-doc-statusbox">
-                <div class="label">Status</div>
-                <div class="value" style="color: {{ sub_status_colors.get(subscriber.status, '#6b7280') }};">
-                    {{ subscriber.status|replace('_', ' ')|capitalize }}
-                </div>
-            </div>
-        </div>
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
 
-        <div class="sr-doc-section">
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Service Account</span></div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Plan</div>
-                    <div class="fvalue">{{ subscriber.plan_type or "—" }}</div>
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <div class="text-muted small">{{ subscriber.subscriber_code }}</div>
+                        <h3 class="mb-0">{{ subscriber.full_name }}</h3>
+                    </div>
+                    <span class="badge fs-6 {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
+                        {{ subscriber.status|replace('_', ' ')|capitalize }}
+                    </span>
                 </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Installed</div>
-                    <div class="fvalue">{{ subscriber.installed_at.strftime('%B %d, %Y') if subscriber.installed_at else "—" }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Contact</div>
-                    <div class="fvalue">{{ subscriber.contact_number or "—" }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Email</div>
-                    <div class="fvalue">{{ subscriber.email or "—" }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Address</div>
-                    <div class="fvalue">{{ subscriber.address or "—" }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Linked Login</div>
-                    <div class="fvalue" style="border-bottom: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+
+                <h6 class="text-muted mb-3">Service Account</h6>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Plan</dt>
+                    <dd class="col-sm-8">{{ subscriber.plan_type or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Installed</dt>
+                    <dd class="col-sm-8">{{ subscriber.installed_at.strftime('%B %d, %Y') if subscriber.installed_at else "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Contact</dt>
+                    <dd class="col-sm-8">{{ subscriber.contact_number or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Email</dt>
+                    <dd class="col-sm-8">{{ subscriber.email or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ subscriber.address or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Linked Login</dt>
+                    <dd class="col-sm-8 d-flex align-items-center justify-content-between gap-2">
                         <span>
                             {% if subscriber.user %}
                                 {{ subscriber.user.username }}
@@ -160,59 +77,55 @@
                             </button>
                         </form>
                         {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+                    </dd>
+                </dl>
 
-        <div class="sr-doc-section">
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Connected NAP</span></div>
-            {% if subscriber.nap %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">NAP Code</div>
-                    <div class="fvalue">{{ subscriber.nap.nap_code }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Name</div>
-                    <div class="fvalue">{{ subscriber.nap.name }}</div>
-                </div>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">Not currently connected to a NAP.</p>
-            {% endif %}
-        </div>
+                <hr class="my-4">
 
-        <div class="sr-doc-section">
-            <div class="sr-doc-section-bar">
-                <span class="bar"></span>
-                <span class="title">Technical Issues ({{ subscriber.technical_issues|length }})</span>
-            </div>
-            {% if subscriber.technical_issues %}
-            <div class="sr-doc-table-wrap">
-                <table class="sr-doc-table">
-                    <thead><tr><th>Issue</th><th>Type</th><th>Status</th><th>Reported</th></tr></thead>
-                    <tbody>
-                        {% for issue in subscriber.technical_issues %}
-                        <tr>
-                            <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
-                            <td>{{ issue.issue_type }}</td>
-                            <td>{{ issue.status|replace('_',' ')|capitalize }}</td>
-                            <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="sr-doc-table-wrap">
-                <div class="sr-doc-empty">No technical issues reported.</div>
-            </div>
-            {% endif %}
-        </div>
+                <h6 class="text-muted mb-3">Connected NAP</h6>
+                {% if subscriber.nap %}
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">NAP Code</dt>
+                    <dd class="col-sm-8">{{ subscriber.nap.nap_code }}</dd>
 
-        <div class="sr-doc-footer">
-            This record reflects the current service account information on file for this subscriber.
+                    <dt class="col-sm-4 text-muted fw-normal">Name</dt>
+                    <dd class="col-sm-8">{{ subscriber.nap.name }}</dd>
+                </dl>
+                {% else %}
+                <p class="text-muted mb-0">Not currently connected to a NAP.</p>
+                {% endif %}
+
+                <hr class="my-4">
+
+                <h6 class="text-muted mb-3">Technical Issues ({{ subscriber.technical_issues|length }})</h6>
+                <div class="table-responsive mb-0">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Issue</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Reported</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for issue in subscriber.technical_issues %}
+                            <tr>
+                                <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
+                                <td>{{ issue.issue_type }}</td>
+                                <td>{{ issue.status|replace('_',' ')|capitalize }}</td>
+                                <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No technical issues reported.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
         </div>
     </div>
 </div>

@@ -3,8 +3,7 @@
 {% block page_title %}Tickets{% endblock %}
 {% block page_subtitle %}
 <p class="text-muted small mb-0" id="issuesRecordCount">
-    {{ total_open_tickets }} total ticket{{ '' if total_open_tickets == 1 else 's' }} opened &middot;
-    full history — see the <a href="{{ url_for('dispatch.index') }}">Dispatch Board</a> for open work only
+    {{ total_open_tickets }} total ticket{{ '' if total_open_tickets == 1 else 's' }} opened
 </p>
 {% endblock %}
 

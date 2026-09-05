@@ -2,89 +2,6 @@
 {% block title %}{{ 'Service Request Details' if mode == 'edit' else 'Add Service Request' }}{% endblock %}
 {% block page_title %}{{ 'Service Request Details' if mode == 'edit' else 'Add New Service Request' }}{% endblock %}
 
-{% block extra_head %}
-{% if mode == 'edit' %}
-<style>
-    /* Phase 32: the read-only Service Request review screen re-themed
-       to match the rest of the (dark-capable) dashboard — same
-       --napiq-* tokens the sidebar/cards/modals use (see
-       dashboard.css / theme-dark.css) instead of a hardcoded white
-       "paper" look, and sized as a full-width dashboard panel instead
-       of a fixed A4 column so it doesn't sit as a narrow card in a
-       sea of empty background on wide screens. Every field is now
-       rendered as a boxed value (like the app's own form inputs /
-       the Service Order modal) rather than a thin underline, so the
-       extra detail this screen carries reads clearly at this larger
-       size. Content/markup is unchanged — this is styling only. */
-    .sr-doc-wrapper { display: block; }
-    .sr-doc {
-        position: relative;
-        width: 100%;
-        max-width: 1180px;
-        margin: 0 auto;
-        background: var(--napiq-surface);
-        color: inherit;
-        border: 1px solid var(--napiq-border);
-        border-radius: 1rem;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, .12);
-        padding: 2.5rem 2.75rem 2rem;
-        overflow: hidden;
-    }
-    [data-bs-theme="dark"] .sr-doc { box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
-    .sr-doc-watermark {
-        position: absolute;
-        top: 220px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 520px;
-        height: auto;
-        object-fit: contain;
-        opacity: .035;
-        z-index: 0;
-        pointer-events: none;
-    }
-    [data-bs-theme="dark"] .sr-doc-watermark { filter: invert(1) brightness(1.8); opacity: .05; }
-    .sr-doc-header, .sr-doc-section, .sr-doc-footer { position: relative; z-index: 1; }
-    .sr-doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .sr-doc-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: var(--napiq-primary); font-weight: 700; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
-    .sr-doc-brand-logo { height: 40px; width: auto; object-fit: contain; flex: none; }
-    .sr-doc-title { font-size: 2.1rem; font-weight: 800; color: inherit; margin-bottom: 2px; }
-    .sr-doc-subtitle { font-size: 1rem; color: var(--napiq-text-muted); font-weight: 500; }
-    .sr-doc-statusbox { border: 1.5px solid var(--napiq-border); background: transparent; border-radius: .6rem; padding: 12px 24px; text-align: center; min-width: 150px; }
-    .sr-doc-statusbox .label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--napiq-text-muted); }
-    .sr-doc-statusbox .value { font-weight: 700; margin-top: 2px; font-size: 1.05rem; }
-    .sr-doc-section { margin-top: 32px; }
-    .sr-doc-section-bar { display: flex; align-items: center; gap: 10px; background: rgba(139, 92, 246, .12); padding: 10px 16px; border-radius: .5rem; margin-bottom: 20px; position: relative; z-index: 2; }
-    [data-bs-theme="dark"] .sr-doc-section-bar { background: rgba(139, 92, 246, .18); }
-    .sr-doc-section-bar .bar { width: 4px; height: 16px; background: var(--napiq-primary); border-radius: 2px; flex: none; }
-    .sr-doc-section-bar .title { font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: inherit; }
-    .sr-doc-row { display: flex; flex-wrap: wrap; gap: 28px; margin-bottom: 20px; }
-    .sr-doc-row:last-child { margin-bottom: 0; }
-    .sr-doc-field { flex: 1 1 0; min-width: 220px; }
-    .sr-doc-field.full { flex: 1 1 100%; }
-    .sr-doc-field .flabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--napiq-text-muted); margin-bottom: 6px; }
-    .sr-doc-field .fvalue {
-        font-size: 1rem;
-        font-weight: 600;
-        color: inherit;
-        background: transparent;
-        border: 1px solid var(--napiq-border);
-        border-radius: .5rem;
-        padding: .7rem 1rem;
-        min-height: 2.6em;
-        display: flex;
-        align-items: center;
-    }
-    .sr-doc-footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--napiq-border); font-size: .78rem; color: var(--napiq-text-muted); font-style: italic; }
-    @media (max-width: 820px) {
-        .sr-doc { padding: 1.75rem 1.25rem 1.5rem; }
-        .sr-doc-watermark { width: 300px; top: 220px; }
-        .sr-doc-row { gap: 16px; }
-    }
-</style>
-{% endif %}
-{% endblock %}
-
 {% block content %}
 <div class="mb-3">
     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
@@ -94,77 +11,62 @@
 
 {% if mode == 'edit' %}
 {#
-    Phase 31 (printable review document): the read-only Service
-    Request review screen (Phase 30) is now styled as an A4-proportioned
-    "paper" record — see the scoped CSS in extra_head above — with a
-    faint PG Networks watermark, matching the look of a printed/
-    exportable bio-data-style form rather than another dashboard card.
-    Content and behavior are unchanged from Phase 30: still purely
-    read-only, still Approve/Reject as the only actions, still only
-    offered while 'pending'.
+    Re-themed to match NAP Management's read-only detail card
+    (naps/view.html) — a plain Bootstrap card with a title/status
+    header and dl/dt/dd field rows — instead of the old printable
+    "paper document" look. Content and behavior are unchanged: still
+    purely read-only, still Approve/Reject/Close as the only actions,
+    still gated on status exactly as before.
 #}
-{% set status_colors = {'pending': '#8890a0', 'approved': '#2563eb', 'scheduled': '#7c3aed', 'completed': '#15803d', 'rejected': '#dc2626', 'closed': '#111827'} %}
-<div class="sr-doc-wrapper">
-    <div class="sr-doc">
-        <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-watermark" alt="" aria-hidden="true">
+{% set status_classes = {
+    'pending': 'text-bg-secondary',
+    'approved': 'text-bg-primary',
+    'scheduled': 'text-bg-info',
+    'completed': 'text-bg-success',
+    'rejected': 'text-bg-danger',
+    'closed': 'text-bg-dark'
+} %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
 
-        <div class="sr-doc-header">
-            <div>
-                <div class="sr-doc-brand">
-                    <img src="{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}" class="sr-doc-brand-logo" alt="PG Networks logo">
-                    <span>PG Networks</span>
-                </div>
-                <div class="sr-doc-title">Service Request</div>
-                <div class="sr-doc-subtitle">Customer Application Record</div>
-            </div>
-            <div class="sr-doc-statusbox">
-                <div class="label">Status</div>
-                <div class="value" style="color: {{ status_colors.get(service_request.status, '#6b7280') }};">
-                    {{ service_request.status|capitalize }}
-                </div>
-            </div>
-        </div>
-
-        <div class="sr-doc-section">
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Request Details</span></div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Request Type</div>
-                    <div class="fvalue text-capitalize">{{ service_request.request_type|replace('_', ' ') }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Date Submitted</div>
-                    <div class="fvalue">{{ service_request.created_at.strftime('%B %d, %Y') }}</div>
-                </div>
-            </div>
-            {% if service_request.priority %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Priority</div>
-                    <div class="fvalue text-capitalize">{{ service_request.priority }}</div>
-                </div>
-                {% if service_request.request_type == 'new_installation' and service_request.scheduled_date %}
-                <div class="sr-doc-field">
-                    <div class="flabel">Scheduled Installation</div>
-                    <div class="fvalue">{{ service_request.scheduled_date.strftime('%B %d, %Y') }}</div>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-
-            {% if service_request.request_type == 'new_installation' %}
-                {% if service_request.plan_label %}
-                <div class="sr-doc-row">
-                    <div class="sr-doc-field full">
-                        <div class="flabel">Plan</div>
-                        <div class="fvalue">{{ service_request.plan_label }}</div>
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <div class="text-muted small">Customer Application Record</div>
+                        <h3 class="mb-0">Service Request</h3>
                     </div>
+                    <span class="badge fs-6 {{ status_classes.get(service_request.status, 'text-bg-secondary') }}">
+                        {{ service_request.status|capitalize }}
+                    </span>
                 </div>
-                {% endif %}
-                <div class="sr-doc-row">
-                    <div class="sr-doc-field full">
-                        <div class="flabel">Requested NAP</div>
-                        <div class="fvalue">
+
+                <h6 class="text-muted mb-3">Request Details</h6>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Request Type</dt>
+                    <dd class="col-sm-8 text-capitalize">{{ service_request.request_type|replace('_', ' ') }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Date Submitted</dt>
+                    <dd class="col-sm-8">{{ service_request.created_at.strftime('%B %d, %Y') }}</dd>
+
+                    {% if service_request.priority %}
+                    <dt class="col-sm-4 text-muted fw-normal">Priority</dt>
+                    <dd class="col-sm-8 text-capitalize">{{ service_request.priority }}</dd>
+
+                    {% if service_request.request_type == 'new_installation' and service_request.scheduled_date %}
+                    <dt class="col-sm-4 text-muted fw-normal">Scheduled Installation</dt>
+                    <dd class="col-sm-8">{{ service_request.scheduled_date.strftime('%B %d, %Y') }}</dd>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if service_request.request_type == 'new_installation' %}
+                        {% if service_request.plan_label %}
+                        <dt class="col-sm-4 text-muted fw-normal">Plan</dt>
+                        <dd class="col-sm-8">{{ service_request.plan_label }}</dd>
+                        {% endif %}
+
+                        <dt class="col-sm-4 text-muted fw-normal">Requested NAP</dt>
+                        <dd class="col-sm-8">
                             {% if service_request.requested_nap %}
                                 {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
                             {% elif service_request.suggested_nap %}
@@ -172,44 +74,32 @@
                             {% else %}
                                 Not yet assigned
                             {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <div class="sr-doc-row">
-                    <div class="sr-doc-field full">
-                        <div class="flabel">Service Location</div>
-                        <div class="fvalue">
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Service Location</dt>
+                        <dd class="col-sm-8">
                             {% if service_request.latitude is not none and service_request.longitude is not none %}
                                 {{ service_request.latitude }}, {{ service_request.longitude }}
                             {% else %}
                                 Not provided
                             {% endif %}
-                        </div>
-                    </div>
-                </div>
+                        </dd>
 
-            {% elif service_request.request_type == 'add_nap' %}
-                <div class="sr-doc-row">
-                    <div class="sr-doc-field">
-                        <div class="flabel">Planned NAP Code</div>
-                        <div class="fvalue">{{ service_request.planned_nap_code or "—" }}</div>
-                    </div>
-                    <div class="sr-doc-field">
-                        <div class="flabel">Port Capacity</div>
-                        <div class="fvalue">{{ service_request.port_capacity or "—" }}{% if service_request.port_capacity %} ports{% endif %}</div>
-                    </div>
-                </div>
+                    {% elif service_request.request_type == 'add_nap' %}
+                        <dt class="col-sm-4 text-muted fw-normal">Planned NAP Code</dt>
+                        <dd class="col-sm-8">{{ service_request.planned_nap_code or "—" }}</dd>
 
-            {% else %}
-            {# relocation / upgrade / disconnection: these three only ever
-               come from the full Add Service Request page, which never
-               collects priority/plan/scheduled — same Requested NAP /
-               Service Location fields as new_installation above, minus
-               the fields that page's form doesn't have. #}
-                <div class="sr-doc-row">
-                    <div class="sr-doc-field full">
-                        <div class="flabel">Requested NAP</div>
-                        <div class="fvalue">
+                        <dt class="col-sm-4 text-muted fw-normal">Port Capacity</dt>
+                        <dd class="col-sm-8">{{ service_request.port_capacity or "—" }}{% if service_request.port_capacity %} ports{% endif %}</dd>
+
+                    {% else %}
+                    {# relocation / upgrade / disconnection: these three only ever
+                       come from the full Add Service Request page, which never
+                       collects priority/plan/scheduled — same Requested NAP /
+                       Service Location fields as new_installation above, minus
+                       the fields that page's form doesn't have. #}
+                        <dt class="col-sm-4 text-muted fw-normal">Requested NAP</dt>
+                        <dd class="col-sm-8">
                             {% if service_request.requested_nap %}
                                 {{ service_request.requested_nap.nap_code }} — {{ service_request.requested_nap.name }}
                             {% elif service_request.suggested_nap %}
@@ -217,230 +107,182 @@
                             {% else %}
                                 Not yet assigned
                             {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <div class="sr-doc-row">
-                    <div class="sr-doc-field full">
-                        <div class="flabel">Service Location</div>
-                        <div class="fvalue">
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted fw-normal">Service Location</dt>
+                        <dd class="col-sm-8">
                             {% if service_request.latitude is not none and service_request.longitude is not none %}
                                 {{ service_request.latitude }}, {{ service_request.longitude }}
                             {% else %}
                                 Not provided
                             {% endif %}
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        </div>
+                        </dd>
+                    {% endif %}
+                </dl>
 
-        <div class="sr-doc-section">
-            {% if service_request.request_type == 'add_nap' %}
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">NAP Information</span></div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Planned NAP Name</div>
-                    <div class="fvalue">{{ service_request.full_name or "—" }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Barangay</div>
-                    <div class="fvalue">{{ service_request.address or "—" }}</div>
-                </div>
-            </div>
-            {% else %}
-            {% set section_titles = {
-                'new_installation': 'Customer Information',
-                'relocation': 'Relocation Details',
-                'upgrade': 'Upgrade Details',
-                'disconnection': 'Disconnection Details'
-            } %}
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">{{ section_titles.get(service_request.request_type, 'Customer Information') }}</span></div>
-            {% if service_request.subscriber %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Full Name</div>
-                    <div class="fvalue">{{ service_request.subscriber.full_name }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Subscriber Code</div>
-                    <div class="fvalue">{{ service_request.subscriber.subscriber_code }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Mobile Number</div>
-                    <div class="fvalue">{{ service_request.subscriber.contact_number or "—" }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Email Address</div>
-                    <div class="fvalue">{{ service_request.subscriber.email or "—" }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Installation Address</div>
-                    <div class="fvalue">{{ service_request.subscriber.address or "—" }}</div>
-                </div>
-            </div>
-            {% elif service_request.full_name or service_request.address or service_request.contact_number %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Full Name</div>
-                    <div class="fvalue">{{ service_request.full_name or "—" }}</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Contact Number</div>
-                    <div class="fvalue">{{ service_request.contact_number or "—" }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Applicant Type</div>
-                    <div class="fvalue">Walk-in (no subscriber record yet)</div>
-                </div>
-            </div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Address</div>
-                    <div class="fvalue">{{ service_request.address or "—" }}</div>
-                </div>
-            </div>
-            {% else %}
-            <p class="text-muted mb-0">No subscriber record linked to this request.</p>
-            {% endif %}
-            {% endif %}
-        </div>
+                <hr class="my-4">
 
-        {% if dispatch_assignment and service_request.request_type in ('new_installation', 'add_nap') %}
-        {#
-            Phase 35: only new_installation/add_nap tickets are ever
-            dispatched to a field assistant at all (relocation/upgrade/
-            disconnection have no Assignment path — see
-            _dispatch_field_assistant()'s own docstring), so this
-            section only renders for those two, and only once a
-            dispatch actually exists. Shows who was sent and, once
-            they've gone through the mobile "Mark complete" flow, the
-            same completion evidence that flow required (photo,
-            pinned GPS location, port serviced, resolution notes) —
-            see api_v1/technician.py's complete_assignment().
-        #}
-        <div class="sr-doc-section">
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Assigned Field Technician</span></div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Technician</div>
-                    <div class="fvalue">{{ dispatch_assignment.technician.full_name if dispatch_assignment.technician else "—" }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Assignment Status</div>
-                    <div class="fvalue text-capitalize">{{ dispatch_assignment.status|replace('_', ' ') }}</div>
-                </div>
-            </div>
-            {% if dispatch_assignment.status == 'completed' %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field">
-                    <div class="flabel">Completed On</div>
-                    <div class="fvalue">{{ dispatch_assignment.completed_at.strftime('%B %d, %Y %I:%M %p') if dispatch_assignment.completed_at else "—" }}</div>
-                </div>
-                <div class="sr-doc-field">
-                    <div class="flabel">Port Serviced</div>
-                    <div class="fvalue">{{ ("Port " ~ dispatch_assignment.port_number) if dispatch_assignment.port_number is not none else "—" }}</div>
-                </div>
-            </div>
-            {% if dispatch_assignment.pin_latitude is not none and dispatch_assignment.pin_longitude is not none %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Technician's Pinned Location</div>
-                    <div class="fvalue">{{ dispatch_assignment.pin_latitude }}, {{ dispatch_assignment.pin_longitude }}</div>
-                </div>
-            </div>
-            {% endif %}
-            {% if dispatch_assignment.resolution_notes %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Technician's Notes</div>
-                    <div class="fvalue" style="border-bottom: none; font-weight: 500;">{{ dispatch_assignment.resolution_notes }}</div>
-                </div>
-            </div>
-            {% endif %}
-            {% if dispatch_assignment.photo_filename %}
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="flabel">Completion Photo</div>
-                    <img src="{{ dispatch_assignment.photo_filename }}" alt="Completion photo" style="max-width: 100%; max-height: 320px; border-radius: 4px; margin-top: 4px;">
-                </div>
-            </div>
-            {% endif %}
-            {% endif %}
-        </div>
-        {% endif %}
+                {% if service_request.request_type == 'add_nap' %}
+                <h6 class="text-muted mb-3">NAP Information</h6>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Planned NAP Name</dt>
+                    <dd class="col-sm-8">{{ service_request.full_name or "—" }}</dd>
 
-        <div class="sr-doc-section">
-            <div class="sr-doc-section-bar"><span class="bar"></span><span class="title">Notes</span></div>
-            <div class="sr-doc-row">
-                <div class="sr-doc-field full">
-                    <div class="fvalue" style="border-bottom: none; font-weight: 500;">{{ service_request.notes or "—" }}</div>
-                </div>
-            </div>
-        </div>
+                    <dt class="col-sm-4 text-muted fw-normal">Barangay</dt>
+                    <dd class="col-sm-8">{{ service_request.address or "—" }}</dd>
+                </dl>
+                {% else %}
+                {% set section_titles = {
+                    'new_installation': 'Customer Information',
+                    'relocation': 'Relocation Details',
+                    'upgrade': 'Upgrade Details',
+                    'disconnection': 'Disconnection Details'
+                } %}
+                <h6 class="text-muted mb-3">{{ section_titles.get(service_request.request_type, 'Customer Information') }}</h6>
+                {% if service_request.subscriber %}
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Full Name</dt>
+                    <dd class="col-sm-8">{{ service_request.subscriber.full_name }}</dd>
 
-        <div class="sr-doc-footer">
-            This record reflects the information submitted for this service request and is used by PG Networks staff to review and process the application.
+                    <dt class="col-sm-4 text-muted fw-normal">Subscriber Code</dt>
+                    <dd class="col-sm-8">{{ service_request.subscriber.subscriber_code }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Mobile Number</dt>
+                    <dd class="col-sm-8">{{ service_request.subscriber.contact_number or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Email Address</dt>
+                    <dd class="col-sm-8">{{ service_request.subscriber.email or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Installation Address</dt>
+                    <dd class="col-sm-8">{{ service_request.subscriber.address or "—" }}</dd>
+                </dl>
+                {% elif service_request.full_name or service_request.address or service_request.contact_number %}
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Full Name</dt>
+                    <dd class="col-sm-8">{{ service_request.full_name or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Contact Number</dt>
+                    <dd class="col-sm-8">{{ service_request.contact_number or "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Applicant Type</dt>
+                    <dd class="col-sm-8">Walk-in (no subscriber record yet)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ service_request.address or "—" }}</dd>
+                </dl>
+                {% else %}
+                <p class="text-muted mb-0">No subscriber record linked to this request.</p>
+                {% endif %}
+                {% endif %}
+
+                {% if dispatch_assignment and service_request.request_type in ('new_installation', 'add_nap') %}
+                {#
+                    Phase 35: only new_installation/add_nap tickets are ever
+                    dispatched to a field assistant at all (relocation/upgrade/
+                    disconnection have no Assignment path — see
+                    _dispatch_field_assistant()'s own docstring), so this
+                    section only renders for those two, and only once a
+                    dispatch actually exists. Shows who was sent and, once
+                    they've gone through the mobile "Mark complete" flow, the
+                    same completion evidence that flow required (photo,
+                    pinned GPS location, port serviced, resolution notes) —
+                    see api_v1/technician.py's complete_assignment().
+                #}
+                <hr class="my-4">
+                <h6 class="text-muted mb-3">Assigned Field Technician</h6>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Technician</dt>
+                    <dd class="col-sm-8">{{ dispatch_assignment.technician.full_name if dispatch_assignment.technician else "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Assignment Status</dt>
+                    <dd class="col-sm-8 text-capitalize">{{ dispatch_assignment.status|replace('_', ' ') }}</dd>
+
+                    {% if dispatch_assignment.status == 'completed' %}
+                    <dt class="col-sm-4 text-muted fw-normal">Completed On</dt>
+                    <dd class="col-sm-8">{{ dispatch_assignment.completed_at.strftime('%B %d, %Y %I:%M %p') if dispatch_assignment.completed_at else "—" }}</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Port Serviced</dt>
+                    <dd class="col-sm-8">{{ ("Port " ~ dispatch_assignment.port_number) if dispatch_assignment.port_number is not none else "—" }}</dd>
+
+                    {% if dispatch_assignment.pin_latitude is not none and dispatch_assignment.pin_longitude is not none %}
+                    <dt class="col-sm-4 text-muted fw-normal">Technician's Pinned Location</dt>
+                    <dd class="col-sm-8">{{ dispatch_assignment.pin_latitude }}, {{ dispatch_assignment.pin_longitude }}</dd>
+                    {% endif %}
+
+                    {% if dispatch_assignment.resolution_notes %}
+                    <dt class="col-sm-4 text-muted fw-normal">Technician's Notes</dt>
+                    <dd class="col-sm-8">{{ dispatch_assignment.resolution_notes }}</dd>
+                    {% endif %}
+
+                    {% if dispatch_assignment.photo_filename %}
+                    <dt class="col-sm-4 text-muted fw-normal">Completion Photo</dt>
+                    <dd class="col-sm-8">
+                        <img src="{{ dispatch_assignment.photo_filename }}" alt="Completion photo" style="max-width: 100%; max-height: 320px; border-radius: 4px;">
+                    </dd>
+                    {% endif %}
+                    {% endif %}
+                </dl>
+                {% endif %}
+
+                <hr class="my-4">
+                <h6 class="text-muted mb-3">Notes</h6>
+                <p class="mb-0">{{ service_request.notes or "—" }}</p>
+
+                {% if service_request.status == 'pending' %}
+                <hr class="my-4">
+                <div class="d-flex justify-content-end gap-2">
+                    <form method="post" id="approveRequestForm"
+                          action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
+                          data-dispatch-url="{{ url_for('dispatch.index') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-success">
+                            <i class="bi bi-check-lg me-1"></i>Approve
+                        </button>
+                    </form>
+                    <form method="post" action="{{ url_for('service_requests.reject_request', request_id=service_request.id) }}"
+                          onsubmit="return confirm('Reject this service request?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-x-lg me-1"></i>Reject
+                        </button>
+                    </form>
+                </div>
+                <script src="{{ url_for('static', filename='js/service-request-approve.js') }}"></script>
+                {% elif service_request.status == 'completed' %}
+                {#
+                    Phase 34: the installation/add_nap counterpart to issues/view.html's
+                    "resolved -> Close Issue" block. A technician's own completion
+                    (api_v1/technician.py's complete_assignment()) is what gets a
+                    request to 'completed' in the first place; this is the
+                    administrator's own deliberate sign-off on top of that, and the
+                    "Navigate" link that sends the admin to the exact spot the job was
+                    done at (see naps.geomap()'s navigate_type=service_request docs
+                    and napmap.js's focusServiceRequestFromNavigate()). Navigate is
+                    only offered when this request actually has coordinates on file —
+                    same nullable-latitude/longitude guard issues/view.html uses.
+                #}
+                <hr class="my-4">
+                <div class="d-flex justify-content-end gap-2">
+                    {% if service_request.latitude is not none and service_request.longitude is not none %}
+                    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=service_request.id) }}"
+                       class="btn btn-outline-success">
+                        <i class="bi bi-signpost-split me-1"></i>Navigate to Location
+                    </a>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('service_requests.close_request', request_id=service_request.id) }}"
+                          onsubmit="return confirm('Close this service request? This confirms the work is complete and ends the workflow.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-dark">
+                            <i class="bi bi-lock-fill me-1"></i>Close Request
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
+            </div>
         </div>
     </div>
 </div>
-
-{% if service_request.status == 'pending' %}
-<div class="d-flex justify-content-center gap-2 mt-4">
-    <form method="post" id="approveRequestForm"
-          action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
-          data-dispatch-url="{{ url_for('dispatch.index') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-outline-success">
-            <i class="bi bi-check-lg me-1"></i>Approve
-        </button>
-    </form>
-    <form method="post" action="{{ url_for('service_requests.reject_request', request_id=service_request.id) }}"
-          onsubmit="return confirm('Reject this service request?');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-outline-danger">
-            <i class="bi bi-x-lg me-1"></i>Reject
-        </button>
-    </form>
-</div>
-<script src="{{ url_for('static', filename='js/service-request-approve.js') }}"></script>
-{% elif service_request.status == 'completed' %}
-{#
-    Phase 34: the installation/add_nap counterpart to issues/view.html's
-    "resolved -> Close Issue" block. A technician's own completion
-    (api_v1/technician.py's complete_assignment()) is what gets a
-    request to 'completed' in the first place; this is the
-    administrator's own deliberate sign-off on top of that, and the
-    "Navigate" link that sends the admin to the exact spot the job was
-    done at (see naps.geomap()'s navigate_type=service_request docs
-    and napmap.js's focusServiceRequestFromNavigate()). Navigate is
-    only offered when this request actually has coordinates on file —
-    same nullable-latitude/longitude guard issues/view.html uses.
-#}
-<div class="d-flex justify-content-center gap-2 mt-4">
-    {% if service_request.latitude is not none and service_request.longitude is not none %}
-    <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=service_request.id) }}"
-       class="btn btn-outline-success">
-        <i class="bi bi-signpost-split me-1"></i>Navigate to Location
-    </a>
-    {% endif %}
-    <form method="post" action="{{ url_for('service_requests.close_request', request_id=service_request.id) }}"
-          onsubmit="return confirm('Close this service request? This confirms the work is complete and ends the workflow.');">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="btn btn-dark">
-            <i class="bi bi-lock-fill me-1"></i>Close Request
-        </button>
-    </form>
-</div>
-{% endif %}
 
 {% else %}
 <div class="row justify-content-center">
