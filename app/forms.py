@@ -52,6 +52,39 @@ class LoginForm(FlaskForm):
     )
 
 
+class SelfRegisterForm(FlaskForm):
+    """Public self-service sign-up form — the web counterpart to the
+    mobile app's RegisterScreen / POST /api/v1/auth/register
+    (Phase 30's "pure registration": just enough to create an
+    account). Deliberately just username + password, no confirm-
+    password field, matching RegisterScreen exactly rather than
+    AddUserForm's admin-facing version below (which does have one).
+
+    Username uniqueness is checked here the same way UserForm.
+    validate_username does it above, just without an excluded
+    `user_id` since this form only ever creates a brand new account.
+    """
+
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(message="Username is required."),
+            Length(min=3, max=50, message="Username must be between 3 and 50 characters."),
+        ],
+    )
+    password = PasswordField(
+        "Password",
+        validators=[
+            DataRequired(message="Password is required."),
+            Length(min=8, message="Password must be at least 8 characters."),
+        ],
+    )
+
+    def validate_username(self, field):
+        if User.query.filter_by(username=field.data.strip()).first() is not None:
+            raise ValidationError("This username is already taken. Choose a different one.")
+
+
 def _nap_code_is_taken(code, exclude_id=None):
     """Shared uniqueness check used by both NapForm and
     MapQuickAddNapForm so the rule only lives in one place."""

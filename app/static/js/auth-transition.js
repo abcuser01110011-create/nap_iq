@@ -33,6 +33,13 @@
             title: "Signing out",
             steps: ["Closing active session", "Clearing local cache"],
         },
+        // Shared by auth/register.html's sign-up form -- same overlay
+        // machinery as "signin" above, just its own title/step copy
+        // for account creation instead of a credential check.
+        register: {
+            title: "Creating your account",
+            steps: ["Reserving your username", "Setting up your account", "Signing you in"],
+        },
     };
 
     function networkSpeed() {

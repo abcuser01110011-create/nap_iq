@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Sign In &middot; PG Networks</title>
+    <title>Create Account &middot; PG Networks</title>
 
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
@@ -23,14 +23,13 @@
     <div class="login-card">
         <div class="login-brand">
             <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="PG Networks" class="login-brand__mark">
-            <h1 class="login-brand__title">PG Networks</h1>
-            <p class="login-brand__subtitle">Sign in to continue</p>
+            <h1 class="login-brand__title">Create your account</h1>
+            <p class="login-brand__subtitle">Choose a username and password to get started</p>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% set shown = messages | rejectattr("1", "equalto", "Please log in to continue.") | list %}
-                {% if shown %}
+                {% if messages %}
                     <div class="login-toast-stack">
-                        {% for category, message in shown %}
+                        {% for category, message in messages %}
                             <div class="login-flash login-flash--{{ 'danger' if category in ('danger', 'error') else category }}" data-toast-autohide>
                                 {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% endif %}
                                 {% if category in ('danger', 'error') %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
@@ -42,14 +41,14 @@
             {% endwith %}
         </div>
 
-        <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin">
+        <form method="post" action="{{ url_for('auth.register') }}" novalidate data-auth-transition="register">
             {{ form.hidden_tag() }}
 
             <div class="login-field">
                 {{ form.username.label(class="login-field__label") }}
                 <div class="login-field__wrap">
                     <i class="bi bi-person login-field__icon"></i>
-                    {{ form.username(class="login-field__input login-field__input--icon" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username", placeholder="Enter your username") }}
+                    {{ form.username(class="login-field__input login-field__input--icon" + (" is-invalid" if form.username.errors else ""), autofocus=true, autocomplete="username", placeholder="Choose a username") }}
                 </div>
                 {% for error in form.username.errors %}
                     <div class="login-field__error">{{ error }}</div>
@@ -57,13 +56,10 @@
             </div>
 
             <div class="login-field">
-                <div class="login-field__label-row">
-                    {{ form.password.label(class="login-field__label") }}
-                    <button type="button" class="login-forgot" title="Contact an administrator to reset your password.">Forgot?</button>
-                </div>
+                {{ form.password.label(class="login-field__label") }}
                 <div class="login-field__wrap">
                     <i class="bi bi-lock login-field__icon"></i>
-                    {{ form.password(class="login-field__input login-field__input--icon" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password", placeholder="Enter your password") }}
+                    {{ form.password(class="login-field__input login-field__input--icon" + (" is-invalid" if form.password.errors else ""), autocomplete="new-password", id="password", placeholder="Choose a password") }}
                     <button class="login-field__toggle" type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false" tabindex="-1">
                         <i class="bi bi-eye"></i>
                     </button>
@@ -73,17 +69,13 @@
                 {% endfor %}
             </div>
 
-            <label class="login-remember">
-                <input type="checkbox" class="login-remember__input" checked>
-                <span class="login-remember__box"><i class="bi bi-check-lg"></i></span>
-                <span class="login-remember__label">Keep me signed in on this device</span>
-            </label>
+            <p class="login-footnote">You don't have an active subscription yet &mdash; you can apply for service from your dashboard after creating your account.</p>
 
             <button type="submit" class="login-submit">
-                Sign in<i class="bi bi-arrow-right"></i>
+                Create account<i class="bi bi-arrow-right"></i>
             </button>
 
-            <a href="{{ url_for('auth.register') }}" class="login-register-link">Don't have an account? Register now</a>
+            <a href="{{ url_for('auth.login') }}" class="login-register-link">Already have an account? Sign in</a>
         </form>
     </div>
 </div>

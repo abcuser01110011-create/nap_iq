@@ -394,6 +394,29 @@ body.login-body {
     color: var(--login-text-muted);
 }
 
+/* Sign-up entry point in the sign-in card's footer slot -- same slot
+   .login-footnote used to occupy, and the same slot the mobile
+   LoginScreen uses for its "Don't have an account? Register now"
+   link (see LoginScreen.tsx's own comment on this swap). Styled as a
+   plain link rather than a button since it's just a navigation,
+   colored with the same accent blue as .login-submit so it reads as
+   the one interactive/actionable thing left on an otherwise
+   informational card footer. */
+.login-register-link {
+    display: block;
+    text-align: center;
+    margin: 1.1rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--login-accent-bright);
+    text-decoration: none;
+}
+
+.login-register-link:hover,
+.login-register-link:focus-visible {
+    text-decoration: underline;
+}
+
 @media (max-width: 420px) {
     .login-card {
         padding: 1.9rem 1.4rem 1.75rem;

@@ -8,19 +8,21 @@ after signing in is decided purely by the `role` column on their
 separate "admin login" vs "customer login" page to keep in sync.
 
 Routes:
-    GET  /login   -> login   (show the sign-in form)
-    POST /login   -> login   (validate credentials, start a session)
-    POST /logout  -> logout  (end the session)
-    GET  /home    -> home    (redirect helper: sends a logged-in user
-                              to whichever page matches their role)
+    GET  /login    -> login    (show the sign-in form)
+    POST /login    -> login    (validate credentials, start a session)
+    GET  /register -> register (show the self-service sign-up form)
+    POST /register -> register (create the account, then sign it in)
+    POST /logout   -> logout   (end the session)
+    GET  /home     -> home     (redirect helper: sends a logged-in user
+                                to whichever page matches their role)
 """
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, g, current_app
 
-from app.forms import LoginForm
+from app.forms import LoginForm, SelfRegisterForm
 from app.models import User
 from app.auth import login_required, ROLE_HOME_ENDPOINT
-from app.extensions import limiter
+from app.extensions import db, limiter
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -107,6 +109,66 @@ def login():
             return redirect(url_for("auth.home"))
 
     return render_template("auth/login.html", form=form)
+
+
+@auth_bp.route("/register", methods=["GET", "POST"])
+# Same reasoning as api_v1/auth.py's register(): looser than login's
+# brute-force limits (this isn't a credential-guessing target), but
+# still capped per-IP so an uncapped sign-up form isn't a spam/fake-
+# account vector. Reuses the exact same config value so both
+# registration paths (web and mobile) share one rate-limit policy.
+@limiter.limit(lambda: current_app.config["REGISTER_RATE_LIMIT_PER_IP"], methods=["POST"])
+def register():
+    """Public self-service sign-up — the web counterpart to the mobile
+    app's Register screen (RegisterScreen.tsx / POST
+    /api/v1/auth/register). Reachable from the "Don't have an account?
+    Register now" link on the sign-in page, in the same footer slot
+    the mobile login screen uses it for (see login.html/LoginScreen.tsx).
+
+    Phase 30 "pure registration" rule applies here identically to the
+    mobile endpoint: this only ever creates the login itself —
+    username + password, role='user', status='active'. No Subscriber,
+    no ServiceRequest, no email/location/plan required up front; a
+    brand-new account can apply for service later from the customer
+    dashboard whenever it's ready, exactly as the mobile app's
+    post-register "Apply for service" prompt describes.
+
+    On success, signs the new account straight in (session cookie,
+    mirroring login() above) and sends it to its dashboard home —
+    matching RegisterScreen's "a successful register() signs the new
+    account straight in" behavior, just via a session instead of a
+    mobile token pair.
+    """
+    # Already signed in? Same behavior as login() above.
+    if g.get("user") is not None:
+        return redirect(url_for("auth.home"))
+
+    form = SelfRegisterForm()
+
+    if form.validate_on_submit():
+        username = form.username.data.strip()
+
+        user = User(
+            # No separate full-name field on this form, same gap as
+            # RegisterScreen -- defaulted to the username for now and
+            # editable later from the account's profile page.
+            username=username,
+            full_name=username,
+            role="user",
+            status="active",
+        )
+        user.set_password(form.password.data)
+        db.session.add(user)
+        db.session.commit()
+
+        session.clear()
+        session["user_id"] = user.id
+        session.permanent = True
+
+        flash(f"Welcome, {user.full_name}. Your account has been created.", "success")
+        return redirect(url_for("auth.home"))
+
+    return render_template("auth/register.html", form=form)
 
 
 @auth_bp.route("/logout", methods=["POST"])
