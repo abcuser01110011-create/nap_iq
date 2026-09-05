@@ -6,6 +6,31 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Dashboard{% endblock %}</title>
 
+    {# Sidebar-collapsed state, applied synchronously before first paint.
+       Without this, the collapsed/icon-only state -- read from
+       localStorage and applied by the <script> block at the bottom of
+       this page -- doesn't take effect until every script on the page
+       has finished loading, so navigating to a new page always flashed
+       the full-width sidebar first and only snapped to icon-only a
+       moment later. Setting the class here, in a tiny blocking inline
+       script that runs while the parser is still in <head>, means the
+       very first frame the browser paints already reflects it -- same
+       fix pattern already used for initial map view in napmap.js. Kept
+       in sync by hand with the STORAGE_KEY / class name the toggle
+       script below uses. #}
+    <script>
+        (function () {
+            try {
+                if (window.innerWidth >= 992 && window.localStorage.getItem('napiq-sidebar-collapsed') === '1') {
+                    document.documentElement.classList.add('dash-sidebar-collapsed');
+                }
+            } catch (e) {
+                // localStorage unavailable (privacy mode, etc.) -- fall back
+                // to the default expanded sidebar, same as before this fix.
+            }
+        })();
+    </script>
+
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48.png') }}">
@@ -457,18 +482,21 @@
 
     // Sidebar collapse-to-icons (desktop only -- the mobile slide-out
     // toggle above handles narrow widths). Persisted per-browser via
-    // localStorage so it survives navigating to a different page.
+    // localStorage so it survives navigating to a different page. The
+    // class itself now lives on <html>, not .dash-shell, so the inline
+    // <head> script above can apply it before .dash-shell even exists
+    // in the DOM yet (see that script's comment) -- this block just
+    // keeps the toggle button's icon/label in sync with it afterward.
     (function () {
-        const shell = document.querySelector('.dash-shell');
         const collapseToggle = document.getElementById('dashSidebarCollapseToggle');
-        if (!shell || !collapseToggle) return;
+        if (!collapseToggle) return;
 
         const STORAGE_KEY = 'napiq-sidebar-collapsed';
         const icon = collapseToggle.querySelector('i');
         const label = collapseToggle.querySelector('span');
 
         function applyCollapsed(collapsed) {
-            shell.classList.toggle('dash-sidebar-collapsed', collapsed);
+            document.documentElement.classList.toggle('dash-sidebar-collapsed', collapsed);
             if (icon) icon.className = collapsed ? 'bi bi-chevron-double-right' : 'bi bi-chevron-double-left';
             if (label) label.textContent = collapsed ? 'Expand' : 'Collapse';
             collapseToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
@@ -478,12 +506,33 @@
         // narrow screen the sidebar is already off-canvas by default
         // (see dashboard.css's mobile breakpoint), so forcing icon-only
         // mode there too would just be confusing once it slides open.
+        // (Re-applies what the <head> script above already set pre-paint
+        // -- this is what keeps it correct on resize/no-JS-cache edge
+        // cases, and is what actually updates the icon/label text.)
         applyCollapsed(window.localStorage.getItem(STORAGE_KEY) === '1' && window.innerWidth >= 992);
 
         collapseToggle.addEventListener('click', function () {
-            const collapsed = !shell.classList.contains('dash-sidebar-collapsed');
+            const collapsed = !document.documentElement.classList.contains('dash-sidebar-collapsed');
             applyCollapsed(collapsed);
             window.localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+
+            // GeoMap (naps/map.html): Leaflet measures #napMap's size
+            // once, when the map is created, and never re-measures on
+            // its own. Collapsing/expanding the sidebar changes that
+            // container's width (via the CSS transition on .dash-main/
+            // .dash-sidebar below), so without this the map kept its
+            // old, narrower canvas and left a blank strip down the
+            // right-hand side until the next manual browser resize.
+            // window.NapIQMap is only set on the GeoMap page (see
+            // napmap.js) and undefined everywhere else, so this is a
+            // harmless no-op on every other page. The 220ms delay lets
+            // the 0.2s sidebar transition finish first so Leaflet
+            // measures the *final* width, not a mid-transition one.
+            if (window.NapIQMap) {
+                setTimeout(function () {
+                    window.NapIQMap.invalidateSize();
+                }, 220);
+            }
         });
 
         // Icon-only nav links lose their visible label, so fall back to

@@ -3,7 +3,7 @@
 {% block page_title %}Tickets{% endblock %}
 {% block page_subtitle %}
 <p class="text-muted small mb-0" id="issuesRecordCount">
-    {{ tickets|length }} ticket{{ '' if tickets|length == 1 else 's' }} shown &middot;
+    {{ total_open_tickets }} total ticket{{ '' if total_open_tickets == 1 else 's' }} opened &middot;
     full history — see the <a href="{{ url_for('dispatch.index') }}">Dispatch Board</a> for open work only
 </p>
 {% endblock %}
@@ -40,8 +40,9 @@
     </form>
 
     <div class="dropdown">
-        <button type="button" class="btn btn-primary rounded-pill px-3 position-relative" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-plus-lg me-1"></i>Requests
+        <button type="button" id="requestsDropdownBtn" class="btn btn-primary btn-sm dropdown-toggle position-relative"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            Requests
             {% if pending_requests %}
                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger"
                       style="font-size: .55rem;">
@@ -49,7 +50,7 @@
                 </span>
             {% endif %}
         </button>
-        <ul class="dropdown-menu dropdown-menu-end">
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="requestsDropdownBtn">
             {% if pending_requests %}
                 {% for req in pending_requests %}
                     <li>

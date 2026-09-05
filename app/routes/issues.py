@@ -111,6 +111,13 @@ _OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
 # up until it's resolved/closed).
 _OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 
+# Service-order equivalent of _OPEN_ISSUE_STATUSES above, used only by
+# list_issues()'s "total tickets opened" stat below -- a service_requests
+# row is still open/outstanding through pending -> approved -> scheduled,
+# and only counts as done once it's completed/rejected/closed (mirrors
+# the lifecycle documented in service_requests.py's route docstrings).
+_OPEN_SERVICE_REQUEST_STATUSES = ("pending", "approved", "scheduled")
+
 # Phase 36: same status -> badge-class mapping service_requests/list.html
 # already uses for its own status pills, reused here so a Service Order
 # row shown in the merged Tickets table gets the exact same color
@@ -271,6 +278,16 @@ def list_issues():
         _ticket_row_from_service_request(sr, assignment_by_request.get(sr.id)) for sr in service_requests
     ]
 
+    # "Total tickets opened" stat shown in the page subtitle
+    # (issues/list.html): counted against the *full* merged list before
+    # search/status/priority filtering below, so it always reads as a
+    # fixed at-a-glance total rather than shifting with the admin's
+    # current filter selection.
+    total_open_tickets = sum(
+        1 for t in tickets
+        if t["status"] in _OPEN_ISSUE_STATUSES or t["status"] in _OPEN_SERVICE_REQUEST_STATUSES
+    )
+
     if search_term:
         term = search_term.lower()
         tickets = [t for t in tickets if term in t["search_blob"]]
@@ -319,6 +336,7 @@ def list_issues():
         status_filter=status_filter,
         priority_filter=priority_filter,
         pending_requests=pending_requests,
+        total_open_tickets=total_open_tickets,
     )
 
 

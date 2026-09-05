@@ -215,8 +215,11 @@
 
 /* Overriding the width variable here (rather than a fixed width on
    .dash-sidebar directly) means .dash-main's margin-left -- which
-   also reads this same variable -- shrinks to match automatically. */
-.dash-shell.dash-sidebar-collapsed {
+   also reads this same variable -- shrinks to match automatically.
+   Keyed off html.dash-sidebar-collapsed (not .dash-shell itself) since
+   the toggle script now sets the class on <html> -- see
+   dashboard_base.html's inline <head> script for why. */
+html.dash-sidebar-collapsed .dash-shell {
     --napiq-sidebar-width: 76px;
 }
 
