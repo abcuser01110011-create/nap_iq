@@ -1505,12 +1505,31 @@
     /** Fills #ticketDetailsModal from an in-memory issue record and shows it.
      * "Ticket Code" here deliberately uses the "TN 00033" convention
      * (see mobile/apps/app/src/screens/technician/statusLabels.ts
-     * ticketCode()) rather than issue.issue_code's "ISS-0037" -- this
-     * modal represents the ticket a technician is dispatched on, and
-     * needs to match what they see in the field-assistant app. The
-     * Issues module (list/view page, GeoMap issue-popup badge) keeps
-     * showing issue_code as-is; that's a separate, intentional
-     * identifier for the underlying complaint record. */
+     * ticketCode()) rather than issue.issue_code's "ISS-0037" as-is --
+     * this modal represents the ticket a technician is dispatched on,
+     * and needs to match what they see in the field-assistant app.
+     * The Issues module (list/view page, GeoMap issue-popup badge)
+     * keeps showing issue_code as-is; that's a separate, intentional
+     * identifier for the underlying complaint record.
+     *
+     * For a Fiber Break, though, `issue.id` is this *specific*
+     * subscriber's own row -- every connected subscriber gets their
+     * own TechnicalIssue row so their own marker/popup/history still
+     * works, but they're all one outage and report_fiber_break()
+     * already stamps them all with the same shared `issue_code`
+     * ("ISS-0008" for every connected subscriber, not just this
+     * one). So the TN code shown here is derived from that shared
+     * issue_code's number when present, not from this row's own id --
+     * that's what makes every connected subscriber's ticket modal
+     * show the identical "TN 00008" instead of a different number
+     * per subscriber. Falls back to issue.id when issue_code isn't
+     * in that "ISS-####" shape (or is missing), same as before. */
+    function ticketCodeFor(issue) {
+        const match = /^ISS-(\d+)$/.exec(issue.issue_code || "");
+        const num = match ? parseInt(match[1], 10) : issue.id;
+        return "TN " + String(num).padStart(5, "0");
+    }
+
     function openTicketDetailsModal(issue) {
         if (!ticketDetailsModalInstance) return;
 
@@ -1520,8 +1539,9 @@
             if (el) el.textContent = value || "\u2014";
         };
 
-        setText("ticketDetailsCode", "TN " + String(issue.id).padStart(5, "0"));
+        setText("ticketDetailsCode", ticketCodeFor(issue));
         setText("ticketDetailsType", issue.issue_type);
+        setText("ticketDetailsSubscriber", issue.subscriber_name);
         setText("ticketDetailsNap", issue.nap_code);
         setText("ticketDetailsPriority", formatPriorityLabel(issue.priority, issue.issue_type));
         setText("ticketDetailsStatus", formatStatusLabel(issue.status));
