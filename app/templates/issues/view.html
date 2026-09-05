@@ -14,54 +14,7 @@
         <a href="{{ url_for('naps.geomap') }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i>Back to GeoMap
         </a>
-        {# Phase 13 (65%, navigation destination panels): only offered
-           when this issue actually has coordinates — latitude/longitude
-           are nullable on this model, and naps.geomap()'s
-           focusNavigationFromQueryParam() silently selects nothing for
-           an issue it can't plot. #}
-        {% if issue.latitude is not none and issue.longitude is not none %}
-        <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=issue.id) }}" class="btn btn-sm btn-outline-success">
-            <i class="bi bi-signpost-split me-1"></i>Navigate
-        </a>
-        {% endif %}
     </div>
-
-    {# "Create Ticket" opens the exact same "+ Tickets" quick-create
-       modal the GeoMap uses (see partials/ticket_form_modal.html) --
-       admin-only, same as the Dispatch panel this replaced used to
-       be. Only the "Repair" option carries data-preset-subscriber-*
-       attributes: it's the one TN type tied to a real, already-
-       existing subscriber (this issue's own), so tickets.js's
-       readPresetSubscriber() picks it up and pre-selects that
-       subscriber instead of making the admin search for them again.
-       New Installation / Nap Installation / Fiber Break aren't about
-       an existing subscriber's own record, so they open blank like
-       they do on the GeoMap. #}
-    {% if current_user.role == 'administrator' %}
-    <div class="dropdown">
-        <button type="button" class="btn btn-primary btn-sm dropdown-toggle"
-                data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-            <i class="bi bi-plus-lg me-1"></i>Create Ticket
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end ticket-type-menu">
-            <li><h6 class="dropdown-header">Service Order (SO)</h6></li>
-            <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="new_installation" data-type-label="New Installation">New Installation</a></li>
-            <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="add_nap" data-type-label="Nap Installation">Nap Installation</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><h6 class="dropdown-header">Ticket Number (TN)</h6></li>
-            <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Fiber Break" data-type-label="Fiber Break">Fiber Break</a></li>
-            <li>
-                <a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Repair" data-type-label="Repair"
-                   data-preset-subscriber-id="{{ issue.subscriber.id }}"
-                   data-preset-subscriber-code="{{ issue.subscriber.subscriber_code }}"
-                   data-preset-subscriber-name="{{ issue.subscriber.full_name }}"
-                   data-preset-subscriber-address="{{ issue.subscriber.address or '' }}"
-                   data-preset-subscriber-lat="{{ issue.subscriber.latitude if issue.subscriber.latitude is not none else '' }}"
-                   data-preset-subscriber-lng="{{ issue.subscriber.longitude if issue.subscriber.longitude is not none else '' }}">Repair</a>
-            </li>
-        </ul>
-    </div>
-    {% endif %}
 </div>
 
 <div class="row justify-content-center">
@@ -121,23 +74,17 @@
                     <dt class="col-sm-4 text-muted fw-normal">Address</dt>
                     <dd class="col-sm-8">{{ issue.address or "—" }}</dd>
 
-                    {# Recorded by the technician on-site when they save notes/
-                       complete the assignment (app's SignaturePad/JobDetailScreen
-                       flow -> Assignment.port_number). Only ever set once a
-                       technician has actually been dispatched, so this falls
-                       back to "—" until then, same as every other not-yet-known
-                       field on this page. #}
-                    <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
-                    <dd class="col-sm-8">{{ assignment.port_number if assignment and assignment.port_number is not none else "—" }}</dd>
-
+                    {# Port Number and Last Updated were dropped from this
+                       list: both are ticket-side details (technician
+                       on-site data, admin review activity) that don't
+                       exist yet for a raw, not-yet-reviewed report. Until
+                       an admin turns this into an actual ticket, all this
+                       page should claim is when the report came in. #}
                     <dt class="col-sm-4 text-muted fw-normal">Coordinates</dt>
                     <dd class="col-sm-8">{{ issue.latitude }}, {{ issue.longitude }}</dd>
 
                     <dt class="col-sm-4 text-muted fw-normal">Reported</dt>
                     <dd class="col-sm-8">{{ issue.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Last Updated</dt>
-                    <dd class="col-sm-8">{{ issue.updated_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
                 </dl>
 
                 <hr class="my-4">
@@ -145,6 +92,43 @@
                 <h6 class="mb-2">Description</h6>
                 <div class="p-3 border rounded bg-body-secondary">
                     {{ issue.description or "—" }}
+                </div>
+
+                {# Phase 13 (65%, navigation destination panels): only offered
+                   when this issue actually has coordinates — latitude/longitude
+                   are nullable on this model, and naps.geomap()'s
+                   focusNavigationFromQueryParam() silently selects nothing for
+                   an issue it can't plot.
+
+                   "Create Ticket" opens the exact same "+ Tickets" quick-create
+                   modal the GeoMap uses (see partials/ticket_form_modal.html) --
+                   admin-only. This is now a single plain button rather than a
+                   dropdown: since the point of this page is a report that
+                   hasn't been reviewed yet, the only sensible ticket to raise
+                   straight from here is a Repair TN against this issue's own
+                   subscriber, so it's opened directly with that type
+                   preselected. tickets.js's ticket-type-option click handler
+                   and readPresetSubscriber() need no changes for this -- they
+                   just read whatever element (dropdown item or plain button)
+                   carries these data-* attributes. #}
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    {% if issue.latitude is not none and issue.longitude is not none %}
+                    <a href="{{ url_for('naps.geomap', navigate_type='issue', navigate_id=issue.id) }}" class="btn btn-outline-success">
+                        <i class="bi bi-signpost-split me-1"></i>Navigate
+                    </a>
+                    {% endif %}
+                    {% if current_user.role == 'administrator' %}
+                    <button type="button" class="btn btn-primary ticket-type-option"
+                            data-category="TN" data-type-value="Repair" data-type-label="Repair"
+                            data-preset-subscriber-id="{{ issue.subscriber.id }}"
+                            data-preset-subscriber-code="{{ issue.subscriber.subscriber_code }}"
+                            data-preset-subscriber-name="{{ issue.subscriber.full_name }}"
+                            data-preset-subscriber-address="{{ issue.subscriber.address or '' }}"
+                            data-preset-subscriber-lat="{{ issue.subscriber.latitude if issue.subscriber.latitude is not none else '' }}"
+                            data-preset-subscriber-lng="{{ issue.subscriber.longitude if issue.subscriber.longitude is not none else '' }}">
+                        <i class="bi bi-plus-lg me-1"></i>Create Ticket
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
