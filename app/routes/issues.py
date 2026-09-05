@@ -677,6 +677,13 @@ def report_fiber_break():
     hard-blocks on for a single subscriber) rather than failing the
     whole NAP-wide ticket for one bad record.
 
+    All connected subscribers flagged by one fiber break report also
+    share the exact same `issue_code` -- it's a single outage, so it
+    reads as one ticket everywhere a code is shown, not a different
+    ISS-#### per line. That code is minted once (from the first
+    affected subscriber's issue processed below) and copied onto
+    every other affected subscriber's issue.
+
     Returns 400 with `errors.nap_id` if no NAP id was submitted, the
     NAP doesn't exist, or the NAP currently has zero connected (non-
     disconnected) subscribers to notify.
@@ -715,6 +722,14 @@ def report_fiber_break():
     updated_count = 0
     skipped_no_location = 0
     dispatched = False  # only the first affected subscriber's issue gets an Assignment
+    # Every connected subscriber flagged by this fiber break shares one
+    # ticket code -- it's one outage, not one complaint per line, so
+    # the code is minted once (from whichever subscriber's issue is
+    # processed first below) and then stamped onto every other
+    # affected subscriber's issue instead of each generating its own
+    # from its own row id. TechnicalIssue.issue_code's DB-level
+    # uniqueness was dropped for this reason (see models.py).
+    shared_ticket_code = None
 
     for subscriber in affected_subscribers:
         if subscriber.latitude is None or subscriber.longitude is None:
@@ -738,6 +753,9 @@ def report_fiber_break():
             existing_issue.latitude = subscriber.latitude
             existing_issue.longitude = subscriber.longitude
             existing_issue.nap_id = nap.id
+            if shared_ticket_code is None:
+                shared_ticket_code = f"ISS-{existing_issue.id:04d}"
+            existing_issue.issue_code = shared_ticket_code
             notify_issue_updated(existing_issue)
             db.session.commit()
             if not dispatched and assigned_team_id:
@@ -766,7 +784,9 @@ def report_fiber_break():
             db.session.add(issue)
             db.session.commit()  # issue.id is now populated by MySQL
 
-            issue.issue_code = f"ISS-{issue.id:04d}"
+            if shared_ticket_code is None:
+                shared_ticket_code = f"ISS-{issue.id:04d}"
+            issue.issue_code = shared_ticket_code
             notify_new_issue_reported(issue)
             if not dispatched and assigned_team_id:
                 issue.address = nap.address

@@ -285,7 +285,11 @@ class TechnicalIssue(db.Model):
     __tablename__ = "technical_issues"
 
     id = db.Column(db.Integer, primary_key=True)
-    issue_code = db.Column(db.String(20), unique=True, nullable=True)
+    # Not unique: a Fiber Break ticket fans out into one TechnicalIssue
+    # per connected subscriber (see issues.report_fiber_break()), and
+    # all of those rows deliberately share the same issue_code since
+    # it's one outage, not one ticket per line.
+    issue_code = db.Column(db.String(20), unique=False, nullable=True)
     issue_type = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text, nullable=True)
     priority = db.Column(

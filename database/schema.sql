@@ -139,7 +139,10 @@ CREATE TABLE IF NOT EXISTS technicians (
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS technical_issues (
     id              INT AUTO_INCREMENT PRIMARY KEY,
-    issue_code      VARCHAR(20) UNIQUE,
+    -- Not UNIQUE: every subscriber flagged by the same Fiber Break
+    -- report shares one issue_code (see report_fiber_break() in
+    -- app/routes/issues.py) instead of getting a distinct one each.
+    issue_code      VARCHAR(20),
     issue_type      VARCHAR(50)  NOT NULL,
     description     TEXT,
     priority        ENUM('low', 'medium', 'high', 'critical') NOT NULL DEFAULT 'medium',

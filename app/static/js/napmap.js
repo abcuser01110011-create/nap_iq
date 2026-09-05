@@ -1631,11 +1631,17 @@
             // to the icon builder when "Show Issues" is on, so the
             // alert badge/pulse appears together with that toggle
             // instead of always showing for a subscriber with an
-            // open issue.
-            const worstPriority = showIssuesEnabled ? getSubscriberWorstOpenPriority(subscriber.id) : null;
+            // open issue. Pulled from the whole worst-open-issue
+            // record (not just its priority) so buildSubscriberIcon()
+            // can also see issue_type -- needed to tell a Fiber Break
+            // apart from every other "critical"/urgent issue type
+            // (see buildSubscriberIcon()'s docstring).
+            const worstOpenIssue = showIssuesEnabled ? getSubscriberOpenIssue(subscriber.id) : null;
+            const worstPriority = worstOpenIssue ? worstOpenIssue.priority : null;
+            const worstIssueType = worstOpenIssue ? worstOpenIssue.issue_type : null;
 
             const marker = L.marker([subscriber.latitude, subscriber.longitude], {
-                icon: buildSubscriberIcon(worstPriority),
+                icon: buildSubscriberIcon(worstPriority, worstIssueType),
                 title: subscriber.subscriber_code + " - " + subscriber.full_name,
             });
             marker.bindPopup(buildSubscriberPopupHtml(subscriber));
@@ -1687,23 +1693,39 @@
      * passed in and the normal person icon is swapped for the same
      * warning-badge look issues use (colored + pulsed at that
      * priority's rate) so a subscriber with a problem stands out from
-     * a healthy one without needing to open its popup. */
-    function buildSubscriberIcon(priority) {
+     * a healthy one without needing to open its popup.
+     *
+     * `issueType` mirrors buildIssueIcon()'s Fiber Break exception: a
+     * Fiber Break's forced-critical priority isn't an individual
+     * complaint, it's the whole NAP being down, so every connected
+     * subscriber's marker gets the same red SQUARE badge the issue
+     * marker itself uses instead of the round badge. The round
+     * "circle" alert badge is reserved for actual urgent (critical-
+     * priority, non-Fiber-Break) complaints -- and every other
+     * priority, same as before. */
+    function buildSubscriberIcon(priority, issueType) {
         const s = Math.round(22 * getIconScale());
 
         if (priority) {
             const color = PRIORITY_COLORS[priority] || NO_ISSUE_LINE_COLOR;
             const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
-            // Same r=7 circle as the normal (no-issue) icon below, so
-            // the subscriber marker reads as the same on-screen size
-            // whether or not it currently has an open issue -- only
-            // the badge's color/glyph and the pulse change.
-            const svg =
-                '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
-                '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
-                '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
-                'font-family="Arial, sans-serif">!</text>' +
-                "</svg>";
+            const isFiberBreak = issueType === "Fiber Break";
+            // Same r=7 circle (or same-footprint rounded square) as
+            // the normal (no-issue) icon below, so the subscriber
+            // marker reads as the same on-screen size whether or not
+            // it currently has an open issue -- only the badge's
+            // shape/color/glyph and the pulse change.
+            const svg = isFiberBreak
+                ? '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+                  '<rect x="3" y="3" width="16" height="16" rx="3" fill="' + color + '"/>' +
+                  '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+                  'font-family="Arial, sans-serif">!</text>' +
+                  "</svg>"
+                : '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+                  '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
+                  '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+                  'font-family="Arial, sans-serif">!</text>' +
+                  "</svg>";
             const html =
                 '<div class="priority-pulse-wrap" style="color:' + color + ';--pulse-duration:' + pulseSeconds + 's;">' +
                 svg +
@@ -1711,7 +1733,9 @@
 
             return L.divIcon({
                 html: html,
-                className: "subscriber-marker-icon subscriber-marker-icon-alert",
+                className:
+                    "subscriber-marker-icon subscriber-marker-icon-alert" +
+                    (isFiberBreak ? " subscriber-marker-icon-fiber-break" : ""),
                 iconSize: [s, s],
                 iconAnchor: [Math.round(s / 2), Math.round(s / 2)],
                 popupAnchor: [0, -Math.round(s / 2)],
