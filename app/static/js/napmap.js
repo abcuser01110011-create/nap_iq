@@ -1110,7 +1110,7 @@
             lines.forEach((line) => {
                 const row = document.createElement("a");
                 row.className = "napmap-detail-line-row";
-                row.href = "/subscribers/" + line.subscriber_id;
+                row.href = "#";
                 row.innerHTML =
                     '<span class="badge napmap-detail-line-code">' +
                     escapeHtml(line.subscriber_code) + "</span>" +
@@ -1118,6 +1118,20 @@
                     '<span class="badge ' + paymentStatusBadgeClass(line.payment_status) + '">' +
                     escapeHtml(line.payment_status) + "</span>" +
                     '<i class="bi bi-chevron-right napmap-detail-line-chevron"></i>';
+                // Was a plain link off to /subscribers/<id> — now stays
+                // on the GeoMap instead: closes this panel out of the
+                // way and reuses focusSubscriber() (the same
+                // pan/zoom-in + open-popup behavior a search result or
+                // a direct marker click already gets) so clicking a
+                // connected line actually shows *that* subscriber on
+                // the map rather than just navigating away from it.
+                row.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    const subscriber = allSubscribers.find((s) => s.id === line.subscriber_id);
+                    if (!subscriber) return;
+                    closeNapDetailPanel();
+                    focusSubscriber(subscriber);
+                });
                 linesList.appendChild(row);
             });
         }
