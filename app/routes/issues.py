@@ -113,10 +113,13 @@ _OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 
 # Service-order equivalent of _OPEN_ISSUE_STATUSES above, used only by
 # list_issues()'s "total tickets opened" stat below -- a service_requests
-# row is still open/outstanding through pending -> approved -> scheduled,
-# and only counts as done once it's completed/rejected/closed (mirrors
-# the lifecycle documented in service_requests.py's route docstrings).
-_OPEN_SERVICE_REQUEST_STATUSES = ("pending", "approved", "scheduled")
+# row is still open/outstanding through pending -> approved -> scheduled
+# -> completed. "completed" is included (unlike the technical-issue
+# equivalent's "resolved") because a completed service order still
+# needs an admin to review and close it out -- it isn't done from the
+# admin's perspective until it reaches "closed". Kept in sync by hand
+# with dashboard.py's own OPEN_SERVICE_REQUEST_STATUSES.
+_OPEN_SERVICE_REQUEST_STATUSES = ("pending", "approved", "scheduled", "completed")
 
 # Phase 36: same status -> badge-class mapping service_requests/list.html
 # already uses for its own status pills, reused here so a Service Order

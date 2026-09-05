@@ -59,11 +59,14 @@ OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 # Service-order equivalent of OPEN_ISSUE_STATUSES above, used only by
 # the top-row "Open Tickets" stat card's combined count -- a
 # service_requests row is still open/outstanding through
-# pending -> approved -> scheduled, and only counts as done once it's
-# completed/rejected/closed. Kept in sync by hand with issues.py's own
-# _OPEN_SERVICE_REQUEST_STATUSES (same duplication tradeoff as this
-# module's other OPEN_*_STATUSES constants).
-OPEN_SERVICE_REQUEST_STATUSES = ("pending", "approved", "scheduled")
+# pending -> approved -> scheduled -> completed. "completed" is
+# included here (unlike OPEN_ISSUE_STATUSES' technical-issue
+# equivalent) because a completed service order still needs an admin
+# to review and close it out -- it isn't done from the admin's
+# perspective until it reaches "closed". Kept in sync by hand with
+# issues.py's own _OPEN_SERVICE_REQUEST_STATUSES (same duplication
+# tradeoff as this module's other OPEN_*_STATUSES constants).
+OPEN_SERVICE_REQUEST_STATUSES = ("pending", "approved", "scheduled", "completed")
 
 # Fixed display order + labels/colors for the Technical Issue Status
 # Summary panel's status bars.
