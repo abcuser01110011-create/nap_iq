@@ -1119,17 +1119,28 @@
                     escapeHtml(line.payment_status) + "</span>" +
                     '<i class="bi bi-chevron-right napmap-detail-line-chevron"></i>';
                 // Was a plain link off to /subscribers/<id> — now stays
-                // on the GeoMap instead: closes this panel out of the
-                // way and reuses focusSubscriber() (the same
-                // pan/zoom-in + open-popup behavior a search result or
-                // a direct marker click already gets) so clicking a
-                // connected line actually shows *that* subscriber on
-                // the map rather than just navigating away from it.
+                // on the GeoMap instead and reuses focusSubscriber()
+                // (the same pan/zoom-in + open-popup behavior a search
+                // result or a direct marker click already gets) so
+                // clicking a connected line actually shows *that*
+                // subscriber on the map rather than just navigating
+                // away from it.
+                //
+                // Deliberately does NOT call closeNapDetailPanel()
+                // anymore: this panel is *this* NAP's own connected-
+                // lines list, so closing it every time a line is
+                // clicked meant the list itself vanished the moment
+                // you tried to look at one of the subscribers on it,
+                // making it impossible to click through more than one
+                // without reopening the NAP first. The panel now stays
+                // open (still showing this same NAP) while the map
+                // pans to and opens the popup for whichever connected
+                // subscriber was clicked, so multiple lines can be
+                // checked one after another.
                 row.addEventListener("click", (event) => {
                     event.preventDefault();
                     const subscriber = allSubscribers.find((s) => s.id === line.subscriber_id);
                     if (!subscriber) return;
-                    closeNapDetailPanel();
                     focusSubscriber(subscriber);
                 });
                 linesList.appendChild(row);
@@ -2366,10 +2377,31 @@
         // just to refocus one of them, which reads as a glitch rather
         // than a smooth pan (see focusMapOn() for the equivalent
         // zoom/pan smoothing this pairs with).
+        //
+        // Wrapped in try/catch so that a problem building any one
+        // subscriber's marker/connection-line (a bad nap link, a
+        // malformed record, etc. -- easy to hit here since this layer
+        // is off by default and may be getting built for the very
+        // first time on this click) can't silently swallow the pan
+        // below. Before this, an error thrown partway through
+        // renderSubscriberMarkers() aborted focusSubscriber()
+        // entirely, which is exactly why picking a subscriber from
+        // search could show up in the results list but never actually
+        // move the map -- selectNap() (the NAP equivalent) has no such
+        // dependency and always reached its own pan/zoom call.
         if (toggleChanged || !subscriberMarkersById[subscriber.id]) {
-            renderSubscriberMarkers();
+            try {
+                renderSubscriberMarkers();
+            } catch (err) {
+                console.error("Failed to render subscriber markers while focusing a subscriber:", err);
+            }
         }
 
+        // Deliberately called unconditionally, using subscriber's own
+        // lat/lng rather than depending on the marker lookup below --
+        // the pan/zoom must happen even if the marker itself couldn't
+        // be built for any reason. focusSubscriberOnMap() already only
+        // opens a popup when a marker is actually passed in.
         const marker = subscriberMarkersById[subscriber.id];
         focusSubscriberOnMap(subscriber, marker);
     }
