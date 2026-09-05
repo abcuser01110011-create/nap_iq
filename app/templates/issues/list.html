@@ -65,6 +65,22 @@
         </ul>
     </div>
 
+    <div class="dropdown">
+        <button type="button" id="ticketsDropdownBtn" class="btn btn-primary btn-sm dropdown-toggle"
+                data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+            <i class="bi bi-plus-lg me-1"></i>Tickets
+        </button>
+        <ul class="dropdown-menu ticket-type-menu" aria-labelledby="ticketsDropdownBtn">
+            <li><h6 class="dropdown-header">Service Order (SO)</h6></li>
+            <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="new_installation" data-type-label="New Installation">New Installation</a></li>
+            <li><a class="dropdown-item ticket-type-option" href="#" data-category="SO" data-type-value="add_nap" data-type-label="Nap Installation">Nap Installation</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Ticket Number (TN)</h6></li>
+            <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Fiber Break" data-type-label="Fiber Break">Fiber Break</a></li>
+            <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Repair" data-type-label="Repair">Repair</a></li>
+        </ul>
+    </div>
+
     <div class="subs-pill-group" role="group" aria-label="Filter by status">
         {% for value, label in status_options %}
             <a
@@ -159,6 +175,9 @@
         </table>
     </div>
 </div>
+
+{# "+ Tickets" quick-create modal -- same partial GeoMap uses. #}
+{% include "partials/ticket_form_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}
@@ -209,5 +228,14 @@
         // server-side search (?q=...), which also covers issues
         // outside the currently loaded status/priority subset.
     })();
+
+    // tickets.js (below) dispatches this after a successful create --
+    // on GeoMap that just tells napmap.js to refresh its markers, but
+    // this page has no live marker layer to refresh, so just reload
+    // to show the new ticket/request in the table.
+    window.addEventListener('napiq:ticket-created', function () {
+        window.location.reload();
+    });
 </script>
+<script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
 {% endblock %}
