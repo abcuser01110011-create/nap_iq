@@ -81,6 +81,7 @@ from app.auth import role_required
 from app.models import Technician, Assignment
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify_issue_status_change
+from app.issue_utils import resolve_fiber_break_siblings
 
 # Mirrors app/routes/api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS exactly
 # -- same completion-photo requirement, just reachable from the desktop
@@ -354,6 +355,11 @@ def complete_assignment(assignment_id):
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
     assignment.technical_issue.status = "resolved"
+    # A Fiber Break's other connected subscribers never get their own
+    # Assignment (see resolve_fiber_break_siblings()'s docstring) --
+    # resolve them together with the one that was actually dispatched
+    # so their markers/tickets don't keep showing the outage as open.
+    resolve_fiber_break_siblings(assignment.technical_issue)
     profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
 
     still_has_open_work = (
