@@ -76,7 +76,7 @@ from decimal import Decimal
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician, ServiceRequest
+from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician, ServiceRequest, Plan
 from app.forms import IssueReportForm
 from app.notifications_utils import notify_issue_status_change, notify_new_issue_reported, notify_issue_updated
 
@@ -802,6 +802,7 @@ def view_issue(issue_id):
     assignment = None
     technicians = []
     assignment_history = []
+    subscriber_plan_types = []
 
     if g.user.role == "administrator":
         OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
@@ -826,12 +827,28 @@ def view_issue(issue_id):
             .all()
         )
 
+        # Backs the "Create Ticket" button's "+ Tickets" modal (see
+        # partials/ticket_form_modal.html) — same union of existing
+        # Subscriber.plan_type values + the curated Plan list used by
+        # naps.py's geomap() for the same dropdown, kept in sync by
+        # hand since the two pages don't share a view function.
+        existing_plan_types = {
+            row[0]
+            for row in db.session.query(Subscriber.plan_type)
+            .filter(Subscriber.plan_type.isnot(None), Subscriber.plan_type != "")
+            .distinct()
+            .all()
+        }
+        curated_plan_names = {p.name for p in Plan.query.all()}
+        subscriber_plan_types = sorted(existing_plan_types | curated_plan_names)
+
     return render_template(
         "issues/view.html",
         issue=issue,
         assignment=assignment,
         technicians=technicians,
         assignment_history=assignment_history,
+        subscriber_plan_types=subscriber_plan_types,
     )
 
 

@@ -679,10 +679,48 @@
         loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --", applyAssistedByExclusion);
     }
 
-    function openTicketForm(category, typeValue, typeLabel) {
+    // presetSubscriber (optional): {id, subscriber_code, full_name,
+    // address, latitude, longitude} -- lets a caller open the form
+    // with a subscriber already attached instead of making the admin
+    // search for one, e.g. issues/view.html's "Create Ticket" button,
+    // which already knows which subscriber this issue belongs to.
+    // Applied for TN types via the same selectSubscriber() the live
+    // search results use; for SO types (a free-text field, not a real
+    // match) it just pre-fills the Customer name as a starting point,
+    // except "Add NAP" where that field means something else
+    // entirely and is left alone.
+    function openTicketForm(category, typeValue, typeLabel, presetSubscriber) {
         resetForm();
         applyCategory(category, typeValue, typeLabel);
+        if (presetSubscriber) {
+            if (category === "TN" && !isFiberBreakForm()) {
+                selectSubscriber(presetSubscriber);
+            } else if (category === "SO" && !isAddNapForm()) {
+                document.getElementById("ticketFormCustomerName").value = presetSubscriber.full_name || "";
+            }
+        }
         modalInstance.show();
+    }
+
+    // Reads the optional data-preset-subscriber-* attributes off a
+    // clicked ticket-type-option element (see issues/view.html's
+    // "Create Ticket" dropdown) into the shape openTicketForm()
+    // expects. Returns null for the normal GeoMap dropdown items,
+    // which don't carry these attributes -- so this changes nothing
+    // about their existing behavior.
+    function readPresetSubscriber(item) {
+        const id = item.getAttribute("data-preset-subscriber-id");
+        if (!id) return null;
+        const lat = item.getAttribute("data-preset-subscriber-lat");
+        const lng = item.getAttribute("data-preset-subscriber-lng");
+        return {
+            id: Number(id),
+            subscriber_code: item.getAttribute("data-preset-subscriber-code") || "",
+            full_name: item.getAttribute("data-preset-subscriber-name") || "",
+            address: item.getAttribute("data-preset-subscriber-address") || "",
+            latitude: lat ? Number(lat) : null,
+            longitude: lng ? Number(lng) : null,
+        };
     }
 
     // ------------------------------------------------------------------
@@ -1027,7 +1065,7 @@
                 const category = item.getAttribute("data-category");
                 const typeValue = item.getAttribute("data-type-value");
                 const typeLabel = item.getAttribute("data-type-label");
-                openTicketForm(category, typeValue, typeLabel);
+                openTicketForm(category, typeValue, typeLabel, readPresetSubscriber(item));
             });
         });
 

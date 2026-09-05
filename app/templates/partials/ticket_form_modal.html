@@ -1,0 +1,196 @@
+{# "+ Tickets" / "Create Ticket" quick-create modal: one shared form,
+   reconfigured by app/static/js/tickets.js for either a Service Order
+   (SO) or a Trouble Ticket (TN) depending on which dropdown item was
+   clicked. Extracted out of naps/map.html so the same modal can also
+   be opened from issues/view.html's "Create Ticket" button (see that
+   template's admin-only block) without duplicating this markup.
+   Whichever page includes this partial must also load tickets.js and
+   provide a `subscriber_plan_types` context variable (used by the SO
+   "Plan" dropdown below) -- see naps.py's geomap() for the reference
+   implementation of that list. #}
+<div class="modal" id="ticketFormModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="ticketForm" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ticketFormTitle">Service Order</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="ticketFormGeneralError" class="alert alert-danger d-none py-2 small"></div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Ticket Code</label>
+                        <input type="text" class="form-control" id="ticketFormCode" readonly>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Type</label>
+                        <input type="text" class="form-control" id="ticketFormType" readonly>
+                        <input type="hidden" id="ticketFormTypeValue">
+                        <div class="invalid-feedback d-block small" data-error-for="request_type"></div>
+                    </div>
+
+                    {# SO: plain free-text customer name -- except "Add NAP",
+                       which repurposes this same input for the NAP's planned
+                       name (there's no customer involved). Relabeled/
+                       re-placeholder'd per type in tickets.js's applyCategory().
+                       Not matched or looked up against the subscribers table --
+                       this is meant for someone applying for service who isn't
+                       a subscriber yet, so it never fetches or auto-suggests
+                       anything. #}
+                    <div class="mb-2" id="ticketFormCustomerNameWrapper">
+                        <label class="form-label small text-muted mb-1" id="ticketFormCustomerNameLabel">Customer</label>
+                        <input type="text" class="form-control" id="ticketFormCustomerName"
+                               placeholder="Customer's full name" autocomplete="off">
+                        <div class="invalid-feedback d-block small" data-error-for="full_name"></div>
+                    </div>
+
+                    {# TN: real subscriber match required (the backend needs the
+                       pin to exactly match a registered subscriber's location),
+                       so this keeps the live auto-recommend search. Hidden for
+                       SO -- see ticketFormCustomerNameWrapper above. #}
+                    <div class="mb-2 position-relative d-none" id="ticketFormSubscriberWrapper">
+                        <label class="form-label small text-muted mb-1">Customer</label>
+                        <input type="text" class="form-control" id="ticketFormSubscriberInput"
+                               placeholder="Search by name or subscriber code…" autocomplete="off">
+                        <input type="hidden" id="ticketFormSubscriberId">
+                        <div id="ticketFormSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        <div id="ticketFormSubscriberHelp" class="form-text"></div>
+                        <div class="invalid-feedback d-block small" data-error-for="subscriber_id"></div>
+                    </div>
+
+                    {# Fiber Break only: a fiber break is a NAP-wide outage, not a
+                       single customer's complaint, so this replaces the Customer
+                       field entirely -- pick the affected NAP instead, with the
+                       same live auto-recommend search pattern the Customer field
+                       uses for Repair/other TN types. Hidden for every other
+                       type; see ticketFormSubscriberWrapper/ticketFormCustomerNameWrapper
+                       above for the other two. #}
+                    <div class="mb-2 position-relative d-none" id="ticketFormNapWrapper">
+                        <label class="form-label small text-muted mb-1">NAP</label>
+                        <input type="text" class="form-control" id="ticketFormNapInput"
+                               placeholder="Search by NAP code or name…" autocomplete="off">
+                        <input type="hidden" id="ticketFormNapId">
+                        <div id="ticketFormNapResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        <div id="ticketFormNapHelp" class="form-text"></div>
+                        <div class="invalid-feedback d-block small" data-error-for="nap_id"></div>
+                    </div>
+
+                    {# SO only: plan + contact number. Plan options come from
+                       the same subscriber_plan_types list the Plan
+                       Installation form step already suggests from (see
+                       app/routes/naps.py), so there's no separate list to
+                       keep in sync. #}
+                    <div class="row g-2" id="ticketFormSOExtraFields">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Plan</label>
+                            <select class="form-select" id="ticketFormPlan">
+                                <option value="">-- Select Plan --</option>
+                                {% for plan_type in subscriber_plan_types %}
+                                <option value="{{ plan_type }}">{{ plan_type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Contact Number</label>
+                            <input type="tel" class="form-control" id="ticketFormContactNumber"
+                                   placeholder="09XX XXX XXXX" autocomplete="off">
+                            <div class="invalid-feedback d-block small" data-error-for="contact_number"></div>
+                        </div>
+                    </div>
+
+                    {# "Add NAP" only: the NAP's own auto-increment code (a
+                       display preview -- see /api/naps/next-code -- never
+                       user-editable, never reserved) and the port capacity
+                       the field assistant should install. Hidden for every
+                       other type; see ticketFormSOExtraFields above. #}
+                    <div class="row g-2 d-none" id="ticketFormAddNapExtraFields">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">NAP Code</label>
+                            <input type="text" class="form-control" id="ticketFormNapCode" readonly>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Port Capacity</label>
+                            <input type="number" class="form-control" id="ticketFormPortCapacity"
+                                   min="1" step="1" placeholder="e.g. 8">
+                            <div class="invalid-feedback d-block small" data-error-for="port_capacity"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-2 position-relative" id="ticketFormBarangayWrapper">
+                        <label class="form-label small text-muted mb-1">Barangay</label>
+                        <input type="text" class="form-control" id="ticketFormBarangayInput"
+                               placeholder="Search barangay (Santa Cruz, Laguna)…" autocomplete="off">
+                        <div id="ticketFormBarangayResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        <div class="invalid-feedback d-block small" data-error-for="barangay"></div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Priority</label>
+                            <select class="form-select" id="ticketFormPriority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Urgent</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Status</label>
+                            <select class="form-select" id="ticketFormStatus">
+                                <option value="pending" selected>Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="completed">Completed</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2 mt-2">
+                        <label class="form-label small text-muted mb-1">Technician</label>
+                        <select class="form-select" id="ticketFormAssignedTeam">
+                            <option value="">-- None --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">Assisted By</label>
+                        <div class="d-flex gap-2">
+                            <select class="form-select" id="ticketFormTechnicianSelect">
+                                <option value="">-- Select Technician --</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="ticketFormAddTechnicianBtn">
+                                <i class="bi bi-plus-lg"></i> Add
+                            </button>
+                        </div>
+                        <div id="ticketFormTechnicianChips" class="d-flex flex-wrap gap-1 mt-2"></div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Created</label>
+                            <input type="text" class="form-control" id="ticketFormCreated" readonly>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted mb-1">Scheduled</label>
+                            <input type="date" class="form-control" id="ticketFormScheduled">
+                        </div>
+                    </div>
+
+                    <div class="mb-1 mt-2">
+                        <label class="form-label small text-muted mb-1">Description <span class="text-muted">(optional)</span></label>
+                        <textarea class="form-control" id="ticketFormDescription" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="ticketFormSubmitBtn">
+                        <i class="bi bi-check-lg me-1"></i>Create
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
