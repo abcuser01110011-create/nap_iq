@@ -1115,8 +1115,8 @@
                     '<span class="badge napmap-detail-line-code">' +
                     escapeHtml(line.subscriber_code) + "</span>" +
                     '<span class="napmap-detail-line-name">' + escapeHtml(line.full_name) + "</span>" +
-                    '<span class="badge ' + paymentStatusBadgeClass(line.payment_status) + '">' +
-                    escapeHtml(line.payment_status) + "</span>" +
+                    '<span class="badge ' + portNumberBadgeClass(line.port_number) + '">' +
+                    escapeHtml(portNumberLabel(line.port_number)) + "</span>" +
                     '<i class="bi bi-chevron-right napmap-detail-line-chevron"></i>';
                 // Was a plain link off to /subscribers/<id> — now stays
                 // on the GeoMap instead and reuses focusSubscriber()
@@ -1160,21 +1160,25 @@
     }
 
     /**
-     * Bootstrap badge class for a connected line's payment status,
-     * matching the same status->color language payments/list.html
-     * already uses (confirmed/"Paid" -> success, pending/"Pending" ->
-     * secondary, overdue/"Overdue" -> danger, voided/"Voided" ->
-     * dark), keyed here off the human-readable label
-     * naps_json()/_connected_lines() sends instead of the raw status.
+     * Display text for a connected line's port number badge: "Port N"
+     * for a subscriber /api/naps's connected_lines placed at a real
+     * slot (see api.py's _connected_lines(), which reuses
+     * naps.view_nap()'s own _nap_port_assignments() so the two never
+     * disagree), or "Not connected" for one it didn't place at all
+     * (disconnected, or otherwise not occupying a physical slot).
      */
-    function paymentStatusBadgeClass(paymentStatus) {
-        switch (paymentStatus) {
-            case "Paid": return "text-bg-success";
-            case "Pending": return "text-bg-secondary";
-            case "Overdue": return "text-bg-danger";
-            case "Voided": return "text-bg-dark";
-            default: return "text-bg-secondary"; // "No payment"
-        }
+    function portNumberLabel(portNumber) {
+        return portNumber != null ? "Port " + portNumber : "Not connected";
+    }
+
+    /**
+     * Bootstrap badge class for a connected line's port number badge:
+     * green once it has a real assigned port, neutral gray for "Not
+     * connected" (mirrors this row's previous payment-status badge,
+     * which defaulted to the same gray for its "No payment" case).
+     */
+    function portNumberBadgeClass(portNumber) {
+        return portNumber != null ? "text-bg-success" : "text-bg-secondary";
     }
 
     /**

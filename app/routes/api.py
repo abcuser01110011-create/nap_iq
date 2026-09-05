@@ -47,6 +47,7 @@ from app.auth import role_required
 from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
+from app.routes.naps import _nap_port_assignments
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -85,40 +86,33 @@ def naps_json():
     `connected_lines` array — one entry per subscriber attached to
     that NAP (`nap.subscribers`) — so the panel doesn't need a second
     request per marker. Each entry carries the subscriber's code and
-    name plus a `payment_status` derived from that subscriber's most
-    recent payment (`subscriber.payments[0]`, already ordered newest
-    first by `Payment.payment_date.desc()` on the relationship):
-    "confirmed" -> "Paid", "pending" -> "Pending", "overdue" ->
-    "Overdue", "voided" -> "Voided". A subscriber with no payment
-    history yet gets "No payment" rather than a guessed status.
+    name plus a `port_number` — the same technician-recorded (or, for
+    a subscriber added without one, next-free-slot) port
+    `naps.view_nap()`'s per-port table already shows, reused here via
+    that page's `_nap_port_assignments()` so the two never disagree.
+    `port_number` is `None` for a subscriber that mapping doesn't
+    place at all (disconnected, or otherwise no longer occupying a
+    physical slot) — the panel shows "Not connected" for those.
     """
     naps = Nap.query.order_by(Nap.name.asc()).all()
 
-    payment_status_labels = {
-        "confirmed": "Paid",
-        "pending": "Pending",
-        "overdue": "Overdue",
-        "voided": "Voided",
-    }
-
     def _connected_lines(nap):
+        port_by_subscriber_id = {
+            subscriber.id: port
+            for port, subscriber in _nap_port_assignments(nap).items()
+        }
         lines = []
         for subscriber in nap.subscribers:
-            latest_payment = subscriber.payments[0] if subscriber.payments else None
-            payment_status = (
-                payment_status_labels.get(latest_payment.status, latest_payment.status)
-                if latest_payment
-                else "No payment"
-            )
             lines.append(
                 {
                     "subscriber_id": subscriber.id,
                     "subscriber_code": subscriber.subscriber_code,
                     "full_name": subscriber.full_name,
-                    "payment_status": payment_status,
+                    "port_number": port_by_subscriber_id.get(subscriber.id),
                 }
             )
         return lines
+
 
     def _slot_usage(nap):
         """`nap.used_ports`/`available_ports` are stored counters that
