@@ -43,11 +43,11 @@
         </a>
     </div>
     <div class="col-6 col-lg">
-        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('dispatch.index') }}">
-            <span class="dash-stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></span>
+        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('issues.list_issues') }}">
+            <span class="dash-stat-icon stat-icon-red"><i class="bi bi-ticket-detailed-fill"></i></span>
             <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ open_technical_issues }}</span>
-                <span class="dash-stat-label">Open Technical Issues</span>
+                <span class="dash-stat-value">{{ open_tickets }}</span>
+                <span class="dash-stat-label">Open Tickets</span>
             </div>
         </a>
     </div>

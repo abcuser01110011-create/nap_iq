@@ -56,6 +56,15 @@ NAP_STATUS_COLORS = {
 # underneath the Technical Issue Status Summary panel.
 OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 
+# Service-order equivalent of OPEN_ISSUE_STATUSES above, used only by
+# the top-row "Open Tickets" stat card's combined count -- a
+# service_requests row is still open/outstanding through
+# pending -> approved -> scheduled, and only counts as done once it's
+# completed/rejected/closed. Kept in sync by hand with issues.py's own
+# _OPEN_SERVICE_REQUEST_STATUSES (same duplication tradeoff as this
+# module's other OPEN_*_STATUSES constants).
+OPEN_SERVICE_REQUEST_STATUSES = ("pending", "approved", "scheduled")
+
 # Fixed display order + labels/colors for the Technical Issue Status
 # Summary panel's status bars.
 ISSUE_STATUS_ORDER = ["pending", "assigned", "in_progress", "resolved", "closed"]
@@ -224,6 +233,18 @@ def index():
         issue_status_counts.get(status, 0) for status in OPEN_ISSUE_STATUSES
     )
 
+    # "Open Tickets" top-row stat card (issues/list.html's merged
+    # Tickets view, not just technical_issues): open technical issues
+    # above, plus any service_requests row still outstanding
+    # (pending/approved/scheduled) -- same combined definition
+    # issues.py's list_issues() uses for its own "total tickets opened"
+    # subtitle, so the two numbers never disagree.
+    open_service_requests_count = ServiceRequest.query.filter(
+        ServiceRequest.status.in_(OPEN_SERVICE_REQUEST_STATUSES)
+    ).count()
+    open_tickets = open_technical_issues + open_service_requests_count
+
+
     max_issue_status_count = max(issue_status_counts.values(), default=0)
     issue_status_bars = [
         {
@@ -342,6 +363,7 @@ def index():
         pending_service_requests=pending_service_requests,
         total_technical_issues=total_technical_issues,
         open_technical_issues=open_technical_issues,
+        open_tickets=open_tickets,
         issue_status_bars=issue_status_bars,
         open_issues_by_priority=open_issues_by_priority,
         recent_issues=recent_issues,
