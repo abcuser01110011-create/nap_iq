@@ -41,10 +41,24 @@
 
     <div class="dropdown">
         <button type="button" class="btn btn-primary rounded-pill px-3 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-plus-lg me-1"></i>Add Requests
+            <i class="bi bi-plus-lg me-1"></i>Requests
+            {% if pending_requests %}
+                <span class="badge rounded-pill text-bg-danger ms-1">{{ pending_requests|length }}</span>
+            {% endif %}
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-            <li><span class="dropdown-item disabled" aria-disabled="true">No request</span></li>
+            {% if pending_requests %}
+                {% for req in pending_requests %}
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('issues.view_issue', issue_id=req.id) }}">
+                            <span class="fw-semibold">{{ req.subscriber_name }}</span>
+                            <span class="text-muted small d-block">{{ req.issue_type }} &middot; {{ req.issue_code }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li><span class="dropdown-item disabled" aria-disabled="true">No request</span></li>
+            {% endif %}
         </ul>
     </div>
 

@@ -283,12 +283,42 @@ def list_issues():
 
     tickets.sort(key=lambda t: t["created_at"], reverse=True)
 
+    # "Add Requests" dropdown (issues/list.html): surfaces issues a
+    # subscriber reported themselves -- via the customer web portal
+    # (app/routes/customer.py's report_issue()) or the mobile app
+    # (api_v1/customer.py's report_issue()) -- and that are still
+    # sitting untouched in 'pending'. Self-reported issues always
+    # carry a photo (both of those routes require one); an issue
+    # created here from the GeoMap's "Report Issue" / "+ Tickets" flow
+    # never does -- see photo_filename's comment on the TechnicalIssue
+    # model -- so that's used as the signal rather than adding a new
+    # column just to tag the source. Once staff move a request past
+    # 'pending' (assigned/in_progress/etc.) it drops off this list on
+    # its own, since it's already been seen and is easy to find in the
+    # main ticket table below by then.
+    pending_requests = sorted(
+        (
+            {
+                "id": issue.id,
+                "issue_code": issue.issue_code,
+                "subscriber_name": issue.subscriber.full_name if issue.subscriber else "",
+                "issue_type": issue.issue_type,
+                "created_at": issue.created_at,
+            }
+            for issue in issues
+            if issue.status == "pending" and issue.photo_filename
+        ),
+        key=lambda r: r["created_at"],
+        reverse=True,
+    )
+
     return render_template(
         "issues/list.html",
         tickets=tickets,
         search_term=search_term,
         status_filter=status_filter,
         priority_filter=priority_filter,
+        pending_requests=pending_requests,
     )
 
 
