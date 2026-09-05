@@ -25,6 +25,20 @@
         >
     </form>
 
+    {# Placeholder dropdown for now -- not wired to real data yet, just
+       always shows "No request" until subscriber-side installation
+       requests are implemented. Same shape/markup as issues/list.html's
+       "Requests" dropdown so it's a drop-in swap once that data exists. #}
+    <div class="dropdown">
+        <button type="button" id="installationRequestsDropdownBtn" class="btn btn-primary btn-sm dropdown-toggle"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            Installation Request
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="installationRequestsDropdownBtn">
+            <li><span class="dropdown-item disabled" aria-disabled="true">No request</span></li>
+        </ul>
+    </div>
+
     <div class="subs-pill-group" role="group" aria-label="Filter by status">
         {% for value, label in status_options %}
             <a
