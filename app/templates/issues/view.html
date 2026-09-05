@@ -64,6 +64,9 @@
                         {% endif %}
                     </dd>
 
+                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+                    <dd class="col-sm-8">{{ issue.address or "—" }}</dd>
+
                     {# Read-only: this is just showing which NAP the
                        subscriber is on, not an action to take, so it's
                        plain text rather than a link off this page. #}
@@ -75,9 +78,6 @@
                             Not linked to a specific NAP
                         {% endif %}
                     </dd>
-
-                    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
-                    <dd class="col-sm-8">{{ issue.address or "—" }}</dd>
 
                     {# Recorded by the technician on-site when they save notes/
                        complete the assignment (app's SignaturePad/JobDetailScreen
@@ -92,6 +92,18 @@
                 </dl>
 
                 <hr class="my-4">
+
+                {# The photo a subscriber attaches when self-reporting (see
+                   customer.py's / api_v1/customer.py's report_issue()) --
+                   staff-created issues from the GeoMap have no photo step,
+                   so this section just doesn't render for those. #}
+                {% if issue.photo_filename %}
+                <h6 class="mb-2">Photo</h6>
+                <a href="{{ issue.photo_filename }}" target="_blank" rel="noopener">
+                    <img src="{{ issue.photo_filename }}" alt="Photo attached to this report"
+                         class="img-fluid rounded border mb-4" style="max-height: 320px;">
+                </a>
+                {% endif %}
 
                 <h6 class="mb-2">Description</h6>
                 <div class="p-3 border rounded bg-body-secondary">
