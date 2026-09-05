@@ -127,7 +127,7 @@
                     </div>
 
                     <div class="row g-2">
-                        <div class="col-6">
+                        <div class="col-6" id="ticketFormPriorityCol">
                             <label class="form-label small text-muted mb-1">Priority</label>
                             <select class="form-select" id="ticketFormPriority">
                                 <option value="low">Low</option>
@@ -135,8 +135,19 @@
                                 <option value="high">High</option>
                                 <option value="critical">Urgent</option>
                             </select>
+                            {# Fiber Break only: every connected line is always
+                               flagged critical (see report_fiber_break()'s
+                               docstring in app/routes/issues.py), so there's
+                               nothing to actually choose -- this replaces the
+                               dropdown above with a plain read-only display
+                               instead of a disabled-but-still-a-dropdown
+                               control. The real <select> above stays in the
+                               DOM (hidden, value locked to "critical" by
+                               tickets.js) since submitFiberBreak() still reads
+                               its .value. #}
+                            <div class="form-control d-none" id="ticketFormPriorityStatic" tabindex="-1" aria-readonly="true">Critical</div>
                         </div>
-                        <div class="col-6">
+                        <div class="col-6" id="ticketFormStatusCol">
                             <label class="form-label small text-muted mb-1">Status</label>
                             <select class="form-select" id="ticketFormStatus">
                                 <option value="pending" selected>Pending</option>

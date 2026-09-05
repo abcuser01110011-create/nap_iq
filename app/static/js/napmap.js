@@ -1276,7 +1276,7 @@
             if (!passesIssueFilters(issue, filters)) return;
 
             const marker = L.marker([issue.latitude, issue.longitude], {
-                icon: buildIssueIcon(issue.priority),
+                icon: buildIssueIcon(issue.priority, issue.issue_type),
                 title: (issue.issue_code || "Issue") + " - " + issue.issue_type,
             });
             marker.bindPopup(buildIssuePopupHtml(issue));
@@ -1320,25 +1320,43 @@
      * priority-pulse ring (see .priority-pulse-wrap in napmap.css) so
      * a reported issue reads as "live" on the map, pulsing faster the
      * more urgent its priority is.
+     *
+     * Fiber Break is the one exception: every connected subscriber it
+     * flags is always forced to "critical" (see report_fiber_break()'s
+     * docstring in app/routes/issues.py) for the same NAP-wide-outage
+     * reason, not because it happens to be the worst individual
+     * complaint on file -- so its marker gets its own square badge
+     * with a "CRITICAL" label instead of the round "URGENT" badge
+     * every other critical-priority issue type still uses.
      */
-    function buildIssueIcon(priority) {
+    function buildIssueIcon(priority, issueType) {
         const color = PRIORITY_COLORS[priority] || "#0d6efd";
         const pulseSeconds = PRIORITY_PULSE_SECONDS[priority] || 1.6;
         const scale = getIconScale();
         const s = Math.round(22 * scale);
-        const svg =
-            '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
-            '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
-            '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
-            'font-family="Arial, sans-serif">!</text>' +
-            "</svg>";
+        const isFiberBreak = issueType === "Fiber Break";
+        const svg = isFiberBreak
+            ? '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+              '<rect x="3" y="3" width="16" height="16" rx="3" fill="' + color + '"/>' +
+              '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+              'font-family="Arial, sans-serif">!</text>' +
+              "</svg>"
+            : '<svg width="' + s + '" height="' + s + '" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">' +
+              '<circle cx="11" cy="11" r="7" fill="' + color + '"/>' +
+              '<text x="11" y="14.5" font-size="10" font-weight="bold" text-anchor="middle" fill="#ffffff" ' +
+              'font-family="Arial, sans-serif">!</text>' +
+              "</svg>";
         // Small priority label ("CRITICAL", "HIGH", ...) shown above the
         // badge, colored to match its priority so the marker's urgency
         // reads at a glance without opening the popup. Font size is
         // deliberately fixed (not multiplied by the zoom-based icon
         // `scale`) so labels stay a constant, small on-screen size and
         // don't grow/overlap each other when zoomed in.
-        const labelText = priority ? (PRIORITY_LABELS[priority] || String(priority).toUpperCase()) : "";
+        const labelText = isFiberBreak
+            ? "CRITICAL"
+            : priority
+            ? (PRIORITY_LABELS[priority] || String(priority).toUpperCase())
+            : "";
         const label = labelText
             ? '<div class="issue-marker-label" style="color:' + color + ';">' + labelText + "</div>"
             : "";
@@ -1397,8 +1415,17 @@
     /** Same idea as formatStatusLabel(), but for priority values --
      * routes through PRIORITY_LABELS first so relabeled priorities
      * (e.g. "critical" -> "Urgent") show consistently anywhere a
-     * priority is displayed as text, not just on the map badge. */
-    function formatPriorityLabel(value) {
+     * priority is displayed as text, not just on the map badge.
+     *
+     * `issueType` is optional and only matters for Fiber Break: its
+     * forced-critical priority reads as "Critical" rather than the
+     * "Urgent" label every other critical-priority issue type keeps
+     * (see buildIssueIcon()'s docstring for why Fiber Break is the
+     * one exception). */
+    function formatPriorityLabel(value, issueType) {
+        if (issueType === "Fiber Break" && value === "critical") {
+            return "Critical";
+        }
         const mapped = PRIORITY_LABELS[value];
         if (mapped) {
             return mapped.charAt(0).toUpperCase() + mapped.slice(1).toLowerCase();
@@ -1496,7 +1523,7 @@
         setText("ticketDetailsCode", "TN " + String(issue.id).padStart(5, "0"));
         setText("ticketDetailsType", issue.issue_type);
         setText("ticketDetailsNap", issue.nap_code);
-        setText("ticketDetailsPriority", formatPriorityLabel(issue.priority));
+        setText("ticketDetailsPriority", formatPriorityLabel(issue.priority, issue.issue_type));
         setText("ticketDetailsStatus", formatStatusLabel(issue.status));
         setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam);
         setText("ticketDetailsTechnicians", parsed.extras.technicians);

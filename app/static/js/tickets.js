@@ -654,22 +654,35 @@
         }
 
         // Fiber Break always flags every connected line critical (see
-        // report_fiber_break()'s docstring) -- lock the Priority
-        // dropdown to Critical rather than leaving a selectable value
-        // the backend would silently override anyway. Every other
-        // type (including "Add NAP" now that ServiceRequest has its
-        // own priority column) leaves it selectable.
+        // report_fiber_break()'s docstring) -- for this type there's
+        // nothing to actually choose, so the selectable dropdown is
+        // swapped out entirely for a plain read-only "Critical"
+        // display (not just a disabled dropdown that still looks
+        // choosable). The underlying select stays in the DOM, hidden,
+        // with its value locked to "critical" -- submitFiberBreak()
+        // still reads it the same way. Every other type (including
+        // "Add NAP" now that ServiceRequest has its own priority
+        // column) keeps the normal selectable dropdown.
         const prioritySelect = document.getElementById("ticketFormPriority");
-        prioritySelect.disabled = isFiberBreak;
+        const priorityStatic = document.getElementById("ticketFormPriorityStatic");
+        prioritySelect.classList.toggle("d-none", isFiberBreak);
+        priorityStatic.classList.toggle("d-none", !isFiberBreak);
         if (isFiberBreak) prioritySelect.value = "critical";
 
         // Status only makes sense as a real choice for SO (a
         // service_request can start anywhere); a brand-new trouble
         // ticket always starts "pending" (app/forms.py's
-        // IssueReportForm docstring), so lock it for TN.
+        // IssueReportForm docstring). Fiber Break goes a step further
+        // than the ordinary TN lock below -- since it can only ever
+        // be "pending" on creation, the field is dropped from the
+        // form entirely rather than shown disabled. The Priority
+        // column widens to fill the row in its place.
         const statusSelect = document.getElementById("ticketFormStatus");
         statusSelect.disabled = category === "TN";
         if (category === "TN") statusSelect.value = "pending";
+        document.getElementById("ticketFormStatusCol").classList.toggle("d-none", isFiberBreak);
+        document.getElementById("ticketFormPriorityCol").classList.toggle("col-12", isFiberBreak);
+        document.getElementById("ticketFormPriorityCol").classList.toggle("col-6", !isFiberBreak);
 
         // Was "field_assistant" only, which left this list empty for
         // any admin who'd only added personnel_type='technician' rows
