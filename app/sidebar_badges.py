@@ -36,7 +36,6 @@ from app.models import (
     Notification,
     Payment,
     ServiceRequest,
-    Subscriber,
     Technician,
     TechnicalIssue,
 )
@@ -63,8 +62,11 @@ def _admin_badges():
       service requests (installs) with no open assignment. Same
       "what needs a technician right now" question dispatch/index.html
       answers, just as a single number instead of a full board.
-    - subscribers: subscriber records awaiting review before going
-      active ('pending_review') — the "a new customer applied" case.
+    - subscribers: pending installation requests awaiting a decision
+      ('pending' new_installation ServiceRequest rows) — the same
+      count the Subscribers page's own "Installation Request" dropdown
+      badge shows (see app/routes/subscribers.py's list_subscribers()),
+      so the sidebar number and the dropdown number never disagree.
     - service_requests: newly submitted requests awaiting a decision
       ('pending' — not yet approved/scheduled/rejected).
     - payments: payments recorded but not yet confirmed ('pending').
@@ -88,10 +90,14 @@ def _admin_badges():
     else:
         unassigned_requests = 0
 
+    pending_installation_requests = ServiceRequest.query.filter_by(
+        request_type="new_installation", status="pending"
+    ).count()
+
     return {
         "issues": issues_pending,
         "dispatch": issues_pending + unassigned_requests,
-        "subscribers": Subscriber.query.filter_by(status="pending_review").count(),
+        "subscribers": pending_installation_requests,
         "service_requests": ServiceRequest.query.filter_by(status="pending").count(),
         "payments": Payment.query.filter_by(status="pending").count(),
     }

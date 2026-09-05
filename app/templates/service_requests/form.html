@@ -87,9 +87,9 @@
 
 {% block content %}
 <div class="mb-3">
-    <a href="{{ url_for('service_requests.list_requests') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Service Requests
-    </a>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
+        <i class="bi bi-arrow-left"></i>
+    </button>
 </div>
 
 {% if mode == 'edit' %}
