@@ -25,17 +25,33 @@
         >
     </form>
 
-    {# Placeholder dropdown for now -- not wired to real data yet, just
-       always shows "No request" until subscriber-side installation
-       requests are implemented. Same shape/markup as issues/list.html's
-       "Requests" dropdown so it's a drop-in swap once that data exists. #}
+    {# "Installation Request" dropdown -- surfaces new_installation
+       requests still in 'pending' (an applicant who applied via the
+       web portal or mobile app and hasn't been reviewed yet). Same
+       shape/markup as issues/list.html's "Requests" dropdown. #}
     <div class="dropdown">
-        <button type="button" id="installationRequestsDropdownBtn" class="btn btn-primary btn-sm dropdown-toggle"
+        <button type="button" id="installationRequestsDropdownBtn" class="btn btn-primary btn-sm dropdown-toggle position-relative"
                 data-bs-toggle="dropdown" aria-expanded="false">
             Installation Request
+            {% if pending_installation_requests %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger"
+                      style="font-size: .55rem;">
+                    {{ pending_installation_requests|length }}
+                </span>
+            {% endif %}
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="installationRequestsDropdownBtn">
-            <li><span class="dropdown-item disabled" aria-disabled="true">No request</span></li>
+            {% if pending_installation_requests %}
+                {% for req in pending_installation_requests %}
+                    <li>
+                        <a class="dropdown-item" href="{{ url_for('service_requests.edit_request', request_id=req.id) }}">
+                            <span class="fw-semibold">{{ req.applicant_name or "Unnamed applicant" }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li><span class="dropdown-item disabled" aria-disabled="true">No request</span></li>
+            {% endif %}
         </ul>
     </div>
 

@@ -21,6 +21,7 @@ import ApplyForServiceScreen from "../screens/ApplyForServiceScreen";
 import HomeScreen from "../screens/customer/HomeScreen";
 import CustomerIssuesScreen from "../screens/customer/IssuesScreen";
 import ReportIssueScreen from "../screens/customer/ReportIssueScreen";
+import LinkAccountScreen from "../screens/customer/LinkAccountScreen";
 import ServiceRequestsScreen from "../screens/customer/ServiceRequestsScreen";
 import PaymentsScreen from "../screens/customer/PaymentsScreen";
 import CustomerProfileScreen from "../screens/customer/ProfileScreen";
@@ -77,6 +78,10 @@ export type CustomerStackParamList = {
   // longer needs username/password route params — the account
   // already exists and is signed in by the time this screen opens.
   ApplyForService: undefined;
+  // Reached from HomeScreen's "Link Existing Account" prompt (same
+  // "no subscriber yet" empty state as ApplyForService above) -- for
+  // a self-registered account that already has service from before.
+  LinkAccount: undefined;
 };
 
 export type CustomerTabParamList = {
@@ -185,6 +190,11 @@ function CustomerApp() {
         <CustomerStack.Screen
           name="ApplyForService"
           component={ApplyForServiceScreen}
+          options={{ presentation: "modal", headerShown: false }}
+        />
+        <CustomerStack.Screen
+          name="LinkAccount"
+          component={LinkAccountScreen}
           options={{ presentation: "modal", headerShown: false }}
         />
       </CustomerStack.Navigator>

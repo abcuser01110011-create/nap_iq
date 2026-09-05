@@ -3,6 +3,8 @@ import type {
   ApiErrorBody,
   ApplyInput,
   ApplyResponse,
+  LinkAccountInput,
+  LinkAccountResponse,
   Assignment,
   CoverageCheckResult,
   CustomerIssue,
@@ -414,6 +416,18 @@ export class ApiClient {
      * turns out to be outside coverage. */
     apply: (input: ApplyInput) =>
       this.request<ApplyResponse>("/api/v1/customer/apply", {
+        method: "POST",
+        body: input,
+      }),
+
+    /** Attaches the signed-in account to an existing subscriber record
+     * it already has -- the mobile equivalent of the web portal's
+     * "Link Existing Account" form. 409s if this login already has a
+     * subscriber on file, 400 with a generic error if the code/phone
+     * pair doesn't match anything (see app/routes/api_v1/customer.py's
+     * link_account()). */
+    linkAccount: (input: LinkAccountInput) =>
+      this.request<LinkAccountResponse>("/api/v1/customer/link-account", {
         method: "POST",
         body: input,
       }),

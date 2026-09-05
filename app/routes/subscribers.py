@@ -103,11 +103,37 @@ def list_subscribers():
 
     subscribers = query.order_by(Subscriber.full_name.asc()).all()
 
+    # "Installation Request" dropdown: surfaces new_installation
+    # requests still sitting in 'pending' -- i.e. an applicant who
+    # applied via the web portal (customer.apply) or the mobile app
+    # (api_v1/customer.apply) and hasn't been approved/rejected yet.
+    # Same "pending_requests" shape/pattern as issues/list.html's own
+    # "Requests" dropdown. For now this just surfaces the applicant's
+    # name (walk-in requests carry it on the request itself; a self-
+    # registered applicant's name lives on the Subscriber that apply()
+    # already created for them) so an admin can jump straight to
+    # reviewing the request.
+    pending_installation_requests = sorted(
+        (
+            {
+                "id": req.id,
+                "applicant_name": req.subscriber.full_name if req.subscriber else req.full_name,
+                "created_at": req.created_at,
+            }
+            for req in ServiceRequest.query.filter_by(
+                request_type="new_installation", status="pending"
+            ).all()
+        ),
+        key=lambda r: r["created_at"],
+        reverse=True,
+    )
+
     return render_template(
         "subscribers/list.html",
         subscribers=subscribers,
         search_term=search_term,
         status_filter=status_filter,
+        pending_installation_requests=pending_installation_requests,
     )
 
 

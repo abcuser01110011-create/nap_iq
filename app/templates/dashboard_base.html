@@ -208,30 +208,6 @@
                 </li>
                 {% elif current_user and current_user.role == 'user' %}
                 <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.report_issue' else '' }}"
-                       href="{{ url_for('customer.report_issue') }}">
-                        <i class="bi bi-exclamation-triangle"></i><span>Report an Issue</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.my_service_requests' else '' }}"
-                       href="{{ url_for('customer.my_service_requests') }}">
-                        <i class="bi bi-clipboard-check"></i><span>My Service Requests</span>
-                        {% if sidebar_badges.get('customer_service_requests') %}
-                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.customer_service_requests }}</span>
-                        {% endif %}
-                    </a>
-                </li>
-                <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.my_issues' else '' }}"
-                       href="{{ url_for('customer.my_issues') }}">
-                        <i class="bi bi-life-preserver"></i><span>My Issues</span>
-                        {% if sidebar_badges.get('customer_issues') %}
-                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.customer_issues }}</span>
-                        {% endif %}
-                    </a>
-                </li>
-                <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == 'customer.my_payments' else '' }}"
                        href="{{ url_for('customer.my_payments') }}">
                         <i class="bi bi-cash-coin"></i><span>Payments</span>
@@ -248,7 +224,7 @@
             <div class="dash-nav-divider"></div>
 
             <ul class="dash-nav-list">
-                {% if current_user %}
+                {% if current_user and current_user.role != 'user' %}
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('settings.') else '' }}"
                        href="{{ url_for('settings.index') }}">

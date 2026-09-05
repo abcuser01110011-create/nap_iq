@@ -258,6 +258,19 @@ export interface ApplyResponse {
   subscriber: Subscriber;
 }
 
+/** Body for ApiClient.customer.linkAccount() -- POST
+ * /api/v1/customer/link-account. Both fields must match an existing
+ * subscriber record's own subscriber_code / contact_number for the
+ * link to succeed -- see that endpoint's docstring. */
+export interface LinkAccountInput {
+  subscriber_code: string;
+  contact_number: string;
+}
+
+export interface LinkAccountResponse {
+  subscriber: Subscriber;
+}
+
 export interface SendVerificationCodeResponse {
   message: string;
 }

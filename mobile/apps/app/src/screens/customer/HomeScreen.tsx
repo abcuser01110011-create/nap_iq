@@ -89,16 +89,42 @@ function PendingApplicationCard({
 // has no subscriber yet — a perfectly normal state now that
 // registration no longer requires applying for service up front,
 // not a failure to recover from.
-function NoSubscriberCard({ onApply }: { onApply: () => void }) {
+//
+// Phase 31: brought to full parity with the web portal's own "not
+// subscribed yet" card (app/templates/customer/index.html) — same
+// wording (including the account holder's name), same primary "Apply
+// for Installation" action, and the same "Already a PG Networks
+// subscriber?" callout leading to Link Existing Account, so a
+// self-registered customer with no subscriber yet sees one consistent
+// empty state whether they're on the app or the website.
+function NoSubscriberCard({
+  fullName,
+  onApply,
+  onLinkAccount,
+}: {
+  fullName: string;
+  onApply: () => void;
+  onLinkAccount: () => void;
+}) {
   return (
     <View style={styles.card}>
       <Text style={styles.cardLabel}>Service</Text>
       <Text style={styles.cardValue}>You're not subscribed yet</Text>
       <Text style={styles.trackerMessage}>
-        Your account is all set. Apply for service whenever you're ready to get connected.
+        Your account is all set, {fullName} — apply for installation whenever you're ready to
+        get connected.
       </Text>
       <TouchableOpacity style={styles.applyButton} onPress={onApply}>
-        <Text style={styles.applyButtonText}>Apply for service</Text>
+        <Text style={styles.applyButtonText}>+ Apply for Installation</Text>
+      </TouchableOpacity>
+
+      <View style={styles.linkCallout}>
+        <Text style={styles.linkCalloutText}>
+          Already a PG Networks subscriber? Link your existing account.
+        </Text>
+      </View>
+      <TouchableOpacity style={styles.linkButton} onPress={onLinkAccount}>
+        <Text style={styles.linkButtonText}>Link Existing Account</Text>
       </TouchableOpacity>
     </View>
   );
@@ -191,7 +217,11 @@ export default function HomeScreen() {
       {error && <Text style={styles.error}>{error}</Text>}
 
       {noSubscriber ? (
-        <NoSubscriberCard onApply={() => navigation.navigate("ApplyForService")} />
+        <NoSubscriberCard
+          fullName={user?.full_name ?? "there"}
+          onApply={() => navigation.navigate("ApplyForService")}
+          onLinkAccount={() => navigation.navigate("LinkAccount")}
+        />
       ) : isPendingReview && subscriber ? (
         <PendingApplicationCard subscriber={subscriber} installRequest={installRequest} />
       ) : (
@@ -298,4 +328,21 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   applyButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
+  linkCallout: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    paddingLeft: 12,
+    paddingVertical: 4,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  linkCalloutText: { color: colors.text, fontSize: 14, fontWeight: "700", lineHeight: 20 },
+  linkButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  linkButtonText: { color: colors.primary, fontSize: 14, fontWeight: "600" },
 });

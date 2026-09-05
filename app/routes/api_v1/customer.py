@@ -16,6 +16,11 @@ Routes:
                                                  for an already-registered,
                                                  signed-in account with no
                                                  subscriber yet)
+    POST /api/v1/customer/link-account       -> link_account
+                                                (Phase 31: attach an
+                                                 already-registered login
+                                                 to an existing subscriber
+                                                 record it already has)
     GET  /api/v1/customer/issues             -> list_issues
     POST /api/v1/customer/issues             -> report_issue
     GET  /api/v1/customer/service-requests   -> list_service_requests
@@ -337,6 +342,62 @@ def apply():
         consume_verification(email, purpose=_APPLICATION_EMAIL_PURPOSE)
 
     return jsonify(subscriber=_serialize_subscriber(subscriber)), 201
+
+
+@api_v1_customer_bp.route("/link-account", methods=["POST"])
+@jwt_role_required("user")
+# Same rate-limit ceiling app/routes/customer.py's link_account() uses
+# for the HTML portal form (see that route's docstring for why: this
+# is a credential-guessing-shaped surface -- account code + phone --
+# not a read-only lookup).
+@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"])
+def link_account():
+    """The mobile equivalent of app/routes/customer.py's link_account()
+    -- lets a signed-in account with no subscriber yet attach itself to
+    an existing `subscribers` row, for a customer who already has
+    service from before creating this login.
+
+    Same rule that route's docstring explains: requires both the
+    subscriber code AND the phone number already on file to match, and
+    returns the same generic error whichever part was wrong (unknown
+    code, mismatched phone, or a code that's real but already linked
+    to a different login), so this can't be used to enumerate which
+    subscriber codes exist or are already taken.
+    """
+    if _own_subscriber_or_none() is not None:
+        return jsonify(error="Your login is already linked to a subscriber record."), 409
+
+    data = request.get_json(silent=True) or {}
+    code = str(data.get("subscriber_code") or "").strip().upper()
+    phone = str(data.get("contact_number") or "").strip()
+
+    if not code or not phone:
+        return jsonify(
+            errors={
+                **({"subscriber_code": "Subscriber account number is required."} if not code else {}),
+                **({"contact_number": "Phone number is required."} if not phone else {}),
+            }
+        ), 400
+
+    generic_error = (
+        "We couldn't find a subscriber record matching that account number "
+        "and phone number. Please double-check both, or contact PG Networks "
+        "support for help linking your account."
+    )
+
+    subscriber = Subscriber.query.filter_by(subscriber_code=code).first()
+
+    if (
+        subscriber is None
+        or (subscriber.contact_number or "").strip() != phone
+        or subscriber.user_id is not None
+    ):
+        return jsonify(error=generic_error), 400
+
+    subscriber.user_id = current_user.id
+    db.session.commit()
+
+    return jsonify(subscriber=_serialize_subscriber(subscriber)), 200
 
 
 @api_v1_customer_bp.route("/issues", methods=["GET"])
