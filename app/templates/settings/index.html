@@ -90,22 +90,40 @@
 
                 <form method="post" action="{{ url_for('settings.add_plan') }}" novalidate class="mb-3">
                     {{ plan_form.hidden_tag() }}
-                    <div class="input-group">
-                        {{ plan_form.name(class="form-control" ~ (" is-invalid" if plan_form.name.errors else ""), placeholder="e.g. Fiber 50Mbps") }}
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-plus-lg me-1"></i>Add Plan
-                        </button>
+                    <div class="row g-2">
+                        <div class="col-sm-7">
+                            {{ plan_form.name(class="form-control" ~ (" is-invalid" if plan_form.name.errors else ""), placeholder="e.g. Fiber 50Mbps") }}
+                            {% for error in plan_form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="input-group">
+                                <span class="input-group-text">₱</span>
+                                {{ plan_form.monthly_fee(class="form-control" ~ (" is-invalid" if plan_form.monthly_fee.errors else ""), placeholder="Monthly fee") }}
+                            </div>
+                            {% for error in plan_form.monthly_fee.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-sm-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus-lg me-1"></i>Add
+                            </button>
+                        </div>
                     </div>
-                    {% for error in plan_form.name.errors %}
-                        <div class="invalid-feedback d-block">{{ error }}</div>
-                    {% endfor %}
                 </form>
 
                 {% if plans %}
                 <ul class="list-group">
                     {% for plan in plans %}
                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ plan.name }}
+                        <span>
+                            {{ plan.name }}
+                            <span class="text-muted small ms-2">
+                                {{ '₱{:,.2f}'.format(plan.monthly_fee) if plan.monthly_fee is not none else 'No fee set' }}
+                            </span>
+                        </span>
                         <form method="post" action="{{ url_for('settings.delete_plan', plan_id=plan.id) }}"
                               onsubmit="return confirm('Remove the plan \'{{ plan.name }}\'? This won\'t change any subscriber who already has this plan.');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

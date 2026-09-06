@@ -104,6 +104,16 @@
         #}
         <nav class="dash-nav">
             <ul class="dash-nav-list">
+                {# Hidden for payment_collector: that role's "My Collections"
+                   item further down already points at role_home_endpoint
+                   (collector.index) -- unlike every other role, a collector
+                   has no separate landing page distinct from that one page,
+                   so rendering this generic item too gave them two nav links
+                   to the exact same URL, both showing 'active' at once
+                   (Dashboard AND My Collections highlighted together). Same
+                   "no redundant path to the same place" reasoning already
+                   applied to field_assistant/administrator/user below. #}
+                {% if not current_user or current_user.role != 'payment_collector' %}
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == role_home_endpoint else '' }}"
                        href="{{ url_for(role_home_endpoint) }}">
@@ -113,6 +123,7 @@
                         {% endif %}
                     </a>
                 </li>
+                {% endif %}
                 {% if current_user and current_user.role in ('administrator', 'field_assistant') %}
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == 'naps.geomap' else '' }}"

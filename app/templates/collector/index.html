@@ -117,30 +117,22 @@
                         {% endif %}
 
                         {# Auto-filled the moment a subscriber is picked above.
-                           Plan/Address/Due Date are informational only; the
-                           Reference Number row also carries the real (hidden)
-                           reference_number field that gets submitted with the
-                           payment -- it's just displayed here instead of as
-                           an editable input. #}
+                           Plan/Monthly Fee/Current Balance/Due Date are all
+                           informational only (Monthly Fee comes from the
+                           admin-priced Settings > Plans list; Current Balance
+                           is estimated from it -- see collector.py's
+                           _plan_monthly_fee()/_current_balance() -- both show
+                           "—" for a plan an administrator hasn't priced yet). #}
                         <dl class="row mb-0 mt-2 small d-none" id="collectorSubscriberInfo">
                             <dt class="col-4 col-sm-3">Plan</dt>
                             <dd class="col-8 col-sm-9" id="collectorSubInfoPlan">—</dd>
-                            <dt class="col-4 col-sm-3">Address</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoAddress">—</dd>
-                            <dt class="col-4 col-sm-3">Est. Due Date</dt>
+                            <dt class="col-4 col-sm-3">Monthly Fee</dt>
+                            <dd class="col-8 col-sm-9" id="collectorSubInfoFee">—</dd>
+                            <dt class="col-4 col-sm-3">Current Balance</dt>
+                            <dd class="col-8 col-sm-9" id="collectorSubInfoBalance">—</dd>
+                            <dt class="col-4 col-sm-3">Due Date</dt>
                             <dd class="col-8 col-sm-9" id="collectorSubInfoDueDate">—</dd>
-                            <dt class="col-4 col-sm-3">Reference No.</dt>
-                            <dd class="col-8 col-sm-9 d-flex align-items-center gap-2">
-                                <span id="collectorSubInfoReference">—</span>
-                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" id="collectorRefRegenerateBtn" title="Generate a new reference number">
-                                    <i class="bi bi-arrow-clockwise"></i>
-                                </button>
-                            </dd>
                         </dl>
-                        {{ form.reference_number(class="d-none", id="collectorReferenceNumberInput") }}
-                        {% for error in form.reference_number.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
                     </div>
 
                     <div class="row g-2">
@@ -182,6 +174,34 @@
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                         </div>
+                    </div>
+
+                    {# Reference Number -- auto-generated the moment a
+                       subscriber is picked above (see collector-payment.js),
+                       shown as plain read-only text with a refresh button
+                       next to it to generate a new one on demand. The real
+                       value submitted with the payment still travels in this
+                       hidden field -- only how it's presented changed. #}
+                    <div class="mb-3">
+                        <label class="form-label">Reference No.</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="form-control-plaintext py-1 fw-semibold" id="collectorSubInfoReference">—</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" id="collectorRefRegenerateBtn" title="Generate a new reference number">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                        {{ form.reference_number(class="d-none", id="collectorReferenceNumberInput") }}
+                        {% for error in form.reference_number.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.remarks.label }} <span class="text-muted small">(optional)</span></label>
+                        {{ form.remarks(class="form-control" ~ (" is-invalid" if form.remarks.errors else ""), rows=2, placeholder="Any notes about this payment...") }}
+                        {% for error in form.remarks.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
                     </div>
 
                     <button type="submit" class="btn btn-primary w-100">

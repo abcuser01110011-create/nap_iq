@@ -100,7 +100,7 @@ def add_plan():
     plan_form = PlanForm()
 
     if plan_form.validate_on_submit():
-        plan = Plan(name=plan_form.name.data.strip())
+        plan = Plan(name=plan_form.name.data.strip(), monthly_fee=plan_form.monthly_fee.data)
         db.session.add(plan)
         db.session.commit()
         flash(f'Plan "{plan.name}" added.', "success")

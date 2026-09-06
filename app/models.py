@@ -459,6 +459,7 @@ class Payment(db.Model):
     )
     payment_date = db.Column(db.Date, nullable=False)
     reference_number = db.Column(db.String(50), nullable=True)
+    remarks = db.Column(db.String(500), nullable=True)
     status = db.Column(
         db.Enum("pending", "confirmed", "overdue", "voided", name="payment_status"),
         nullable=False,
@@ -706,6 +707,11 @@ class Plan(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False, unique=True)
+    # Nullable: a plan added before this column existed (or one an
+    # administrator just hasn't priced yet) simply has no fee on file —
+    # callers (see collector.py's _plan_monthly_fee()) treat that as
+    # "unknown", never as free/zero.
+    monthly_fee = db.Column(db.Numeric(10, 2), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     def __repr__(self):

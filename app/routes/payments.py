@@ -133,6 +133,7 @@ def add_payment():
             payment_method=form.payment_method.data,
             payment_date=datetime.strptime(form.payment_date.data.strip(), "%Y-%m-%d").date(),
             reference_number=(form.reference_number.data or "").strip() or None,
+            remarks=(form.remarks.data or "").strip() or None,
             status=form.status.data,
         )
         db.session.add(payment)
@@ -179,6 +180,7 @@ def edit_payment(payment_id):
         payment.payment_method = form.payment_method.data
         payment.payment_date = datetime.strptime(form.payment_date.data.strip(), "%Y-%m-%d").date()
         payment.reference_number = (form.reference_number.data or "").strip() or None
+        payment.remarks = (form.remarks.data or "").strip() or None
         payment.status = form.status.data
 
         if became_overdue:

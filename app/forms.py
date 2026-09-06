@@ -628,6 +628,10 @@ class RecordPaymentForm(FlaskForm):
         default="confirmed",
         validators=[DataRequired()],
     )
+    remarks = TextAreaField(
+        "Remarks",
+        validators=[Optional(), Length(max=500, message="Remarks must be at most 500 characters.")],
+    )
 
     def validate_payment_date(self, field):
         """Kept as a plain StringField (rather than WTForms' DateField,
@@ -1281,6 +1285,14 @@ class PlanForm(FlaskForm):
         validators=[
             DataRequired(message="Plan name is required."),
             Length(max=50, message="Plan name must be at most 50 characters."),
+        ],
+    )
+    monthly_fee = DecimalField(
+        "Monthly Fee",
+        places=2,
+        validators=[
+            Optional(),
+            NumberRange(min=0, message="Monthly fee can't be negative."),
         ],
     )
 

@@ -12,16 +12,17 @@
  *     app/routes/collector.py's subscribers_json()/
  *     _populate_subscriber_choices()). Picking a result sets that
  *     hidden <select> so form submission/validation are unchanged,
- *     and fills in the read-only Plan / Address / Est. Due Date /
- *     Reference No. panel underneath.
+ *     and fills in the read-only Plan / Monthly Fee / Current Balance /
+ *     Due Date panel underneath (Monthly Fee/Current Balance come from
+ *     app/routes/collector.py's _plan_monthly_fee()/_current_balance()).
  *
  *  2. Reference number -- auto-generated (RCPT-<code>-<timestamp>)
  *     the moment a subscriber is picked, shown as plain read-only
- *     text in that same panel (not an editable input) with a refresh
- *     button next to it to generate a new one on demand. The actual
- *     value submitted with the payment still travels in a hidden
- *     #collectorReferenceNumberInput -- only how it's presented
- *     changed, not what gets saved.
+ *     text further down the form (not an editable input) with a
+ *     refresh button next to it to generate a new one on demand. The
+ *     actual value submitted with the payment still travels in a
+ *     hidden #collectorReferenceNumberInput -- only how it's
+ *     presented changed, not what gets saved.
  *
  *  3. Status -- no longer a manual dropdown. Automatically computed
  *     by comparing the entered Payment Date against the selected
@@ -46,7 +47,8 @@
     var helpText = document.getElementById("collectorSubscriberHelp");
     var infoBox = document.getElementById("collectorSubscriberInfo");
     var infoPlan = document.getElementById("collectorSubInfoPlan");
-    var infoAddress = document.getElementById("collectorSubInfoAddress");
+    var infoFee = document.getElementById("collectorSubInfoFee");
+    var infoBalance = document.getElementById("collectorSubInfoBalance");
     var infoDueDate = document.getElementById("collectorSubInfoDueDate");
     var infoReference = document.getElementById("collectorSubInfoReference");
     var refHiddenInput = document.getElementById("collectorReferenceNumberInput");
@@ -93,6 +95,18 @@
         var d = new Date(iso + "T00:00:00");
         if (isNaN(d.getTime())) return "—";
         return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    }
+
+    // Monthly Fee / Current Balance come from the server as plain
+    // decimal strings (or null when the subscriber's plan hasn't been
+    // priced yet in Settings > Plans -- see collector.py's
+    // _plan_monthly_fee()) -- "—" covers that case rather than showing
+    // ₱0.00, which would misleadingly read as "nothing owed".
+    function formatCurrency(value) {
+        if (value === null || value === undefined || value === "") return "—";
+        var num = parseFloat(value);
+        if (isNaN(num)) return "—";
+        return "₱" + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function renderResults(matches) {
@@ -208,7 +222,8 @@
         if (infoBox) {
             infoBox.classList.remove("d-none");
             infoPlan.textContent = sub.plan_type || "—";
-            infoAddress.textContent = sub.address || "—";
+            infoFee.textContent = formatCurrency(sub.monthly_fee);
+            infoBalance.textContent = formatCurrency(sub.current_balance);
             infoDueDate.textContent = formatDueDate(sub.due_date);
         }
 

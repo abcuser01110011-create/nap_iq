@@ -24,13 +24,14 @@ Routes:
 """
 
 from datetime import datetime, date, timedelta
+from decimal import Decimal
 
 from flask import Blueprint, render_template, redirect, url_for, flash, g, jsonify
 from sqlalchemy import func, extract
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Payment, Subscriber
+from app.models import Payment, Plan, Subscriber
 from app.forms import RecordPaymentForm
 from app.notifications_utils import notify_payment_overdue, notify_payment_pending_confirmation
 
@@ -58,6 +59,43 @@ def _estimate_next_due_date(subscriber):
     if anchor is None:
         return None
     return anchor + timedelta(days=30)
+
+
+def _plan_monthly_fee(plan_type):
+    """Looks up the admin-priced Monthly Fee for a subscriber's
+    `plan_type` (see the `Plan` model's `monthly_fee` column, set from
+    Settings > Plans). `Subscriber.plan_type` is free text, not a
+    foreign key to `plans` (same reasoning as `Plan`'s own docstring),
+    so this is a case-insensitive name match rather than a join.
+    Returns None -- never 0 -- when the subscriber has no plan_type,
+    or when it doesn't match a plan an administrator has priced yet
+    (e.g. a legacy free-text value), so the Record a Payment form can
+    show "—" instead of a made-up fee.
+    """
+    if not plan_type:
+        return None
+    plan = Plan.query.filter(func.lower(Plan.name) == plan_type.strip().lower()).first()
+    return plan.monthly_fee if plan and plan.monthly_fee is not None else None
+
+
+def _current_balance(subscriber, monthly_fee):
+    """Rough "amount currently owed" for the Record a Payment form's
+    auto-fill panel only -- purely informational, same "never stored"
+    scope as `_estimate_next_due_date()` above. The schema has no
+    dedicated dues/invoice ledger, so a subscriber is treated as owing
+    one full billing cycle's fee once that cycle's estimated due date
+    has arrived (today or earlier), and owing nothing while still
+    inside a cycle they've already paid for. Returns None when there's
+    no priced plan to base this on at all.
+    """
+    if monthly_fee is None:
+        return None
+    due_date = _estimate_next_due_date(subscriber)
+    if due_date is None:
+        # No payment/install history to anchor a cycle to yet --
+        # treat as a fresh, currently-unpaid cycle.
+        return monthly_fee
+    return monthly_fee if due_date <= date.today() else Decimal("0.00")
 
 
 def _coverage_barangays():
@@ -193,6 +231,7 @@ def record_payment():
             payment_method=form.payment_method.data,
             payment_date=datetime.strptime(form.payment_date.data.strip(), "%Y-%m-%d").date(),
             reference_number=(form.reference_number.data or "").strip() or None,
+            remarks=(form.remarks.data or "").strip() or None,
             status=form.status.data,
         )
         db.session.add(payment)
@@ -237,6 +276,8 @@ def subscribers_json():
     data = []
     for s in subscribers:
         due_date = _estimate_next_due_date(s)
+        monthly_fee = _plan_monthly_fee(s.plan_type)
+        current_balance = _current_balance(s, monthly_fee)
         data.append(
             {
                 "id": s.id,
@@ -245,6 +286,8 @@ def subscribers_json():
                 "address": s.address,
                 "plan_type": s.plan_type,
                 "due_date": due_date.isoformat() if due_date else None,
+                "monthly_fee": str(monthly_fee) if monthly_fee is not None else None,
+                "current_balance": str(current_balance) if current_balance is not None else None,
             }
         )
     return jsonify(data)
