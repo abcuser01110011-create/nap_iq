@@ -89,7 +89,9 @@ from app.notifications_utils import notify_issue_status_change
 from app.issue_utils import resolve_fiber_break_siblings
 from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage
-from app.routes.api_v1.technician import _assignment_nap, _nap_occupied_ports, _validate_port_number
+from app.routes.api_v1.technician import (
+    _assignment_nap, _nap_occupied_ports, _validate_port_number, _subscriber_installed_port_number,
+)
 
 # Mirrors app/routes/api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS exactly
 # -- same completion-photo requirement, just reachable from the desktop
@@ -740,6 +742,20 @@ def _serialize_job(assignment):
     # to build its 1..total_ports dropdown from, same fields the mobile
     # app's assignment.nap already carries.
     nap = _assignment_nap(assignment)
+
+    # A Repair ticket's `issue.nap` is only ever set if the person who
+    # reported it happened to pick one on the report form -- it's an
+    # optional field (app/routes/issues.py's IssueReportForm, "None" is
+    # a valid choice), so it's often blank even though the subscriber
+    # is obviously connected to a real NAP. Fall back to that actual
+    # connection (`subscriber.nap`) so "NAP connected" reliably shows
+    # on a Repair ticket's Job Detail page instead of only when the
+    # original report happened to name one. Left untouched for an
+    # installation, where `request.requested_nap` is already the
+    # correct, deliberate answer.
+    if nap is None and not is_installation and subscriber is not None:
+        nap = subscriber.nap
+
     nap_info = (
         {
             "id": nap.id,
@@ -751,6 +767,22 @@ def _serialize_job(assignment):
         if nap
         else None
     )
+
+    # Same reasoning for the port number: `assignment.port_number` is
+    # only ever set once a technician explicitly (re-)records one for
+    # THIS ticket, so a freshly-opened Repair ticket normally has none
+    # yet even though the subscriber has been connected to a specific
+    # port since their installation. Fall back to that on-file port --
+    # the exact same _subscriber_installed_port_number() lookup the
+    # native mobile app's API already exposes as
+    # subscriber.installed_port_number -- so the desktop and
+    # mobile-web Job Detail pages show the same "port they're
+    # servicing" a technician sees there. Left untouched for an
+    # installation, where a still-blank port genuinely means "not
+    # chosen yet".
+    displayed_port_number = assignment.port_number
+    if displayed_port_number is None and not is_installation and subscriber is not None:
+        displayed_port_number = _subscriber_installed_port_number(subscriber)
 
     return {
         "assignment": assignment,
@@ -767,7 +799,7 @@ def _serialize_job(assignment):
         ),
         "plan_label": request.plan_label if request else None,
         "contact_number": subscriber.contact_number if subscriber else (request.contact_number if request else None),
-        "port_number": assignment.port_number,
+        "port_number": displayed_port_number,
         "description": issue.description if issue else (request.notes if request else None),
         "nap": nap_info,
         "nap_label": f"{nap.nap_code} — {nap.name}" if nap else None,
