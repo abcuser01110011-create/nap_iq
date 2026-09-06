@@ -16,13 +16,16 @@ it's scoped to exactly what a field collector needs: record what you
 collected today, see your own recent history.
 
 Routes:
-    GET  /collector/          -> index        (own recent payments + record form)
-    POST /collector/record    -> record_payment
+    GET  /collector/                -> index        (own recent payments + record form)
+    POST /collector/record          -> record_payment
+    GET  /collector/subscribers.json -> subscribers_json (search feed for the
+                                         Record a Payment form's searchable
+                                         Subscriber field)
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, flash, g
+from flask import Blueprint, render_template, redirect, url_for, flash, g, jsonify
 from sqlalchemy import func, extract
 
 from app.extensions import db
@@ -32,6 +35,29 @@ from app.forms import RecordPaymentForm
 from app.notifications_utils import notify_payment_overdue, notify_payment_pending_confirmation
 
 collector_bp = Blueprint("collector", __name__, url_prefix="/collector")
+
+
+def _estimate_next_due_date(subscriber):
+    """Rough "next due" estimate for the Record a Payment form's
+    auto-fill panel only -- purely informational, never stored
+    anywhere. The schema has no dedicated due-date column at all
+    (see notifications_utils.py's notify_payment_overdue() docstring:
+    a payment's `status` becoming 'overdue' is the only due/overdue
+    signal that exists), so this estimates a 30-day billing cycle from
+    the subscriber's most recent *confirmed* payment, falling back to
+    their install date if they have no confirmed payment yet. Returns
+    None if neither is on file, so the form can show "—" instead of a
+    made-up date.
+    """
+    last_confirmed = (
+        Payment.query.filter_by(subscriber_id=subscriber.id, status="confirmed")
+        .order_by(Payment.payment_date.desc())
+        .first()
+    )
+    anchor = last_confirmed.payment_date if last_confirmed else subscriber.installed_at
+    if anchor is None:
+        return None
+    return anchor + timedelta(days=30)
 
 
 def _coverage_barangays():
@@ -186,3 +212,39 @@ def record_payment():
         for message in field_errors:
             flash(message, "danger")
     return redirect(url_for("collector.index"))
+
+
+@collector_bp.route("/subscribers.json")
+@role_required("payment_collector")
+def subscribers_json():
+    """Coverage-scoped active-subscriber feed for the Record a Payment
+    form's searchable Subscriber field (collector/index.html +
+    static/js/collector-payment.js).
+
+    Reuses the exact same `_coverage_barangays()` / `_coverage_subscribers_query()`
+    helpers `_populate_subscriber_choices()`
+    already uses to build the (now-hidden) `subscriber_id` SelectField's
+    server-side choices, so a subscriber picked from this search box is
+    always one of that field's valid, already-validated choices.
+
+    Each entry also carries the fields the search box auto-fills once
+    picked: `plan_type`, `address`, and an estimated `due_date` (see
+    `_estimate_next_due_date()` above) -- informational only, not part
+    of the submitted payment.
+    """
+    barangays = _coverage_barangays()
+    subscribers = _coverage_subscribers_query(barangays).order_by(Subscriber.full_name).all()
+    data = []
+    for s in subscribers:
+        due_date = _estimate_next_due_date(s)
+        data.append(
+            {
+                "id": s.id,
+                "subscriber_code": s.subscriber_code,
+                "full_name": s.full_name,
+                "address": s.address,
+                "plan_type": s.plan_type,
+                "due_date": due_date.isoformat() if due_date else None,
+            }
+        )
+    return jsonify(data)

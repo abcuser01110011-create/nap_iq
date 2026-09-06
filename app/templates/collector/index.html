@@ -11,6 +11,7 @@
 {% endblock %}
 
 {% block extra_head %}
+<link href="{{ url_for('static', filename='css/ticket_form.css') }}" rel="stylesheet">
 <style>
     /* Amount input's peso-sign prefix -- matches the look of a proper
        currency field rather than a bare number box. */
@@ -25,6 +26,13 @@
     }
     .collector-roster-search .input-group-text {
         background: var(--napiq-surface);
+    }
+    /* Auto-fill panel shown under the Subscriber search box once a
+       match is picked (Plan / Address / Est. Due Date) -- read-only,
+       informational, not part of the submitted payment. */
+    #collectorSubscriberInfo dt {
+        font-weight: 400;
+        color: var(--napiq-text-muted);
     }
 </style>
 {% endblock %}
@@ -86,9 +94,19 @@
                 <form method="post" action="{{ url_for('collector.record_payment') }}" novalidate>
                     {{ form.hidden_tag() }}
 
-                    <div class="mb-3">
+                    <div class="mb-3 position-relative" id="collectorSubscriberWrapper">
                         <label class="form-label">{{ form.subscriber_id.label }}</label>
-                        {{ form.subscriber_id(class="form-select" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
+                        <div class="subs-search-form">
+                            <i class="bi bi-search"></i>
+                            <input
+                                type="text" id="collectorSubscriberInput"
+                                placeholder="Search by name, code, or address..."
+                                autocomplete="off"
+                            >
+                        </div>
+                        <div id="collectorSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
+                        {{ form.subscriber_id(class="d-none" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
+                        <div id="collectorSubscriberHelp" class="form-text"></div>
                         {% for error in form.subscriber_id.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
@@ -97,6 +115,17 @@
                         {% else %}
                             <div class="form-text text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> No coverage area set — showing all active subscribers.</div>
                         {% endif %}
+
+                        {# Auto-filled the moment a subscriber is picked above --
+                           informational only, never submitted with the payment. #}
+                        <dl class="row mb-0 mt-2 small d-none" id="collectorSubscriberInfo">
+                            <dt class="col-4 col-sm-3">Plan</dt>
+                            <dd class="col-8 col-sm-9" id="collectorSubInfoPlan">—</dd>
+                            <dt class="col-4 col-sm-3">Address</dt>
+                            <dd class="col-8 col-sm-9" id="collectorSubInfoAddress">—</dd>
+                            <dt class="col-4 col-sm-3">Est. Due Date</dt>
+                            <dd class="col-8 col-sm-9" id="collectorSubInfoDueDate">—</dd>
+                        </dl>
                     </div>
 
                     <div class="row g-2">
@@ -137,10 +166,13 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">{{ form.reference_number.label }} <span class="text-muted small">(optional)</span></label>
+                        <label class="form-label">{{ form.reference_number.label }} <span class="text-muted small">(auto-generated — you can edit it)</span></label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-receipt"></i></span>
-                            {{ form.reference_number(class="form-control" ~ (" is-invalid" if form.reference_number.errors else ""), placeholder="e.g. RCPT-0001") }}
+                            {{ form.reference_number(class="form-control" ~ (" is-invalid" if form.reference_number.errors else ""), id="collectorReferenceNumberInput", placeholder="e.g. RCPT-0001") }}
+                            <button type="button" class="btn btn-outline-secondary" id="collectorRefRegenerateBtn" title="Generate a new reference number">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
                         </div>
                         {% for error in form.reference_number.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
@@ -273,6 +305,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/collector-payment.js') }}"></script>
 <script>
     // Lightweight client-side filter for the coverage roster table --
     // no round trip needed since the whole list is already scoped
