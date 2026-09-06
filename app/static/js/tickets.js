@@ -216,11 +216,11 @@
                 (list || []).forEach((p) => {
                     if (p.recommended) recommendedId = p.id;
                     const workload = " — " + p.open_count + " open, " + p.completed_count + " done";
-                    const recTag = p.recommended ? " ★ Recommended" : "";
+                    const recPrefix = p.recommended ? "★ Recommended — " : "";
                     options.push(
                         '<option value="' + p.id + '" data-name="' + escapeHtml(p.full_name) + '">' +
-                            escapeHtml(p.full_name) + " (" + escapeHtml(p.status) + ")" +
-                            workload + recTag + "</option>"
+                            recPrefix + escapeHtml(p.full_name) + " (" + escapeHtml(p.status) + ")" +
+                            workload + "</option>"
                     );
                 });
                 selectEl.innerHTML = options.join("");
