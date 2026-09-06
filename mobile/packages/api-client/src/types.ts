@@ -285,3 +285,13 @@ export interface CoverageCheckResult {
   nearest_nap_code?: string;
   distance_km?: number;
 }
+
+/** One entry from ApiClient.public.listPlans() -- GET
+ * /api/v1/customer/plans. `monthly_fee` is a decimal string (e.g.
+ * "999.00"), or `null` if an admin added the plan but hasn't priced
+ * it yet (see Plan.monthly_fee's nullable-means-unknown docstring on
+ * the backend) -- never treat `null` here as free/zero. */
+export interface PlanOption {
+  name: string;
+  monthly_fee: string | null;
+}

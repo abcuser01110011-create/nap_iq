@@ -97,9 +97,24 @@ def coverage_check():
 def list_plans():
     """Public plan list for the Register flow's plan-selection step.
     Same source table (Settings > App Settings > Plans) the admin
-    dropdowns already read from — see Plan's docstring in app/models.py."""
+    dropdowns already read from — see Plan's docstring in app/models.py.
+
+    Each entry includes `monthly_fee` (a string, e.g. "999.00", or
+    `None` if the admin hasn't priced that plan yet — see Plan.
+    monthly_fee's own nullable-means-unknown docstring) alongside the
+    plan `name`, so ApplyForServiceScreen can show a price next to
+    each option instead of just its name.
+    """
     plans = Plan.query.order_by(Plan.name).all()
-    return jsonify(plans=[p.name for p in plans]), 200
+    return jsonify(
+        plans=[
+            {
+                "name": p.name,
+                "monthly_fee": str(p.monthly_fee) if p.monthly_fee is not None else None,
+            }
+            for p in plans
+        ]
+    ), 200
 
 
 def _validate_application(data: dict) -> dict:

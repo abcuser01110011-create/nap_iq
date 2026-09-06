@@ -87,14 +87,30 @@ customer_bp = Blueprint("customer", __name__, url_prefix="/portal")
 ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "heic", "webp"}
 
 
+def _plan_choice_label(plan):
+    """"Fiber 100Mbps — ₱999.00/mo" for a priced plan, or just the
+    plain name if an admin added the plan but hasn't set a fee yet
+    (see Plan.monthly_fee's nullable-means-unknown docstring) — never
+    shown as ₱0.00, which would misleadingly read as free."""
+    if plan.monthly_fee is None:
+        return plan.name
+    return f"{plan.name} — ₱{plan.monthly_fee:,.2f}/mo"
+
+
 def _populate_plan_choices(form):
     """Fills in the Apply-for-Installation form's "Plan" dropdown from
     the current `plans` table (Settings > App Settings > Plans), same
     dynamic-choices pattern as routes/subscribers.py's own
     _populate_plan_choices() — duplicated here rather than imported
-    since the two forms/routes don't otherwise share code."""
+    since the two forms/routes don't otherwise share code.
+
+    Choice *values* stay the plain plan name (that's what's stored on
+    Subscriber.plan_type and shown everywhere else) — only the
+    displayed label grows a price, via _plan_choice_label() above."""
     plans = Plan.query.order_by(Plan.name).all()
-    form.plan_name.choices = [("", "-- No preference --")] + [(p.name, p.name) for p in plans]
+    form.plan_name.choices = [("", "-- No preference --")] + [
+        (p.name, _plan_choice_label(p)) for p in plans
+    ]
 
 
 def _own_subscriber_or_none():

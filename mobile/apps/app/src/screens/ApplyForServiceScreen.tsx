@@ -14,6 +14,7 @@ import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ApiError } from "@nap-iq/api-client";
+import type { PlanOption } from "@nap-iq/api-client";
 import { useAuth } from "../auth/AuthContext";
 import { colors } from "../theme/shared";
 import FloatingLabelInput from "../components/FloatingLabelInput";
@@ -49,6 +50,18 @@ const LOCATION_FIX_TIMEOUT_MS = 20000;
 // applicant from pinning a random location: it's not that the app
 // asks nicely, it's that there is no code path left that accepts a
 // hand-placed coordinate.
+// Same "₱X.XX, or a dash if unpriced" convention HomeScreen/
+// PaymentsScreen use for a subscriber's actual monthly_fee -- a plan
+// an admin added but hasn't priced yet (`monthly_fee: null`, see
+// PlanOption's docstring) shows as "Price TBD" rather than looking
+// like a $0 plan.
+function formatPlanFee(monthlyFee: string | null): string {
+  if (monthlyFee === null) return "Price TBD";
+  const amount = parseFloat(monthlyFee);
+  if (Number.isNaN(amount)) return "Price TBD";
+  return `₱${amount.toFixed(2)}/mo`;
+}
+
 function buildMapHtml(center: LatLng) {
   return `
     <!DOCTYPE html>
@@ -138,7 +151,7 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentAgreed, setConsentAgreed] = useState(false);
 
-  const [plans, setPlans] = useState<string[]>([]);
+  const [plans, setPlans] = useState<PlanOption[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   const [address, setAddress] = useState("");
@@ -400,11 +413,12 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
             <>
               {plans.map((plan) => (
                 <TouchableOpacity
-                  key={plan}
-                  style={[styles.planOption, selectedPlan === plan && styles.planOptionSelected]}
-                  onPress={() => setSelectedPlan(plan)}
+                  key={plan.name}
+                  style={[styles.planOption, selectedPlan === plan.name && styles.planOptionSelected]}
+                  onPress={() => setSelectedPlan(plan.name)}
                 >
-                  <Text style={styles.planOptionText}>{plan}</Text>
+                  <Text style={styles.planOptionText}>{plan.name}</Text>
+                  <Text style={styles.planOptionPrice}>{formatPlanFee(plan.monthly_fee)}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -475,9 +489,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   planOptionSelected: { borderColor: colors.primary },
   planOptionText: { color: colors.text, fontSize: 15 },
+  planOptionPrice: { color: colors.textFaint, fontSize: 13, marginLeft: 12 },
   button: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 8 },
   buttonSecondary: { borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 12, borderWidth: 1, borderColor: colors.primary },
   buttonSecondaryText: { color: colors.primary, fontSize: 16, fontWeight: "600" },

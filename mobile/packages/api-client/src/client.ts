@@ -10,6 +10,7 @@ import type {
   CustomerIssue,
   LoginResponse,
   Payment,
+  PlanOption,
   RefreshResponse,
   RegisterInput,
   ReportIssueInput,
@@ -489,7 +490,7 @@ listPayments: () => this.request<{ payments: Payment[] }>("/api/v1/customer/paym
       }),
 
     listPlans: () =>
-      this.request<{ plans: string[] }>("/api/v1/customer/plans", { auth: false }),
+      this.request<{ plans: PlanOption[] }>("/api/v1/customer/plans", { auth: false }),
 
     /** Sends a 6-digit one-time code to `email` via Gmail SMTP
      * (app/email_utils.py). Always resolves — the backend deliberately
