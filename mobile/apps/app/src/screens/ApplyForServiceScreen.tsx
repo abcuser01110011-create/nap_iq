@@ -157,6 +157,12 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
   const [address, setAddress] = useState("");
   const [fullName, setFullName] = useState("");
 
+  // Tracks the last address text *we* auto-filled (as opposed to
+  // something the applicant typed themselves) so a re-detect after
+  // walking to a different spot can safely refresh the field, while a
+  // manual edit in between is never clobbered.
+  const autoFilledAddressRef = useRef("");
+
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -176,6 +182,38 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
         setTimeout(() => reject(new Error("TIMEOUT")), timeoutMs);
       }),
     ]);
+  };
+
+  // Reverse-geocodes a fix via OpenStreetMap's Nominatim (same free,
+  // no-API-key provider the web portal's apply-installation.js and
+  // the admin map's napmap.js already use) and fills "Installation
+  // address" with "<street>, <barangay>". Nominatim's reverse
+  // endpoint returns the barangay/village under whichever of
+  // `suburb`/`village`/`neighbourhood`/`quarter` it happened to tag
+  // that area with in OSM's data -- there's no single reliable key
+  // for "barangay" everywhere, so all four are tried in order.
+  // Best-effort only: a failed or empty lookup just leaves the field
+  // for the applicant to fill in by hand, same as before this
+  // existed.
+  const reverseGeocodeAddress = async (lat: number, lng: number) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=${lat}&lon=${lng}`;
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const data = await response.json();
+      const addr = data?.address ?? {};
+      const barangay = addr.suburb || addr.village || addr.neighbourhood || addr.quarter || addr.hamlet;
+      const street = addr.road || addr.pedestrian;
+      const parts = [street, barangay].filter(Boolean);
+      const text: string | undefined = parts.length ? parts.join(", ") : data?.display_name;
+      if (!text) return;
+
+      setAddress((current) => (current === "" || current === autoFilledAddressRef.current ? text : current));
+      autoFilledAddressRef.current = text;
+    } catch {
+      // Silent -- this is a convenience only, the applicant can still
+      // type the address in by hand.
+    }
   };
 
   const requestLocation = async () => {
@@ -207,6 +245,7 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
       setCoverageResult(null);
       setGeoState("idle");
       focusMapOnFix(latitude, longitude, acc ?? null);
+      reverseGeocodeAddress(latitude, longitude);
     } catch (err: any) {
       setGeoState("error");
       if (err?.message === "TIMEOUT") {

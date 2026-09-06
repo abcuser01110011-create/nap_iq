@@ -55,8 +55,56 @@
     var latField = document.getElementById("applyLatitude");
     var lngField = document.getElementById("applyLongitude");
     var detailsForm = document.getElementById("applyDetailsForm");
+    var addressField = document.getElementById("address");
 
     var currentFix = null; // {lat, lng}
+
+    // Tracks the last value *we* wrote into the address field (as
+    // opposed to something the customer typed themselves) so a second
+    // "Detect my location" click can safely refresh it, while a
+    // manual edit in between is never clobbered — same "don't
+    // overwrite the customer's own input" rule as any other
+    // autofill on this form.
+    var lastAutoFilledAddress = "";
+
+    // Reverse-geocodes a fix via OpenStreetMap's Nominatim (same
+    // provider already credited in this map's tile attribution, and
+    // the same one napmap.js's resolveSubscriberAddress() uses for
+    // the admin map's subscriber popups) and fills the Installation
+    // Address field with "<street>, <barangay>" when it resolves.
+    // Nominatim's reverse endpoint returns the barangay/village under
+    // whichever of `suburb`/`village`/`neighbourhood`/`quarter` it
+    // happened to tag that area with -- there's no single reliable
+    // key for "barangay" across all of its OSM-sourced data, so all
+    // four are tried in order. Best-effort only: a failed or empty
+    // lookup just leaves the field for the customer to fill in by
+    // hand, same as before this existed.
+    function reverseGeocodeAddress(lat, lng) {
+        if (!addressField) return;
+        var url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=" + lat + "&lon=" + lng;
+        fetch(url, { headers: { Accept: "application/json" } })
+            .then(function (response) {
+                if (!response.ok) throw new Error("geocode request failed");
+                return response.json();
+            })
+            .then(function (data) {
+                var addr = (data && data.address) || {};
+                var barangay = addr.suburb || addr.village || addr.neighbourhood || addr.quarter || addr.hamlet;
+                var street = addr.road || addr.pedestrian;
+                var parts = [street, barangay].filter(Boolean);
+                var text = parts.length ? parts.join(", ") : data && data.display_name;
+                if (!text) return;
+
+                if (addressField.value === "" || addressField.value === lastAutoFilledAddress) {
+                    addressField.value = text;
+                    lastAutoFilledAddress = text;
+                }
+            })
+            .catch(function () {
+                // Silent -- this is a convenience only, the customer can
+                // still type the address in by hand.
+            });
+    }
 
     function showError(message) {
         errorEl.textContent = message;
@@ -95,6 +143,7 @@
                 currentFix = { lat: position.coords.latitude, lng: position.coords.longitude };
                 placeFix(currentFix.lat, currentFix.lng, position.coords.accuracy || null);
                 checkCoverageBtn.classList.remove("d-none");
+                reverseGeocodeAddress(currentFix.lat, currentFix.lng);
             },
             function (err) {
                 detectBtn.disabled = false;
