@@ -48,6 +48,12 @@ from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, 
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
 from app.routes.naps import _nap_port_assignments
+from app.recommendation import (
+    OPEN_ASSIGNMENT_STATUSES as _REC_OPEN_ASSIGNMENT_STATUSES,
+    _availability_score,
+    _workload_score,
+    _performance_score,
+)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -283,24 +289,104 @@ def personnel_json():
     assistants) and Technician pickers. `?type=technician` or
     `?type=field_assistant` narrows to one or the other; omitted
     returns both. Administrator-only, matching every other route that
-    manages dispatch staffing (app/routes/dispatch.py)."""
+    manages dispatch staffing (app/routes/dispatch.py).
+
+    Workload note: each row also carries `open_count` (currently
+    OPEN_ASSIGNMENT_STATUSES assignments -- 'assigned'/'accepted'/
+    'in_progress'), `completed_count` (all-time, the same
+    `resolved_issues_count` counter reports.py's workload report
+    already shows), and `recommend_score` -- computed with the exact
+    same availability/workload/performance formula
+    app/recommendation.py uses to rank technicians for issue dispatch
+    (see that module's docstring for the full breakdown of each
+    factor), just without the distance factor: this quick-create
+    modal has no single confirmed target location to measure from
+    (a brand-new Service Order may not even have a NAP picked yet).
+    The remaining three factors are rescaled to still sum to 1.0,
+    keeping workload weighted highest for the same reason
+    recommendation.py does -- it's the number that most directly
+    answers "who can actually take this on right now":
+        availability .25, workload .50, performance .25
+    Whichever candidate scores highest (an 'offline' technician is
+    never picked, same candidate-pool rule recommendation.py uses,
+    though they still appear in the list for a manual override) is
+    flagged `recommended: true`, so the ticket form's Technician
+    dropdown (tickets.js) can pre-select them by default while
+    leaving the field fully editable."""
     personnel_type = request.args.get("type")
     query = Technician.query
     if personnel_type in ("technician", "field_assistant"):
         query = query.filter_by(personnel_type=personnel_type)
 
     people = query.order_by(Technician.full_name).all()
-    return jsonify(
-        [
+    person_ids = [p.id for p in people]
+
+    # Two queries total for the whole roster, not N+1 per row -- same
+    # pattern app/recommendation.py's get_recommendations() and
+    # app/routes/reports.py's workload report already use.
+    open_by_person = {}
+    completed_by_person = {}
+    if person_ids:
+        open_assignments = Assignment.query.filter(
+            Assignment.technician_id.in_(person_ids),
+            Assignment.status.in_(_REC_OPEN_ASSIGNMENT_STATUSES),
+        ).all()
+        for a in open_assignments:
+            open_by_person.setdefault(a.technician_id, []).append(a)
+
+        completed_assignments = Assignment.query.filter(
+            Assignment.technician_id.in_(person_ids),
+            Assignment.status == "completed",
+            Assignment.completed_at.isnot(None),
+        ).all()
+        for a in completed_assignments:
+            completed_by_person.setdefault(a.technician_id, []).append(a)
+
+    WEIGHT_AVAILABILITY = 0.25
+    WEIGHT_WORKLOAD = 0.50
+    WEIGHT_PERFORMANCE = 0.25
+
+    rows = []
+    best_id, best_score = None, -1
+    for p in people:
+        open_for_p = open_by_person.get(p.id, [])
+        completed_for_p = completed_by_person.get(p.id, [])
+
+        availability_score = _availability_score(p)
+        workload_score = _workload_score(len(open_for_p))
+        performance_score, _avg_hrs, _completed_n, _perf_known = _performance_score(
+            p, completed_for_p
+        )
+        recommend_score = round(
+            (WEIGHT_AVAILABILITY * availability_score)
+            + (WEIGHT_WORKLOAD * workload_score)
+            + (WEIGHT_PERFORMANCE * performance_score),
+            1,
+        )
+
+        rows.append(
             {
                 "id": p.id,
                 "full_name": p.full_name,
                 "status": p.status,
                 "personnel_type": p.personnel_type,
+                "open_count": len(open_for_p),
+                "completed_count": p.resolved_issues_count or 0,
+                "recommend_score": recommend_score,
+                "recommended": False,
             }
-            for p in people
-        ]
-    )
+        )
+
+        if p.status != "offline" and recommend_score > best_score:
+            best_score, best_id = recommend_score, p.id
+
+    if best_id is not None:
+        for row in rows:
+            if row["id"] == best_id:
+                row["recommended"] = True
+                break
+
+    return jsonify(rows)
 
 
 @api_bp.route("/tickets/next-code")

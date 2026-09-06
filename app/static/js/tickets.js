@@ -199,19 +199,34 @@
             });
     }
 
-    function loadPersonnel(personnelType, selectEl, placeholder, onLoaded) {
+    // `autoSelectRecommended`: when true, whichever person /api/personnel
+    // flags `recommended: true` (lightest current workload, weighted with
+    // availability + past completion performance -- see that route's
+    // docstring for the full formula) is pre-selected once the list loads,
+    // instead of leaving the field on its placeholder. Purely a default --
+    // the dropdown is a normal <select>, so it's still fully editable
+    // afterwards, same as picking anyone else.
+    function loadPersonnel(personnelType, selectEl, placeholder, onLoaded, autoSelectRecommended) {
         selectEl.innerHTML = '<option value="">Loading…</option>';
         fetch("/api/personnel?type=" + encodeURIComponent(personnelType))
             .then((r) => r.json())
             .then((list) => {
                 const options = ['<option value="">' + placeholder + "</option>"];
+                let recommendedId = "";
                 (list || []).forEach((p) => {
+                    if (p.recommended) recommendedId = p.id;
+                    const workload = " — " + p.open_count + " open, " + p.completed_count + " done";
+                    const recTag = p.recommended ? " ★ Recommended" : "";
                     options.push(
                         '<option value="' + p.id + '" data-name="' + escapeHtml(p.full_name) + '">' +
-                            escapeHtml(p.full_name) + " (" + escapeHtml(p.status) + ")</option>"
+                            escapeHtml(p.full_name) + " (" + escapeHtml(p.status) + ")" +
+                            workload + recTag + "</option>"
                     );
                 });
                 selectEl.innerHTML = options.join("");
+                if (autoSelectRecommended && recommendedId) {
+                    selectEl.value = String(recommendedId);
+                }
                 if (typeof onLoaded === "function") onLoaded();
             })
             .catch(() => {
@@ -688,7 +703,7 @@
         // any admin who'd only added personnel_type='technician' rows
         // via Technician Management -- pass "" (no type filter) so
         // every technician AND field assistant shows up here.
-        loadPersonnel("", document.getElementById("ticketFormAssignedTeam"), "-- None --", applyAssistedByExclusion);
+        loadPersonnel("", document.getElementById("ticketFormAssignedTeam"), "-- None --", applyAssistedByExclusion, true);
         loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --", applyAssistedByExclusion);
     }
 
