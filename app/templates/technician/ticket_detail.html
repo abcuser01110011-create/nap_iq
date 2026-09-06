@@ -45,12 +45,12 @@
             <dd class="col-sm-9">{{ job.contact_number }}</dd>
             {% endif %}
 
-            {% if job.port_number %}
+            {% if job.port_number and not job.is_new_installation %}
             <dt class="col-sm-3">Port Number</dt>
             <dd class="col-sm-9">Port {{ job.port_number }}</dd>
             {% endif %}
 
-            {% if job.nap_label %}
+            {% if job.nap_label and not job.is_new_installation %}
             <dt class="col-sm-3">NAP</dt>
             <dd class="col-sm-9">{{ job.nap_label }}</dd>
             {% endif %}
@@ -146,6 +146,78 @@
 </div>
 {% endif %}
 
+{% if job.is_new_installation %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-2">NAP &amp; Port</h2>
+
+        {% if job.nap %}
+            <p class="small mb-2"><strong>NAP:</strong> {{ job.nap.nap_code }} — {{ job.nap.name }}</p>
+
+            <label for="portNumberSelect" class="form-label small text-muted mb-1">Port number</label>
+            {% if job.can_edit %}
+            <select id="portNumberSelect" class="form-select form-select-sm mb-2" style="max-width: 220px;">
+                <option value="" {{ "selected" if not job.port_number else "" }}>-- Select a port --</option>
+                {% for n in range(1, job.nap.total_ports + 1) %}
+                <option value="{{ n }}"
+                    {{ "selected" if job.port_number == n else "" }}
+                    {{ "disabled" if (n in job.nap.occupied_ports and n != job.port_number) else "" }}>
+                    Port {{ n }}{{ " · In use" if (n in job.nap.occupied_ports and n != job.port_number) else "" }}
+                </option>
+                {% endfor %}
+            </select>
+            <div id="portNumberError" class="alert alert-danger small py-2 d-none" role="alert"></div>
+            {% else %}
+            <p class="small text-muted mb-2">
+                {{ ("Port " ~ job.port_number) if job.port_number else "No port recorded." }}
+            </p>
+            {% endif %}
+        {% elif job.can_edit and job.assignment.pin_latitude is not none %}
+            <p class="small text-muted mb-2">No NAP linked yet for this installation.</p>
+        {% elif job.can_edit %}
+            <p class="small text-muted mb-0">Pin your location first to see nearby NAPs.</p>
+        {% else %}
+            <p class="small text-muted mb-0">No NAP was linked.</p>
+        {% endif %}
+
+        {% if job.can_edit and (job.nap or job.assignment.pin_latitude is not none) %}
+        <div id="nearbyNapsError" class="alert alert-danger small py-2 d-none mt-2" role="alert"></div>
+        <button type="button" id="findNapsBtn" class="btn btn-outline-secondary btn-sm"
+                data-nearby-action="{{ url_for('technician.nearby_naps', assignment_id=job.assignment.id) }}"
+                data-link-action="{{ url_for('technician.link_nap', assignment_id=job.assignment.id) }}">
+            {% if job.nap %}
+            <i class="bi bi-arrow-repeat me-1"></i>Change NAP
+            {% else %}
+            <i class="bi bi-geo-fill me-1"></i>Find Nearby NAPs
+            {% endif %}
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Nearby-NAPs picker -- populated via JS from GET nearby-naps
+     (data-nearby-action on findNapsBtn above), each row's "Link"
+     button POSTs to link-nap (data-link-action) then reloads the page
+     so the NAP/port card and Mark Complete's gating both pick up the
+     new value, same reload-on-success pattern pin-location uses. -->
+<div class="modal fade" id="napModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nearby NAPs</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="napModalBody">
+                <div class="d-flex align-items-center gap-2 text-muted small">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Looking up nearby NAPs…
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="d-flex flex-wrap gap-2">
     {% if job.can_accept %}
         <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=job.assignment.id) }}">
@@ -177,12 +249,14 @@
             <i class="bi bi-journal-plus me-1"></i>Notes
         </button>
         {% set pin_ready = (not job.is_installation) or (job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none) %}
-        {% if job.assignment.photo_filename and pin_ready %}
-        <button type="button" class="btn btn-success"
+        {% set nap_ready = (not job.is_new_installation) or (job.nap is not none) %}
+        {% if job.assignment.photo_filename and pin_ready and nap_ready %}
+        <button type="button" class="btn btn-success" id="markCompleteBtn"
                 data-bs-toggle="modal" data-bs-target="#notesModal"
                 data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=job.assignment.id) }}"
                 data-notes-value="{{ job.assignment.resolution_notes or '' }}"
-                data-notes-mode="complete">
+                data-notes-mode="complete"
+                data-requires-port="{{ "true" if job.is_new_installation else "false" }}">
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
         {% else %}
@@ -190,8 +264,12 @@
         <button type="button" class="btn btn-success" disabled title="Add a completion photo first">
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
-        {% else %}
+        {% elif not pin_ready %}
         <button type="button" class="btn btn-success" disabled title="Pin your on-site location first">
+            <i class="bi bi-check2-circle me-1"></i>Mark Complete
+        </button>
+        {% else %}
+        <button type="button" class="btn btn-success" disabled title="Link a NAP first">
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
         {% endif %}
@@ -208,6 +286,7 @@
     <div class="modal-dialog">
         <form method="post" id="notesModalForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="port_number" id="notesModalPortNumber" value="">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="notesModalTitle">Resolution Notes</h5>
@@ -250,6 +329,10 @@ document.addEventListener("DOMContentLoaded", function () {
             var title = document.getElementById("notesModalTitle");
             var help = document.getElementById("notesModalHelp");
             var submitBtn = document.getElementById("notesModalSubmit");
+            submitBtn.setAttribute("data-current-mode", mode);
+
+            var portErrorEl = document.getElementById("portNumberError");
+            if (portErrorEl) portErrorEl.classList.add("d-none");
 
             if (mode === "complete") {
                 title.textContent = "Complete Assignment";
@@ -265,6 +348,10 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
+        ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
+        : null;
+
     // "Pin My Location" / "Update My Location" -- installation-only,
     // same browser-geolocation pattern as apply-installation.js's
     // "Detect my location" step, just posted straight to
@@ -275,17 +362,13 @@ document.addEventListener("DOMContentLoaded", function () {
     // duplicating this page's render logic in JS.
     var pinBtn = document.getElementById("pinLocationBtn");
     var pinErrorEl = document.getElementById("pinLocationError");
-    if (!pinBtn) return;
-
-    var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
-        ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
-        : null;
 
     function showPinError(message) {
         pinErrorEl.textContent = message;
         pinErrorEl.classList.remove("d-none");
     }
 
+    if (pinBtn) {
     pinBtn.addEventListener("click", function () {
         pinErrorEl.classList.add("d-none");
 
@@ -343,6 +426,147 @@ document.addEventListener("DOMContentLoaded", function () {
             { enableHighAccuracy: true, timeout: 20000 }
         );
     });
+    }
+
+    // "Find Nearby NAPs" / "Change NAP" -- installation-only, mirrors
+    // the mobile app's handleFindNearbyNaps()/handleLinkNap(): fetches
+    // nearby_naps() candidates into the shared #napModal, and linking
+    // one just reloads the page (same "let the server-rendered markup
+    // be the source of truth" approach as the pin button above)
+    // instead of patching the NAP/port card's DOM by hand.
+    var findNapsBtn = document.getElementById("findNapsBtn");
+    if (findNapsBtn) {
+        var napModalEl = document.getElementById("napModal");
+        var napModal = new bootstrap.Modal(napModalEl);
+        var napModalBody = document.getElementById("napModalBody");
+        var nearbyNapsErrorEl = document.getElementById("nearbyNapsError");
+
+        function renderNapList(naps) {
+            if (naps.length === 0) {
+                napModalBody.innerHTML =
+                    '<p class="small text-muted mb-0">No active NAP with a free port was found near your pinned location.</p>';
+                return;
+            }
+            var list = document.createElement("div");
+            list.className = "list-group";
+            naps.forEach(function (nap) {
+                var row = document.createElement("button");
+                row.type = "button";
+                row.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+                row.innerHTML =
+                    '<span>' +
+                    "<strong>" + nap.nap_code + "</strong> — " + nap.name +
+                    (nap.is_recommended ? ' <span class="badge text-bg-success">Nearest</span>' : "") +
+                    '<br><span class="text-muted small">' +
+                    nap.distance_km.toFixed(2) + " km away · " + nap.available_ports + "/" + nap.total_ports + " ports free" +
+                    "</span></span>";
+                row.addEventListener("click", function () {
+                    row.disabled = true;
+                    fetch(findNapsBtn.getAttribute("data-link-action"), {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": CSRF_TOKEN,
+                        },
+                        body: JSON.stringify({ nap_id: nap.id }),
+                    })
+                        .then(function (resp) {
+                            return resp.json().then(function (data) {
+                                return { ok: resp.ok, data: data };
+                            });
+                        })
+                        .then(function (result) {
+                            if (!result.ok) {
+                                row.disabled = false;
+                                if (nearbyNapsErrorEl) {
+                                    nearbyNapsErrorEl.textContent = (result.data && result.data.error) || "Couldn't link that NAP. Try again.";
+                                    nearbyNapsErrorEl.classList.remove("d-none");
+                                }
+                                return;
+                            }
+                            window.location.reload();
+                        })
+                        .catch(function () {
+                            row.disabled = false;
+                            if (nearbyNapsErrorEl) {
+                                nearbyNapsErrorEl.textContent = "Couldn't link that NAP. Please check your connection and try again.";
+                                nearbyNapsErrorEl.classList.remove("d-none");
+                            }
+                        });
+                });
+                list.appendChild(row);
+            });
+            napModalBody.innerHTML = "";
+            napModalBody.appendChild(list);
+        }
+
+        findNapsBtn.addEventListener("click", function () {
+            napModalBody.innerHTML =
+                '<div class="d-flex align-items-center gap-2 text-muted small">' +
+                '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>' +
+                "Looking up nearby NAPs…</div>";
+            napModal.show();
+
+            fetch(findNapsBtn.getAttribute("data-nearby-action"))
+                .then(function (resp) {
+                    return resp.json().then(function (data) {
+                        return { ok: resp.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (!result.ok) {
+                        napModalBody.innerHTML =
+                            '<p class="small text-danger mb-0">' +
+                            ((result.data && result.data.error) || "Couldn't load nearby NAPs.") +
+                            "</p>";
+                        return;
+                    }
+                    renderNapList(result.data.naps || []);
+                })
+                .catch(function () {
+                    napModalBody.innerHTML = '<p class="small text-danger mb-0">Couldn\'t load nearby NAPs. Please check your connection and try again.</p>';
+                });
+        });
+    }
+
+    // Mark Complete's port requirement: portNumberSelect lives outside
+    // notesModalForm (it's a persistent part of the NAP & Port card,
+    // not something you'd want reset every time the notes modal
+    // opens/closes), so its value has to be read and copied into the
+    // form's hidden port_number input right before submit, and the
+    // submit blocked client-side (mirroring the mobile app's own
+    // handleComplete check) if a New Installation ticket has no port
+    // picked yet -- complete_assignment() still re-checks this
+    // server-side regardless, same "never trust the client" rule as
+    // link_nap()'s live NAP-availability re-check.
+    var notesForm = document.getElementById("notesModalForm");
+    if (notesForm) {
+        notesForm.addEventListener("submit", function (event) {
+            var submitBtn = document.getElementById("notesModalSubmit");
+            var mode = submitBtn ? submitBtn.getAttribute("data-current-mode") : null;
+            var portSelect = document.getElementById("portNumberSelect");
+            var portHidden = document.getElementById("notesModalPortNumber");
+            var portErrorEl = document.getElementById("portNumberError");
+
+            if (mode !== "complete") return;
+
+            var requiresPort = document.getElementById("markCompleteBtn")
+                ? document.getElementById("markCompleteBtn").getAttribute("data-requires-port") === "true"
+                : false;
+
+            if (portSelect) {
+                portHidden.value = portSelect.value;
+            }
+
+            if (requiresPort && (!portSelect || !portSelect.value)) {
+                event.preventDefault();
+                if (portErrorEl) {
+                    portErrorEl.textContent = "Select a port before this installation can be marked complete.";
+                    portErrorEl.classList.remove("d-none");
+                }
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

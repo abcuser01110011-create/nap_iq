@@ -83,10 +83,13 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, g
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Technician, Assignment
+from app.models import Technician, Assignment, Nap
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify_issue_status_change
 from app.issue_utils import resolve_fiber_break_siblings
+from app.nap_recommendation import recommend_naps
+from app.nap_status import slot_usage
+from app.routes.api_v1.technician import _assignment_nap, _nap_occupied_ports, _validate_port_number
 
 # Mirrors app/routes/api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS exactly
 # -- same completion-photo requirement, just reachable from the desktop
@@ -353,6 +356,104 @@ def pin_assignment_location(assignment_id):
     return {"pin_latitude": latitude, "pin_longitude": longitude}, 200
 
 
+@technician_bp.route("/assignments/<int:assignment_id>/nearby-naps", methods=["GET"])
+@role_required("technician")
+def nearby_naps(assignment_id):
+    """Nearest-suitable-NAP candidates for the technician's own pinned
+    on-site location, so they can link the right NAP themselves on a
+    New Installation that was dispatched with none set. Desktop web
+    counterpart of api_v1/technician.py's nearby_naps() — same
+    recommend_naps() engine (active status, a free port, and, if
+    configured, within Settings > App Settings' Max Connection
+    Radius), just reached via a plain JSON fetch from
+    ticket_detail.html instead of the mobile app's JWT API call.
+
+    Requires a location already pinned (pin_assignment_location()
+    above) — there's nothing to measure distance from otherwise, so
+    this 409s rather than silently falling back to some other
+    coordinate."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.service_request_id is None:
+        return {"error": "Linking a NAP only applies to an installation assignment."}, 409
+
+    if assignment.pin_latitude is None or assignment.pin_longitude is None:
+        return {"error": "Pin your location before looking up nearby NAPs."}, 409
+
+    recommendations = recommend_naps(float(assignment.pin_latitude), float(assignment.pin_longitude))
+
+    return {
+        "naps": [
+            {
+                "id": row["nap"].id,
+                "nap_code": row["nap_code"],
+                "name": row["name"],
+                "distance_km": row["distance_km"],
+                "available_ports": row["available_ports"],
+                "total_ports": row["total_ports"],
+                "is_recommended": row["is_recommended"],
+            }
+            for row in recommendations
+        ]
+    }, 200
+
+
+@technician_bp.route("/assignments/<int:assignment_id>/link-nap", methods=["POST"])
+@role_required("technician")
+def link_nap(assignment_id):
+    """Sets `service_request.requested_nap_id` from the nearby_naps()
+    list above — desktop web counterpart of api_v1/technician.py's
+    link_nap(), same rules and re-checked live availability (never
+    trusting the nearby-NAPs snapshot the browser fetched a moment
+    earlier), same "switching NAPs clears any already-picked
+    port_number" safeguard, since a port number is a physical port on
+    one specific NAP's hardware."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.service_request_id is None:
+        return {"error": "Linking a NAP only applies to an installation assignment."}, 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return {"error": "A NAP can only be linked on an assignment you've accepted or started."}, 409
+
+    if assignment.pin_latitude is None or assignment.pin_longitude is None:
+        return {"error": "Pin your location before linking a NAP."}, 409
+
+    data = request.get_json(silent=True) or {}
+    nap_id = data.get("nap_id")
+    nap = Nap.query.get(nap_id) if nap_id else None
+    if nap is None:
+        return {"error": "nap_id is required and must reference a real NAP."}, 400
+
+    _used, live_available = slot_usage(nap)
+    if nap.status != "active" or live_available <= 0:
+        return {
+            "error": (
+                f"NAP '{nap.nap_code}' is no longer active with available "
+                "ports — refresh nearby NAPs and try again."
+            )
+        }, 409
+
+    if assignment.service_request.requested_nap_id != nap.id:
+        assignment.port_number = None
+
+    assignment.service_request.requested_nap_id = nap.id
+    db.session.commit()
+
+    return {
+        "nap": {
+            "id": nap.id,
+            "nap_code": nap.nap_code,
+            "name": nap.name,
+            "total_ports": nap.total_ports,
+            "occupied_ports": _nap_occupied_ports(nap, exclude_assignment_id=assignment.id),
+        },
+        "port_number": assignment.port_number,
+    }, 200
+
+
 @technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
 @role_required("technician")
 def save_notes(assignment_id):
@@ -410,10 +511,13 @@ def complete_assignment(assignment_id):
     see that route's docstring.
 
     Note: unlike the mobile app, this does not yet auto-activate the
-    subscriber / assign a port / create a NAP row on completing an
-    installation (Phase 29 in api_v1/technician.py) — the desktop UI
-    has no port-picker yet. An installation completed here still needs
-    that follow-up done by an administrator for now."""
+    subscriber (Phase 29 in api_v1/technician.py) on completing an
+    installation — that's a bigger follow-up (creating the Subscriber
+    row, syncing NAP occupancy, etc.) the desktop UI doesn't attempt.
+    It now DOES require picking a NAP + port for a New Installation
+    ticket, though — same _validate_port_number() rule the mobile app
+    uses, so the port actually gets recorded either way; an
+    administrator just still needs to flip the subscriber active."""
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
@@ -430,6 +534,31 @@ def complete_assignment(assignment_id):
         flash("Pin your on-site location before this installation can be marked complete.", "warning")
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
+    # A New Installation ticket (connecting a subscriber into a free
+    # port on an existing NAP) needs a NAP linked and a port picked
+    # before it's really "done" — an Add NAP ticket (installing the
+    # NAP box itself) has no subscriber port to record, so it's
+    # narrower than the broader is_installation check above, same
+    # distinction api_v1/technician.py's isNewInstallationTicket
+    # makes on the mobile side.
+    is_new_installation = (
+        is_installation
+        and assignment.service_request is not None
+        and assignment.service_request.request_type == "new_installation"
+    )
+    if is_new_installation and _assignment_nap(assignment) is None:
+        flash("Link a NAP before this installation can be marked complete.", "warning")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    port_number, port_error = _validate_port_number(assignment, request.form)
+    if port_error is not None:
+        message, _status = port_error
+        flash(message, "danger")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+    if is_new_installation and port_number is None:
+        flash("Select a port before this installation can be marked complete.", "warning")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
     form = ResolutionNotesForm()
     if not form.validate_on_submit():
         for field_errors in form.errors.values():
@@ -438,6 +567,7 @@ def complete_assignment(assignment_id):
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.resolution_notes = form.resolution_notes.data.strip()
+    assignment.port_number = port_number
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
 
@@ -600,6 +730,28 @@ def _serialize_job(assignment):
     can_complete = assignment.status == "in_progress"
     is_closed = assignment.status in CLOSED_ASSIGNMENT_STATUSES
 
+    # The linked NAP, if any — issue.nap for a repair/Fiber Break,
+    # request.requested_nap for an installation (see _assignment_nap()
+    # in api_v1/technician.py, imported above; shared with
+    # nearby_naps()/link_nap()/complete_assignment() so this view-model
+    # and those routes never disagree about which NAP an assignment is
+    # linked to). Exposed as its own dict (not just nap_label below) so
+    # ticket_detail.html's port picker has total_ports/occupied_ports
+    # to build its 1..total_ports dropdown from, same fields the mobile
+    # app's assignment.nap already carries.
+    nap = _assignment_nap(assignment)
+    nap_info = (
+        {
+            "id": nap.id,
+            "nap_code": nap.nap_code,
+            "name": nap.name,
+            "total_ports": nap.total_ports,
+            "occupied_ports": _nap_occupied_ports(nap, exclude_assignment_id=assignment.id),
+        }
+        if nap
+        else None
+    )
+
     return {
         "assignment": assignment,
         "ticket_code": _ticket_code(assignment),
@@ -617,7 +769,8 @@ def _serialize_job(assignment):
         "contact_number": subscriber.contact_number if subscriber else (request.contact_number if request else None),
         "port_number": assignment.port_number,
         "description": issue.description if issue else (request.notes if request else None),
-        "nap_label": f"{assignment.technical_issue.nap.nap_code} — {assignment.technical_issue.nap.name}" if (issue and issue.nap) else None,
+        "nap": nap_info,
+        "nap_label": f"{nap.nap_code} — {nap.name}" if nap else None,
         "lat": lat,
         "lng": lng,
         "is_installation": is_installation,
