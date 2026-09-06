@@ -332,7 +332,7 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
         // need, instead of sitting at a small fixed height with a big
         // blank gap under the "Sign in" link.
         <View style={styles.locationStepContainer}>
-          <Text style={styles.title}>Apply for service</Text>
+          <Text style={styles.title}>Apply for Installation</Text>
           <Text style={styles.subtitle}>Step 1 of 3 — Track your installation address</Text>
 
           <View style={styles.mapWrap}>
@@ -442,7 +442,7 @@ export default function ApplyForServiceScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Text style={styles.title}>Apply for service</Text>
+          <Text style={styles.title}>Apply for Installation</Text>
           <Text style={styles.subtitle}>
             {step === "plan" && "Step 2 of 3 — Choose a plan"}
             {step === "details" && "Step 3 of 3 — Your details"}
