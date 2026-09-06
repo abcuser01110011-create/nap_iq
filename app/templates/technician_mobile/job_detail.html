@@ -123,7 +123,7 @@
         </p>
     {% endif %}
     {% if job.can_edit %}
-    <button type="button" class="tm-btn-secondary" style="margin-top: 10px;" disabled>
+    <button type="button" class="tm-btn-secondary tm-btn-pin" style="margin-top: 10px;" disabled>
         {{ "Update My Location" if job.assignment.pin_latitude is not none else "Pin My Location" }}
     </button>
     {% endif %}
@@ -136,14 +136,23 @@
     <p class="tm-card-label">NAP</p>
     {% if job.nap_label %}
         <div class="tm-dropdown-field">
-            <span style="color: var(--tm-text); font-weight: 600;">{{ job.nap_label }}</span>
-            <span>&#9662;</span>
+            <span class="tm-dropdown-value">{{ job.nap_label }}</span>
+            <span class="tm-dropdown-chevron">&#9662;</span>
         </div>
         <p class="tm-card-label tm-card-label-spaced">Port number</p>
         <div class="tm-dropdown-field">
-            <span style="color: var(--tm-text); font-weight: 600;">{{ ("Port " ~ job.port_number) if job.port_number else "Select a port" }}</span>
-            <span>&#9662;</span>
+            {% if job.port_number %}
+                <span class="tm-dropdown-value">Port {{ job.port_number }}</span>
+            {% else %}
+                <span class="tm-dropdown-placeholder">Select a port</span>
+            {% endif %}
+            <span class="tm-dropdown-chevron">&#9662;</span>
         </div>
+        {% if job.can_edit and not job.port_number %}
+        <p class="tm-notes-text tm-notes-text-spaced mb-0">
+            No port selected yet — required before completing this installation.
+        </p>
+        {% endif %}
     {% else %}
         <p class="tm-notes-text">No NAP linked yet for this installation.</p>
         <button type="button" class="tm-btn-secondary" disabled>Find nearby NAPs</button>

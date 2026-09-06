@@ -269,6 +269,7 @@ body.tm-body {
 .tm-info-value { color: var(--tm-text); font-size: 0.88rem; font-weight: 600; margin-top: 2px; }
 
 .tm-notes-text { color: var(--tm-text-muted); font-size: 0.88rem; line-height: 1.4; }
+.tm-notes-text-spaced { margin-top: 10px; }
 
 .tm-map-link {
     color: var(--tm-primary);
@@ -308,11 +309,30 @@ body.tm-body {
     justify-content: space-between;
     align-items: center;
     background: var(--tm-bg);
-    border: 1px solid var(--tm-border);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 10px;
-    padding: 12px;
+    padding: 13px 14px;
     color: var(--tm-text-faint);
-    font-size: 0.88rem;
+    font-size: 0.92rem;
+}
+
+/* A field with a real value picked (e.g. "N-014 — bagong nap") reads
+   bold and full-white; an unfilled one (e.g. "Select a port") stays
+   the field's muted placeholder color -- matches the mobile app's own
+   dropdownField / portOptionText treatment 1:1. */
+.tm-dropdown-value {
+    color: var(--tm-text);
+    font-weight: 700;
+}
+
+.tm-dropdown-placeholder {
+    color: var(--tm-text-faint);
+    font-weight: 400;
+}
+
+.tm-dropdown-chevron {
+    color: var(--tm-text-faint);
+    margin-left: 8px;
 }
 
 /* ---------------------------------------------------------------- */
@@ -343,7 +363,7 @@ body.tm-body {
     width: 100%;
     background: transparent;
     color: var(--tm-primary);
-    border: 1px solid var(--tm-primary);
+    border: 1.5px solid var(--tm-primary);
     border-radius: 10px;
     padding: 10px;
     font-size: 0.85rem;
@@ -353,6 +373,14 @@ body.tm-body {
     text-decoration: none;
 }
 .tm-btn-secondary:hover { color: var(--tm-primary); opacity: 0.9; }
+
+/* Standalone full-width pin/location action ("Pin My Location" /
+   "Update My Location") reads a bit larger and roomier than the
+   small paired photo buttons above it -- matches the screenshot. */
+.tm-btn-pin {
+    padding: 14px;
+    font-size: 0.95rem;
+}
 
 .tm-btn-danger-soft {
     display: block;
