@@ -293,13 +293,11 @@ def personnel_json():
 
     Workload note: each row also carries `open_count` (currently
     OPEN_ASSIGNMENT_STATUSES assignments -- 'assigned'/'accepted'/
-    'in_progress'), `completed_count` (all-time, the same
-    `resolved_issues_count` counter reports.py's workload report
-    already shows), and `recommend_score` -- computed with the exact
-    same availability/workload/performance formula
-    app/recommendation.py uses to rank technicians for issue dispatch
-    (see that module's docstring for the full breakdown of each
-    factor), just without the distance factor: this quick-create
+    'in_progress'), `completed_count`, and `recommend_score` --
+    computed with the exact same availability/workload/performance
+    formula app/recommendation.py uses to rank technicians for issue
+    dispatch (see that module's docstring for the full breakdown of
+    each factor), just without the distance factor: this quick-create
     modal has no single confirmed target location to measure from
     (a brand-new Service Order may not even have a NAP picked yet).
     The remaining three factors are rescaled to still sum to 1.0,
@@ -307,6 +305,19 @@ def personnel_json():
     recommendation.py does -- it's the number that most directly
     answers "who can actually take this on right now":
         availability .25, workload .50, performance .25
+
+    `completed_count` counts every 'completed' Assignment row for
+    that person -- installation and repair tickets alike -- not
+    `technicians.resolved_issues_count`. That counter only increments
+    inside complete_assignment()'s technical_issue branch
+    (app/routes/technician.py), so an installation-heavy field
+    assistant would otherwise show as having completed nothing; this
+    feed (and app/recommendation.py's own performance scoring, fixed
+    alongside this) counts every ticket type instead. `open_count`
+    already counted every type correctly -- OPEN_ASSIGNMENT_STATUSES
+    was never scoped to technical_issue only -- so only the completed
+    side needed this fix.
+
     Whichever candidate scores highest (an 'offline' technician is
     never picked, same candidate-pool rule recommendation.py uses,
     though they still appear in the list for a manual override) is
@@ -371,7 +382,7 @@ def personnel_json():
                 "status": p.status,
                 "personnel_type": p.personnel_type,
                 "open_count": len(open_for_p),
-                "completed_count": p.resolved_issues_count or 0,
+                "completed_count": len(completed_for_p),
                 "recommend_score": recommend_score,
                 "recommended": False,
             }

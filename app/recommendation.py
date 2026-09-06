@@ -268,7 +268,19 @@ def _distance_score_and_km(technician, issue_coords):
 
 def _performance_score(technician, completed_for_tech):
     """Returns (performance_score, avg_resolution_hours_or_None,
-    completed_count, performance_known)."""
+    completed_count, performance_known).
+
+    `completed_count` (and the volume component below) is the length
+    of `completed_for_tech` -- every 'completed' Assignment row for
+    this technician, installation and repair alike -- not
+    `technician.resolved_issues_count`. That counter is only
+    incremented inside complete_assignment()'s technical_issue branch
+    (app/routes/technician.py), so a technician who mostly does
+    installations would otherwise look like they'd never finished
+    anything. `completed_for_tech` has no such gap: it comes straight
+    from `assignments.status = 'completed'`, which is set the same
+    way regardless of whether the assignment is linked to a
+    `technical_issue` or a `service_request`."""
     completed_count = len(completed_for_tech)
     if completed_count < MIN_COMPLETED_FOR_PERFORMANCE:
         return NEUTRAL_PERFORMANCE_SCORE, None, completed_count, False
@@ -280,7 +292,7 @@ def _performance_score(technician, completed_for_tech):
     avg_hours = total_hours / completed_count
 
     speed_component = max(0, 100 - (avg_hours / PERFORMANCE_CEILING_HOURS) * 100)
-    volume_component = min(100, ((technician.resolved_issues_count or 0) / VOLUME_CAP) * 100)
+    volume_component = min(100, (completed_count / VOLUME_CAP) * 100)
     score = (0.7 * speed_component) + (0.3 * volume_component)
     return round(score, 1), round(avg_hours, 1), completed_count, True
 
