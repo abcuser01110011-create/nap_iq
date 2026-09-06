@@ -127,6 +127,17 @@
     color: #ffd98a;
 }
 
+/* Same treatment as .alert-warning above, for the pin-location /
+   nearby-NAPs / port-selection inline error banners added alongside
+   the NAP & Port and Pin Location cards -- Bootstrap's own
+   .alert-danger is a light pink (--bs-danger-bg-subtle), which reads
+   as a light-theme leftover on an all-navy card. */
+.dash-theme-tech .alert-danger {
+    background-color: #3a1f2a;
+    border-color: #6b1f34;
+    color: #ff9eb0;
+}
+
 .dash-theme-tech .modal-content {
     background-color: var(--napiq-surface);
     color: #eef2fa;
@@ -145,6 +156,36 @@
 }
 
 .dash-theme-tech .form-control::placeholder {
+    color: #8896ab;
+}
+
+/* .form-select isn't covered by the .form-control rule above (it's a
+   separate Bootstrap component) and, left alone, keeps Bootstrap's
+   light --bs-body-bg white -- glaringly out of place as the NAP &
+   Port card's port dropdown on an otherwise all-navy page. The chevron
+   icon is a baked-in SVG data-URI colored for a light background
+   (see bootstrap.min.css's --bs-form-select-bg-img), so it's redrawn
+   here in a light stroke color rather than left dark-on-dark. */
+.dash-theme-tech .form-select {
+    --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23c7d0de' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-color: var(--napiq-bg);
+    border-color: var(--napiq-border);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .form-select:focus {
+    background-color: var(--napiq-bg);
+    border-color: var(--napiq-border);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .form-select option {
+    background-color: var(--napiq-surface);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .form-select:disabled,
+.dash-theme-tech .form-select option:disabled {
     color: #8896ab;
 }
 
@@ -188,7 +229,39 @@
 }
 
 /* ---------------------------------------------------------------- */
-/* TECHNICIAN ASSIGNMENT CARDS (technician/index.html,                */
+/* NEARBY-NAPS PICKER (ticket_detail.html's #napModal -- rows built  */
+/* client-side into a Bootstrap .list-group). Same "light Bootstrap  */
+/* surface needs an explicit dark override" reasoning as .form-select */
+/* and .alert-danger above; colors match technician-mobile.css's own  */
+/* napOption/nearestBadge/napOptionSubtext treatment so the picker    */
+/* looks the same whether it's reached from the phone app or here.   */
+/* ---------------------------------------------------------------- */
+
+.dash-theme-tech .list-group-item {
+    background-color: var(--napiq-surface);
+    border-color: var(--napiq-border);
+    color: #eef2fa;
+}
+
+.dash-theme-tech .list-group-item-action:hover,
+.dash-theme-tech .list-group-item-action:focus {
+    background-color: #16315a;
+    color: #ffffff;
+}
+
+.dash-theme-tech .list-group-item.disabled,
+.dash-theme-tech .list-group-item:disabled {
+    background-color: var(--napiq-surface);
+    color: #8896ab;
+    opacity: 0.6;
+}
+
+.dash-theme-tech .badge.text-bg-success {
+    background-color: #3ddc97 !important;
+    color: #06231a !important;
+}
+
+
 /* technician/history.html -- see the .tech-assign-* rules in         */
 /* dashboard.css for the shared layout/grid; only colors change here) */
 /* ---------------------------------------------------------------- */
