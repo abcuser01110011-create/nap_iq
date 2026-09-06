@@ -203,9 +203,9 @@
     // flags `recommended: true` (lightest current workload, weighted with
     // availability + past completion performance -- see that route's
     // docstring for the full formula) is pre-selected once the list loads,
-    // instead of leaving the field on its placeholder. Purely a default --
-    // the dropdown is a normal <select>, so it's still fully editable
-    // afterwards, same as picking anyone else.
+    // instead of leaving the field on its placeholder. Used by the
+    // "Assisted By" select below; the primary Technician field has its
+    // own richer card-style picker instead -- see loadAssignedTeamOptions().
     function loadPersonnel(personnelType, selectEl, placeholder, onLoaded, autoSelectRecommended) {
         selectEl.innerHTML = '<option value="">Loading…</option>';
         fetch("/api/personnel?type=" + encodeURIComponent(personnelType))
@@ -231,6 +231,64 @@
             })
             .catch(() => {
                 selectEl.innerHTML = '<option value="">-- Could not load --</option>';
+            });
+    }
+
+    // ------------------------------------------------------------------
+    // Technician field -- card-style picker (matches the "Find Nearby
+    // NAPs" list's look: bold name, muted stats line, green "Recommended"
+    // badge on the top-scoring pick) instead of a plain <select>, so the
+    // workload/completed counts from /api/personnel are actually visible
+    // rather than just sitting unused in option text.
+    // ------------------------------------------------------------------
+    let assignedTeamPeople = [];
+
+    function renderAssignedTeamResults() {
+        const box = document.getElementById("ticketFormAssignedTeamResults");
+        const rows = ['<button type="button" class="list-group-item list-group-item-action" data-person-id="">-- None --</button>'];
+        assignedTeamPeople.forEach((p) => {
+            rows.push(
+                '<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-person-id="' +
+                    p.id + '">' +
+                    "<span>" +
+                    "<strong>" + escapeHtml(p.full_name) + "</strong> (" + escapeHtml(p.status) + ")" +
+                    (p.recommended ? ' <span class="badge text-bg-success">Recommended</span>' : "") +
+                    '<br><span class="text-muted small">' +
+                    p.open_count + " open · " + p.completed_count + " completed" +
+                    "</span></span></button>"
+            );
+        });
+        box.innerHTML = rows.join("");
+    }
+
+    function selectAssignedTeam(person) {
+        const hiddenInput = document.getElementById("ticketFormAssignedTeam");
+        const displayText = document.getElementById("ticketFormAssignedTeamDisplayText");
+        hiddenInput.value = person ? person.id : "";
+        hiddenInput.setAttribute("data-label", person ? person.full_name : "");
+        displayText.textContent = person ? person.full_name + " (" + person.status + ")" : "-- None --";
+        displayText.classList.toggle("text-muted", !person);
+        document.getElementById("ticketFormAssignedTeamResults").classList.add("d-none");
+        hiddenInput.dispatchEvent(new Event("change"));
+    }
+
+    function loadAssignedTeamOptions() {
+        const displayText = document.getElementById("ticketFormAssignedTeamDisplayText");
+        displayText.textContent = "Loading…";
+        assignedTeamPeople = [];
+        fetch("/api/personnel?type=")
+            .then((r) => r.json())
+            .then((list) => {
+                assignedTeamPeople = list || [];
+                renderAssignedTeamResults();
+                // Default to the recommended (lightest-workload) pick,
+                // same as before -- still fully editable via the list.
+                const recommended = assignedTeamPeople.find((p) => p.recommended);
+                selectAssignedTeam(recommended || null);
+            })
+            .catch(() => {
+                assignedTeamPeople = [];
+                displayText.textContent = "-- Could not load --";
             });
     }
 
@@ -703,7 +761,7 @@
         // any admin who'd only added personnel_type='technician' rows
         // via Technician Management -- pass "" (no type filter) so
         // every technician AND field assistant shows up here.
-        loadPersonnel("", document.getElementById("ticketFormAssignedTeam"), "-- None --", applyAssistedByExclusion, true);
+        loadAssignedTeamOptions();
         loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --", applyAssistedByExclusion);
     }
 
@@ -771,6 +829,13 @@
     // ------------------------------------------------------------------
 
     function selectedOptionLabel(selectEl) {
+        if (selectEl.tagName !== "SELECT") {
+            // ticketFormAssignedTeam: a hidden input now (see
+            // renderAssignedTeamResults()/selectAssignedTeam() below),
+            // carrying the chosen person's display label in data-label
+            // the same way a <select>'s selected <option>'s text used to.
+            return selectEl.value ? selectEl.getAttribute("data-label") || "" : "";
+        }
         const opt = selectEl.options[selectEl.selectedIndex];
         return opt && opt.value ? opt.textContent : "";
     }
@@ -1147,6 +1212,19 @@
             renderBarangayResults([]);
         });
 
+        const assignedTeamDisplay = document.getElementById("ticketFormAssignedTeamDisplay");
+        const assignedTeamResults = document.getElementById("ticketFormAssignedTeamResults");
+        assignedTeamDisplay.addEventListener("click", () => {
+            assignedTeamResults.classList.toggle("d-none");
+        });
+        assignedTeamResults.addEventListener("click", (event) => {
+            const btn = event.target.closest("[data-person-id]");
+            if (!btn) return;
+            const id = btn.getAttribute("data-person-id");
+            const person = id ? assignedTeamPeople.find((p) => String(p.id) === id) : null;
+            selectAssignedTeam(person || null);
+        });
+
         document.addEventListener("click", (event) => {
             if (!event.target.closest("#ticketFormSubscriberInput") && !event.target.closest("#ticketFormSubscriberResults")) {
                 renderSubscriberResults([]);
@@ -1156,6 +1234,9 @@
             }
             if (!event.target.closest("#ticketFormBarangayInput") && !event.target.closest("#ticketFormBarangayResults")) {
                 renderBarangayResults([]);
+            }
+            if (!event.target.closest("#ticketFormAssignedTeamDisplay") && !event.target.closest("#ticketFormAssignedTeamResults")) {
+                assignedTeamResults.classList.add("d-none");
             }
         });
 

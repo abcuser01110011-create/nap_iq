@@ -159,11 +159,19 @@
                         </div>
                     </div>
 
-                    <div class="mb-2 mt-2">
+                    <div class="mb-2 mt-2 position-relative" id="ticketFormAssignedTeamWrapper">
                         <label class="form-label small text-muted mb-1">Technician</label>
-                        <select class="form-select" id="ticketFormAssignedTeam">
-                            <option value="">-- None --</option>
-                        </select>
+                        <button type="button" class="form-control d-flex justify-content-between align-items-center text-start"
+                                id="ticketFormAssignedTeamDisplay">
+                            <span id="ticketFormAssignedTeamDisplayText" class="text-muted">-- None --</span>
+                            <i class="bi bi-chevron-down small text-muted ms-2"></i>
+                        </button>
+                        {# Real submitted value + label live here, same contract a
+                           <select>'s .value/selectedOptionLabel() already gave the
+                           rest of tickets.js -- see selectedOptionLabel()'s
+                           non-<select> branch. #}
+                        <input type="hidden" id="ticketFormAssignedTeam" value="" data-label="">
+                        <div id="ticketFormAssignedTeamResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
                     </div>
 
                     <div class="mb-2">
