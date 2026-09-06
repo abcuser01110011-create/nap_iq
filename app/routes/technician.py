@@ -269,7 +269,20 @@ def start_assignment(assignment_id):
     """Marks work as actually underway. Only valid from 'accepted'.
     Mirrors the status onto the linked technical_issue (so it shows as
     'in_progress' everywhere else in the app — the dashboard, the
-    issue detail page, etc.) and marks the technician 'busy'."""
+    issue detail page, etc.) and marks the technician 'busy'.
+
+    Bug fix: an installation-type assignment is linked via
+    service_request_id instead of technical_issue_id (see Assignment's
+    docstring in app/models.py), so assignment.technical_issue is None
+    for it — unconditionally writing to `.status` on it here raised
+    an AttributeError (500) the moment a technician tried to start
+    work on an installation. Guarded exactly like
+    api_v1/technician.py's start_assignment() already does: a
+    service_request has no 'in_progress' value in its own status enum
+    (it's already 'scheduled' from dispatch and stays that way through
+    accept/start — see that route's docstring), so for an installation
+    this now only flips the Assignment's own status and the
+    technician's busy state, same as the mobile app already does."""
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
@@ -278,13 +291,17 @@ def start_assignment(assignment_id):
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "in_progress"
-    assignment.technical_issue.status = "in_progress"
+    if assignment.technical_issue is not None:
+        assignment.technical_issue.status = "in_progress"
+        notify_issue_status_change(assignment.technical_issue)
     profile.status = "busy"
-    notify_issue_status_change(assignment.technical_issue)
     db.session.commit()
 
-    issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
-    flash(f"{issue_label} marked as in progress.", "success")
+    if assignment.technical_issue is not None:
+        issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
+        flash(f"{issue_label} marked as in progress.", "success")
+    else:
+        flash("Installation marked as in progress.", "success")
     return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
