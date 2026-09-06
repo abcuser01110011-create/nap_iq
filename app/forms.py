@@ -1291,7 +1291,7 @@ class PlanForm(FlaskForm):
         "Monthly Fee",
         places=2,
         validators=[
-            Optional(),
+            DataRequired(message="Monthly fee is required."),
             NumberRange(min=0, message="Monthly fee can't be negative."),
         ],
     )

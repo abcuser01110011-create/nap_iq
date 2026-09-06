@@ -107,6 +107,8 @@ def add_plan():
     else:
         for error in plan_form.name.errors:
             flash(error, "danger")
+        for error in plan_form.monthly_fee.errors:
+            flash(error, "danger")
 
     return redirect(url_for("settings.index"))
 

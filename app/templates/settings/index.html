@@ -100,7 +100,7 @@
                         <div class="col-sm-3">
                             <div class="input-group">
                                 <span class="input-group-text">₱</span>
-                                {{ plan_form.monthly_fee(class="form-control" ~ (" is-invalid" if plan_form.monthly_fee.errors else ""), placeholder="Monthly fee") }}
+                                {{ plan_form.monthly_fee(class="form-control" ~ (" is-invalid" if plan_form.monthly_fee.errors else ""), placeholder="Monthly fee", required=True) }}
                             </div>
                             {% for error in plan_form.monthly_fee.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
