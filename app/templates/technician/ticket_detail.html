@@ -114,6 +114,38 @@
 </div>
 {% endif %}
 
+{% if job.is_installation %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-2">Pin Location</h2>
+
+        {% if job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none %}
+            <p class="small mb-2">
+                <i class="bi bi-geo-alt-fill me-1 text-success"></i>
+                Pinned at {{ "%.6f"|format(job.assignment.pin_latitude) }}, {{ "%.6f"|format(job.assignment.pin_longitude) }}
+                &mdash;
+                <a href="https://maps.google.com/?q={{ job.assignment.pin_latitude }},{{ job.assignment.pin_longitude }}"
+                   target="_blank" rel="noopener">Open in Maps</a>
+            </p>
+        {% else %}
+            <p class="small text-muted mb-2">
+                {{ "No location pinned yet — required before this installation can be marked complete."
+                   if job.can_edit else "No location was pinned." }}
+            </p>
+        {% endif %}
+
+        {% if job.can_edit %}
+        <div id="pinLocationError" class="alert alert-danger small py-2 d-none" role="alert"></div>
+        <button type="button" id="pinLocationBtn" class="btn btn-outline-secondary btn-sm"
+                data-pin-action="{{ url_for('technician.pin_assignment_location', assignment_id=job.assignment.id) }}">
+            <i class="bi bi-geo-alt me-1"></i>
+            {{ "Update My Location" if (job.assignment.pin_latitude is not none) else "Pin My Location" }}
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="d-flex flex-wrap gap-2">
     {% if job.can_accept %}
         <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=job.assignment.id) }}">
@@ -144,7 +176,8 @@
                 data-notes-mode="save">
             <i class="bi bi-journal-plus me-1"></i>Notes
         </button>
-        {% if job.assignment.photo_filename %}
+        {% set pin_ready = (not job.is_installation) or (job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none) %}
+        {% if job.assignment.photo_filename and pin_ready %}
         <button type="button" class="btn btn-success"
                 data-bs-toggle="modal" data-bs-target="#notesModal"
                 data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=job.assignment.id) }}"
@@ -153,9 +186,15 @@
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
         {% else %}
+        {% if not job.assignment.photo_filename %}
         <button type="button" class="btn btn-success" disabled title="Add a completion photo first">
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
+        {% else %}
+        <button type="button" class="btn btn-success" disabled title="Pin your on-site location first">
+            <i class="bi bi-check2-circle me-1"></i>Mark Complete
+        </button>
+        {% endif %}
         {% endif %}
     {% endif %}
 </div>
@@ -196,34 +235,113 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var modalEl = document.getElementById("notesModal");
-    if (!modalEl) return;
+    if (modalEl) {
+        modalEl.addEventListener("show.bs.modal", function (event) {
+            var button = event.relatedTarget;
+            if (!button) return;
 
-    modalEl.addEventListener("show.bs.modal", function (event) {
-        var button = event.relatedTarget;
-        if (!button) return;
+            var action = button.getAttribute("data-notes-action");
+            var value = button.getAttribute("data-notes-value") || "";
+            var mode = button.getAttribute("data-notes-mode");
 
-        var action = button.getAttribute("data-notes-action");
-        var value = button.getAttribute("data-notes-value") || "";
-        var mode = button.getAttribute("data-notes-mode");
+            document.getElementById("notesModalForm").setAttribute("action", action);
+            document.getElementById("notesModalTextarea").value = value;
 
-        document.getElementById("notesModalForm").setAttribute("action", action);
-        document.getElementById("notesModalTextarea").value = value;
+            var title = document.getElementById("notesModalTitle");
+            var help = document.getElementById("notesModalHelp");
+            var submitBtn = document.getElementById("notesModalSubmit");
 
-        var title = document.getElementById("notesModalTitle");
-        var help = document.getElementById("notesModalHelp");
-        var submitBtn = document.getElementById("notesModalSubmit");
+            if (mode === "complete") {
+                title.textContent = "Complete Assignment";
+                help.textContent = "Resolution notes are required to mark this issue resolved.";
+                submitBtn.textContent = "Mark Complete";
+                submitBtn.className = "btn btn-success";
+            } else {
+                title.textContent = "Resolution Notes";
+                help.textContent = "Describe what was found and what was done. This is saved on the assignment record.";
+                submitBtn.textContent = "Save Notes";
+                submitBtn.className = "btn btn-primary";
+            }
+        });
+    }
 
-        if (mode === "complete") {
-            title.textContent = "Complete Assignment";
-            help.textContent = "Resolution notes are required to mark this issue resolved.";
-            submitBtn.textContent = "Mark Complete";
-            submitBtn.className = "btn btn-success";
-        } else {
-            title.textContent = "Resolution Notes";
-            help.textContent = "Describe what was found and what was done. This is saved on the assignment record.";
-            submitBtn.textContent = "Save Notes";
-            submitBtn.className = "btn btn-primary";
+    // "Pin My Location" / "Update My Location" -- installation-only,
+    // same browser-geolocation pattern as apply-installation.js's
+    // "Detect my location" step, just posted straight to
+    // pin_assignment_location() as soon as a fix lands (see that
+    // route's docstring) instead of waiting on a form submit. Reloads
+    // the page on success so the pinned coordinates and the "Mark
+    // Complete" button's gating both pick up the new value without
+    // duplicating this page's render logic in JS.
+    var pinBtn = document.getElementById("pinLocationBtn");
+    var pinErrorEl = document.getElementById("pinLocationError");
+    if (!pinBtn) return;
+
+    var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
+        ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
+        : null;
+
+    function showPinError(message) {
+        pinErrorEl.textContent = message;
+        pinErrorEl.classList.remove("d-none");
+    }
+
+    pinBtn.addEventListener("click", function () {
+        pinErrorEl.classList.add("d-none");
+
+        if (!navigator.geolocation) {
+            showPinError("Your browser doesn't support location detection. Try the mobile app instead.");
+            return;
         }
+
+        pinBtn.disabled = true;
+        var originalText = pinBtn.innerHTML;
+        pinBtn.innerHTML = "Pinning\u2026";
+
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                fetch(pinBtn.getAttribute("data-pin-action"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": CSRF_TOKEN,
+                    },
+                    body: JSON.stringify({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                    }),
+                })
+                    .then(function (resp) {
+                        return resp.json().then(function (data) {
+                            return { ok: resp.ok, data: data };
+                        });
+                    })
+                    .then(function (result) {
+                        if (!result.ok) {
+                            pinBtn.disabled = false;
+                            pinBtn.innerHTML = originalText;
+                            showPinError((result.data && result.data.error) || "Couldn't save your location. Please try again.");
+                            return;
+                        }
+                        window.location.reload();
+                    })
+                    .catch(function () {
+                        pinBtn.disabled = false;
+                        pinBtn.innerHTML = originalText;
+                        showPinError("Couldn't save your location. Please check your connection and try again.");
+                    });
+            },
+            function (err) {
+                pinBtn.disabled = false;
+                pinBtn.innerHTML = originalText;
+                if (err.code === err.PERMISSION_DENIED) {
+                    showPinError("Location permission was denied. Allow location access for this site in your browser settings, then try again.");
+                } else {
+                    showPinError("We couldn't detect your location. Please check your connection and try again.");
+                }
+            },
+            { enableHighAccuracy: true, timeout: 20000 }
+        );
     });
 });
 </script>

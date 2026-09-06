@@ -36,6 +36,11 @@ Routes:
     POST /technician/assignments/<id>/start          -> start_assignment
                                                         (accepted -> in_progress;
                                                         issue -> in_progress)
+    POST /technician/assignments/<id>/pin-location   -> pin_assignment_location
+                                                        (installation-only GPS fix, desktop
+                                                        counterpart of api_v1/technician.py's
+                                                        same-named route; required before
+                                                        complete_assignment on an installation)
     POST /technician/assignments/<id>/notes          -> save_notes
                                                         (resolution_notes only, no status change)
     POST /technician/assignments/<id>/photo          -> upload_photo
@@ -305,6 +310,49 @@ def start_assignment(assignment_id):
     return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
+@technician_bp.route("/assignments/<int:assignment_id>/pin-location", methods=["POST"])
+@role_required("technician")
+def pin_assignment_location(assignment_id):
+    """Records the technician's own on-site GPS fix for an
+    *installation* assignment — the desktop web counterpart of
+    api_v1/technician.py's pin_assignment_location(), same validation
+    rules (installation-only, only while 'accepted'/'in_progress'),
+    just reached via a plain JSON fetch from ticket_detail.html's
+    'Pin My Location' button (browser geolocation) instead of the
+    mobile app's expo-location + JWT API call. Required before
+    complete_assignment() below will accept an installation as done —
+    see that route's own docstring."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.service_request_id is None:
+        return {"error": "A pinned location only applies to an installation assignment."}, 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return {"error": "A location can only be pinned on an assignment you've accepted or started."}, 409
+
+    data = request.get_json(silent=True) or {}
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
+    if latitude is None or longitude is None:
+        return {"error": "latitude and longitude are required."}, 400
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError):
+        return {"error": "latitude and longitude must be numbers."}, 400
+
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        return {"error": "latitude/longitude are out of range."}, 400
+
+    assignment.pin_latitude = latitude
+    assignment.pin_longitude = longitude
+    db.session.commit()
+
+    return {"pin_latitude": latitude, "pin_longitude": longitude}, 200
+
+
 @technician_bp.route("/assignments/<int:assignment_id>/notes", methods=["POST"])
 @role_required("technician")
 def save_notes(assignment_id):
@@ -338,18 +386,34 @@ def save_notes(assignment_id):
 @technician_bp.route("/assignments/<int:assignment_id>/complete", methods=["POST"])
 @role_required("technician")
 def complete_assignment(assignment_id):
-    """Marks an assignment (and its linked issue) resolved. Only valid
-    from 'in_progress'. Requires resolution notes (phase_8.pdf's
-    workflow lists 'Save resolution notes' as part of a technician's
-    update to an issue) — if notes were already saved via save_notes()
-    above, the field is pre-filled here and this just confirms them.
-    Also requires a completion photo (uploaded separately via
-    upload_photo() below) to already be attached — mirrors the same
-    rule app/routes/api_v1/technician.py's complete_assignment()
-    enforces for the mobile app, now on the desktop web UI too.
-    Also increments the technician's resolved_issues_count, and — if
-    this was their last open assignment — sets them back to
-    'available'."""
+    """Marks an assignment (and its linked issue, for a repair) resolved.
+    Only valid from 'in_progress'. Requires resolution notes
+    (phase_8.pdf's workflow lists 'Save resolution notes' as part of a
+    technician's update to an issue) — if notes were already saved via
+    save_notes() above, the field is pre-filled here and this just
+    confirms them. Also requires a completion photo (uploaded
+    separately via upload_photo() below) to already be attached —
+    mirrors the same rule app/routes/api_v1/technician.py's
+    complete_assignment() enforces for the mobile app, now on the
+    desktop web UI too. Also increments the technician's
+    resolved_issues_count, and — if this was their last open
+    assignment — sets them back to 'available'.
+
+    Bug fix: an installation-type assignment has no technical_issue
+    (see Assignment's docstring in app/models.py) — the old code
+    unconditionally wrote to assignment.technical_issue.status,
+    raising an AttributeError (500) the moment a technician tried to
+    complete an installation. Guarded the same way start_assignment()
+    above already was fixed. Also now requires the technician's own
+    on-site GPS pin (pin_assignment_location() above) before an
+    installation can be completed, matching the mobile app's rule —
+    see that route's docstring.
+
+    Note: unlike the mobile app, this does not yet auto-activate the
+    subscriber / assign a port / create a NAP row on completing an
+    installation (Phase 29 in api_v1/technician.py) — the desktop UI
+    has no port-picker yet. An installation completed here still needs
+    that follow-up done by an administrator for now."""
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
@@ -359,6 +423,11 @@ def complete_assignment(assignment_id):
 
     if not assignment.photo_filename:
         flash("A completion photo is required before this assignment can be marked complete.", "warning")
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    is_installation = assignment.service_request_id is not None
+    if is_installation and (assignment.pin_latitude is None or assignment.pin_longitude is None):
+        flash("Pin your on-site location before this installation can be marked complete.", "warning")
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     form = ResolutionNotesForm()
@@ -371,13 +440,16 @@ def complete_assignment(assignment_id):
     assignment.resolution_notes = form.resolution_notes.data.strip()
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
-    assignment.technical_issue.status = "resolved"
-    # A Fiber Break's other connected subscribers never get their own
-    # Assignment (see resolve_fiber_break_siblings()'s docstring) --
-    # resolve them together with the one that was actually dispatched
-    # so their markers/tickets don't keep showing the outage as open.
-    resolve_fiber_break_siblings(assignment.technical_issue)
-    profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
+
+    if assignment.technical_issue is not None:
+        assignment.technical_issue.status = "resolved"
+        # A Fiber Break's other connected subscribers never get their own
+        # Assignment (see resolve_fiber_break_siblings()'s docstring) --
+        # resolve them together with the one that was actually dispatched
+        # so their markers/tickets don't keep showing the outage as open.
+        resolve_fiber_break_siblings(assignment.technical_issue)
+        profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
+        notify_issue_status_change(assignment.technical_issue)
 
     still_has_open_work = (
         Assignment.query.filter(
@@ -390,11 +462,13 @@ def complete_assignment(assignment_id):
     if not still_has_open_work:
         profile.status = "available"
 
-    notify_issue_status_change(assignment.technical_issue)
     db.session.commit()
 
-    issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
-    flash(f"{issue_label} marked complete. Nice work!", "success")
+    if assignment.technical_issue is not None:
+        issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
+        flash(f"{issue_label} marked complete. Nice work!", "success")
+    else:
+        flash("Installation marked complete. Nice work!", "success")
     return redirect(url_for("technician.index"))
 
 
