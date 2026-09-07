@@ -75,7 +75,7 @@ Routes:
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 import cloudinary
 import cloudinary.uploader
@@ -83,12 +83,13 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, g
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Technician, Assignment, Nap
+from app.models import Technician, Assignment, Nap, Subscriber
 from app.forms import ResolutionNotesForm
-from app.notifications_utils import notify_issue_status_change
+from app.notifications_utils import notify, notify_issue_status_change
 from app.issue_utils import resolve_fiber_break_siblings
 from app.nap_recommendation import recommend_naps
-from app.nap_status import slot_usage
+from app.nap_status import slot_usage, sync_nap_status
+from app.routes.service_requests import _sync_subscriber_nap
 from app.routes.api_v1.technician import (
     _assignment_nap, _nap_occupied_ports, _validate_port_number, _subscriber_installed_port_number,
 )
@@ -512,14 +513,21 @@ def complete_assignment(assignment_id):
     installation can be completed, matching the mobile app's rule —
     see that route's docstring.
 
-    Note: unlike the mobile app, this does not yet auto-activate the
-    subscriber (Phase 29 in api_v1/technician.py) on completing an
-    installation — that's a bigger follow-up (creating the Subscriber
-    row, syncing NAP occupancy, etc.) the desktop UI doesn't attempt.
-    It now DOES require picking a NAP + port for a New Installation
-    ticket, though — same _validate_port_number() rule the mobile app
-    uses, so the port actually gets recorded either way; an
-    administrator just still needs to flip the subscriber active."""
+    Bug fix: this now matches the mobile app's Phase 29/36/37/38
+    auto-activation behavior exactly (see api_v1/technician.py's
+    complete_assignment() docstring) instead of stopping at
+    assignment.status = "completed". Previously, completing a job from
+    the desktop web UI left service_request.status stuck at whatever
+    it was (so the ticket still showed as pending), never created the
+    real Nap row for an "Add NAP" ticket (so it never appeared on the
+    GeoMap), never provisioned/activated the Subscriber for a walk-in
+    New Installation, and never called _sync_subscriber_nap()/
+    sync_nap_status() (so an existing subscriber's connector line and
+    the NAP's occupancy/status badge never updated either) -- the same
+    installation, completed from a phone, did all of this correctly.
+    The web technician UI is the one being changed here to match the
+    mobile app's already-correct behavior; the mobile flow itself is
+    untouched."""
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
@@ -582,6 +590,77 @@ def complete_assignment(assignment_id):
         resolve_fiber_break_siblings(assignment.technical_issue)
         profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
         notify_issue_status_change(assignment.technical_issue)
+
+    # Phase 29/36/37/38 (auto-activation) -- ported from
+    # api_v1/technician.py's complete_assignment() so completing an
+    # installation from the desktop web UI behaves exactly like
+    # completing it from the mobile app: the ServiceRequest is closed
+    # out, an "Add NAP" ticket's real Nap row gets created (so it can
+    # show up on the GeoMap), a walk-in New Installation's Subscriber
+    # gets provisioned/activated, and the NAP <-> Subscriber sync +
+    # status recompute both run. See that function's docstring for the
+    # full reasoning behind each step; this block is kept identical on
+    # purpose so the two entry points never drift apart again.
+    if assignment.service_request is not None:
+        service_request = assignment.service_request
+        subscriber = service_request.subscriber
+        service_request.status = "completed"
+
+        if service_request.request_type == "add_nap":
+            nap_code = service_request.planned_nap_code
+            if not nap_code or Nap.query.filter_by(nap_code=nap_code).first() is not None:
+                candidate_number = Nap.query.count() + 1
+                nap_code = f"N-{candidate_number:03d}"
+                while Nap.query.filter_by(nap_code=nap_code).first() is not None:
+                    candidate_number += 1
+                    nap_code = f"N-{candidate_number:03d}"
+
+            total_ports = service_request.port_capacity or 8
+            nap = Nap(
+                nap_code=nap_code,
+                name=service_request.full_name or f"NAP {nap_code}",
+                address=service_request.address,
+                latitude=assignment.pin_latitude or service_request.latitude,
+                longitude=assignment.pin_longitude or service_request.longitude,
+                total_ports=total_ports,
+                used_ports=0,
+                available_ports=total_ports,
+                status="active",
+            )
+            db.session.add(nap)
+
+        if subscriber is None and is_new_installation:
+            subscriber = Subscriber(
+                subscriber_code=f"PENDING-{assignment.id}",
+                full_name=service_request.full_name or "Walk-in customer",
+                address=service_request.address,
+                latitude=assignment.pin_latitude or service_request.latitude,
+                longitude=assignment.pin_longitude or service_request.longitude,
+                contact_number=service_request.contact_number,
+                plan_type=service_request.plan_label,
+                status="active",
+            )
+            db.session.add(subscriber)
+            db.session.flush()  # assigns subscriber.id
+            subscriber.subscriber_code = f"SUB-{subscriber.id:04d}"
+            service_request.subscriber_id = subscriber.id
+
+        if subscriber is not None:
+            subscriber.status = "active"
+            subscriber.installed_at = date.today()
+            _sync_subscriber_nap(service_request)
+            db.session.flush()
+            if subscriber.nap is not None:
+                sync_nap_status(subscriber.nap)
+            notify(
+                "service_request",
+                "You're connected!",
+                f"Your installation is complete — {subscriber.subscriber_code} is now active. "
+                "Welcome to PG Networks!",
+                customer_user_id=subscriber.user_id,
+                entity_type="service_request",
+                entity_id=service_request.id,
+            )
 
     still_has_open_work = (
         Assignment.query.filter(
