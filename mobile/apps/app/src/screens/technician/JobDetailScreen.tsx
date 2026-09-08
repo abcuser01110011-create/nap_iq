@@ -534,6 +534,27 @@ export default function JobDetailScreen({ route, navigation }: any) {
   };
 
   const handleComplete = () => {
+    // Guards against the exact race this was added for: cable-path
+    // recording is its own separate network call (handleStopRecordingPath's
+    // recordCablePath), independent of completeJob below. Without this,
+    // tapping Mark complete while that save is still in flight — or
+    // worse, while a recording is still actively running and was never
+    // stopped — can let completeJob's request reach the server and
+    // promote the (still-empty) cable path before the recording ever
+    // gets there, silently leaving the GeoMap showing a straight line
+    // even though the technician really did record and save a real
+    // walked route. The button is already disabled for both states
+    // (see the primaryButtonDisabled/onPress wiring below), but a
+    // straight function call from elsewhere isn't guaranteed to check
+    // that, so it's re-checked here too.
+    if (recordingPath) {
+      setError("Stop and save the cable path recording before marking this job complete.");
+      return;
+    }
+    if (pathSaving) {
+      setError("The cable path is still saving — wait a moment, then try again.");
+      return;
+    }
     if (!assignment.photo_url) {
       setError("Add a completion photo before marking this job complete.");
       return;
@@ -1161,10 +1182,21 @@ export default function JobDetailScreen({ route, navigation }: any) {
           )}
           {canComplete && (
             <TouchableOpacity
-              style={[styles.primaryButton, styles.completeButton]}
+              style={[
+                styles.primaryButton,
+                styles.completeButton,
+                (recordingPath || pathSaving) && styles.primaryButtonDisabled,
+              ]}
               onPress={handleComplete}
+              disabled={recordingPath || pathSaving}
             >
-              <Text style={styles.primaryButtonText}>Mark complete</Text>
+              <Text style={styles.primaryButtonText}>
+                {recordingPath
+                  ? "Stop cable path recording first"
+                  : pathSaving
+                  ? "Saving cable path…"
+                  : "Mark complete"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1338,5 +1370,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   completeButton: { backgroundColor: colors.success },
+  primaryButtonDisabled: { opacity: 0.5 },
   primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
 });
