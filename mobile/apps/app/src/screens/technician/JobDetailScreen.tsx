@@ -30,6 +30,17 @@ import { PRIORITY_COLORS, REQUEST_TYPE_LABELS, STATUS_LABELS, priorityLabel, tic
 // plain setTimeout below.
 const LOCATION_FIX_TIMEOUT_MS = 20000;
 
+// A GPS fix reporting a worse (larger) margin of error than this,
+// in meters, is dropped rather than added to a cable-path recording
+// (see handleStartRecordingPath's watchPositionAsync callback below).
+// Consumer phone GPS commonly reports 5-10m accuracy even with clear
+// sky, and worse under tree cover or near buildings -- this threshold
+// is set loose enough to still accept a normal outdoor fix, while
+// rejecting the occasional much-worse reading that would otherwise
+// visibly distort a short recorded path (where a NAP and its
+// subscriber are often only a few meters apart to begin with).
+const MAX_ACCEPTABLE_FIX_ACCURACY_M = 15;
+
 function InfoRow({
   label,
   value,
@@ -420,15 +431,46 @@ export default function JobDetailScreen({ route, navigation }: any) {
 
       const subscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
+          // BestForNavigation asks the GPS chip for its tightest fix
+          // (favors satellite-only over any faster but coarser
+          // network/cell-assisted position) -- worth the extra
+          // battery/time per fix specifically for this feature, since
+          // a NAP and its subscriber are very often only a few
+          // meters apart and every bit of precision matters at that
+          // scale, unlike the one-shot "roughly where is this
+          // technician" fix handlePinLocation above only needs.
+          accuracy: Location.Accuracy.BestForNavigation,
           // A new fix at most every 2 seconds, and only once the
-          // technician has actually moved ~3 meters — enough to trace
-          // a walked cable run without flooding pathPoints with
-          // near-duplicate points from standing still at either end.
+          // technician has actually moved ~1 meter -- tightened down
+          // from the original 3m specifically so a short walk (a NAP
+          // and subscriber a few meters apart) still captures enough
+          // points to show real shape instead of just two points at
+          // either end. Still nowhere near flooding pathPoints --
+          // MAX_CABLE_PATH_POINTS below is a generous ceiling that
+          // isn't realistic to hit even for a long run at this
+          // interval.
           timeInterval: 2000,
-          distanceInterval: 3,
+          distanceInterval: 1,
         },
         (position) => {
+          // position.coords.accuracy is the GPS chip's own reported
+          // margin of error (meters, radius) for this specific fix --
+          // not a fixed number, it varies fix-to-fix with sky view,
+          // satellite geometry, tree cover, nearby buildings, etc.
+          // Dropping a fix this unreliable prevents one bad reading
+          // from yanking the drawn line off to the side of the real
+          // route -- better to have fewer, trustworthy points than
+          // more points where some are noise. MAX_ACCEPTABLE_FIX_ACCURACY_M
+          // below is deliberately generous (not every device/location
+          // will ever report better than this) rather than tuned to
+          // reject "everything except a perfect fix", which would
+          // leave most technicians unable to record anything at all.
+          if (
+            typeof position.coords.accuracy === "number" &&
+            position.coords.accuracy > MAX_ACCEPTABLE_FIX_ACCURACY_M
+          ) {
+            return;
+          }
           const { latitude, longitude } = position.coords;
           setPathPoints((prev) => [...prev, { latitude, longitude }]);
         }
