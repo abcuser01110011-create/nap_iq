@@ -155,6 +155,47 @@ export default function JobDetailScreen({ route, navigation }: any) {
     };
   }, []);
 
+  // Guards against silently losing an in-progress cable-path
+  // recording. pathPoints only ever lives in this component's local
+  // state until "Stop & Save" actually posts it to the server (see
+  // handleStopRecordingPath below) — so backing out of this screen
+  // mid-recording (hardware back button, swipe-back, tapping into
+  // another tab) previously discarded the whole walked trail with no
+  // save and no warning, leaving the technician with nothing to show
+  // for a route they physically just walked. This is very likely
+  // what's behind "I recorded the path but the GeoMap line is still
+  // straight" reports: the recording never made it to the server in
+  // the first place because the screen was left before tapping Stop
+  // & Save. Only intercepts navigation while recordingPath is true —
+  // once it's stopped (saved or explicitly discarded), leaving the
+  // screen behaves normally.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+      if (!recordingPath) return;
+      e.preventDefault();
+      Alert.alert(
+        "Cable path recording in progress",
+        "You haven't saved the recorded route yet. Leaving now will discard everything you've walked so far.",
+        [
+          { text: "Keep Recording", style: "cancel" },
+          {
+            text: "Discard & Leave",
+            style: "destructive",
+            onPress: () => {
+              locationSubscriptionRef.current?.remove();
+              locationSubscriptionRef.current = null;
+              setRecordingPath(false);
+              setPathPoints([]);
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ]
+      );
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, recordingPath]);
+
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
 
