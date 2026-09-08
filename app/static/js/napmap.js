@@ -1685,21 +1685,44 @@
             // otherwise the color of their worst open issue's priority
             // (same palette the issue markers/legend already use), so
             // a glance at the map shows which links are unhealthy.
+            //
+            // subscriber.cable_path (see /api/subscribers) is the
+            // actual GPS trail a technician walked while running this
+            // drop cable (record_cable_path() in
+            // api_v1/technician.py) -- when present, the line is
+            // drawn through those real waypoints instead of a plain
+            // NAP<->subscriber straight guess. Rendered solid (no
+            // dashArray) specifically so a real recorded route is
+            // visually distinguishable at a glance from the dashed
+            // straight-line guess every other connection still falls
+            // back to.
             const nap = findNapById(subscriber.nap_id);
             if (nap) {
-                const line = L.polyline(
-                    [
-                        [subscriber.latitude, subscriber.longitude],
-                        [nap.latitude, nap.longitude],
-                    ],
-                    {
-                        color: getSubscriberConnectionColor(subscriber.id),
-                        weight: 2.5,
-                        opacity: 0.8,
-                        dashArray: "4,4",
-                        interactive: false,
-                    }
-                );
+                const recordedPath = Array.isArray(subscriber.cable_path) && subscriber.cable_path.length >= 2
+                    ? subscriber.cable_path
+                    : null;
+                const latlngs = recordedPath
+                    ? recordedPath.map((p) => [p.latitude, p.longitude])
+                    : [
+                          [subscriber.latitude, subscriber.longitude],
+                          [nap.latitude, nap.longitude],
+                      ];
+                const line = L.polyline(latlngs, {
+                    color: getSubscriberConnectionColor(subscriber.id),
+                    weight: recordedPath ? 3 : 2.5,
+                    opacity: 0.85,
+                    dashArray: recordedPath ? null : "4,4",
+                    // Only the recorded-path line needs to be
+                    // hoverable -- the straight-line guess has nothing
+                    // extra to say beyond what the subscriber marker's
+                    // own popup already covers.
+                    interactive: !!recordedPath,
+                });
+                if (recordedPath) {
+                    line.bindTooltip("Recorded cable path (" + recordedPath.length + " GPS points)", {
+                        sticky: true,
+                    });
+                }
                 subscriberConnectionLayer.addLayer(line);
             }
         });

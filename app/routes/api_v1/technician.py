@@ -55,9 +55,14 @@ Routes:
     POST /api/v1/technician/assignments/<id>/pin-location -> pin_assignment_location
                                                              (install-only; replaces the
                                                              signature requirement)
+    POST /api/v1/technician/assignments/<id>/cable-path   -> record_cable_path
+                                                             (install-only; optional --
+                                                             the walked route of the
+                                                             drop cable itself)
     POST /api/v1/technician/assignments/<id>/complete    -> complete_assignment
 """
 
+import json
 import uuid
 from datetime import date, datetime
 from io import BytesIO
@@ -83,7 +88,7 @@ except ImportError:  # pragma: no cover - exercised only if the dep is missing
 
 from app.extensions import db
 from app.jwt_auth import jwt_role_required
-from app.models import Assignment, Nap, ServiceRequest, Subscriber, Technician, TechnicalIssue
+from app.models import Assignment, CablePath, Nap, ServiceRequest, Subscriber, Technician, TechnicalIssue
 from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
@@ -384,6 +389,16 @@ def _serialize_assignment(assignment: Assignment) -> dict:
         # Only ever non-null for an installation.
         "pin_latitude": float(assignment.pin_latitude) if assignment.pin_latitude is not None else None,
         "pin_longitude": float(assignment.pin_longitude) if assignment.pin_longitude is not None else None,
+        # Point count only (not the raw coordinates) -- enough for the
+        # Job Detail screen to show "Cable path recorded (214 points)"
+        # after an app restart / offline sync without shipping the
+        # whole breadcrumb trail back down. See record_cable_path()
+        # below.
+        "cable_path_point_count": (
+            len(json.loads(assignment.cable_path_points))
+            if assignment.cable_path_points
+            else 0
+        ),
         "issue": {
             "id": issue.id,
             "issue_code": issue.issue_code,
@@ -897,6 +912,83 @@ def pin_assignment_location(assignment_id):
     return jsonify(assignment=_serialize_assignment(assignment)), 200
 
 
+# A generous but sane ceiling on how many breadcrumb points one
+# recording can carry -- a technician walking even a very long drop
+# run at a normal GPS sample rate (Location.watchPositionAsync's
+# default ~1/sec on the Job Detail screen) won't come close to this;
+# it exists purely to stop a malformed/malicious payload from writing
+# an unbounded blob into cable_path_points.
+MAX_CABLE_PATH_POINTS = 5000
+
+
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/cable-path", methods=["POST"])
+@jwt_role_required("technician")
+def record_cable_path(assignment_id):
+    """Saves the GPS breadcrumb trail the technician walked while
+    running the drop cable from the NAP to the subscriber's premises
+    on an installation — the "exact route on the ground" the GeoMap's
+    plain straight NAP<->subscriber line (see napmap.js's
+    renderSubscriberMarkers()) can't show on its own.
+
+    Optional, unlike pin-location above: nothing here blocks
+    complete_assignment() if it's never called. Staged onto the
+    Assignment itself first (assignment.cable_path_points), same
+    reasoning as pin_latitude/pin_longitude -- a walk-in installation's
+    Subscriber row doesn't exist yet while the technician is on-site.
+    complete_assignment() below copies it into a CablePath row once
+    the subscriber/NAP link is actually established.
+
+    Body: {"points": [{"latitude": .., "longitude": ..}, ...]} in the
+    order they were recorded. Replaces any previously-saved trail for
+    this assignment outright (e.g. the technician tapped Stop, then
+    Start again to redo a section) rather than appending -- the mobile
+    screen is expected to send the complete trail each time, not just
+    new points since the last call.
+    """
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.service_request_id is None:
+        return jsonify(error="A cable path only applies to an installation assignment."), 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return jsonify(error="A cable path can only be recorded on an assignment you've accepted or started."), 409
+
+    data = request.get_json(silent=True) or {}
+    points = data.get("points")
+    if not isinstance(points, list) or len(points) < 2:
+        return jsonify(error="points must be a list of at least 2 {latitude, longitude} coordinates."), 400
+    if len(points) > MAX_CABLE_PATH_POINTS:
+        return jsonify(error=f"points cannot exceed {MAX_CABLE_PATH_POINTS} coordinates."), 400
+
+    cleaned_points = []
+    for point in points:
+        if not isinstance(point, dict):
+            return jsonify(error="Each point must be an object with latitude and longitude."), 400
+        lat = point.get("latitude")
+        lng = point.get("longitude")
+        if lat is None or lng is None:
+            return jsonify(error="Each point must include latitude and longitude."), 400
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            return jsonify(error="latitude/longitude must be numbers."), 400
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return jsonify(error="latitude/longitude are out of range."), 400
+        cleaned_points.append({"latitude": lat, "longitude": lng})
+
+    assignment.cable_path_points = json.dumps(cleaned_points)
+    db.session.commit()
+
+    return jsonify(assignment=_serialize_assignment(assignment)), 200
+
+
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/nearby-naps", methods=["GET"])
 @jwt_role_required("technician")
 def nearby_naps(assignment_id):
@@ -1247,6 +1339,26 @@ def complete_assignment(assignment_id):
             db.session.flush()
             if subscriber.nap is not None:
                 sync_nap_status(subscriber.nap)
+                # Promote whatever GPS trail the technician recorded
+                # while running the cable (see record_cable_path()
+                # above) from the assignment-level staging column into
+                # this subscriber's real, queryable CablePath row, so
+                # the GeoMap can draw the actual walked route instead
+                # of a straight line. Upserted (not just created) since
+                # a subscriber's CablePath row already exists if this
+                # is a relocation/re-run over a previous installation.
+                # Silently does nothing if the technician skipped the
+                # optional recording step -- that subscriber's
+                # connector line just stays a straight line, same as
+                # every subscriber did before this feature existed.
+                if assignment.cable_path_points:
+                    existing_path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
+                    if existing_path is None:
+                        existing_path = CablePath(subscriber_id=subscriber.id)
+                        db.session.add(existing_path)
+                    existing_path.nap_id = subscriber.nap.id
+                    existing_path.source_assignment_id = assignment.id
+                    existing_path.points = assignment.cable_path_points
             notify(
                 "service_request",
                 "You're connected!",

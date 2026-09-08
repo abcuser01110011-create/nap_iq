@@ -235,6 +235,17 @@ class Subscriber(db.Model):
         "Payment", back_populates="subscriber",
         order_by="Payment.payment_date.desc()",
     )
+    # The real-world drop-cable route to this subscriber's linked NAP,
+    # if a technician has ever recorded one — see CablePath's
+    # docstring. uselist=False: at most one path per subscriber (the
+    # one for however they're currently connected); a later
+    # re-install/relocation overwrites it rather than accumulating
+    # history, same as nap_id itself only ever reflecting the current
+    # connection.
+    cable_path = db.relationship(
+        "CablePath", back_populates="subscriber", uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<Subscriber {self.subscriber_code}>"
@@ -552,6 +563,23 @@ class Assignment(db.Model):
     # assignment has no pin-location step and these stay NULL.
     pin_latitude = db.Column(db.Numeric(10, 7), nullable=True)
     pin_longitude = db.Column(db.Numeric(10, 7), nullable=True)
+    # The actual route the technician walked while running the drop
+    # cable from the NAP to the subscriber's premises, recorded on the
+    # mobile Job Detail screen (Location.watchPositionAsync breadcrumbs
+    # — see record_cable_path() in api_v1/technician.py and
+    # JobDetailScreen.tsx's "Record Cable Path" step). Stored here
+    # first (same staging pattern as pin_latitude/pin_longitude above,
+    # since a walk-in installation's Subscriber row doesn't exist yet
+    # while the technician is on-site) and copied into a CablePath row
+    # once the subscriber/NAP link is established at completion — see
+    # complete_assignment()'s docstring. A JSON-encoded string
+    # (rather than a dedicated child table) because these are only
+    # ever read/written as one whole ordered list, never queried
+    # point-by-point. Only ever set for an installation assignment;
+    # NULL for a repair, and NULL until the technician actually
+    # records a walk (this step is optional, not required to
+    # complete the job — see JobDetailScreen.tsx's docstring).
+    cable_path_points = db.Column(db.Text, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -585,6 +613,60 @@ class Assignment(db.Model):
             else f"request={self.service_request_id}"
         )
         return f"<Assignment {source} tech={self.technician_id}>"
+
+
+class CablePath(db.Model):
+    """The actual real-world route a drop cable takes from a NAP to a
+    subscriber's premises — an ordered list of GPS points recorded by
+    a technician walking the run on the mobile Job Detail screen,
+    instead of the GeoMap simply drawing a straight line between the
+    two endpoints (see napmap.js's renderSubscriberMarkers()).
+
+    One row per subscriber (subscriber_id is UNIQUE) since a
+    subscriber has exactly one live connection at a time — the same
+    "current connection only" rule subscribers.nap_id already follows.
+    `points` is a JSON-encoded string (kept as db.Text for the same
+    MySQL-version-portability reason as elsewhere in this file rather
+    than a native JSON column type) — a list of
+    `{"latitude": ..., "longitude": ...}` objects, in walked order.
+
+    Populated at installation-completion time (see
+    complete_assignment() in both app/routes/technician.py and
+    app/routes/api_v1/technician.py) from whatever the technician
+    recorded onto Assignment.cable_path_points during the job; simply
+    never created if the technician skipped that optional step, in
+    which case the GeoMap falls back to its old straight-line
+    behavior for that subscriber (see the `cable_path` field on
+    GET /api/subscribers).
+    """
+
+    __tablename__ = "cable_paths"
+
+    id = db.Column(db.Integer, primary_key=True)
+    subscriber_id = db.Column(
+        db.Integer, db.ForeignKey("subscribers.id"), unique=True, nullable=False
+    )
+    nap_id = db.Column(db.Integer, db.ForeignKey("naps.id"), nullable=False)
+    # Which install job actually walked this route — kept for
+    # traceability only (e.g. "who recorded this"); not required to
+    # render the path itself. Nullable since the source assignment
+    # could in principle be deleted later without invalidating the
+    # already-captured path.
+    source_assignment_id = db.Column(
+        db.Integer, db.ForeignKey("assignments.id"), nullable=True
+    )
+    points = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    subscriber = db.relationship("Subscriber", back_populates="cable_path")
+    nap = db.relationship("Nap")
+    source_assignment = db.relationship("Assignment")
+
+    def __repr__(self):
+        return f"<CablePath subscriber={self.subscriber_id} nap={self.nap_id}>"
 
 
 class AppSettings(db.Model):

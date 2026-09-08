@@ -162,6 +162,11 @@ export interface Assignment {
    * marked complete. Null until pinned; always null for a repair. */
   pin_latitude: number | null;
   pin_longitude: number | null;
+  /** Number of GPS points in the technician-recorded cable path for
+   * this installation, or 0 if none has been recorded yet. See
+   * ApiClient.technician.recordCablePath(). Only ever non-zero for an
+   * installation; always 0 for a repair. */
+  cable_path_point_count: number;
   issue: AssignmentIssue | null;
   service_request: AssignmentServiceRequest | null;
   subscriber: AssignmentSubscriber | null;

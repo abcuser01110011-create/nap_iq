@@ -41,10 +41,12 @@ endpoint was needed rather than reusing the existing
 service-request-scoped one.
 """
 
+import json
+
 from flask import Blueprint, jsonify, g, abort, request
 
 from app.auth import role_required
-from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest
+from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, CablePath
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
 from app.routes.naps import _nap_port_assignments
@@ -247,6 +249,15 @@ def subscribers_json():
     no longer report a new issue (from the shared GeoMap "Report an
     Issue" form) against a subscriber they aren't already assigned
     to. An Administrator still sees every active subscriber.
+
+    Each subscriber also carries `cable_path` — the ordered list of
+    `{lat, lng}` points a technician actually walked while running
+    this subscriber's drop cable (see CablePath in app/models.py and
+    record_cable_path() in api_v1/technician.py), or `null` if no
+    technician has recorded one. napmap.js's connector-line renderer
+    draws through these points instead of a straight NAP<->subscriber
+    line when they're present, falling back to the old straight line
+    otherwise.
     """
     query = Subscriber.query.filter_by(status="active")
 
@@ -264,6 +275,19 @@ def subscribers_json():
             query = query.filter(Subscriber.id.in_(assigned_subscriber_ids))
 
     subscribers = query.order_by(Subscriber.full_name).all()
+
+    def _cable_path_points(subscriber):
+        path = subscriber.cable_path
+        if path is None or not path.points:
+            return None
+        try:
+            return json.loads(path.points)
+        except (TypeError, ValueError):
+            # Malformed/corrupt stored JSON -- fall back to no path
+            # rather than 500ing the whole subscriber feed over one
+            # bad row.
+            return None
+
     data = [
         {
             "id": s.id,
@@ -273,6 +297,7 @@ def subscribers_json():
             "latitude": float(s.latitude) if s.latitude is not None else None,
             "longitude": float(s.longitude) if s.longitude is not None else None,
             "nap_id": s.nap_id,
+            "cable_path": _cable_path_points(s),
         }
         for s in subscribers
     ]

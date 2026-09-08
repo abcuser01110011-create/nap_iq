@@ -370,6 +370,19 @@ export class ApiClient {
         `/api/v1/technician/assignments/${assignmentId}/pin-location`,
         { method: "POST", body: { latitude, longitude } }
       ),
+    /** Saves the GPS breadcrumb trail the technician walked while
+     * running the drop cable from the NAP to the subscriber's
+     * premises (see JobDetailScreen.tsx's "Cable path" card and
+     * record_cable_path() in api_v1/technician.py). Optional, unlike
+     * pinAssignmentLocation above — nothing requires this before an
+     * installation can be completed. Sends the whole recorded trail
+     * as one batch (not point-by-point), replacing any previously
+     * saved trail for this assignment outright. */
+    recordCablePath: (assignmentId: number, points: { latitude: number; longitude: number }[]) =>
+      this.request<{ assignment: Assignment }>(
+        `/api/v1/technician/assignments/${assignmentId}/cable-path`,
+        { method: "POST", body: { points } }
+      ),
     /** Nearest-suitable-NAP candidates for the assignment's already-
      * pinned on-site location (see pinAssignmentLocation above) — for
      * an installation dispatched with no NAP linked. Mirrors the

@@ -83,7 +83,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, abort, g
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Technician, Assignment, Nap, Subscriber
+from app.models import Technician, Assignment, CablePath, Nap, Subscriber
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify, notify_issue_status_change
 from app.issue_utils import resolve_fiber_break_siblings
@@ -652,6 +652,22 @@ def complete_assignment(assignment_id):
             db.session.flush()
             if subscriber.nap is not None:
                 sync_nap_status(subscriber.nap)
+                # Kept byte-for-byte identical to the mobile
+                # complete_assignment() in api_v1/technician.py (see
+                # that copy's comment for the full reasoning) so the
+                # two entry points never drift apart: promotes a
+                # technician-recorded cable-path GPS trail (only ever
+                # set via the mobile Job Detail screen — the desktop
+                # web UI has no way to walk a route) into a real
+                # CablePath row for the GeoMap to draw.
+                if assignment.cable_path_points:
+                    existing_path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
+                    if existing_path is None:
+                        existing_path = CablePath(subscriber_id=subscriber.id)
+                        db.session.add(existing_path)
+                    existing_path.nap_id = subscriber.nap.id
+                    existing_path.source_assignment_id = assignment.id
+                    existing_path.points = assignment.cable_path_points
             notify(
                 "service_request",
                 "You're connected!",

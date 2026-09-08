@@ -304,6 +304,14 @@ CREATE TABLE IF NOT EXISTS assignments (
     -- NULL for repair assignments.
     pin_latitude          DECIMAL(10,7) NULL,
     pin_longitude         DECIMAL(10,7) NULL,
+    -- The technician's walked GPS breadcrumb trail for the drop cable
+    -- run on this installation (see record_cable_path() in
+    -- api_v1/technician.py), JSON-encoded as a list of
+    -- {"latitude":..,"longitude":..} points. NULL until recorded --
+    -- this step is optional, not required to complete the job. Copied
+    -- into a cable_paths row (see that table below) once the
+    -- subscriber/NAP link is established at completion.
+    cable_path_points     TEXT NULL,
     completed_at          TIMESTAMP NULL,
     created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -324,6 +332,41 @@ CREATE TABLE IF NOT EXISTS assignments (
 -- won't retrofit an existing install):
 --   ALTER TABLE assignments
 --       ADD COLUMN port_number INT NULL AFTER dispatch_score;
+--   ALTER TABLE assignments
+--       ADD COLUMN cable_path_points TEXT NULL AFTER pin_longitude;
+
+-- ---------------------------------------------------------------------
+-- cable_paths: the real-world drop-cable route (walked GPS trail) from
+-- a NAP to a subscriber's premises, replacing the GeoMap's straight-line
+-- guess for any subscriber a technician has recorded one for. One row
+-- per subscriber (their current connection only, same "latest wins"
+-- rule subscribers.nap_id already follows) -- see CablePath's
+-- docstring in app/models.py.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cable_paths (
+    id                     INT AUTO_INCREMENT PRIMARY KEY,
+    subscriber_id          INT NOT NULL UNIQUE,
+    nap_id                 INT NOT NULL,
+    -- Which install job actually walked this route -- traceability
+    -- only, not required to render the path.
+    source_assignment_id   INT NULL,
+    -- JSON-encoded list of {"latitude":..,"longitude":..} points, in
+    -- walked order.
+    points                 TEXT NOT NULL,
+    created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                               ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_cable_paths_subscriber
+        FOREIGN KEY (subscriber_id) REFERENCES subscribers(id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_cable_paths_nap
+        FOREIGN KEY (nap_id) REFERENCES naps(id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_cable_paths_assignment
+        FOREIGN KEY (source_assignment_id) REFERENCES assignments(id)
+        ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
 -- app_settings: singleton row of admin-configurable app-level config

@@ -129,6 +129,32 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const [nearbyNapsError, setNearbyNapsError] = useState<string | null>(null);
   const [linkingNapId, setLinkingNapId] = useState<number | null>(null);
 
+  // Cable path recording — optional, new_installation-only step: the
+  // technician walks the actual drop-cable route from the NAP to the
+  // subscriber's premises with the app open, and this GPS breadcrumb
+  // trail is what the GeoMap draws instead of a plain straight line
+  // once the job is completed (see record_cable_path() in
+  // api_v1/technician.py and CablePath in app/models.py). Kept
+  // entirely local (pathPoints) while recording — nothing is sent to
+  // the server until the technician taps "Stop & Save", same
+  // "capture, then submit" shape as the photo/pin steps above rather
+  // than a point-by-point live upload.
+  const [recordingPath, setRecordingPath] = useState(false);
+  const [pathPoints, setPathPoints] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [pathSaving, setPathSaving] = useState(false);
+  const [pathError, setPathError] = useState<string | null>(null);
+  const locationSubscriptionRef = React.useRef<Location.LocationSubscription | null>(null);
+
+  // Stop any live GPS watch if the technician backs out of this screen
+  // mid-recording (e.g. to check the map) rather than leaving it
+  // running in the background and draining the battery for a job
+  // they're no longer looking at.
+  useEffect(() => {
+    return () => {
+      locationSubscriptionRef.current?.remove();
+    };
+  }, []);
+
   const pendingCount = pendingByAssignment[assignment.id] ?? 0;
   const conflict = conflicts[assignment.id];
 
@@ -318,6 +344,110 @@ export default function JobDetailScreen({ route, navigation }: any) {
     } finally {
       setLinkingNapId(null);
     }
+  };
+
+  // Fires when the technician taps "Start Recording" / "Re-record" on
+  // the Cable Path card. Same services-enabled -> permission check as
+  // handlePinLocation above, but starts a continuous
+  // Location.watchPositionAsync watch instead of a single timed fix —
+  // every subsequent fix is appended to pathPoints until the
+  // technician taps Stop & Save (handleStopRecordingPath) or Discard
+  // (handleDiscardRecording) below. Nothing is sent to the server
+  // here — this only runs locally while recording, same "capture,
+  // then submit as one batch" shape record_cable_path() in
+  // api_v1/technician.py expects.
+  const handleStartRecordingPath = async () => {
+    setPathError(null);
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setPathError("Location services are turned off on this device. Enable them in Settings, then try again.");
+        return;
+      }
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setPathError("Location permission was denied. Allow location access for PG Networks in your device settings, then try again.");
+        return;
+      }
+
+      // Re-recording a previous attempt starts a fresh trail rather
+      // than appending to whatever was captured (and discarded, or
+      // already saved) before.
+      setPathPoints([]);
+      setRecordingPath(true);
+
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          // A new fix at most every 2 seconds, and only once the
+          // technician has actually moved ~3 meters — enough to trace
+          // a walked cable run without flooding pathPoints with
+          // near-duplicate points from standing still at either end.
+          timeInterval: 2000,
+          distanceInterval: 3,
+        },
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setPathPoints((prev) => [...prev, { latitude, longitude }]);
+        }
+      );
+      locationSubscriptionRef.current = subscription;
+    } catch {
+      setPathError("Could not start recording your location. Please try again.");
+      setRecordingPath(false);
+    }
+  };
+
+  // Fires when the technician taps "Stop & Save". Stops the watch
+  // first regardless of what happens next (no reason to keep the GPS
+  // running once they've asked to stop, even if the save itself
+  // fails), then posts the full captured trail to
+  // client.technician.recordCablePath() — see record_cable_path() in
+  // api_v1/technician.py, which stages it on the assignment until
+  // complete_assignment() promotes it into a real CablePath row.
+  const handleStopRecordingPath = async () => {
+    locationSubscriptionRef.current?.remove();
+    locationSubscriptionRef.current = null;
+    setRecordingPath(false);
+
+    if (pathPoints.length < 2) {
+      setPathError("Not enough movement was recorded — try walking the route again.");
+      setPathPoints([]);
+      return;
+    }
+
+    if (!isOnline) {
+      setPathError("You're offline — connect to the internet to save the recorded path.");
+      return;
+    }
+
+    setPathError(null);
+    setPathSaving(true);
+    try {
+      const result = await client.technician.recordCablePath(assignment.id, pathPoints);
+      applyAssignmentUpdate(result.assignment);
+      setPathPoints([]);
+    } catch (err: any) {
+      setPathError(
+        err instanceof ApiError ? err.body.error ?? "Couldn't save the recorded path. Try again." : "Couldn't save the recorded path. Try again."
+      );
+    } finally {
+      setPathSaving(false);
+    }
+  };
+
+  // Fires when the technician taps "Discard" mid-recording (e.g. they
+  // took a wrong turn and want to redo the walk) — stops the watch
+  // and throws away whatever was captured so far without saving
+  // anything, leaving assignment.cable_path_point_count exactly as it
+  // was before this recording attempt started.
+  const handleDiscardRecording = () => {
+    locationSubscriptionRef.current?.remove();
+    locationSubscriptionRef.current = null;
+    setRecordingPath(false);
+    setPathPoints([]);
+    setPathError(null);
   };
 
   const handleComplete = () => {
@@ -859,6 +989,72 @@ export default function JobDetailScreen({ route, navigation }: any) {
                   No port selected yet — required before completing this installation.
                 </Text>
               )}
+            </View>
+          )}
+
+        {/* Cable path recording — optional, same gating as the NAP/Port
+            card above (a walked route only makes sense once we know
+            both endpoints: the linked NAP and the technician's pinned
+            on-site location). Not required by handleComplete(). */}
+        {isNewInstallationTicket &&
+          (canEditNotes || isClosed) &&
+          assignment.nap &&
+          assignment.pin_latitude != null &&
+          assignment.pin_longitude != null && (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Cable path (optional)</Text>
+
+              {recordingPath ? (
+                <>
+                  <View style={styles.photoUploadingRow}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.photoUploadingText}>
+                      Recording… {pathPoints.length} point{pathPoints.length === 1 ? "" : "s"} captured
+                    </Text>
+                  </View>
+                  <Text style={styles.notesText}>
+                    Walk the actual cable route from the NAP to the subscriber's premises, then tap Stop & Save.
+                  </Text>
+                  <View style={styles.photoButtonRow}>
+                    <TouchableOpacity
+                      style={styles.secondaryButtonSmall}
+                      onPress={handleStopRecordingPath}
+                      disabled={pathSaving}
+                    >
+                      <Text style={styles.secondaryButtonText}>Stop & Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.secondaryButtonSmall}
+                      onPress={handleDiscardRecording}
+                      disabled={pathSaving}
+                    >
+                      <Text style={styles.secondaryButtonText}>Discard</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.notesText}>
+                    {assignment.cable_path_point_count > 0
+                      ? `Cable path recorded (${assignment.cable_path_point_count} GPS points).`
+                      : "No cable path recorded yet. Recording the actual route helps the GeoMap show exactly where this cable runs, instead of a straight line."}
+                  </Text>
+                  {pathSaving && (
+                    <View style={styles.photoUploadingRow}>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={styles.photoUploadingText}>Saving recorded path…</Text>
+                    </View>
+                  )}
+                  {canEditNotes && !pathSaving && (
+                    <TouchableOpacity style={styles.secondaryButton} onPress={handleStartRecordingPath}>
+                      <Text style={styles.secondaryButtonText}>
+                        {assignment.cable_path_point_count > 0 ? "Re-record" : "Start Recording"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+              {pathError && <Text style={styles.error}>{pathError}</Text>}
             </View>
           )}
 
