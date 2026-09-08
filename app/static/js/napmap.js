@@ -242,7 +242,23 @@
 
         // Tiles themselves never change -- only the CSS filter toggles.
         if (!tileLayer) {
-            tileLayer = L.tileLayer(LIGHT_TILE_URL, { maxZoom: 19, attribution: LIGHT_TILE_ATTRIBUTION });
+            tileLayer = L.tileLayer(LIGHT_TILE_URL, {
+                // OpenStreetMap's tiles are only rendered up to z19
+                // natively (maxNativeZoom) -- past that there's no
+                // sharper imagery to fetch. maxZoom above 19 tells
+                // Leaflet it's still allowed to let the user scroll
+                // in further anyway, by upscaling the z19 tiles
+                // (blurrier basemap, but it buys real extra screen
+                // space between two markers/points that are only a
+                // few meters apart -- e.g. a NAP and its one
+                // subscriber ~10m apart, or a short recorded cable
+                // path -- which used to be indistinguishable once the
+                // map hit its old hard cap of 19 and simply wouldn't
+                // zoom in any further).
+                maxZoom: 21,
+                maxNativeZoom: 19,
+                attribution: LIGHT_TILE_ATTRIBUTION,
+            });
             tileLayer.addTo(map);
             tileLayer.bringToBack();
         }
@@ -913,11 +929,18 @@
     // itself lives on the panel element's class (see below).
     let openNapDetailNapId = null;
 
-    // Zoom level a NAP marker click flies in to -- close enough to see
-    // the individual NAP clearly (matches the zoom search results and
-    // "navigate here" links already fly to, e.g. selectNap() further
-    // down) without feeling like a jarring jump-cut.
-    const NAP_FOCUS_ZOOM = 18;
+    // Zoom level a NAP marker click flies in to -- matches the tile
+    // layer's own maxZoom (see LIGHT_TILE_URL's tileLayer() call
+    // above) so a focused NAP/subscriber is at the closest zoom the
+    // map actually supports. Bumped up from 18: at 18 a short
+    // technician-recorded cable path (record_cable_path() in
+    // api_v1/technician.py -- often just a few meters between a NAP
+    // and the subscriber right next to it) could be small enough on
+    // screen to be easy to miss/mistake for the marker icons
+    // themselves; true max zoom gives it enough screen space to
+    // actually see the walked route instead of a plain straight
+    // line.
+    const NAP_FOCUS_ZOOM = 19;
     // How long (seconds) the fly-in animation takes when the map
     // actually needs to zoom in (e.g. from the province-level
     // default). Kept snappy rather than the old 1.1s.
