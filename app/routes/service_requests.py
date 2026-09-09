@@ -161,6 +161,26 @@ def _sync_subscriber_nap(service_request):
         previous_nap = subscriber.nap
         subscriber.nap_id = service_request.requested_nap_id
         db.session.flush()
+        # SQLAlchemy bug fix: reading `subscriber.nap` just above (to
+        # capture previous_nap) loads and CACHES that relationship on
+        # this object -- for a subscriber who had no NAP yet, that's a
+        # cached `None`. Changing the raw `nap_id` column right after
+        # does NOT invalidate that cache by itself; every later read
+        # of `subscriber.nap` in this same request (including
+        # `sync_nap_status(subscriber.nap)` two lines below, and,
+        # critically, complete_assignment()'s
+        # `if subscriber.nap is not None:` guard in
+        # api_v1/technician.py, which is what actually gates promoting
+        # a technician's recorded cable path into a real CablePath
+        # row) kept silently returning that stale `None` even though
+        # nap_id was correctly saved to the database. This is exactly
+        # why a technician-recorded cable path never showed up for a
+        # brand-new walk-in installation no matter how correctly the
+        # recording itself was captured and saved -- expiring the
+        # cached attribute here forces every later read (in this
+        # function and every caller of it) to reload fresh off the
+        # just-updated nap_id instead.
+        db.session.expire(subscriber, ["nap"])
         # This just occupied a slot on the newly-assigned NAP (and, if
         # the subscriber was already linked elsewhere, freed one on
         # its previous NAP) -- see app/nap_status.py for why that has
