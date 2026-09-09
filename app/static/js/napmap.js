@@ -94,6 +94,18 @@
     // subscriber's line flagged red/orange forever.
     const OPEN_ISSUE_STATUSES = ["pending", "assigned", "in_progress"];
     const PRIORITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 };
+
+    // A technician-recorded cable path (see CablePath/record_cable_path()
+    // in the backend) is a raw GPS breadcrumb trail -- GPS drift means
+    // its first/last recorded point almost never lands exactly on the
+    // NAP or subscriber's own registered coordinates, so the drawn
+    // line visibly falls short of (or overshoots) the icon it's
+    // supposed to connect to. Rather than requiring pixel-perfect GPS,
+    // any endpoint within this radius of the icon it belongs to is
+    // snapped onto that icon's exact coordinates -- see
+    // snapCablePathEndpoints() below.
+    const CABLE_PATH_SNAP_METERS = 3;
+
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
     // "healthy" at a glance, same green as an Active NAP.
@@ -1635,6 +1647,53 @@
         if (marker) marker.openPopup();
     }
 
+    /**
+     * A recorded cable path's first/last GPS breadcrumb is only ever
+     * an *approximation* of where the technician actually stood at
+     * the NAP and at the subscriber's premises -- consumer-grade GPS
+     * commonly drifts a few meters, so the drawn line ends up visibly
+     * short of (or poking past) the icon it's meant to terminate at,
+     * even though the technician genuinely started/ended the walk
+     * right there.
+     *
+     * This snaps each endpoint onto its corresponding icon's exact
+     * coordinates whenever it's already within CABLE_PATH_SNAP_METERS
+     * of it, leaving the rest of the recorded route untouched. Points
+     * farther than that are left alone -- a large gap is a sign the
+     * technician genuinely started the recording elsewhere, not GPS
+     * noise, so silently snapping it would misrepresent the real
+     * route.
+     *
+     * `latlngs` is mutated in place (array of [lat, lng] pairs, as
+     * built for L.polyline() below) and also returned for convenience.
+     */
+    function snapCablePathEndpoints(latlngs, subscriberLatLng, napLatLng) {
+        if (!Array.isArray(latlngs) || latlngs.length < 2) return latlngs;
+
+        const first = L.latLng(latlngs[0]);
+        const last = L.latLng(latlngs[latlngs.length - 1]);
+
+        // Each endpoint is checked against both anchors (not just its
+        // "expected" one) since a technician may have walked the run
+        // in either direction -- NAP-to-subscriber or
+        // subscriber-to-NAP -- and recording order isn't guaranteed.
+        const snapIfClose = (point, index) => {
+            const distToSubscriber = point.distanceTo(subscriberLatLng);
+            const distToNap = napLatLng ? point.distanceTo(napLatLng) : Infinity;
+            const nearestAnchor =
+                distToSubscriber <= distToNap ? subscriberLatLng : napLatLng;
+            const nearestDist = Math.min(distToSubscriber, distToNap);
+            if (nearestAnchor && nearestDist <= CABLE_PATH_SNAP_METERS) {
+                latlngs[index] = [nearestAnchor.lat, nearestAnchor.lng];
+            }
+        };
+
+        snapIfClose(first, 0);
+        snapIfClose(last, latlngs.length - 1);
+
+        return latlngs;
+    }
+
     /** Rebuilds the subscriber marker layer from allSubscribers. Only
      * subscribers with known coordinates can be plotted — same
      * skip-if-unplottable rule /api/naps and /api/issues already use
@@ -1725,7 +1784,11 @@
                     ? subscriber.cable_path
                     : null;
                 const latlngs = recordedPath
-                    ? recordedPath.map((p) => [p.latitude, p.longitude])
+                    ? snapCablePathEndpoints(
+                          recordedPath.map((p) => [p.latitude, p.longitude]),
+                          L.latLng(subscriber.latitude, subscriber.longitude),
+                          L.latLng(nap.latitude, nap.longitude)
+                      )
                     : [
                           [subscriber.latitude, subscriber.longitude],
                           [nap.latitude, nap.longitude],
