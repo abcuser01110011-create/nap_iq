@@ -1080,35 +1080,96 @@
         });
     }
 
+    // Every required field for the ticket type currently showing,
+    // checked generically off which wrappers applyCategory() actually
+    // left visible rather than duplicating that per-type logic here
+    // — so this automatically stays correct if applyCategory()'s
+    // show/hide rules ever change. Returns a {fieldName: [message]}
+    // map in the same shape the server's own validation errors use
+    // (see showFieldErrors()), empty if nothing's missing.
+    function isFieldVisible(wrapperId) {
+        const el = document.getElementById(wrapperId);
+        return !!el && !el.classList.contains("d-none");
+    }
+
+    function validateRequiredFields() {
+        const errors = {};
+        const isAddNap = isAddNapForm();
+
+        // Identity field: exactly one of NAP / Subscriber / Customer
+        // Name is ever visible at a time (see applyCategory()).
+        if (isFieldVisible("ticketFormNapWrapper")) {
+            if (!document.getElementById("ticketFormNapId").value) {
+                errors.nap_id = ["Please select the affected NAP."];
+            }
+        } else if (isFieldVisible("ticketFormSubscriberWrapper")) {
+            if (!document.getElementById("ticketFormSubscriberId").value) {
+                errors.subscriber_id = ["Please select a subscriber."];
+            }
+        } else if (isFieldVisible("ticketFormCustomerNameWrapper")) {
+            if (!document.getElementById("ticketFormCustomerName").value.trim()) {
+                errors.full_name = [isAddNap ? "Please enter the NAP name." : "Please enter the customer's name."];
+            }
+        }
+
+        // New Installation only: Plan + Contact Number.
+        if (isFieldVisible("ticketFormSOExtraFields")) {
+            if (!document.getElementById("ticketFormPlan").value) {
+                errors.plan_label = ["Please select a plan."];
+            }
+            if (!document.getElementById("ticketFormContactNumber").value.trim()) {
+                errors.contact_number = ["Please enter a contact number."];
+            }
+        }
+
+        // Add NAP only: Port Capacity (NAP Code is read-only, never
+        // required from the admin).
+        if (isFieldVisible("ticketFormAddNapExtraFields")) {
+            if (!document.getElementById("ticketFormPortCapacity").value) {
+                errors.port_capacity = ["Please enter the port capacity."];
+            }
+        }
+
+        // Hidden entirely for Repair and Fiber Break (see
+        // applyCategory()'s hideBarangay) -- skipped automatically
+        // for those since the wrapper itself is d-none.
+        if (isFieldVisible("ticketFormBarangayWrapper")) {
+            if (!document.getElementById("ticketFormBarangayInput").value.trim()) {
+                errors.barangay = ["Please select a barangay."];
+            }
+        }
+
+        // Common to every type.
+        if (!document.getElementById("ticketFormAssignedTeam").value) {
+            errors.assigned_team = ["Please assign a technician."];
+        }
+        if (!addedTechnicians.length) {
+            errors.technicians = ["Please add at least one assisting technician."];
+        }
+        if (!document.getElementById("ticketFormScheduled").value) {
+            errors.scheduled = ["Please choose a scheduled date."];
+        }
+        if (!document.getElementById("ticketFormDescription").value.trim()) {
+            errors.description = ["Please enter a description."];
+        }
+
+        return errors;
+    }
+
     function handleSubmit(event) {
         event.preventDefault();
         document.getElementById("ticketFormGeneralError").classList.add("d-none");
         document.querySelectorAll("#ticketForm [data-error-for]").forEach((el) => (el.textContent = ""));
 
-        const isFiberBreak = isFiberBreakForm();
-        const isAddNap = isAddNapForm();
-
-        if (isFiberBreak) {
-            // Fiber Break needs the affected NAP, not a subscriber.
-            if (!document.getElementById("ticketFormNapId").value) {
-                showGeneralError("Please select the affected NAP.");
-                return;
-            }
-        } else if (currentCategory === "TN") {
-            // TN still needs a real subscriber match -- the backend
-            // requires the pin to exactly match a registered
-            // subscriber's location.
-            if (!document.getElementById("ticketFormSubscriberId").value) {
-                showGeneralError("Please select a subscriber.");
-                return;
-            }
-        } else if (!document.getElementById("ticketFormCustomerName").value.trim()) {
-            // SO's Customer field is free text -- just needs something
-            // typed, not a match against any existing record. "Add
-            // NAP" repurposes the same field for the NAP's name.
-            showGeneralError(isAddNap ? "Please enter the NAP name." : "Please enter the customer's name.");
+        const errors = validateRequiredFields();
+        if (Object.keys(errors).length) {
+            showFieldErrors(errors);
+            showGeneralError("Please fill in all required fields before submitting.");
             return;
         }
+
+        const isFiberBreak = isFiberBreakForm();
+        const isAddNap = isAddNapForm();
 
         const submitBtn = document.getElementById("ticketFormSubmitBtn");
         submitBtn.disabled = true;
