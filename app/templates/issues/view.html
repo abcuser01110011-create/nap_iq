@@ -170,6 +170,6 @@
 
 {% block extra_scripts %}
 {% if current_user.role == 'administrator' %}
-<script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tickets.js') }}?v={{ asset_version('js/tickets.js') }}"></script>
 {% endif %}
 {% endblock %}

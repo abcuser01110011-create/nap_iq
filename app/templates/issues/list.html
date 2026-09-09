@@ -237,5 +237,5 @@
         window.location.reload();
     });
 </script>
-<script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tickets.js') }}?v={{ asset_version('js/tickets.js') }}"></script>
 {% endblock %}

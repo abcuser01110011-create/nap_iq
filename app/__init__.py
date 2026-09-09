@@ -196,6 +196,37 @@ def create_app(config_class: type = Config) -> Flask:
 
         return {"sidebar_badges": sidebar_badge_counts(g.get("user"))}
 
+    @app.context_processor
+    def inject_asset_version():
+        """Cache-busting helper for the JS/CSS <script>/<link> tags that
+        get iterated on often (napmap.js, tickets.js, etc.) -- appends
+        a `?v=<mtime>` built from the file's own last-modified time, so
+        every deploy that actually changes one of these files forces
+        browsers (and any reverse proxy/CDN in front of, e.g., Railway)
+        to fetch the new copy instead of continuing to serve whatever
+        was cached under that exact same URL from before the deploy.
+        Without this, replacing a static file on the server doesn't
+        guarantee anyone's browser ever sees the change -- someone
+        re-testing the same page/session can keep hitting old,
+        already-fixed bugs indefinitely and have no way to tell that's
+        what's happening. Falls back to "0" if the file can't be
+        stat'd (e.g. a typo'd filename) rather than crashing template
+        rendering over a caching nicety.
+
+        Usage in a template:
+            <script src="{{ url_for('static', filename='js/napmap.js') }}?v={{ asset_version('js/napmap.js') }}"></script>
+        """
+        import os
+
+        def asset_version(filename):
+            try:
+                full_path = os.path.join(app.static_folder, filename)
+                return str(int(os.path.getmtime(full_path)))
+            except OSError:
+                return "0"
+
+        return {"asset_version": asset_version}
+
     # ---- Register blueprints ----
     from app.routes.main import main_bp
     from app.routes.naps import naps_bp

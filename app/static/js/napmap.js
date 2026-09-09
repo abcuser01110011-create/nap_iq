@@ -1747,6 +1747,21 @@
                     });
                 }
                 subscriberConnectionLayer.addLayer(line);
+                // Two subscribers sharing (or very close to) the same
+                // NAP can end up with nearly-coincident lines. Without
+                // this, whichever subscriber happens to be later in
+                // allSubscribers' order draws its line on top of
+                // everything before it -- so a real recorded route
+                // (solid) can end up completely hidden underneath a
+                // later, unrelated subscriber's plain dashed
+                // straight-line guess, making a genuinely recorded
+                // path look like it was never saved at all.
+                // bringToFront() guarantees every recorded line wins
+                // that stacking fight regardless of fetch/render
+                // order, since it's the one line per subscriber that
+                // actually has something extra to show (the tooltip
+                // above).
+                if (recordedPath) line.bringToFront();
             }
         });
 

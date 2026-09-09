@@ -670,13 +670,13 @@
    file itself (same "let Jinja resolve the static path" reasoning as every
    <script src="{{ url_for('static', ...) }}"> tag on this page). #}
 <script>window.NAP_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
-<script src="{{ url_for('static', filename='js/napmap.js') }}"></script>
+<script src="{{ url_for('static', filename='js/napmap.js') }}?v={{ asset_version('js/napmap.js') }}"></script>
 {# "+ Tickets" quick-create dropdown/modal -- self-contained, loads
    after napmap.js only so it can piggyback on the Add NAP button's
    existing mode toggle for the "Add NAP" menu item; otherwise reads
    nothing from napmap.js's internal state and reads its own CSRF
    token from the same <meta name="csrf-token"> tag napmap.js uses. #}
-<script src="{{ url_for('static', filename='js/tickets.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tickets.js') }}?v={{ asset_version('js/tickets.js') }}"></script>
 {# Phase 8 (adapted onto Phase 23's navigation architecture):
    nav-origin.js defines window.NapIQNavOrigin (mirrors
    nav-destination.js) and must load before nav-origin-picker.js,
