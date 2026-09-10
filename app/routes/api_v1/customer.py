@@ -41,6 +41,7 @@ from app.jwt_auth import jwt_role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue, User
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
+from app.recommendation import auto_assign_recommended_technician
 
 api_v1_customer_bp = Blueprint("api_v1_customer", __name__, url_prefix="/api/v1/customer")
 
@@ -205,6 +206,26 @@ def _serialize_subscriber(subscriber: Subscriber) -> dict:
     }
 
 
+
+# Same tuple app/recommendation.py and app/routes/dispatch.py already
+# use for "still open" — kept in sync by hand, same as those two
+# modules already do with each other.
+_OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
+
+
+def _current_assigned_technician_name(issue: TechnicalIssue):
+    """The full name of whichever technician currently has an open
+    assignment for this issue, or `None` if it's still unassigned --
+    so a customer can see, right in their own issue list, who was
+    auto-dispatched to their report (see
+    app/recommendation.py:auto_assign_recommended_technician())
+    without needing separate staff-only dispatch-board access."""
+    for assignment in issue.assignments:
+        if assignment.status in _OPEN_ASSIGNMENT_STATUSES:
+            return assignment.technician.full_name
+    return None
+
+
 def _serialize_issue(issue: TechnicalIssue) -> dict:
     return {
         "id": issue.id,
@@ -218,6 +239,7 @@ def _serialize_issue(issue: TechnicalIssue) -> dict:
         # same convention as Assignment.photo_filename /
         # _serialize_assignment()'s "photo_url" in api_v1/technician.py.
         "photo_url": issue.photo_filename,
+        "assigned_technician_name": _current_assigned_technician_name(issue),
         "created_at": issue.created_at.isoformat() if issue.created_at else None,
         "updated_at": issue.updated_at.isoformat() if issue.updated_at else None,
     }
@@ -500,6 +522,16 @@ def report_issue():
     issue.issue_code = f"ISS-{issue.id:04d}"
     notify_new_issue_reported(issue)
     db.session.commit()
+
+    # Auto-dispatch to the top-recommended technician (see
+    # app/recommendation.py's auto_assign_recommended_technician()) so
+    # a self-reported issue lands directly on that technician's mobile
+    # job list instead of sitting on the dispatch board waiting for an
+    # Administrator to assign it by hand. Best-effort — if no
+    # technician is available right now, the issue simply stays
+    # 'pending' and an Administrator can still dispatch it manually;
+    # either way the report itself has already succeeded above.
+    auto_assign_recommended_technician(issue)
 
     return jsonify(issue=_serialize_issue(issue)), 201
 

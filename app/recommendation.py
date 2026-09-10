@@ -164,7 +164,9 @@ and `assignments.status` are both already indexed by
 import math
 from datetime import datetime
 
+from app.extensions import db
 from app.models import Assignment, Technician
+from app.notifications_utils import notify_issue_status_change
 
 # Same tuple app/routes/dispatch.py and app/routes/reports.py already
 # use — kept in sync by hand, same as those two already do with each
@@ -422,3 +424,63 @@ def get_recommendations(issue, limit=None):
         rows = rows[:limit]
 
     return rows
+
+
+def auto_assign_recommended_technician(issue):
+    """Auto-dispatch — self-reported issues only.
+
+    A `technical_issue` filed through the customer's own "Report an
+    Issue" flow (web portal `app/routes/customer.py:report_issue()`
+    and the mobile app's `app/routes/api_v1/customer.py:report_issue()`)
+    no longer waits on the dispatch board for an Administrator to pick
+    a technician by hand: it's immediately handed to whichever
+    technician `get_recommendations()` ranks first for it, so the
+    ticket lands straight on that technician's job list
+    (`technician/index.html` / `technician_mobile/jobs.html`).
+
+    Deliberately reuses `get_recommendations()` unchanged rather than a
+    separate "pick one" shortcut, so the technician an issue
+    auto-assigns to is always exactly the one an Administrator would
+    have seen ranked #1 on `dispatch/recommend.html` — same formula,
+    same weights, same candidate pool (see app/recommendation.py's
+    module docstring).
+
+    Creates the exact same kind of `assignments` row
+    `app/routes/dispatch.py`'s `assign()` route creates for a manual
+    dispatch (same fields, same `issue.status` transition, same
+    `notify_issue_status_change()` call, `dispatch_score` populated
+    from the candidate's `total_score`) so an auto-assigned ticket is
+    indistinguishable, once created, from one an Administrator
+    dispatched by hand.
+
+    Best-effort only: if the candidate pool is empty (e.g. every
+    technician is currently 'offline'), this does nothing and returns
+    `None` — the issue simply stays 'pending', exactly as it did
+    before this existed, and an Administrator can still dispatch it
+    manually from the board. It never raises, and it never blocks the
+    customer's report from succeeding.
+
+    Callers are expected to have already `db.session.commit()`-ed the
+    new issue (so it has an `id`) before calling this — this function
+    issues its own follow-up commit for the new assignment row and the
+    issue's status change.
+    """
+    recommendations = get_recommendations(issue, limit=1)
+    if not recommendations:
+        return None
+
+    top = recommendations[0]
+    technician = top["technician"]
+
+    assignment = Assignment(
+        technical_issue_id=issue.id,
+        technician_id=technician.id,
+        status="assigned",
+        dispatch_score=top["total_score"],
+    )
+    issue.status = "assigned"
+    db.session.add(assignment)
+    notify_issue_status_change(issue)
+    db.session.commit()
+
+    return assignment

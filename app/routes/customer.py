@@ -79,6 +79,7 @@ from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
+from app.recommendation import auto_assign_recommended_technician
 
 customer_bp = Blueprint("customer", __name__, url_prefix="/portal")
 
@@ -397,7 +398,22 @@ def report_issue():
         notify_new_issue_reported(issue)
         db.session.commit()
 
-        flash(f"Your issue '{issue.issue_code}' was reported successfully.", "success")
+        # Auto-dispatch to the top-recommended technician (see
+        # app/recommendation.py's auto_assign_recommended_technician())
+        # so a self-reported issue lands directly on a technician's
+        # job list instead of sitting on the dispatch board waiting
+        # for an Administrator to assign it by hand. Best-effort — if
+        # no technician is available right now, the issue simply stays
+        # 'pending' and an Administrator can still dispatch it manually.
+        assignment = auto_assign_recommended_technician(issue)
+        if assignment is not None:
+            flash(
+                f"Your issue '{issue.issue_code}' was reported and assigned to "
+                f"{assignment.technician.full_name}.",
+                "success",
+            )
+        else:
+            flash(f"Your issue '{issue.issue_code}' was reported successfully.", "success")
         return redirect(url_for("customer.index"))
 
     return render_template("customer/report_issue.html", form=form, subscriber=subscriber)
