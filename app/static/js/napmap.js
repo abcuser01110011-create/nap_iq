@@ -96,15 +96,18 @@
     const PRIORITY_RANK = { low: 1, medium: 2, high: 3, critical: 4 };
 
     // A technician-recorded cable path (see CablePath/record_cable_path()
-    // in the backend) is a raw GPS breadcrumb trail -- GPS drift means
-    // its first/last recorded point almost never lands exactly on the
-    // NAP or subscriber's own registered coordinates, so the drawn
-    // line visibly falls short of (or overshoots) the icon it's
-    // supposed to connect to. Rather than requiring pixel-perfect GPS,
-    // any endpoint within this radius of the icon it belongs to is
+    // in the backend) is a raw GPS breadcrumb trail. Ordinary
+    // smartphone GPS is commonly 5-15m off outdoors (worse under tree
+    // cover, which this map has a lot of), so its first/last recorded
+    // point rarely lands exactly on the NAP or subscriber's own
+    // registered coordinates and the drawn line visibly falls short
+    // of (or overshoots) the icon it's supposed to connect to. Any
+    // endpoint within this radius of the icon it belongs to is
     // snapped onto that icon's exact coordinates -- see
-    // snapCablePathEndpoints() below.
-    const CABLE_PATH_SNAP_METERS = 3;
+    // snapCablePathEndpoints() below. Bumped up from a stricter 3m to
+    // something that actually covers typical phone-GPS drift; tune
+    // this single constant if your devices are more/less accurate.
+    const CABLE_PATH_SNAP_METERS = 12;
 
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
@@ -1651,17 +1654,22 @@
      * A recorded cable path's first/last GPS breadcrumb is only ever
      * an *approximation* of where the technician actually stood at
      * the NAP and at the subscriber's premises -- consumer-grade GPS
-     * commonly drifts a few meters, so the drawn line ends up visibly
-     * short of (or poking past) the icon it's meant to terminate at,
-     * even though the technician genuinely started/ended the walk
-     * right there.
+     * commonly drifts several meters (worse under tree cover), so the
+     * drawn line ends up visibly short of (or poking past) the icon
+     * it's meant to terminate at, even though the technician
+     * genuinely started/ended the walk right there.
      *
-     * This snaps each endpoint onto its corresponding icon's exact
-     * coordinates whenever it's already within CABLE_PATH_SNAP_METERS
-     * of it, leaving the rest of the recorded route untouched. Points
-     * farther than that are left alone -- a large gap is a sign the
-     * technician genuinely started the recording elsewhere, not GPS
-     * noise, so silently snapping it would misrepresent the real
+     * This snaps the closest matching endpoint onto its corresponding
+     * icon's exact coordinates whenever it's within
+     * CABLE_PATH_SNAP_METERS of it, leaving the rest of the recorded
+     * route untouched. It checks a small window of points at each end
+     * (END_SCAN_WINDOW), not just the single literal first/last
+     * point, since a technician's very first/last fix right after
+     * tapping Start/Stop is often the noisiest one -- a point a
+     * couple of steps in is frequently the better match. Points
+     * farther than the radius are left alone: a large gap is a sign
+     * the technician genuinely started the recording elsewhere, not
+     * GPS noise, so silently snapping it would misrepresent the real
      * route.
      *
      * `latlngs` is mutated in place (array of [lat, lng] pairs, as
@@ -1670,26 +1678,44 @@
     function snapCablePathEndpoints(latlngs, subscriberLatLng, napLatLng) {
         if (!Array.isArray(latlngs) || latlngs.length < 2) return latlngs;
 
-        const first = L.latLng(latlngs[0]);
-        const last = L.latLng(latlngs[latlngs.length - 1]);
+        const END_SCAN_WINDOW = Math.min(5, Math.ceil(latlngs.length / 2));
+        const anchors = [subscriberLatLng, napLatLng].filter(Boolean);
 
-        // Each endpoint is checked against both anchors (not just its
-        // "expected" one) since a technician may have walked the run
-        // in either direction -- NAP-to-subscriber or
-        // subscriber-to-NAP -- and recording order isn't guaranteed.
-        const snapIfClose = (point, index) => {
-            const distToSubscriber = point.distanceTo(subscriberLatLng);
-            const distToNap = napLatLng ? point.distanceTo(napLatLng) : Infinity;
-            const nearestAnchor =
-                distToSubscriber <= distToNap ? subscriberLatLng : napLatLng;
-            const nearestDist = Math.min(distToSubscriber, distToNap);
-            if (nearestAnchor && nearestDist <= CABLE_PATH_SNAP_METERS) {
-                latlngs[index] = [nearestAnchor.lat, nearestAnchor.lng];
-            }
-        };
+        // indices, ordered nearest-to-the-true-end first, so that if
+        // two candidate points tie on distance the one closer to the
+        // actual end of the recorded walk wins.
+        function scanEnd(indices) {
+            anchors.forEach((anchor) => {
+                let bestIdx = null;
+                let bestDist = Infinity;
+                indices.forEach((idx) => {
+                    const d = L.latLng(latlngs[idx]).distanceTo(anchor);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestIdx = idx;
+                    }
+                });
+                if (window.console && console.debug) {
+                    console.debug(
+                        "[cable-path-snap] end candidate -> anchor (" +
+                            anchor.lat.toFixed(6) + "," + anchor.lng.toFixed(6) +
+                            "): closest point is " + bestDist.toFixed(1) + "m away" +
+                            (bestDist <= CABLE_PATH_SNAP_METERS ? " -- snapping" : " -- NOT within " + CABLE_PATH_SNAP_METERS + "m, leaving as-is")
+                    );
+                }
+                if (bestIdx !== null && bestDist <= CABLE_PATH_SNAP_METERS) {
+                    latlngs[bestIdx] = [anchor.lat, anchor.lng];
+                }
+            });
+        }
 
-        snapIfClose(first, 0);
-        snapIfClose(last, latlngs.length - 1);
+        const startIndices = [];
+        for (let i = 0; i < END_SCAN_WINDOW; i++) startIndices.push(i);
+        const endIndices = [];
+        for (let i = 0; i < END_SCAN_WINDOW; i++) endIndices.push(latlngs.length - 1 - i);
+
+        scanEnd(startIndices);
+        scanEnd(endIndices);
 
         return latlngs;
     }
