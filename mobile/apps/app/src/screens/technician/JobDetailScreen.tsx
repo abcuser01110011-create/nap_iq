@@ -23,13 +23,6 @@ import PinLocationMap from "../../components/PinLocationMap";
 import { colors } from "../../theme/technician";
 import { PRIORITY_COLORS, REQUEST_TYPE_LABELS, STATUS_LABELS, priorityLabel, ticketCode } from "./statusLabels";
 
-// How long we'll wait for a GPS fix before treating it as a timeout —
-// same value/reasoning as the customer app's "Track My Location" step
-// on ApplyForServiceScreen: expo-location's getCurrentPositionAsync
-// has no built-in timeout, so this is enforced by racing it against a
-// plain setTimeout below.
-const LOCATION_FIX_TIMEOUT_MS = 20000;
-
 // A GPS fix reporting a worse (larger) margin of error than this,
 // in meters, is dropped rather than added to a cable-path recording
 // (see handleStartRecordingPath's watchPositionAsync callback below).
@@ -40,6 +33,26 @@ const LOCATION_FIX_TIMEOUT_MS = 20000;
 // visibly distort a short recorded path (where a NAP and its
 // subscriber are often only a few meters apart to begin with).
 const MAX_ACCEPTABLE_FIX_ACCURACY_M = 15;
+
+// handlePinLocation used to accept whatever a single Location.Accuracy.High
+// fix returned, with no retry and no look at how good that fix actually
+// was -- a single reading (especially the very first fix after the GPS
+// chip wakes up) can easily be tens of meters off, which is exactly what
+// ends up as a visibly-misplaced subscriber pin on the GeoMap. Pin
+// capture now mirrors the cable-path recorder below more closely: ask
+// for the tightest fix the chip can give (BestForNavigation), and take
+// up to this many attempts, keeping whichever single fix reports the
+// smallest accuracy value rather than just the first one that arrives.
+const PIN_FIX_ATTEMPTS = 3;
+// Per-attempt timeout -- kept well under 20s despite BestForNavigation
+// fixes taking longer to lock, since this can fire up to PIN_FIX_ATTEMPTS
+// times back-to-back; still generous enough for a fix to lock outdoors.
+const PIN_FIX_TIMEOUT_MS = 8000;
+// If an attempt already reports at least this good an accuracy, stop
+// sampling further rather than spending the full attempt budget -- no
+// need to keep the technician waiting once we already have a genuinely
+// tight fix.
+const PIN_FIX_EARLY_STOP_ACCURACY_M = 5;
 
 function InfoRow({
   label,
@@ -297,6 +310,32 @@ export default function JobDetailScreen({ route, navigation }: any) {
     ]);
   };
 
+  // Takes up to PIN_FIX_ATTEMPTS separate GPS fixes and returns whichever
+  // single one reported the smallest (best) accuracy, stopping early once
+  // a fix is already at least PIN_FIX_EARLY_STOP_ACCURACY_M good. A lone
+  // failed/timed-out attempt doesn't fail the whole capture as long as at
+  // least one attempt comes back -- only throws TIMEOUT if every attempt
+  // fails, same error handlePinLocation's catch block already expects.
+  const captureBestLocationFix = async (): Promise<Location.LocationObject> => {
+    let best: Location.LocationObject | null = null;
+    for (let attempt = 0; attempt < PIN_FIX_ATTEMPTS; attempt++) {
+      let position: Location.LocationObject;
+      try {
+        position = await getFixWithTimeout({ accuracy: Location.Accuracy.BestForNavigation }, PIN_FIX_TIMEOUT_MS);
+      } catch {
+        continue;
+      }
+      const accuracy = typeof position.coords.accuracy === "number" ? position.coords.accuracy : Infinity;
+      const bestAccuracy = best && typeof best.coords.accuracy === "number" ? best.coords.accuracy : Infinity;
+      if (!best || accuracy < bestAccuracy) {
+        best = position;
+      }
+      if (accuracy <= PIN_FIX_EARLY_STOP_ACCURACY_M) break;
+    }
+    if (!best) throw new Error("TIMEOUT");
+    return best;
+  };
+
   // Fires when the technician taps "Pin My Location" / "Update My
   // Location" on an installation job. Same request pattern as the
   // customer app's "Track My Location" step (services-enabled check,
@@ -325,7 +364,7 @@ export default function JobDetailScreen({ route, navigation }: any) {
         return;
       }
 
-      const position = await getFixWithTimeout({ accuracy: Location.Accuracy.High }, LOCATION_FIX_TIMEOUT_MS);
+      const position = await captureBestLocationFix();
       const { latitude, longitude } = position.coords;
 
       const result = await client.technician.pinAssignmentLocation(assignment.id, latitude, longitude);

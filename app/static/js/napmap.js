@@ -109,6 +109,19 @@
     // this single constant if your devices are more/less accurate.
     const CABLE_PATH_SNAP_METERS = 12;
 
+    // How much a raw recorded point is allowed to deviate (in meters)
+    // from the straightened route before simplifyCablePath() below
+    // keeps it as a real corner instead of smoothing it away. Even
+    // with the mobile app's own accuracy filtering, a technician
+    // standing still for a couple of fixes (waiting, checking the
+    // pole, chatting) reads as a little scribble/loop rather than a
+    // single point, which both looks noisy and throws off endpoint
+    // matching (the "true" last point ends up buried mid-loop instead
+    // of at the array's actual first/last index). Raise this if paths
+    // still look jittery after this; lower it if real turns in the
+    // route start getting flattened out.
+    const CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 4;
+
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
     // "healthy" at a glance, same green as an Active NAP.
@@ -1651,6 +1664,78 @@
     }
 
     /**
+     * Smooths a raw recorded GPS trail using the Ramer-Douglas-Peucker
+     * algorithm: it keeps only the points that actually define the
+     * route's shape and drops the ones that are just noise/jitter
+     * within CABLE_PATH_SIMPLIFY_TOLERANCE_METERS of the straightened
+     * line between their neighbors. This is what "stabilizes" a messy
+     * recorded path into a clean line -- it doesn't change where the
+     * technician walked, it just stops re-drawing every tiny GPS
+     * wobble along the way (most noticeable as little loops/scribbles
+     * whenever the technician paused).
+     *
+     * Distances are computed with a local flat-earth (equirectangular)
+     * approximation centered on the segment being tested, which is
+     * accurate to well under a centimeter at the scale a drop-cable
+     * run operates at (tens of meters) -- no need for full haversine
+     * math here.
+     *
+     * `points` is an array of [lat, lng] pairs; returns a new array
+     * (does not mutate the input). Always keeps the first and last
+     * point untouched, same as the standard RDP algorithm.
+     */
+    function simplifyCablePath(points, toleranceMeters) {
+        if (!Array.isArray(points) || points.length < 3) {
+            return Array.isArray(points) ? points.slice() : points;
+        }
+
+        const METERS_PER_DEG_LAT = 111320;
+
+        function perpendicularDistanceMeters(point, lineStart, lineEnd) {
+            const latRef = (lineStart[0] * Math.PI) / 180;
+            const mPerDegLng = METERS_PER_DEG_LAT * Math.cos(latRef);
+            const toXY = (p) => [
+                (p[1] - lineStart[1]) * mPerDegLng,
+                (p[0] - lineStart[0]) * METERS_PER_DEG_LAT,
+            ];
+            const [x1, y1] = toXY(lineStart);
+            const [x2, y2] = toXY(lineEnd);
+            const [x0, y0] = toXY(point);
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const lenSq = dx * dx + dy * dy;
+            if (lenSq === 0) return Math.hypot(x0 - x1, y0 - y1);
+            const t = ((x0 - x1) * dx + (y0 - y1) * dy) / lenSq;
+            const px = x1 + t * dx;
+            const py = y1 + t * dy;
+            return Math.hypot(x0 - px, y0 - py);
+        }
+
+        function rdp(pts) {
+            if (pts.length < 3) return pts;
+            let maxDist = 0;
+            let maxIndex = 0;
+            const first = pts[0];
+            const last = pts[pts.length - 1];
+            for (let i = 1; i < pts.length - 1; i++) {
+                const d = perpendicularDistanceMeters(pts[i], first, last);
+                if (d > maxDist) {
+                    maxDist = d;
+                    maxIndex = i;
+                }
+            }
+            if (maxDist > toleranceMeters) {
+                const left = rdp(pts.slice(0, maxIndex + 1));
+                const right = rdp(pts.slice(maxIndex));
+                return left.slice(0, -1).concat(right);
+            }
+            return [first, last];
+        }
+
+        return rdp(points);
+    }
+
+    /**
      * A recorded cable path's first/last GPS breadcrumb is only ever
      * an *approximation* of where the technician actually stood at
      * the NAP and at the subscriber's premises -- consumer-grade GPS
@@ -1811,7 +1896,10 @@
                     : null;
                 const latlngs = recordedPath
                     ? snapCablePathEndpoints(
-                          recordedPath.map((p) => [p.latitude, p.longitude]),
+                          simplifyCablePath(
+                              recordedPath.map((p) => [p.latitude, p.longitude]),
+                              CABLE_PATH_SIMPLIFY_TOLERANCE_METERS
+                          ),
                           L.latLng(subscriber.latitude, subscriber.longitude),
                           L.latLng(nap.latitude, nap.longitude)
                       )
