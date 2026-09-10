@@ -17,15 +17,28 @@ import { ApiError } from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme/customer";
 
-// Kept in sync by hand with app/forms.py's ISSUE_TYPE_CHOICES on the
-// backend — the mobile API validates against this exact same set
-// server-side (app/routes/api_v1/customer.py's _VALID_ISSUE_TYPES),
-// so a mismatch here would just surface as a 400 on submit. This is
-// deliberately a narrower list than the full backend set — "Fiber/
-// Cable Problem" and "NAP Problem" are left off here since they're
-// hard for a subscriber to self-diagnose from the customer app; both
-// remain valid choices on the staff/admin side.
-const ISSUE_TYPES = ["No Internet", "Slow Internet", "Connection Problem", "Other"];
+// Kept in sync by hand with app/forms.py's CUSTOMER_ISSUE_TYPE_CHOICES
+// on the backend — the mobile API validates against this exact same
+// set server-side (app/routes/api_v1/customer.py's
+// _VALID_ISSUE_TYPES), so a mismatch here would just surface as a 400
+// on submit. This is its own customer-facing list, separate from the
+// staff-only issue types (Fiber Break, Repair, NAP Problem,
+// Last-Mile Checking) used by GeoMap ticketing.
+//
+// Priority is no longer picked by the customer anywhere in this
+// screen — the backend sets it automatically from whichever of these
+// is chosen (see resolve_customer_issue_priority() in
+// app/issue_utils.py): "No Internet"/"Cable Problem" -> critical,
+// "Slow Internet"/"Router/Modem Problem" -> high, everything else ->
+// medium.
+const ISSUE_TYPES = [
+  "No Internet",
+  "Slow Internet",
+  "Cable Problem",
+  "Router/Modem Problem",
+  "Connection Problem",
+  "Other",
+];
 
 export default function ReportIssueScreen({ navigation }: any) {
   const { client } = useAuth();

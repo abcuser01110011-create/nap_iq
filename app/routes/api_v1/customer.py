@@ -36,7 +36,8 @@ from flask_jwt_extended import current_user
 
 from app.extensions import db, limiter
 from app.email_utils import consume_verification, is_email_verified
-from app.forms import ISSUE_TYPE_CHOICES
+from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
+from app.issue_utils import resolve_customer_issue_priority
 from app.jwt_auth import jwt_role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue, User
 from app.nap_recommendation import recommend_naps
@@ -56,8 +57,7 @@ _APPLICATION_EMAIL_PURPOSE = "registration"
 # Kept in sync by hand with app/forms.py's CustomerIssueReportForm —
 # same validation rule, just enforced here instead of by WTForms since
 # this blueprint doesn't use Flask-WTF forms.
-_VALID_ISSUE_TYPES = {value for value, _label in ISSUE_TYPE_CHOICES}
-_VALID_PRIORITIES = {"low", "medium", "high", "critical"}
+_VALID_ISSUE_TYPES = {value for value, _label in CUSTOMER_ISSUE_TYPE_CHOICES}
 _DESCRIPTION_MAX_LENGTH = 2000
 # Same allow-list as api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS,
 # duplicated here rather than imported since the two blueprints don't
@@ -457,27 +457,29 @@ def report_issue():
     customer.py's report_issue() does, since the mobile app has no map
     for a customer to drop a pin on either.
 
-    Expects multipart/form-data (issue_type, priority, description
-    fields plus a required "photo" file field) rather than a JSON
-    body, since a photo isn't JSON — mirrors
-    upload_assignment_photo()'s file handling in api_v1/technician.py.
-    This blueprint is already csrf-exempt as a whole (see this
-    module's docstring), so that isn't a concern here either.
+    Expects multipart/form-data (issue_type, description fields plus
+    a required "photo" file field) rather than a JSON body, since a
+    photo isn't JSON — mirrors upload_assignment_photo()'s file
+    handling in api_v1/technician.py. This blueprint is already
+    csrf-exempt as a whole (see this module's docstring), so that
+    isn't a concern here either.
+
+    priority is not accepted from the client — it's derived from
+    issue_type by resolve_customer_issue_priority() (app/issue_utils.py)
+    once issue_type has been validated below, same as the HTML portal's
+    customer.py report_issue().
     """
     subscriber = _own_subscriber_or_none()
     if subscriber is None:
         return _no_subscriber_response()
 
     issue_type = str(request.form.get("issue_type") or "").strip()
-    priority = str(request.form.get("priority") or "medium").strip()
     description = str(request.form.get("description") or "").strip()
     photo = request.files.get("photo")
 
     errors = {}
     if issue_type not in _VALID_ISSUE_TYPES:
         errors["issue_type"] = "Issue type is required and must be one of the supported types."
-    if priority not in _VALID_PRIORITIES:
-        errors["priority"] = "Priority must be one of: low, medium, high, critical."
     if not description:
         errors["description"] = "Please describe the issue."
     elif len(description) > _DESCRIPTION_MAX_LENGTH:
@@ -506,7 +508,7 @@ def report_issue():
     issue = TechnicalIssue(
         issue_type=issue_type,
         description=description,
-        priority=priority,
+        priority=resolve_customer_issue_priority(issue_type),
         status="pending",
         address=subscriber.address,
         latitude=subscriber.latitude,

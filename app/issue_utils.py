@@ -13,6 +13,41 @@ from app.models import TechnicalIssue
 # to avoid a routes-module-importing-routes-module circular import.
 OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
 
+# issue_type -> priority for a *customer* self-reported issue (web
+# portal's CustomerIssueReportForm and the mobile app's POST
+# /api/v1/customer/issues). Both routes call
+# resolve_customer_issue_priority() below instead of taking a
+# priority value from the request, so this dict is the one place that
+# rule lives.
+#
+# TechnicalIssue.priority (app/models.py) is a
+# db.Enum("low", "medium", "high", "critical") column with no
+# "urgent" value, so "urgent" is mapped to "critical", the highest
+# priority the column supports.
+_CRITICAL_CUSTOMER_ISSUE_TYPES = {"No Internet", "Cable Problem"}
+_HIGH_CUSTOMER_ISSUE_TYPES = {"Slow Internet", "Router/Modem Problem"}
+
+
+def resolve_customer_issue_priority(issue_type):
+    """Returns the priority a customer-reported issue should get,
+    based solely on its issue_type:
+
+      - "No Internet" or "Cable Problem" -> "critical"
+      - "Slow Internet" or "Router/Modem Problem" -> "high"
+      - anything else (e.g. "Connection Problem", "Other", or any
+        unrecognized value) -> "medium"
+
+    Never raises -- an unrecognized issue_type just falls through to
+    the "medium" default rather than erroring, since issue_type is
+    already validated against CUSTOMER_ISSUE_TYPE_CHOICES
+    (app/forms.py) by the caller before this is reached.
+    """
+    if issue_type in _CRITICAL_CUSTOMER_ISSUE_TYPES:
+        return "critical"
+    if issue_type in _HIGH_CUSTOMER_ISSUE_TYPES:
+        return "high"
+    return "medium"
+
 
 def resolve_fiber_break_siblings(resolved_issue):
     """When a Fiber Break issue is marked resolved, every other

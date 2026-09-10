@@ -1095,6 +1095,30 @@ class TechnicianForm(FlaskForm):
 # ---------------------------------------------------------------------
 
 
+# Issue types offered to a *customer* self-reporting through the web
+# portal or the mobile app -- deliberately its own list, separate from
+# the staff-facing ISSUE_TYPE_CHOICES above. The staff-only "Fiber
+# Break" / "Repair" / "NAP Problem" / "Last-Mile Checking" values (and
+# the older "Fiber/Cable Problem" label) stay staff-only: "Fiber
+# Break" in particular drives GeoMap's NAP-wide outage fan-out
+# (app/routes/issues.py's report_fiber_break() and this module's
+# resolve_fiber_break_siblings()) and must keep using that exact
+# string, so it's intentionally left out of what a customer can pick.
+# "Cable Problem" and "Router/Modem Problem" are the customer-friendly
+# replacements. Priority is no longer a field a customer fills in --
+# see resolve_customer_issue_priority() in app/issue_utils.py, which
+# both app/routes/customer.py and app/routes/api_v1/customer.py call
+# to set it automatically from whichever of these is chosen.
+CUSTOMER_ISSUE_TYPE_CHOICES = [
+    ("No Internet", "No Internet"),
+    ("Slow Internet", "Slow Internet"),
+    ("Cable Problem", "Cable Problem"),
+    ("Router/Modem Problem", "Router/Modem Problem"),
+    ("Connection Problem", "Connection Problem"),
+    ("Other", "Other"),
+]
+
+
 class CustomerIssueReportForm(FlaskForm):
     """Self-service version of IssueReportForm for a signed-in
     customer reporting a problem on their *own* subscriber account.
@@ -1107,18 +1131,17 @@ class CustomerIssueReportForm(FlaskForm):
     dropped: a customer reporting from the portal isn't clicking a
     map, so the route falls back to the subscriber's own stored
     address/coordinates instead of asking them to supply GPS numbers.
+
+    There is also no `priority` field here (unlike IssueReportForm) --
+    a customer's priority is derived automatically from `issue_type`
+    by app/issue_utils.py's resolve_customer_issue_priority(), which
+    the route calls after validation instead of reading form data.
     """
 
     issue_type = SelectField(
         "Issue Type",
-        choices=ISSUE_TYPE_CHOICES,
+        choices=CUSTOMER_ISSUE_TYPE_CHOICES,
         validators=[DataRequired(message="Issue type is required.")],
-    )
-    priority = SelectField(
-        "Priority",
-        choices=[("low", "Low"), ("medium", "Medium"), ("high", "High"), ("critical", "Critical")],
-        default="medium",
-        validators=[DataRequired()],
     )
     description = TextAreaField(
         "Description",

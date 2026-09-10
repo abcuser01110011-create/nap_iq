@@ -77,6 +77,7 @@ from app.extensions import db, limiter
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
+from app.issue_utils import resolve_customer_issue_priority
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
 from app.recommendation import auto_assign_recommended_technician
@@ -380,7 +381,10 @@ def report_issue():
         issue = TechnicalIssue(
             issue_type=form.issue_type.data,
             description=form.description.data.strip(),
-            priority=form.priority.data,
+            # Priority is derived from issue_type, not taken from the
+            # form -- see resolve_customer_issue_priority()'s docstring
+            # (app/issue_utils.py).
+            priority=resolve_customer_issue_priority(form.issue_type.data),
             status="pending",  # every newly reported issue starts here
             address=subscriber.address,
             latitude=subscriber.latitude,
