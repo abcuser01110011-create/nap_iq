@@ -1307,6 +1307,44 @@
         return true;
     }
 
+    /**
+     * A subscriber with a history of tickets (e.g. an old resolved
+     * report plus a brand-new critical one) has more than one entry
+     * in allIssues at the *same* address -- every one of those issues
+     * carries that subscriber's own latitude/longitude, so rendering
+     * "one marker + one NAP line per issue" stacks perfectly
+     * overlapping markers/lines on top of each other at that single
+     * spot. Only the map's single most-urgent (highest priority,
+     * ties broken by most recently created) issue passing the
+     * current filters should actually show for a given subscriber --
+     * the map should read as "here's this subscriber's current
+     * issue", not "here's every issue this subscriber has ever had".
+     *
+     * Issues with no subscriber_id (shouldn't normally happen, but
+     * defensively handled) are kept as-is, each under its own key, so
+     * they're never accidentally collapsed into one another.
+     */
+    function pickOneIssuePerSubscriber(issues) {
+        const bestBySubscriber = {};
+        issues.forEach((issue) => {
+            const key = issue.subscriber_id != null ? "s" + issue.subscriber_id : "i" + issue.id;
+            const current = bestBySubscriber[key];
+            if (!current) {
+                bestBySubscriber[key] = issue;
+                return;
+            }
+            const currentRank = PRIORITY_RANK[current.priority] || 0;
+            const candidateRank = PRIORITY_RANK[issue.priority] || 0;
+            if (
+                candidateRank > currentRank ||
+                (candidateRank === currentRank && new Date(issue.created_at) > new Date(current.created_at))
+            ) {
+                bestBySubscriber[key] = issue;
+            }
+        });
+        return Object.keys(bestBySubscriber).map((key) => bestBySubscriber[key]);
+    }
+
     /** Rebuilds the issue marker layer from allIssues based on current filters. */
     function renderIssueMarkers() {
         issueMarkerLayer.clearLayers();
@@ -1323,9 +1361,10 @@
         }
 
         const filters = getActiveIssueFilters();
-        allIssues.forEach((issue) => {
-            if (!passesIssueFilters(issue, filters)) return;
-
+        const visibleIssues = pickOneIssuePerSubscriber(
+            allIssues.filter((issue) => passesIssueFilters(issue, filters))
+        );
+        visibleIssues.forEach((issue) => {
             const marker = L.marker([issue.latitude, issue.longitude], {
                 icon: buildIssueIcon(issue.priority, issue.issue_type),
                 title: (issue.issue_code || "Issue") + " - " + issue.issue_type,
