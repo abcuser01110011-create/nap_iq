@@ -110,20 +110,23 @@ def _populate_technician_choices(form, *, exclude_technician_id=None):
     labelled with their status so an administrator can see at a
     glance who's actually free before dispatching them.
 
-    Restricted to personnel_type == 'field_assistant' — see the
-    Technician model's docstring in app/models.py and
-    app/routes/technicians.py's module docstring: a plain
-    'technician' profile never has a linked `users` row/mobile login,
-    so dispatching one here would create a real `assignments` row
-    (the issue/request flips to 'assigned', the administrator sees a
+    Restricted to personnel_type == 'technician' — see
+    app/jwt_auth.py's MOBILE_API_ROLES and
+    app/routes/technicians.py's module docstring: role='technician' is
+    the one issued mobile tokens, so a 'field_assistant' profile has
+    no mobile login to actually see a job on. Dispatching a
+    field_assistant here would create a real `assignments` row (the
+    issue/request flips to 'assigned', the administrator sees a
     success flash) that can never actually appear on any mobile
     Assignments screen — there's no account for it to show up on.
-    Every other dispatch entry point (issues.py's and
-    service_requests.py's `_dispatch_field_assistant()`) already
-    filters this same way; this is the one that was missed.
+    issues.py's and service_requests.py's `_dispatch_field_assistant()`
+    no longer filter this way (their dropdown deliberately lists every
+    technician *and* field assistant now — see those functions'
+    docstrings); this is the one entry point that still should, since
+    it's the one that feeds a mobile-only job list.
     """
     technicians = (
-        Technician.query.filter_by(personnel_type="field_assistant")
+        Technician.query.filter_by(personnel_type="technician")
         .order_by(Technician.full_name)
         .all()
     )

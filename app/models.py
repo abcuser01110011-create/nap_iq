@@ -252,11 +252,13 @@ class Subscriber(db.Model):
 
 
 class Technician(db.Model):
-    """Technician profile used by the (future) dispatch module. When
-    personnel_type == 'field_assistant', linked one-to-one with a
-    `users` account with role='field_assistant' (that login is what
-    lets them use the mobile app); plain 'technician' profiles never
-    have a linked account."""
+    """Technician profile used by the (future) dispatch module. Can be
+    linked one-to-one with a `users` account whose role matches
+    personnel_type ('technician' or 'field_assistant') — see
+    app/routes/technicians.py's module docstring. Only a
+    role='technician' login gets mobile access (see app/jwt_auth.py's
+    MOBILE_API_ROLES); role='field_assistant' is web-dashboard-only.
+    """
 
     __tablename__ = "technicians"
 
