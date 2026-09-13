@@ -1341,21 +1341,44 @@
             // a critical issue's line reads red while a low-priority
             // one reads gray, instead of every issue line looking
             // identically severe.
+            //
+            // This always used to draw a plain straight guess between
+            // the issue and its NAP, even when the issue's own
+            // subscriber already has a technician-recorded cable_path
+            // (see the subscriber↔NAP line above). With "Show
+            // Subscribers" also on, that produced two visibly
+            // different lines to the same NAP for the same
+            // subscriber -- the real recorded route, plus a redundant
+            // straight-line "guess" cutting across it. Reusing the
+            // recorded path here (when one exists) keeps the two
+            // lines in agreement, same as the subscriber connector.
             const nap = findNapById(issue.nap_id);
             if (nap) {
-                const line = L.polyline(
-                    [
-                        [issue.latitude, issue.longitude],
-                        [nap.latitude, nap.longitude],
-                    ],
-                    {
-                        color: PRIORITY_COLORS[issue.priority] || "#dc3545",
-                        weight: 2.5,
-                        opacity: 0.8,
-                        dashArray: "4,4",
-                        interactive: false,
-                    }
-                );
+                const issueSubscriber = allSubscribers.find((s) => s.id === issue.subscriber_id);
+                const recordedPath =
+                    issueSubscriber && Array.isArray(issueSubscriber.cable_path) && issueSubscriber.cable_path.length >= 2
+                        ? issueSubscriber.cable_path
+                        : null;
+                const latlngs = recordedPath
+                    ? snapCablePathEndpoints(
+                          simplifyCablePath(
+                              recordedPath.map((p) => [p.latitude, p.longitude]),
+                              CABLE_PATH_SIMPLIFY_TOLERANCE_METERS
+                          ),
+                          L.latLng(issue.latitude, issue.longitude),
+                          L.latLng(nap.latitude, nap.longitude)
+                      )
+                    : [
+                          [issue.latitude, issue.longitude],
+                          [nap.latitude, nap.longitude],
+                      ];
+                const line = L.polyline(latlngs, {
+                    color: PRIORITY_COLORS[issue.priority] || "#dc3545",
+                    weight: 2.5,
+                    opacity: 0.8,
+                    dashArray: recordedPath ? null : "4,4",
+                    interactive: false,
+                });
                 issueConnectionLayer.addLayer(line);
             }
         });
