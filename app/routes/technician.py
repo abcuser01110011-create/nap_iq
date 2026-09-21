@@ -266,7 +266,20 @@ def ticket_detail(assignment_id):
 def accept_assignment(assignment_id):
     """Acknowledges a newly dispatched assignment. Only valid from
     'assigned' — this is the technician's first action on it, before
-    any work has actually started."""
+    any work has actually started.
+
+    Bug fix: an installation-type assignment has no technical_issue
+    (see Assignment's docstring in app/models.py) — the old code
+    unconditionally read assignment.technical_issue.issue_code for
+    the success flash, raising an AttributeError (500) the moment a
+    technician accepted an installation. The status change and commit
+    above already happened by that point, so the request actually
+    succeeded server-side; the technician just saw an error page
+    instead of the ticket, and re-submitting Accept afterward hit the
+    now-already-'accepted' early-return above instead of crashing
+    again, which is why it looked like it "went through" on the
+    second try. Guarded the same way start_assignment() below already
+    is."""
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
@@ -277,8 +290,11 @@ def accept_assignment(assignment_id):
     assignment.status = "accepted"
     db.session.commit()
 
-    issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
-    flash(f"Assignment for {issue_label} accepted.", "success")
+    if assignment.technical_issue is not None:
+        issue_label = assignment.technical_issue.issue_code or f"#{assignment.technical_issue_id}"
+        flash(f"Assignment for {issue_label} accepted.", "success")
+    else:
+        flash("Installation accepted.", "success")
     return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
@@ -717,6 +733,22 @@ def complete_assignment(assignment_id):
             service_request.subscriber_id = subscriber.id
 
         if subscriber is not None:
+            # Bug fix: kept byte-for-byte identical to the mobile
+            # complete_assignment() in api_v1/technician.py (see that
+            # copy's comment for the full reasoning) so the two entry
+            # points never drift apart -- only a brand-new walk-in
+            # subscriber (created just above) ever got its coordinates
+            # set from the technician's accurate on-site GPS pin. An
+            # installation completed against an EXISTING subscriber
+            # row kept whatever coarser location it already had, even
+            # though a much more precise pin was required and captured
+            # moments ago. That's what left the GeoMap's connector
+            # line, and the recorded cable path's subscriber-end snap
+            # (snapCablePathEndpoints() in napmap.js), anchored on a
+            # stale point instead of the actual premises.
+            if assignment.pin_latitude is not None and assignment.pin_longitude is not None:
+                subscriber.latitude = assignment.pin_latitude
+                subscriber.longitude = assignment.pin_longitude
             subscriber.status = "active"
             subscriber.installed_at = date.today()
             _sync_subscriber_nap(service_request)

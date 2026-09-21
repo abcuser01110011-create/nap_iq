@@ -99,14 +99,17 @@
     // in the backend) is a raw GPS breadcrumb trail. Ordinary
     // smartphone GPS is commonly 5-15m off outdoors (worse under tree
     // cover, which this map has a lot of), so its first/last recorded
-    // point rarely lands exactly on the NAP or subscriber's own
-    // registered coordinates and the drawn line visibly falls short
-    // of (or overshoots) the icon it's supposed to connect to. Any
-    // endpoint within this radius of the icon it belongs to is
-    // snapped onto that icon's exact coordinates -- see
+    // point rarely lands exactly on the subscriber's own registered
+    // coordinates and the drawn line visibly falls short of (or
+    // overshoots) the marker it's supposed to connect to. Any
+    // subscriber-side endpoint within this radius of the marker is
+    // snapped onto its exact coordinates -- see
     // snapCablePathEndpoints() below. Bumped up from a stricter 3m to
     // something that actually covers typical phone-GPS drift; tune
     // this single constant if your devices are more/less accurate.
+    // The NAP-side endpoint isn't governed by this constant at all --
+    // snapCablePathEndpoints() always force-snaps it exactly onto the
+    // NAP icon regardless of distance (see that function's docstring).
     const CABLE_PATH_SNAP_METERS = 12;
 
     // How much a raw recorded point is allowed to deviate (in meters)
@@ -1819,6 +1822,19 @@
      * GPS noise, so silently snapping it would misrepresent the real
      * route.
      *
+     * The NAP side is treated differently from the subscriber side:
+     * a NAP is a fixed physical box at a known, exact coordinate, so
+     * there's never a legitimate reason for a recorded cable route to
+     * genuinely start/end anywhere else -- any gap between the drawn
+     * line and the NAP icon is pure GPS drift (often worse right at
+     * the NAP, e.g. mounted under eaves/trees), never a real
+     * different endpoint the way a large subscriber-side gap can be
+     * (see the reasoning above). So the NAP anchor is ALWAYS
+     * force-snapped onto its exact coordinates with no distance
+     * ceiling, instead of only within CABLE_PATH_SNAP_METERS like the
+     * subscriber anchor -- the recorded line's "tip" should always
+     * land exactly on the NAP icon, not just approximately.
+     *
      * `latlngs` is mutated in place (array of [lat, lng] pairs, as
      * built for L.polyline() below) and also returned for convenience.
      */
@@ -1826,13 +1842,18 @@
         if (!Array.isArray(latlngs) || latlngs.length < 2) return latlngs;
 
         const END_SCAN_WINDOW = Math.min(5, Math.ceil(latlngs.length / 2));
-        const anchors = [subscriberLatLng, napLatLng].filter(Boolean);
+        const anchors = [
+            subscriberLatLng ? { point: subscriberLatLng, force: false } : null,
+            // force: true -- see the docstring above; the NAP end has
+            // no "leave it alone, might be genuine" distance ceiling.
+            napLatLng ? { point: napLatLng, force: true } : null,
+        ].filter(Boolean);
 
         // indices, ordered nearest-to-the-true-end first, so that if
         // two candidate points tie on distance the one closer to the
         // actual end of the recorded walk wins.
         function scanEnd(indices) {
-            anchors.forEach((anchor) => {
+            anchors.forEach(({ point: anchor, force }) => {
                 let bestIdx = null;
                 let bestDist = Infinity;
                 indices.forEach((idx) => {
@@ -1842,15 +1863,20 @@
                         bestIdx = idx;
                     }
                 });
+                const withinThreshold = bestDist <= CABLE_PATH_SNAP_METERS;
                 if (window.console && console.debug) {
                     console.debug(
                         "[cable-path-snap] end candidate -> anchor (" +
                             anchor.lat.toFixed(6) + "," + anchor.lng.toFixed(6) +
                             "): closest point is " + bestDist.toFixed(1) + "m away" +
-                            (bestDist <= CABLE_PATH_SNAP_METERS ? " -- snapping" : " -- NOT within " + CABLE_PATH_SNAP_METERS + "m, leaving as-is")
+                            (force
+                                ? " -- NAP anchor, force-snapping regardless of distance"
+                                : withinThreshold
+                                ? " -- snapping"
+                                : " -- NOT within " + CABLE_PATH_SNAP_METERS + "m, leaving as-is")
                     );
                 }
-                if (bestIdx !== null && bestDist <= CABLE_PATH_SNAP_METERS) {
+                if (bestIdx !== null && (force || withinThreshold)) {
                     latlngs[bestIdx] = [anchor.lat, anchor.lng];
                 }
             });

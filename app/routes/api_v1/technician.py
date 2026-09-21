@@ -1312,6 +1312,28 @@ def complete_assignment(assignment_id):
             service_request.subscriber_id = subscriber.id
 
         if subscriber is not None:
+            # Bug fix: only a brand-new walk-in subscriber (created
+            # just above) ever got its coordinates set from the
+            # technician's accurate on-site GPS pin. An installation
+            # completed against an EXISTING subscriber row (already
+            # provisioned — e.g. from a pre-registered application)
+            # kept whatever coarser location it already had (commonly
+            # just geocoded from the address text) even though a much
+            # more precise pin was captured moments ago (Phase 28
+            # already requires one before this point for an
+            # installation). That's what left the GeoMap's connector
+            # line — and the recorded cable path's subscriber-end
+            # snap in snapCablePathEndpoints() in napmap.js — anchored
+            # on a stale point instead of the actual premises, and let
+            # two subscribers whose addresses geocode to nearly the
+            # same spot end up with visually-overlapping markers even
+            # though their real, pinned locations are genuinely apart.
+            # Only overwrites when a pin actually exists (always true
+            # for an installation by this point, but stays defensive
+            # rather than assuming).
+            if assignment.pin_latitude is not None and assignment.pin_longitude is not None:
+                subscriber.latitude = assignment.pin_latitude
+                subscriber.longitude = assignment.pin_longitude
             subscriber.status = "active"
             subscriber.installed_at = date.today()
             # Phase 37: the mobile completion flow was setting the
