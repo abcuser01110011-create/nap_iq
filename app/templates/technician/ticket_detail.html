@@ -195,6 +195,48 @@
     </div>
 </div>
 
+{% if job.nap and job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none
+      and (job.can_edit or job.is_closed or job.cable_path_point_count > 0) %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-2">Cable Path (Optional)</h2>
+
+        <p class="small text-muted mb-2" id="cablePathStatus">
+            {% if job.cable_path_point_count > 0 %}
+                Cable path recorded ({{ job.cable_path_point_count }} GPS points).
+            {% else %}
+                No cable path recorded yet. Recording the actual route helps the GeoMap show
+                exactly where this cable runs, instead of a straight line.
+            {% endif %}
+        </p>
+
+        {% if job.can_edit %}
+        <div id="cablePathRecordingRow" class="d-flex align-items-center gap-2 text-muted small mb-2 d-none">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span id="cablePathPointCount">Recording… 0 points captured</span>
+        </div>
+        <p class="small text-muted mb-2 d-none" id="cablePathWalkHint">
+            Walk the actual cable route from the NAP to the subscriber's premises, then click Stop &amp; Save.
+        </p>
+        <div id="cablePathError" class="alert alert-danger small py-2 d-none" role="alert"></div>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" id="cablePathStartBtn" class="btn btn-outline-secondary btn-sm"
+                    data-cable-path-action="{{ url_for('technician.record_cable_path', assignment_id=job.assignment.id) }}">
+                <i class="bi bi-record-circle me-1"></i>
+                {{ "Re-record" if job.cable_path_point_count > 0 else "Start Recording" }}
+            </button>
+            <button type="button" id="cablePathStopBtn" class="btn btn-outline-secondary btn-sm d-none">
+                Stop &amp; Save
+            </button>
+            <button type="button" id="cablePathDiscardBtn" class="btn btn-outline-secondary btn-sm d-none">
+                Discard
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Nearby-NAPs picker -- populated via JS from GET nearby-naps
      (data-nearby-action on findNapsBtn above), each row's "Link"
      button POSTs to link-nap (data-link-action) then reloads the page
@@ -426,6 +468,186 @@ document.addEventListener("DOMContentLoaded", function () {
             { enableHighAccuracy: true, timeout: 20000 }
         );
     });
+    }
+
+    // Cable path recording -- new_installation-only, browser
+    // counterpart of the mobile Job Detail screen's
+    // handleStartRecordingPath()/handleStopRecordingPath()/
+    // handleDiscardRecording(). Uses navigator.geolocation.watchPosition
+    // instead of expo-location's watchPositionAsync, but keeps the same
+    // "capture locally, then submit the whole trail on Stop & Save"
+    // shape as the mobile screen rather than a point-by-point live
+    // upload -- see record_cable_path() in app/routes/technician.py.
+    var cablePathStartBtn = document.getElementById("cablePathStartBtn");
+    if (cablePathStartBtn) {
+        // Mirrors MAX_ACCEPTABLE_FIX_ACCURACY_M in the mobile Job Detail
+        // screen exactly -- a fix reporting a worse (larger) margin of
+        // error than this, in meters, is dropped rather than added to
+        // the recording, so one noisy reading can't yank the drawn line
+        // off to the side of the real route.
+        var MAX_ACCEPTABLE_FIX_ACCURACY_M = 15;
+
+        var cablePathStopBtn = document.getElementById("cablePathStopBtn");
+        var cablePathDiscardBtn = document.getElementById("cablePathDiscardBtn");
+        var cablePathRecordingRow = document.getElementById("cablePathRecordingRow");
+        var cablePathPointCountEl = document.getElementById("cablePathPointCount");
+        var cablePathWalkHint = document.getElementById("cablePathWalkHint");
+        var cablePathErrorEl = document.getElementById("cablePathError");
+        var cablePathStatusEl = document.getElementById("cablePathStatus");
+        var markCompleteBtn = document.getElementById("markCompleteBtn");
+        var markCompleteOriginalHtml = markCompleteBtn ? markCompleteBtn.innerHTML : null;
+
+        var watchId = null;
+        var pathPoints = [];
+
+        function showCablePathError(message) {
+            cablePathErrorEl.textContent = message;
+            cablePathErrorEl.classList.remove("d-none");
+        }
+
+        function hideCablePathError() {
+            cablePathErrorEl.classList.add("d-none");
+        }
+
+        // Same "block Mark Complete while a recording is running or its
+        // save is in flight" guard as the mobile screen's
+        // primaryButtonDisabled/handleComplete re-check -- prevents
+        // completeJob's request reaching the server and promoting a
+        // still-empty cable path before the recording ever gets there.
+        function setMarkCompleteBlocked(blocked, label) {
+            if (!markCompleteBtn) return;
+            markCompleteBtn.disabled = blocked;
+            markCompleteBtn.innerHTML = blocked ? label : markCompleteOriginalHtml;
+        }
+
+        function setRecordingUiState(state) {
+            // state: "idle" | "recording" | "saving"
+            cablePathStartBtn.classList.toggle("d-none", state !== "idle");
+            cablePathStopBtn.classList.toggle("d-none", state === "idle");
+            cablePathDiscardBtn.classList.toggle("d-none", state === "idle");
+            cablePathRecordingRow.classList.toggle("d-none", state === "idle");
+            cablePathWalkHint.classList.toggle("d-none", state !== "recording");
+            cablePathStopBtn.disabled = state === "saving";
+            cablePathDiscardBtn.disabled = state === "saving";
+            if (state === "saving") {
+                cablePathPointCountEl.textContent = "Saving recorded path…";
+                setMarkCompleteBlocked(true, "Saving cable path…");
+            } else if (state === "recording") {
+                setMarkCompleteBlocked(true, "Stop cable path recording first");
+            } else {
+                setMarkCompleteBlocked(false, null);
+            }
+        }
+
+        function updatePointCountLabel() {
+            cablePathPointCountEl.textContent =
+                "Recording… " + pathPoints.length + " point" + (pathPoints.length === 1 ? "" : "s") + " captured";
+        }
+
+        // Guards against silently losing an in-progress recording --
+        // pathPoints only ever lives in this page's JS state until Stop
+        // & Save actually posts it, same reasoning as the mobile
+        // screen's "beforeRemove" navigation guard, just expressed as a
+        // browser tab-close/navigate-away confirmation instead.
+        window.addEventListener("beforeunload", function (event) {
+            if (watchId !== null) {
+                event.preventDefault();
+                event.returnValue = "";
+            }
+        });
+
+        cablePathStartBtn.addEventListener("click", function () {
+            hideCablePathError();
+            if (!navigator.geolocation) {
+                showCablePathError("Your browser doesn't support location tracking. Try the mobile app instead.");
+                return;
+            }
+            pathPoints = [];
+            updatePointCountLabel();
+            setRecordingUiState("recording");
+
+            watchId = navigator.geolocation.watchPosition(
+                function (position) {
+                    if (
+                        typeof position.coords.accuracy === "number" &&
+                        position.coords.accuracy > MAX_ACCEPTABLE_FIX_ACCURACY_M
+                    ) {
+                        return;
+                    }
+                    pathPoints.push({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                    });
+                    updatePointCountLabel();
+                },
+                function (err) {
+                    if (err.code === err.PERMISSION_DENIED) {
+                        showCablePathError("Location permission was denied. Allow location access for this site in your browser settings, then try again.");
+                    } else {
+                        showCablePathError("Lost the location signal. You can Stop & Save what's captured so far, or Discard and try again.");
+                    }
+                },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+            );
+        });
+
+        cablePathDiscardBtn.addEventListener("click", function () {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            pathPoints = [];
+            hideCablePathError();
+            setRecordingUiState("idle");
+        });
+
+        cablePathStopBtn.addEventListener("click", function () {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+
+            if (pathPoints.length < 2) {
+                showCablePathError("Not enough movement was recorded — try walking the route again.");
+                pathPoints = [];
+                setRecordingUiState("idle");
+                return;
+            }
+
+            hideCablePathError();
+            setRecordingUiState("saving");
+
+            fetch(cablePathStartBtn.getAttribute("data-cable-path-action"), {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": CSRF_TOKEN,
+                },
+                body: JSON.stringify({ points: pathPoints }),
+            })
+                .then(function (resp) {
+                    return resp.json().then(function (data) {
+                        return { ok: resp.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (!result.ok) {
+                        showCablePathError((result.data && result.data.error) || "Couldn't save the recorded path. Try again.");
+                        // Keep pathPoints and re-show Stop & Save/Discard
+                        // so the walked trail isn't lost just because
+                        // this particular save attempt failed.
+                        setRecordingUiState("recording");
+                        cablePathWalkHint.classList.add("d-none");
+                        return;
+                    }
+                    window.location.reload();
+                })
+                .catch(function () {
+                    showCablePathError("Couldn't save the recorded path. Please check your connection and try again.");
+                    setRecordingUiState("recording");
+                    cablePathWalkHint.classList.add("d-none");
+                });
+        });
     }
 
     // "Find Nearby NAPs" / "Change NAP" -- installation-only, mirrors

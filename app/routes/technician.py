@@ -41,6 +41,12 @@ Routes:
                                                         counterpart of api_v1/technician.py's
                                                         same-named route; required before
                                                         complete_assignment on an installation)
+    POST /technician/assignments/<id>/cable-path     -> record_cable_path
+                                                        (new_installation-only GPS breadcrumb
+                                                        trail, desktop counterpart of
+                                                        api_v1/technician.py's same-named route;
+                                                        optional, staged the same way
+                                                        pin-location is)
     POST /technician/assignments/<id>/notes          -> save_notes
                                                         (resolution_notes only, no status change)
     POST /technician/assignments/<id>/photo          -> upload_photo
@@ -74,6 +80,7 @@ Routes:
     GET  /technician/mobile/jobs/<assignment_id>     -> mobile_job_detail
 """
 
+import json
 import uuid
 from datetime import date, datetime
 
@@ -92,6 +99,7 @@ from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
 from app.routes.api_v1.technician import (
     _assignment_nap, _nap_occupied_ports, _validate_port_number, _subscriber_installed_port_number,
+    MAX_CABLE_PATH_POINTS,
 )
 
 # Mirrors app/routes/api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS exactly
@@ -357,6 +365,69 @@ def pin_assignment_location(assignment_id):
     db.session.commit()
 
     return {"pin_latitude": latitude, "pin_longitude": longitude}, 200
+
+
+@technician_bp.route("/assignments/<int:assignment_id>/cable-path", methods=["POST"])
+@role_required("technician")
+def record_cable_path(assignment_id):
+    """Records the GPS breadcrumb trail the technician walked while
+    running the drop cable from the NAP to the subscriber's premises
+    on a *new_installation* assignment — the desktop web counterpart
+    of api_v1/technician.py's record_cable_path(), same validation
+    rules (installation-only, only while 'accepted'/'in_progress', at
+    least 2 and at most MAX_CABLE_PATH_POINTS points), just reached
+    via a plain JSON fetch from ticket_detail.html's 'Start
+    Recording'/'Stop & Save' buttons (browser geolocation
+    watchPosition) instead of the mobile app's expo-location +
+    JWT API call.
+
+    Optional, same as the mobile version: nothing here blocks
+    complete_assignment() above if it's never called. Staged onto the
+    Assignment itself first (assignment.cable_path_points) —
+    complete_assignment() promotes it into a real CablePath row once
+    the subscriber/NAP link is actually established, using the exact
+    same block api_v1/technician.py's complete_assignment() already
+    runs (see that block's comment). Replaces any previously-saved
+    trail for this assignment outright, same "send the complete trail
+    each time" contract the mobile screen already relies on.
+    """
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.service_request_id is None:
+        return {"error": "A cable path only applies to an installation assignment."}, 409
+
+    if assignment.status not in ("accepted", "in_progress"):
+        return {"error": "A cable path can only be recorded on an assignment you've accepted or started."}, 409
+
+    data = request.get_json(silent=True) or {}
+    points = data.get("points")
+    if not isinstance(points, list) or len(points) < 2:
+        return {"error": "points must be a list of at least 2 {latitude, longitude} coordinates."}, 400
+    if len(points) > MAX_CABLE_PATH_POINTS:
+        return {"error": f"points cannot exceed {MAX_CABLE_PATH_POINTS} coordinates."}, 400
+
+    cleaned_points = []
+    for point in points:
+        if not isinstance(point, dict):
+            return {"error": "Each point must be an object with latitude and longitude."}, 400
+        lat = point.get("latitude")
+        lng = point.get("longitude")
+        if lat is None or lng is None:
+            return {"error": "Each point must include latitude and longitude."}, 400
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            return {"error": "latitude/longitude must be numbers."}, 400
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return {"error": "latitude/longitude are out of range."}, 400
+        cleaned_points.append({"latitude": lat, "longitude": lng})
+
+    assignment.cable_path_points = json.dumps(cleaned_points)
+    db.session.commit()
+
+    return {"point_count": len(cleaned_points)}, 200
 
 
 @technician_bp.route("/assignments/<int:assignment_id>/nearby-naps", methods=["GET"])
@@ -656,10 +727,10 @@ def complete_assignment(assignment_id):
                 # complete_assignment() in api_v1/technician.py (see
                 # that copy's comment for the full reasoning) so the
                 # two entry points never drift apart: promotes a
-                # technician-recorded cable-path GPS trail (only ever
-                # set via the mobile Job Detail screen — the desktop
-                # web UI has no way to walk a route) into a real
-                # CablePath row for the GeoMap to draw.
+                # technician-recorded cable-path GPS trail (set via
+                # either the mobile Job Detail screen or this ticket's
+                # own Cable Path card — see record_cable_path() above)
+                # into a real CablePath row for the GeoMap to draw.
                 if assignment.cable_path_points:
                     existing_path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
                     if existing_path is None:
@@ -898,6 +969,14 @@ def _serialize_job(assignment):
         "description": issue.description if issue else (request.notes if request else None),
         "nap": nap_info,
         "nap_label": f"{nap.nap_code} — {nap.name}" if nap else None,
+        # Mirrors api_v1/technician.py's _serialize_assignment() field
+        # of the same name -- ticket_detail.html's Cable Path card
+        # reads this to show "recorded (N GPS points)" vs. the
+        # nothing-recorded-yet copy, same as the mobile Job Detail
+        # screen's assignment.cable_path_point_count.
+        "cable_path_point_count": (
+            len(json.loads(assignment.cable_path_points)) if assignment.cable_path_points else 0
+        ),
         "lat": lat,
         "lng": lng,
         "is_installation": is_installation,
