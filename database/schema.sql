@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_method    ENUM('cash', 'gcash', 'bank_transfer', 'other') NOT NULL DEFAULT 'cash',
     payment_date      DATE NOT NULL,
     reference_number  VARCHAR(50),
+    remarks           VARCHAR(500),
     status            ENUM('pending', 'confirmed', 'overdue', 'voided') NOT NULL DEFAULT 'confirmed',
     created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -467,6 +468,7 @@ INSERT IGNORE INTO app_settings (id) VALUES (1);
 CREATE TABLE IF NOT EXISTS plans (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     name            VARCHAR(50) NOT NULL UNIQUE,
+    monthly_fee     DECIMAL(10,2),
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
