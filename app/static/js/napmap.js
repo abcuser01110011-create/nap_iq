@@ -112,6 +112,21 @@
     // NAP icon regardless of distance (see that function's docstring).
     const CABLE_PATH_SNAP_METERS = 12;
 
+    // How close a recorded breadcrumb has to land to a NAP's own
+    // fixed coordinates before the drawn cable line is treated as
+    // "having reached the NAP" and clipped/snapped exactly onto it --
+    // see snapCablePathEndpoints() below. This is intentionally its
+    // own tiny, fixed constant, completely separate from
+    // AppSettings.nap_connection_radius_meters (the admin's "Max
+    // Connection Radius" under Settings > App Settings -- a business
+    // rule about how far a *subscriber* may be assigned from a NAP,
+    // surfaced on the map as napConnectionRadiusMeters/the coverage
+    // ring). That setting has nothing to do with line-drawing
+    // accuracy and must never be read here. Keep this within a 3-5m
+    // band -- tight enough that only a breadcrumb genuinely standing
+    // at the NAP box counts, not just "somewhere in the yard".
+    const NAP_SNAP_RADIUS_METERS = 4;
+
     // How much a raw recorded point is allowed to deviate (in meters)
     // from the straightened route before simplifyCablePath() below
     // keeps it as a real corner instead of smoothing it away. Even
@@ -120,10 +135,15 @@
     // pole, chatting) reads as a little scribble/loop rather than a
     // single point, which both looks noisy and throws off endpoint
     // matching (the "true" last point ends up buried mid-loop instead
-    // of at the array's actual first/last index). Raise this if paths
-    // still look jittery after this; lower it if real turns in the
-    // route start getting flattened out.
-    const CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 4;
+    // of at the array's actual first/last index). Tightened from an
+    // earlier 4m -- at 4m, genuine curves in a technician's actual
+    // walked route (drop-cable runs are rarely a straight line) were
+    // being flattened into straight-looking segments, which is what
+    // made a real, non-straight walk render as an inaccurate
+    // straight-ish line on the map. Raise this if paths still look
+    // jittery after this; lower it further if turns are still being
+    // smoothed away.
+    const CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 2;
 
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
@@ -1829,11 +1849,32 @@
      * line and the NAP icon is pure GPS drift (often worse right at
      * the NAP, e.g. mounted under eaves/trees), never a real
      * different endpoint the way a large subscriber-side gap can be
-     * (see the reasoning above). So the NAP anchor is ALWAYS
-     * force-snapped onto its exact coordinates with no distance
-     * ceiling, instead of only within CABLE_PATH_SNAP_METERS like the
-     * subscriber anchor -- the recorded line's "tip" should always
-     * land exactly on the NAP icon, not just approximately.
+     * (see the reasoning above).
+     *
+     * Unlike the subscriber anchor -- which is only ever looked for
+     * in a small window at the two literal ends of the array -- the
+     * NAP anchor is searched for across the ENTIRE recorded trail.
+     * A technician commonly starts recording before actually reaching
+     * the NAP (from the truck/pole) and/or keeps walking a few steps
+     * past it before heading off to the subscriber, so the single
+     * breadcrumb that's genuinely "at the NAP" can land anywhere in
+     * the array, not just at index 0 or the last index. Whichever
+     * breadcrumb is closest to the NAP, anywhere in the trail, gets
+     * snapped exactly onto the NAP's coordinates, and everything on
+     * the far side of it (the overshoot -- either the walk-up before
+     * it, or the walk-past after it) is dropped, so the drawn line
+     * always terminates cleanly right at the NAP icon instead of
+     * poking through it or stopping short.
+     *
+     * This only fires within NAP_SNAP_RADIUS_METERS (a small, fixed
+     * 3-5m band -- see that constant; deliberately NOT the admin's
+     * Max Connection Radius setting, which is an unrelated business
+     * rule). If no breadcrumb anywhere in the trail actually gets
+     * that close, we fall back to force-snapping the nearer of the
+     * two literal ends onto the NAP regardless of distance, same as
+     * this function always used to do -- so a badly-recorded trail
+     * still visually reaches the NAP rather than leaving a dangling
+     * gap, while a normal recording gets the tight, accurate snap.
      *
      * `latlngs` is mutated in place (array of [lat, lng] pairs, as
      * built for L.polyline() below) and also returned for convenience.
@@ -1841,23 +1882,86 @@
     function snapCablePathEndpoints(latlngs, subscriberLatLng, napLatLng) {
         if (!Array.isArray(latlngs) || latlngs.length < 2) return latlngs;
 
-        const END_SCAN_WINDOW = Math.min(5, Math.ceil(latlngs.length / 2));
-        const anchors = [
-            subscriberLatLng ? { point: subscriberLatLng, force: false } : null,
-            // force: true -- see the docstring above; the NAP end has
-            // no "leave it alone, might be genuine" distance ceiling.
-            napLatLng ? { point: napLatLng, force: true } : null,
-        ].filter(Boolean);
+        // --- NAP end: global nearest-point search + overshoot clip ---
+        if (napLatLng) {
+            let bestIdx = null;
+            let bestDist = Infinity;
+            for (let i = 0; i < latlngs.length; i++) {
+                const d = L.latLng(latlngs[i]).distanceTo(napLatLng);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = i;
+                }
+            }
 
-        // indices, ordered nearest-to-the-true-end first, so that if
-        // two candidate points tie on distance the one closer to the
-        // actual end of the recorded walk wins.
-        function scanEnd(indices) {
-            anchors.forEach(({ point: anchor, force }) => {
+            if (bestIdx !== null) {
+                const withinRadius = bestDist <= NAP_SNAP_RADIUS_METERS;
+                if (window.console && console.debug) {
+                    console.debug(
+                        "[cable-path-snap] NAP anchor (" +
+                            napLatLng.lat.toFixed(6) + "," + napLatLng.lng.toFixed(6) +
+                            "): closest breadcrumb (index " + bestIdx + " of " + latlngs.length +
+                            ") is " + bestDist.toFixed(1) + "m away" +
+                            (withinRadius
+                                ? " -- within " + NAP_SNAP_RADIUS_METERS + "m, snapping + clipping overshoot"
+                                : " -- NOT within " + NAP_SNAP_RADIUS_METERS + "m anywhere in the trail, force-snapping nearest end instead")
+                    );
+                }
+
+                if (withinRadius) {
+                    // Figure out which side of this index the
+                    // subscriber-ward portion of the walk is on, so we
+                    // clip the overshoot and not the real route.
+                    const first = L.latLng(latlngs[0]);
+                    const last = L.latLng(latlngs[latlngs.length - 1]);
+                    const subscriberIsNearEnd =
+                        !subscriberLatLng || last.distanceTo(subscriberLatLng) <= first.distanceTo(subscriberLatLng);
+
+                    latlngs[bestIdx] = [napLatLng.lat, napLatLng.lng];
+                    if (subscriberIsNearEnd) {
+                        // Subscriber-ward points come after bestIdx --
+                        // drop the walk-up-to-the-NAP prefix before it.
+                        latlngs.splice(0, bestIdx);
+                    } else {
+                        // Subscriber-ward points come before bestIdx --
+                        // drop the walked-past-the-NAP suffix after it.
+                        latlngs.splice(bestIdx + 1);
+                    }
+                } else {
+                    // Never actually got close enough anywhere in the
+                    // trail -- still force the nearer literal end onto
+                    // the NAP's exact coordinates so the line always
+                    // visually reaches the NAP box (see docstring).
+                    const idx = first_or_last(latlngs, napLatLng);
+                    latlngs[idx] = [napLatLng.lat, napLatLng.lng];
+                }
+            }
+        }
+
+        // A degenerate clip (NAP breadcrumb was the only point on its
+        // side) can leave a single-point array; pad it back out so a
+        // polyline can still be drawn.
+        if (latlngs.length < 2 && subscriberLatLng) {
+            latlngs.push([subscriberLatLng.lat, subscriberLatLng.lng]);
+        }
+
+        // --- Subscriber end: unchanged end-window snap ---------------
+        // Still only searched for at the two literal ends, and only
+        // snapped within CABLE_PATH_SNAP_METERS -- a subscriber isn't
+        // a small fixed box the way a NAP is, so a large gap here is
+        // left alone rather than force-snapped (see docstring above).
+        if (subscriberLatLng && latlngs.length >= 2) {
+            const END_SCAN_WINDOW = Math.min(5, Math.ceil(latlngs.length / 2));
+            const startIndices = [];
+            for (let i = 0; i < END_SCAN_WINDOW; i++) startIndices.push(i);
+            const endIndices = [];
+            for (let i = 0; i < END_SCAN_WINDOW; i++) endIndices.push(latlngs.length - 1 - i);
+
+            function scanForSubscriber(indices) {
                 let bestIdx = null;
                 let bestDist = Infinity;
                 indices.forEach((idx) => {
-                    const d = L.latLng(latlngs[idx]).distanceTo(anchor);
+                    const d = L.latLng(latlngs[idx]).distanceTo(subscriberLatLng);
                     if (d < bestDist) {
                         bestDist = d;
                         bestIdx = idx;
@@ -1866,31 +1970,31 @@
                 const withinThreshold = bestDist <= CABLE_PATH_SNAP_METERS;
                 if (window.console && console.debug) {
                     console.debug(
-                        "[cable-path-snap] end candidate -> anchor (" +
-                            anchor.lat.toFixed(6) + "," + anchor.lng.toFixed(6) +
+                        "[cable-path-snap] subscriber anchor (" +
+                            subscriberLatLng.lat.toFixed(6) + "," + subscriberLatLng.lng.toFixed(6) +
                             "): closest point is " + bestDist.toFixed(1) + "m away" +
-                            (force
-                                ? " -- NAP anchor, force-snapping regardless of distance"
-                                : withinThreshold
-                                ? " -- snapping"
-                                : " -- NOT within " + CABLE_PATH_SNAP_METERS + "m, leaving as-is")
+                            (withinThreshold ? " -- snapping" : " -- NOT within " + CABLE_PATH_SNAP_METERS + "m, leaving as-is")
                     );
                 }
-                if (bestIdx !== null && (force || withinThreshold)) {
-                    latlngs[bestIdx] = [anchor.lat, anchor.lng];
+                if (bestIdx !== null && withinThreshold) {
+                    latlngs[bestIdx] = [subscriberLatLng.lat, subscriberLatLng.lng];
                 }
-            });
+            }
+
+            scanForSubscriber(startIndices);
+            scanForSubscriber(endIndices);
         }
 
-        const startIndices = [];
-        for (let i = 0; i < END_SCAN_WINDOW; i++) startIndices.push(i);
-        const endIndices = [];
-        for (let i = 0; i < END_SCAN_WINDOW; i++) endIndices.push(latlngs.length - 1 - i);
-
-        scanEnd(startIndices);
-        scanEnd(endIndices);
-
         return latlngs;
+    }
+
+    /** Small helper for snapCablePathEndpoints()'s no-breadcrumb-in-range
+     * fallback: returns 0 or latlngs.length-1, whichever literal end of
+     * the trail sits closer to `anchor`. */
+    function first_or_last(latlngs, anchor) {
+        const distStart = L.latLng(latlngs[0]).distanceTo(anchor);
+        const distEnd = L.latLng(latlngs[latlngs.length - 1]).distanceTo(anchor);
+        return distStart <= distEnd ? 0 : latlngs.length - 1;
     }
 
     /** Rebuilds the subscriber marker layer from allSubscribers. Only
