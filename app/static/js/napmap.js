@@ -143,7 +143,20 @@
     // straight-ish line on the map. Raise this if paths still look
     // jittery after this; lower it further if turns are still being
     // smoothed away.
-    const CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 2;
+    //
+    // Tightened again from 2m -> 0.75m: even at 2m, real bends in a
+    // technician's actual walked route (going around a post, hugging
+    // a fence line, stepping around a gate) were still getting
+    // flattened away by RDP, so the drawn line was a looser
+    // approximation of the recorded trail than the GPS data actually
+    // supports. 0.75m only removes sub-meter jitter/loops (standing
+    // still, a couple of noisy fixes in place) while keeping every
+    // genuine turn in the walked path -- i.e. as close to "exactly
+    // what was recorded" as we can render without just replaying
+    // raw GPS noise. Lower further (toward 0) for an even more
+    // literal trace; raise back toward 2m only if paths still look
+    // noticeably jittery on real devices.
+    const CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 0.75;
 
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
