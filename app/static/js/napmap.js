@@ -961,8 +961,28 @@
             html: html,
             className: "nap-marker-icon" + (status === "pending" ? " nap-marker-pending" : ""),
             iconSize: [w, h],
-            iconAnchor: [Math.round(w / 2), Math.round(h * (27 / 31))],
-            popupAnchor: [0, -Math.round(h * (24 / 31))],
+            // iconAnchor.y: the point within the 34x31 artwork that
+            // corresponds exactly to the NAP's real coordinate.
+            // Measured directly against the source PNG's actual
+            // opaque pixels (nap-icon-blue.png) rather than assumed
+            // -- the tower's two feet (the true "on the ground" point
+            // the icon represents) sit right at the very bottom of
+            // the artwork, not partway up inside the legs. An earlier
+            // value here (27/31) put the anchor a few pixels too
+            // high, so the icon visibly sat above and to the side of
+            // a NAP's actual plotted location instead of exactly on
+            // it -- most noticeable comparing the icon against a
+            // connection line, which is drawn from the real
+            // coordinate and so always lands in the right place even
+            // when the icon on top of it doesn't. 30/31 is where the
+            // feet actually are; don't nudge this without re-checking
+            // the PNG.
+            iconAnchor: [Math.round(w / 2), Math.round(h * (30 / 31))],
+            // Kept as a fixed 3-unit gap above iconAnchor (same
+            // relationship the original 27/24 pairing had) so the
+            // popup still opens right at the icon's own top edge,
+            // just below the name/usage label.
+            popupAnchor: [0, -Math.round(h * (27 / 31))],
         });
     }
 
@@ -3039,8 +3059,17 @@
             html: svg,
             className: "nap-marker-icon customer-marker-icon",
             iconSize: [30, 42],
-            iconAnchor: [15, 40],
-            popupAnchor: [0, -36],
+            // The SVG path's teardrop tip is exactly at (15, 42) --
+            // the very bottom of the 30x42 viewBox (see the path's
+            // "...15,27 s15,-15.75 15,-27..." ending back at y=15+27=42).
+            // iconAnchor was a couple of pixels short of that (40, not
+            // 42), same class of anchor-too-high mismatch as the NAP
+            // tower icon above -- landing exactly on the tip is what
+            // makes the pin point precisely at the real coordinate
+            // instead of just above it.
+            iconAnchor: [15, 42],
+            // Same fixed gap above iconAnchor as before (was 40-36=4).
+            popupAnchor: [0, -38],
         });
     }
     // ---------------- Add NAP from map click ----------------

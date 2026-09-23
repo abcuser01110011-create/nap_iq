@@ -53,6 +53,41 @@ def _is_safe_next_url(next_url: str) -> bool:
     return bool(next_url) and next_url.startswith("/") and not next_url.startswith("//")
 
 
+def _next_url_allowed_for_role(next_url: str, role: str) -> bool:
+    """True unless `next_url` resolves to a route that @role_required
+    has restricted to roles that don't include `role`.
+
+    `next` exists to send someone back to the exact page they were on
+    before getting bounced to the login form -- genuinely convenient
+    when the *same* account logs back in after e.g. a session timeout.
+    But it travels as a plain query string / hidden login-form field,
+    not anything tied to a specific account, so it can just as easily
+    be left over from a DIFFERENT account's session in the same browser
+    tab: an administrator's session expires while viewing an
+    admin-only page (next=/that/page gets baked into the login form's
+    action), they then sign in as a Technician on that same
+    already-loaded form. Without this check, that Technician would be
+    sent straight into the admin page and immediately hit a 403,
+    instead of landing on their own dashboard the way ROLE_HOME_ENDPOINT
+    guarantees everywhere else -- this closes that one gap.
+
+    Routes with no @role_required (bare @login_required, or public)
+    have nothing to violate and are always allowed here.
+    """
+    try:
+        adapter = current_app.url_map.bind(request.host)
+        endpoint, _args = adapter.match(next_url, method="GET")
+    except Exception:
+        # Doesn't resolve to a real GET route (unknown path, a
+        # POST-only endpoint, a malformed value, ...) -- safest to not
+        # honor it rather than guess.
+        return False
+
+    view = current_app.view_functions.get(endpoint)
+    allowed_roles = getattr(view, "role_required_roles", None)
+    return allowed_roles is None or role in allowed_roles
+
+
 @auth_bp.route("/login", methods=["GET", "POST"])
 # Phase 18 — brute-force protection (SECURITY_CHECKLIST.md's previously-
 # open "Rate limiting on /login" gap). Two independent limits, both
@@ -104,7 +139,7 @@ def login():
             flash(f"Welcome back, {user.full_name}.", "success")
 
             next_url = request.args.get("next") or request.form.get("next")
-            if _is_safe_next_url(next_url):
+            if _is_safe_next_url(next_url) and _next_url_allowed_for_role(next_url, user.role):
                 return redirect(next_url)
             return redirect(url_for("auth.home"))
 

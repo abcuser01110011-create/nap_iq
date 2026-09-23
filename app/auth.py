@@ -108,6 +108,13 @@ def role_required(*roles):
                 abort(403)
             return view(*args, **kwargs)
 
+        # Stashed on the wrapped view so login()'s post-login "next"
+        # redirect (routes/auth.py) can check *before* redirecting
+        # whether the just-authenticated user's role is actually
+        # allowed onto this endpoint, instead of blindly trusting a
+        # `next` value -- see _next_url_allowed_for_role() in
+        # routes/auth.py for why that matters.
+        wrapped_view.role_required_roles = roles
         return wrapped_view
 
     return decorator
