@@ -407,6 +407,8 @@ document.addEventListener("DOMContentLoaded", function () {
     var snapped = false;
     var firstFixSeen = false;
     var originWasNap = false;
+    var startChecked = false;      // start-location check runs once per recording
+    var startOriginIsNap = false;
 
     var liveLine = null;
     var remainingLine = null;
@@ -620,6 +622,37 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function onFix(position) {
         if (snapPending) return;
+
+        // Start-location check: done ONCE, on the very first fix that
+        // arrives after pressing Start Recording -- before the accuracy
+        // filter below, which can hold back the first "good" fix for
+        // several seconds while the GPS warms up (by which time the
+        // technician has already walked away from the start point).
+        // Later fixes never re-run this check, so walking away from the
+        // start point toward the destination never triggers it.
+        if (!startChecked) {
+            startChecked = true;
+            var here = { lat: position.coords.latitude, lng: position.coords.longitude };
+            var startAcc = typeof position.coords.accuracy === "number" ? position.coords.accuracy : 0;
+            var dStartPin = pinPos ? distanceM(here, pinPos) : null;
+            var dStartNap = napPos ? distanceM(here, napPos) : null;
+            var nearest = Math.min(
+                dStartPin === null ? Infinity : dStartPin,
+                dStartNap === null ? Infinity : dStartNap
+            );
+            // Give the fix the benefit of its own reported error: only
+            // block when the technician is outside the radius even after
+            // allowing for that margin, so a coarse first fix can't
+            // wrongly reject someone who is actually on the spot.
+            if (nearest - startAcc > START_RADIUS_M) {
+                stopWatch();
+                resetRecordingState();
+                setRecordingUiState("idle");
+                showStartLocationDialog(dStartPin, dStartNap);
+                return;
+            }
+            startOriginIsNap = !pinPos || (dStartNap !== null && dStartPin !== null && dStartNap < dStartPin);
+        }
         if (
             typeof position.coords.accuracy === "number" &&
             position.coords.accuracy > MAX_ACCEPTABLE_FIX_ACCURACY_M
@@ -630,24 +663,10 @@ document.addEventListener("DOMContentLoaded", function () {
         var acc = typeof position.coords.accuracy === "number" ? position.coords.accuracy : 0;
 
         if (!lastFix) {
-            // Recording may only begin at one of the two endpoints.
-            var dStartPin = pinPos ? distanceM(cur, pinPos) : null;
-            var dStartNap = napPos ? distanceM(cur, napPos) : null;
-            var nearest = Math.min(
-                dStartPin === null ? Infinity : dStartPin,
-                dStartNap === null ? Infinity : dStartNap
-            );
-            if (nearest > START_RADIUS_M) {
-                stopWatch();
-                resetRecordingState();
-                setRecordingUiState("idle");
-                showStartLocationDialog(dStartPin, dStartNap);
-                return;
-            }
             // The line always starts on a marker, never on a raw GPS
             // fix: whichever of the subscriber pin / NAP the technician
             // is closer to when recording begins.
-            var originIsNap = !pinPos || (napPos && distanceM(cur, napPos) < distanceM(cur, pinPos));
+            var originIsNap = startOriginIsNap;
             var origin = originIsNap ? napPos : pinPos;
             originWasNap = originIsNap;
             pathPoints.push({ latitude: origin.lat, longitude: origin.lng });
@@ -697,6 +716,8 @@ document.addEventListener("DOMContentLoaded", function () {
         snapped = false;
         firstFixSeen = false;
         originWasNap = false;
+        startChecked = false;
+        startOriginIsNap = false;
         [liveLine, remainingLine, headMarker].forEach(function (layer) {
             if (layer) map.removeLayer(layer);
         });
