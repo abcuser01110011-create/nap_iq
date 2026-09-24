@@ -39,6 +39,24 @@
         border-radius: 50%;
         margin-right: 0.35rem;
     }
+    /* Wrapping element for the Start/Stop button + its error banner.
+       The banner is positioned absolute (see below) so showing or
+       hiding it never changes this wrapper's height -- it overlaps
+       whatever is underneath instead of pushing it down/up. */
+    .cable-path-action-wrap {
+        position: relative;
+        display: inline-block;
+    }
+    #cablePathError {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: 0.5rem;
+        width: max-content;
+        max-width: min(90vw, 420px);
+        z-index: 5;
+    }
 </style>
 {% endblock %}
 
@@ -81,11 +99,13 @@
 
 {% if job.can_edit %}
 <div class="text-center mb-4">
-    <button type="button" id="cablePathStartBtn" class="btn btn-primary btn-lg px-4">
-        <i class="bi bi-record-circle me-1"></i>
-        {{ "Re-record" if job.cable_path_point_count > 0 else "Start Recording" }}
-    </button>
-    <div id="cablePathError" class="alert alert-danger small py-2 mt-2 d-none" role="alert"></div>
+    <div class="cable-path-action-wrap">
+        <button type="button" id="cablePathStartBtn" class="btn btn-primary btn-lg px-4">
+            <i class="bi bi-record-circle me-1"></i>
+            {{ "Re-record" if job.cable_path_point_count > 0 else "Start Recording" }}
+        </button>
+        <div id="cablePathError" class="alert alert-danger small py-2 mt-2 d-none" role="alert"></div>
+    </div>
 </div>
 {% endif %}
 {% endblock %}
@@ -163,7 +183,20 @@ document.addEventListener("DOMContentLoaded", function () {
         var existingLatLngs = existingPoints.map(function (p) {
             return [p.latitude, p.longitude];
         });
-        recordedLine = L.polyline(existingLatLngs, { color: "#198754", weight: 4 }).addTo(map);
+        // Raw GPS fixes almost never land exactly on the NAP or the
+        // pinned subscriber location, which left the drawn line
+        // visibly short of (or drifting past) those icons. Snap the
+        // *displayed* line's two ends onto the actual marker
+        // coordinates -- the underlying existingPoints/pathPoints
+        // data (what's stored/sent to the server) is untouched.
+        var recordedDisplayLatLngs = existingLatLngs.slice();
+        if (hasNap) {
+            recordedDisplayLatLngs.unshift([napLat, napLng]);
+        }
+        if (hasPin) {
+            recordedDisplayLatLngs.push([pinLat, pinLng]);
+        }
+        recordedLine = L.polyline(recordedDisplayLatLngs, { color: "#198754", weight: 4 }).addTo(map);
         existingLatLngs.forEach(function (ll) {
             boundsPoints.push(ll);
         });
@@ -206,13 +239,26 @@ document.addEventListener("DOMContentLoaded", function () {
     var liveLine = null;
     var recordingState = "idle"; // "idle" | "recording" | "saving"
 
+    var cablePathErrorTimeout = null;
+    var CABLE_PATH_ERROR_AUTOHIDE_MS = 3000;
+
     function showCablePathError(message) {
         cablePathErrorEl.textContent = message;
         cablePathErrorEl.classList.remove("d-none");
+        if (cablePathErrorTimeout !== null) {
+            clearTimeout(cablePathErrorTimeout);
+        }
+        cablePathErrorTimeout = setTimeout(function () {
+            hideCablePathError();
+        }, CABLE_PATH_ERROR_AUTOHIDE_MS);
     }
 
     function hideCablePathError() {
         cablePathErrorEl.classList.add("d-none");
+        if (cablePathErrorTimeout !== null) {
+            clearTimeout(cablePathErrorTimeout);
+            cablePathErrorTimeout = null;
+        }
     }
 
     function setRecordingUiState(state) {
@@ -234,14 +280,27 @@ document.addEventListener("DOMContentLoaded", function () {
         var latLngs = pathPoints.map(function (p) {
             return [p.latitude, p.longitude];
         });
+        if (!latLngs.length) {
+            return;
+        }
+        // Same end-snapping as the recorded (green) line above: draw
+        // the live trail from the NAP marker's exact coordinates,
+        // through the real recorded GPS points, to the pinned
+        // subscriber marker's exact coordinates -- instead of
+        // stopping wherever the last noisy GPS fix happened to land.
+        var displayLatLngs = latLngs.slice();
+        if (hasNap) {
+            displayLatLngs.unshift([napLat, napLng]);
+        }
+        if (hasPin) {
+            displayLatLngs.push([pinLat, pinLng]);
+        }
         if (liveLine) {
-            liveLine.setLatLngs(latLngs);
-        } else if (latLngs.length) {
-            liveLine = L.polyline(latLngs, { color: "#fd7e14", weight: 4 }).addTo(map);
+            liveLine.setLatLngs(displayLatLngs);
+        } else {
+            liveLine = L.polyline(displayLatLngs, { color: "#fd7e14", weight: 4 }).addTo(map);
         }
-        if (latLngs.length) {
-            map.panTo(latLngs[latLngs.length - 1]);
-        }
+        map.panTo(latLngs[latLngs.length - 1]);
     }
 
     window.addEventListener("beforeunload", function (event) {
