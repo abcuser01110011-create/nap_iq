@@ -12,8 +12,11 @@
        height, since Leaflet needs an explicit one on its container. */
     .cable-path-map-shell {
         position: relative;
-        height: calc(100vh - 220px);
-        min-height: 360px;
+        /* Sized to leave room for the Start/Stop button under the map
+           so the whole page fits one phone screen without scrolling. */
+        height: calc(100vh - 290px);
+        height: calc(100dvh - 290px);
+        min-height: 220px;
         border-radius: 0.5rem;
         overflow: hidden;
     }
@@ -26,7 +29,10 @@
         top: 0.75rem;
         right: 0.75rem;
         z-index: 1000;
-        background: var(--bs-body-bg);
+        /* Explicit light box + dark text: the dark theme's inherited
+           text color was near-white and vanished on this white box. */
+        background: #fff;
+        color: #212529;
         border-radius: 0.375rem;
         padding: 0.5rem 0.75rem;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
@@ -46,7 +52,8 @@
         top: 0.75rem;
         left: 0.75rem;
         z-index: 1000;
-        background: var(--bs-body-bg);
+        background: #fff;
+        color: #212529;
         border-radius: 0.5rem;
         padding: 0.5rem 0.9rem;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
@@ -62,7 +69,7 @@
     .cable-path-hud .hud-label,
     .cable-path-hud .hud-walked {
         font-size: 0.75rem;
-        color: var(--bs-secondary-color, #6c757d);
+        color: #6c757d;
     }
     .cable-path-hud.snapped .hud-distance,
     .cable-path-hud.snapped .hud-label {
@@ -75,6 +82,67 @@
     .cable-path-action-wrap {
         position: relative;
         display: inline-block;
+    }
+    /* "Too far from the start point" dialog */
+    .cp-dialog-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        background: rgba(0, 0, 0, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    .cp-dialog {
+        background: #fff;
+        color: #212529;
+        border-radius: 0.75rem;
+        padding: 1.5rem 1.25rem 1.25rem;
+        width: 100%;
+        max-width: 380px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    .cp-dialog-icon {
+        width: 3rem;
+        height: 3rem;
+        margin: 0 auto 0.75rem;
+        border-radius: 50%;
+        background: #fdecea;
+        color: #dc3545;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+    .cp-dialog-title { font-weight: 700; margin-bottom: 0.5rem; color: #212529; }
+    .cp-dialog-text { font-size: 0.9rem; color: #495057; margin-bottom: 0.75rem; }
+    .cp-dialog-hint { margin-bottom: 1rem; }
+    .cp-dialog-distances {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .cp-dialog-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        font-size: 0.9rem;
+        padding: 0.25rem 0;
+        color: #212529;
+    }
+    .cp-dialog-actions { display: flex; gap: 0.5rem; }
+    .cp-dialog-actions .btn { flex: 1; }
+    /* Keep the button pinned in view even on short screens. */
+    .cable-path-actions {
+        position: sticky;
+        bottom: 0.75rem;
+        z-index: 1100;
+    }
+    .cable-path-map-card .card-body {
+        padding: 0.5rem;
     }
     #cablePathError {
         position: absolute;
@@ -90,13 +158,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <a href="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}" class="small text-decoration-none">
         <i class="bi bi-arrow-left me-1"></i>Back to {{ job.ticket_code }}
     </a>
 </div>
 
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm mb-2 cable-path-map-card">
     <div class="card-body">
         <div class="cable-path-map-shell">
             <div id="cablePathMap"
@@ -132,9 +200,9 @@
 {% endif %}
 
 {% if job.can_edit %}
-<div class="text-center mb-4">
+<div class="text-center mb-2 cable-path-actions">
     <div class="cable-path-action-wrap">
-        <button type="button" id="cablePathStartBtn" class="btn btn-primary btn-lg px-4">
+        <button type="button" id="cablePathStartBtn" class="btn btn-primary btn-lg px-4 shadow">
             <i class="bi bi-record-circle me-1"></i>
             {{ "Re-record" if job.cable_path_point_count > 0 else "Start Recording" }}
         </button>
@@ -308,9 +376,11 @@ document.addEventListener("DOMContentLoaded", function () {
     var cablePathStartBtn = document.getElementById("cablePathStartBtn");
     if (!cablePathStartBtn) return;
 
-    var MAX_ACCEPTABLE_FIX_ACCURACY_M = 15;
+    var MAX_ACCEPTABLE_FIX_ACCURACY_M = 10; // drop poor fixes: they cause the zig-zag
     var MIN_STEP_M = 1;            // ignore fixes that moved < 1 m (GPS jitter)
+    var STEP_ACCURACY_FACTOR = 0.4; // ...and anything smaller than 40% of the fix's own error
     var SNAP_RADIUS_M = 3;         // auto-snap, stop and save inside this distance
+    var START_RADIUS_M = 3;        // must begin recording this close to the subscriber pin or the NAP
     var ANIM_STEP_M = 1;           // line/distance advance per animation tick
     var ANIM_TICK_MS = 40;
     var AUTO_SAVE_ON_SNAP = true;  // false = snap, then wait for a tap on Save
@@ -336,6 +406,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var snapPending = false;   // NAP queued as the final target
     var snapped = false;
     var firstFixSeen = false;
+    var originWasNap = false;
 
     var liveLine = null;
     var remainingLine = null;
@@ -556,10 +627,36 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         var cur = { lat: position.coords.latitude, lng: position.coords.longitude };
+        var acc = typeof position.coords.accuracy === "number" ? position.coords.accuracy : 0;
 
-        if (lastFix) {
+        if (!lastFix) {
+            // Recording may only begin at one of the two endpoints.
+            var dStartPin = pinPos ? distanceM(cur, pinPos) : null;
+            var dStartNap = napPos ? distanceM(cur, napPos) : null;
+            var nearest = Math.min(
+                dStartPin === null ? Infinity : dStartPin,
+                dStartNap === null ? Infinity : dStartNap
+            );
+            if (nearest > START_RADIUS_M) {
+                stopWatch();
+                resetRecordingState();
+                setRecordingUiState("idle");
+                showStartLocationDialog(dStartPin, dStartNap);
+                return;
+            }
+            // The line always starts on a marker, never on a raw GPS
+            // fix: whichever of the subscriber pin / NAP the technician
+            // is closer to when recording begins.
+            var originIsNap = !pinPos || (napPos && distanceM(cur, napPos) < distanceM(cur, pinPos));
+            var origin = originIsNap ? napPos : pinPos;
+            originWasNap = originIsNap;
+            pathPoints.push({ latitude: origin.lat, longitude: origin.lng });
+            animQueue.push({ lat: origin.lat, lng: origin.lng });
+        } else {
             var step = distanceM(lastFix, cur);
-            if (step < MIN_STEP_M) return; // hasn't really moved
+            // Ignore jitter: must move at least MIN_STEP_M and more than
+            // a fraction of this fix's own reported error.
+            if (step < Math.max(MIN_STEP_M, acc * STEP_ACCURACY_FACTOR)) return;
             walkedM += step;
         }
         lastFix = cur;
@@ -571,7 +668,7 @@ document.addEventListener("DOMContentLoaded", function () {
             firstFixSeen = true;
             // If recording started right next to the NAP (walking NAP ->
             // subscriber instead), don't snap until they've moved away.
-            snapArmed = distToNap > SNAP_RADIUS_M;
+            snapArmed = !originWasNap && distToNap > SNAP_RADIUS_M;
         } else if (!snapArmed && distToNap >= SNAP_RADIUS_M * 2) {
             snapArmed = true;
         }
@@ -599,12 +696,72 @@ document.addEventListener("DOMContentLoaded", function () {
         snapPending = false;
         snapped = false;
         firstFixSeen = false;
+        originWasNap = false;
         [liveLine, remainingLine, headMarker].forEach(function (layer) {
             if (layer) map.removeLayer(layer);
         });
         liveLine = null;
         remainingLine = null;
         headMarker = null;
+    }
+
+    // ---- "Too far from the start point" dialog ---------------------
+    // Lightweight self-contained modal (no Bootstrap JS dependency).
+    var startDialogEl = null;
+
+    function closeStartLocationDialog() {
+        if (startDialogEl) {
+            document.removeEventListener("keydown", onDialogKeydown);
+            startDialogEl.parentNode && startDialogEl.parentNode.removeChild(startDialogEl);
+            startDialogEl = null;
+        }
+    }
+
+    function onDialogKeydown(e) {
+        if (e.key === "Escape") closeStartLocationDialog();
+    }
+
+    function showStartLocationDialog(dPin, dNap) {
+        closeStartLocationDialog();
+
+        var lines = [];
+        if (dPin !== null) {
+            lines.push('<div class="cp-dialog-row"><span>Subscriber location</span><strong>' + formatDistance(dPin) + " away</strong></div>");
+        }
+        if (dNap !== null) {
+            lines.push('<div class="cp-dialog-row"><span>NAP</span><strong>' + formatDistance(dNap) + " away</strong></div>");
+        }
+
+        startDialogEl = document.createElement("div");
+        startDialogEl.className = "cp-dialog-backdrop";
+        startDialogEl.setAttribute("role", "alertdialog");
+        startDialogEl.setAttribute("aria-modal", "true");
+        startDialogEl.innerHTML =
+            '<div class="cp-dialog">' +
+            '<div class="cp-dialog-icon"><i class="bi bi-geo-alt-fill"></i></div>' +
+            '<h5 class="cp-dialog-title">You&#39;re not at the starting point</h5>' +
+            '<p class="cp-dialog-text">Cable path recording must begin within ' +
+            START_RADIUS_M +
+            " m of either the subscriber location or the NAP.</p>" +
+            '<div class="cp-dialog-distances">' + lines.join("") + "</div>" +
+            '<p class="cp-dialog-text cp-dialog-hint">Move closer to one of these locations, then start recording again.</p>' +
+            '<div class="cp-dialog-actions">' +
+            '<button type="button" class="btn btn-outline-secondary" data-cp="close">Close</button>' +
+            '<button type="button" class="btn btn-primary" data-cp="retry">Try again</button>' +
+            "</div></div>";
+
+        startDialogEl.addEventListener("click", function (e) {
+            var t = e.target;
+            var action = t && t.getAttribute ? t.getAttribute("data-cp") : null;
+            if (action === "retry") {
+                closeStartLocationDialog();
+                startRecording();
+            } else if (action === "close" || t === startDialogEl) {
+                closeStartLocationDialog();
+            }
+        });
+        document.addEventListener("keydown", onDialogKeydown);
+        document.body.appendChild(startDialogEl);
     }
 
     function startRecording() {
