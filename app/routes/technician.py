@@ -460,6 +460,37 @@ def record_cable_path(assignment_id):
     return {"point_count": len(cleaned_points)}, 200
 
 
+@technician_bp.route("/assignments/<int:assignment_id>/cable-path-map")
+@role_required("technician")
+def cable_path_map(assignment_id):
+    """Full-page Leaflet map for recording a cable path -- what
+    ticket_detail.html's 'Start Recording'/'Re-record' button now
+    links to instead of recording inline on the ticket page itself.
+
+    Shows the linked NAP and the technician's own pinned installation
+    location as map markers (job['nap']['latitude']/['longitude'] and
+    job['assignment'].pin_latitude/pin_longitude respectively) so the
+    technician can see, at a glance, where the drop cable needs to
+    run before/while walking it -- the actual GPS recording (Start/
+    Stop & Save/Discard) is unchanged from before, just moved here
+    from ticket_detail.html's inline controls, and posts to the same
+    record_cable_path() above. Redirects back to ticket_detail() on
+    a successful save instead of ticket_detail.html's old
+    window.location.reload(), since this is now a separate page.
+    """
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.service_request_id is None:
+        abort(409)
+
+    return render_template(
+        "technician/cable_path_map.html",
+        profile=profile,
+        job=_serialize_job(assignment),
+    )
+
+
 @technician_bp.route("/assignments/<int:assignment_id>/nearby-naps", methods=["GET"])
 @role_required("technician")
 def nearby_naps(assignment_id):
@@ -975,6 +1006,13 @@ def _serialize_job(assignment):
             "name": nap.name,
             "total_ports": nap.total_ports,
             "occupied_ports": _nap_occupied_ports(nap, exclude_assignment_id=assignment.id),
+            # Exposed so the Cable Path map page (cable_path_map()) can
+            # plot the NAP itself on the Leaflet map alongside the
+            # technician's pinned subscriber location -- everything
+            # else above was already keyed off `nap` for the NAP/Port
+            # card, this just carries its coordinates along too.
+            "latitude": float(nap.latitude),
+            "longitude": float(nap.longitude),
         }
         if nap
         else None
@@ -1022,6 +1060,14 @@ def _serialize_job(assignment):
         # screen's assignment.cable_path_point_count.
         "cable_path_point_count": (
             len(json.loads(assignment.cable_path_points)) if assignment.cable_path_points else 0
+        ),
+        # Raw {latitude, longitude} trail, if one's already been saved --
+        # cable_path_map.html plots this on load so re-opening the map
+        # (or re-recording) shows the previously-walked route instead of
+        # a blank map, the same "show what's already there" treatment
+        # napmap.js gives a subscriber's recorded cable_path.
+        "cable_path_points": (
+            json.loads(assignment.cable_path_points) if assignment.cable_path_points else None
         ),
         "lat": lat,
         "lng": lng,

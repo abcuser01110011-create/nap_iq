@@ -1,0 +1,381 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Cable Path — {{ job.ticket_code }}{% endblock %}
+{% block body_class %}dash-theme-tech{% endblock %}
+{% block page_title %}Cable Path{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ job.ticket_code }} — {{ job.type_label }}</p>{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+<style>
+    /* Kept inline (rather than a new stylesheet) since this is a
+       single small page -- just enough to give #cablePathMap a real
+       height, since Leaflet needs an explicit one on its container. */
+    .cable-path-map-shell {
+        position: relative;
+        height: calc(100vh - 220px);
+        min-height: 360px;
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    #cablePathMap {
+        height: 100%;
+        width: 100%;
+    }
+    .cable-path-legend {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        z-index: 1000;
+        background: var(--bs-body-bg);
+        border-radius: 0.375rem;
+        padding: 0.5rem 0.75rem;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+        font-size: 0.8rem;
+    }
+    .cable-path-legend .swatch {
+        display: inline-block;
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 50%;
+        margin-right: 0.35rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}" class="small text-decoration-none">
+        <i class="bi bi-arrow-left me-1"></i>Back to {{ job.ticket_code }}
+    </a>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="cable-path-map-shell">
+            <div id="cablePathMap"
+                 data-nap-lat="{{ job.nap.latitude if job.nap else '' }}"
+                 data-nap-lng="{{ job.nap.longitude if job.nap else '' }}"
+                 data-nap-label="{{ (job.nap.nap_code ~ ' — ' ~ job.nap.name) if job.nap else '' }}"
+                 data-pin-lat="{{ job.assignment.pin_latitude if job.assignment.pin_latitude is not none else '' }}"
+                 data-pin-lng="{{ job.assignment.pin_longitude if job.assignment.pin_longitude is not none else '' }}"
+                 data-existing-points='{{ (job.cable_path_points or []) | tojson }}'
+                 data-cable-path-action="{{ url_for('technician.record_cable_path', assignment_id=job.assignment.id) }}"
+                 data-ticket-detail-url="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}"></div>
+            <div class="cable-path-legend">
+                <div><span class="swatch" style="background:#0d6efd;"></span>NAP</div>
+                <div><span class="swatch" style="background:#dc3545;"></span>Pinned subscriber location</div>
+                {% if job.cable_path_points %}
+                <div><span class="swatch" style="background:#198754;"></span>Recorded path</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not job.nap %}
+<div class="alert alert-warning small">No NAP is linked to this assignment yet, so it can't be plotted on the map.</div>
+{% endif %}
+{% if job.assignment.pin_latitude is none or job.assignment.pin_longitude is none %}
+<div class="alert alert-warning small">No location has been pinned for this assignment yet, so the subscriber's premises can't be plotted on the map.</div>
+{% endif %}
+
+{% if job.can_edit %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-muted mb-2">Record Cable Path</h2>
+        <p class="small text-muted mb-2" id="cablePathStatus">
+            {% if job.cable_path_point_count > 0 %}
+                Cable path recorded ({{ job.cable_path_point_count }} GPS points). Re-recording will replace it.
+            {% else %}
+                Walk the actual cable route from the NAP to the subscriber's premises, then click Stop &amp; Save.
+            {% endif %}
+        </p>
+
+        <div id="cablePathRecordingRow" class="d-flex align-items-center gap-2 text-muted small mb-2 d-none">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span id="cablePathPointCount">Recording… 0 points captured</span>
+        </div>
+        <div id="cablePathError" class="alert alert-danger small py-2 d-none" role="alert"></div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" id="cablePathStartBtn" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-record-circle me-1"></i>
+                {{ "Re-record" if job.cable_path_point_count > 0 else "Start Recording" }}
+            </button>
+            <button type="button" id="cablePathStopBtn" class="btn btn-outline-secondary btn-sm d-none">
+                Stop &amp; Save
+            </button>
+            <button type="button" id="cablePathDiscardBtn" class="btn btn-outline-secondary btn-sm d-none">
+                Discard
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var mapEl = document.getElementById("cablePathMap");
+    if (!mapEl) return;
+
+    var napLat = parseFloat(mapEl.getAttribute("data-nap-lat"));
+    var napLng = parseFloat(mapEl.getAttribute("data-nap-lng"));
+    var pinLat = parseFloat(mapEl.getAttribute("data-pin-lat"));
+    var pinLng = parseFloat(mapEl.getAttribute("data-pin-lng"));
+    var hasNap = !isNaN(napLat) && !isNaN(napLng);
+    var hasPin = !isNaN(pinLat) && !isNaN(pinLng);
+
+    var existingPoints = [];
+    try {
+        existingPoints = JSON.parse(mapEl.getAttribute("data-existing-points") || "[]");
+    } catch (e) {
+        existingPoints = [];
+    }
+
+    // Fallback center (Sta. Cruz, Laguna) if neither the NAP nor a
+    // pinned location is available yet -- mirrors DEFAULT_ADDRESS's
+    // rough area in app/routes/technician.py so the map still opens
+    // somewhere sensible instead of erroring.
+    var defaultCenter = [14.2814, 121.4153];
+
+    var map = L.map("cablePathMap", { scrollWheelZoom: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    var boundsPoints = [];
+
+    var napIcon = L.divIcon({
+        className: "",
+        html: '<div style="width:16px;height:16px;border-radius:50%;background:#0d6efd;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.6);"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+    });
+    var pinIcon = L.divIcon({
+        className: "",
+        html: '<div style="width:16px;height:16px;border-radius:50%;background:#dc3545;border:2px solid #fff;box-shadow:0 0 2px rgba(0,0,0,.6);"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+    });
+
+    if (hasNap) {
+        L.marker([napLat, napLng], { icon: napIcon })
+            .addTo(map)
+            .bindPopup("<strong>NAP</strong><br>" + (mapEl.getAttribute("data-nap-label") || ""));
+        boundsPoints.push([napLat, napLng]);
+    }
+
+    if (hasPin) {
+        L.marker([pinLat, pinLng], { icon: pinIcon })
+            .addTo(map)
+            .bindPopup("<strong>Pinned subscriber location</strong>");
+        boundsPoints.push([pinLat, pinLng]);
+    }
+
+    // Straight-line reference between the two, same "as the crow
+    // flies" idea napmap.js falls back to when no recorded path
+    // exists yet -- dashed so it reads as a placeholder, not the
+    // actual route.
+    if (hasNap && hasPin) {
+        L.polyline([[napLat, napLng], [pinLat, pinLng]], {
+            color: "#6c757d",
+            weight: 2,
+            dashArray: "6 6",
+        }).addTo(map);
+    }
+
+    var recordedLine = null;
+    if (existingPoints.length >= 2) {
+        var existingLatLngs = existingPoints.map(function (p) {
+            return [p.latitude, p.longitude];
+        });
+        recordedLine = L.polyline(existingLatLngs, { color: "#198754", weight: 4 }).addTo(map);
+        existingLatLngs.forEach(function (ll) {
+            boundsPoints.push(ll);
+        });
+    }
+
+    if (boundsPoints.length > 1) {
+        map.fitBounds(boundsPoints, { padding: [30, 30] });
+    } else if (boundsPoints.length === 1) {
+        map.setView(boundsPoints[0], 18);
+    } else {
+        map.setView(defaultCenter, 13);
+    }
+
+    // ---- Cable path recording -----------------------------------
+    // Same browser-geolocation "capture locally, submit the whole
+    // trail on Stop & Save" flow ticket_detail.html used to run
+    // inline, just moved to this page and now drawing the growing
+    // trail live on the map as it records -- see record_cable_path()
+    // in app/routes/technician.py for what Stop & Save posts to.
+    var cablePathStartBtn = document.getElementById("cablePathStartBtn");
+    if (!cablePathStartBtn) return;
+
+    var MAX_ACCEPTABLE_FIX_ACCURACY_M = 15;
+
+    var cablePathStopBtn = document.getElementById("cablePathStopBtn");
+    var cablePathDiscardBtn = document.getElementById("cablePathDiscardBtn");
+    var cablePathRecordingRow = document.getElementById("cablePathRecordingRow");
+    var cablePathPointCountEl = document.getElementById("cablePathPointCount");
+    var cablePathErrorEl = document.getElementById("cablePathError");
+
+    var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')
+        ? document.querySelector('meta[name="csrf-token"]').getAttribute("content")
+        : null;
+
+    var watchId = null;
+    var pathPoints = [];
+    var liveLine = null;
+
+    function showCablePathError(message) {
+        cablePathErrorEl.textContent = message;
+        cablePathErrorEl.classList.remove("d-none");
+    }
+
+    function hideCablePathError() {
+        cablePathErrorEl.classList.add("d-none");
+    }
+
+    function setRecordingUiState(state) {
+        // state: "idle" | "recording" | "saving"
+        cablePathStartBtn.classList.toggle("d-none", state !== "idle");
+        cablePathStopBtn.classList.toggle("d-none", state === "idle");
+        cablePathDiscardBtn.classList.toggle("d-none", state === "idle");
+        cablePathRecordingRow.classList.toggle("d-none", state === "idle");
+        cablePathStopBtn.disabled = state === "saving";
+        cablePathDiscardBtn.disabled = state === "saving";
+        if (state === "saving") {
+            cablePathPointCountEl.textContent = "Saving recorded path…";
+        }
+    }
+
+    function updatePointCountLabel() {
+        cablePathPointCountEl.textContent =
+            "Recording… " + pathPoints.length + " point" + (pathPoints.length === 1 ? "" : "s") + " captured";
+    }
+
+    function redrawLiveLine() {
+        var latLngs = pathPoints.map(function (p) {
+            return [p.latitude, p.longitude];
+        });
+        if (liveLine) {
+            liveLine.setLatLngs(latLngs);
+        } else if (latLngs.length) {
+            liveLine = L.polyline(latLngs, { color: "#fd7e14", weight: 4 }).addTo(map);
+        }
+        if (latLngs.length) {
+            map.panTo(latLngs[latLngs.length - 1]);
+        }
+    }
+
+    window.addEventListener("beforeunload", function (event) {
+        if (watchId !== null) {
+            event.preventDefault();
+            event.returnValue = "";
+        }
+    });
+
+    cablePathStartBtn.addEventListener("click", function () {
+        hideCablePathError();
+        if (!navigator.geolocation) {
+            showCablePathError("Your browser doesn't support location tracking. Try the mobile app instead.");
+            return;
+        }
+        pathPoints = [];
+        if (liveLine) {
+            map.removeLayer(liveLine);
+            liveLine = null;
+        }
+        updatePointCountLabel();
+        setRecordingUiState("recording");
+
+        watchId = navigator.geolocation.watchPosition(
+            function (position) {
+                if (
+                    typeof position.coords.accuracy === "number" &&
+                    position.coords.accuracy > MAX_ACCEPTABLE_FIX_ACCURACY_M
+                ) {
+                    return;
+                }
+                pathPoints.push({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                });
+                updatePointCountLabel();
+                redrawLiveLine();
+            },
+            function (err) {
+                if (err.code === err.PERMISSION_DENIED) {
+                    showCablePathError("Location permission was denied. Allow location access for this site in your browser settings, then try again.");
+                } else {
+                    showCablePathError("Lost the location signal. You can Stop & Save what's captured so far, or Discard and try again.");
+                }
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+        );
+    });
+
+    cablePathDiscardBtn.addEventListener("click", function () {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+        pathPoints = [];
+        if (liveLine) {
+            map.removeLayer(liveLine);
+            liveLine = null;
+        }
+        hideCablePathError();
+        setRecordingUiState("idle");
+    });
+
+    cablePathStopBtn.addEventListener("click", function () {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+
+        if (pathPoints.length < 2) {
+            showCablePathError("Not enough movement was recorded — try walking the route again.");
+            pathPoints = [];
+            setRecordingUiState("idle");
+            return;
+        }
+
+        hideCablePathError();
+        setRecordingUiState("saving");
+
+        fetch(mapEl.getAttribute("data-cable-path-action"), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": CSRF_TOKEN,
+            },
+            body: JSON.stringify({ points: pathPoints }),
+        })
+            .then(function (resp) {
+                return resp.json().then(function (data) {
+                    return { ok: resp.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                if (!result.ok) {
+                    showCablePathError((result.data && result.data.error) || "Couldn't save the recorded path. Try again.");
+                    setRecordingUiState("recording");
+                    return;
+                }
+                window.location.href = mapEl.getAttribute("data-ticket-detail-url");
+            })
+            .catch(function () {
+                showCablePathError("Couldn't save the recorded path. Please check your connection and try again.");
+                setRecordingUiState("recording");
+            });
+    });
+});
+</script>
+{% endblock %}
