@@ -39,6 +39,35 @@
         border-radius: 50%;
         margin-right: 0.35rem;
     }
+    /* Live distance readout (subscriber -> NAP). Sits top-left so it
+       never collides with the legend (top-right). */
+    .cable-path-hud {
+        position: absolute;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 1000;
+        background: var(--bs-body-bg);
+        border-radius: 0.5rem;
+        padding: 0.5rem 0.9rem;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+        min-width: 7.5rem;
+        pointer-events: none;
+    }
+    .cable-path-hud .hud-distance {
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+    .cable-path-hud .hud-label,
+    .cable-path-hud .hud-walked {
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color, #6c757d);
+    }
+    .cable-path-hud.snapped .hud-distance,
+    .cable-path-hud.snapped .hud-label {
+        color: #198754;
+    }
     /* Wrapping element for the Start/Stop button + its error banner.
        The banner is positioned absolute (see below) so showing or
        hiding it never changes this wrapper's height -- it overlaps
@@ -79,6 +108,11 @@
                  data-existing-points='{{ (job.cable_path_points or []) | tojson }}'
                  data-cable-path-action="{{ url_for('technician.record_cable_path', assignment_id=job.assignment.id) }}"
                  data-ticket-detail-url="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}"></div>
+            <div id="cablePathHud" class="cable-path-hud d-none">
+                <div class="hud-distance" id="cablePathHudDistance">--</div>
+                <div class="hud-label" id="cablePathHudLabel"></div>
+                <div class="hud-walked d-none" id="cablePathHudWalked"></div>
+            </div>
             <div class="cable-path-legend">
                 <div><span class="swatch" style="background:#0d6efd;"></span>NAP</div>
                 <div><span class="swatch" style="background:#dc3545;"></span>Pinned subscriber location</div>
@@ -210,23 +244,76 @@ document.addEventListener("DOMContentLoaded", function () {
         map.setView(defaultCenter, 13);
     }
 
+    // ---- Distance helpers ----------------------------------------
+    function distanceM(a, b) {
+        // Haversine, meters. a/b are {lat, lng}.
+        var R = 6371008.8;
+        var toRad = Math.PI / 180;
+        var dLat = (b.lat - a.lat) * toRad;
+        var dLng = (b.lng - a.lng) * toRad;
+        var h =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(a.lat * toRad) * Math.cos(b.lat * toRad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+    }
+
+    function formatDistance(m) {
+        if (m >= 1000) return (m / 1000).toFixed(2) + " km";
+        if (m >= 10) return Math.round(m) + " m";
+        return m.toFixed(1) + " m";
+    }
+
+    var napPos = hasNap ? { lat: napLat, lng: napLng } : null;
+    var pinPos = hasPin ? { lat: pinLat, lng: pinLng } : null;
+
+    // ---- Live distance readout (HUD) ------------------------------
+    var hudEl = document.getElementById("cablePathHud");
+    var hudDistanceEl = document.getElementById("cablePathHudDistance");
+    var hudLabelEl = document.getElementById("cablePathHudLabel");
+    var hudWalkedEl = document.getElementById("cablePathHudWalked");
+
+    function setHud(distanceText, labelText, walkedText, snapped) {
+        if (!hudEl) return;
+        hudEl.classList.remove("d-none");
+        hudEl.classList.toggle("snapped", !!snapped);
+        hudDistanceEl.textContent = distanceText;
+        hudLabelEl.textContent = labelText;
+        if (walkedText) {
+            hudWalkedEl.textContent = walkedText;
+            hudWalkedEl.classList.remove("d-none");
+        } else {
+            hudWalkedEl.classList.add("d-none");
+        }
+    }
+
+    // Idle state: straight-line distance between the pinned subscriber
+    // and the NAP, so the technician knows how far the run is before
+    // they even start.
+    if (hasNap && hasPin) {
+        setHud(formatDistance(distanceM(pinPos, napPos)), "Subscriber → NAP (straight line)", null, false);
+    }
+
     // ---- Cable path recording -----------------------------------
-    // Same browser-geolocation "capture locally, submit the whole
-    // trail on Stop & Save" flow ticket_detail.html used to run
-    // inline, just moved to this page and drawing the growing trail
-    // live on the map as it records -- see record_cable_path() in
-    // app/routes/technician.py for what Stop & Save posts to.
+    // Walk from the subscriber's premises toward the NAP. Instead of
+    // counting GPS points, the page shows the remaining distance to
+    // the NAP and grows the line one meter at a time as the technician
+    // moves; that number shrinks until the technician is within
+    // SNAP_RADIUS_M of the NAP, at which point the line snaps onto the
+    // NAP marker and the path is saved automatically.
     //
-    // Single toggle button instead of separate Start/Stop/Discard
-    // controls: idle -> tap starts recording, recording -> tap stops
-    // & saves (with the live point count right in the button label).
-    // There's no separate Discard here; walking off and reloading the
-    // page abandons an in-progress recording the same way Discard
-    // used to.
+    // Only what is *displayed* is animated/snapped. What is sent to
+    // the server is still the list of real GPS fixes (plus the NAP's
+    // exact coordinate as the final point once snapped), in
+    // NAP -> subscriber order, same shape record_cable_path() expects.
     var cablePathStartBtn = document.getElementById("cablePathStartBtn");
     if (!cablePathStartBtn) return;
 
     var MAX_ACCEPTABLE_FIX_ACCURACY_M = 15;
+    var MIN_STEP_M = 1;            // ignore fixes that moved < 1 m (GPS jitter)
+    var SNAP_RADIUS_M = 3;         // auto-snap, stop and save inside this distance
+    var ANIM_STEP_M = 1;           // line/distance advance per animation tick
+    var ANIM_TICK_MS = 40;
+    var AUTO_SAVE_ON_SNAP = true;  // false = snap, then wait for a tap on Save
 
     var cablePathErrorEl = document.getElementById("cablePathError");
 
@@ -235,9 +322,24 @@ document.addEventListener("DOMContentLoaded", function () {
         : null;
 
     var watchId = null;
-    var pathPoints = [];
-    var liveLine = null;
+    var pathPoints = [];       // real accepted GPS fixes {latitude, longitude}
+    var lastFix = null;        // last accepted fix {lat, lng}
+    var walkedM = 0;
     var recordingState = "idle"; // "idle" | "recording" | "saving"
+
+    // Display-only animation state
+    var drawnLatLngs = [];     // vertices the line has fully reached
+    var animQueue = [];        // fixes the line is still travelling toward
+    var displayPos = null;     // current animated head of the line {lat, lng}
+    var animTimer = null;
+    var snapArmed = false;
+    var snapPending = false;   // NAP queued as the final target
+    var snapped = false;
+    var firstFixSeen = false;
+
+    var liveLine = null;
+    var remainingLine = null;
+    var headMarker = null;
 
     var cablePathErrorTimeout = null;
     var CABLE_PATH_ERROR_AUTOHIDE_MS = 3000;
@@ -261,46 +363,181 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    function remainingToNapM() {
+        if (!napPos) return null;
+        if (snapped) return 0;
+        if (displayPos) return distanceM(displayPos, napPos);
+        if (pinPos) return distanceM(pinPos, napPos);
+        return null;
+    }
+
+    function refreshReadouts() {
+        var remaining = remainingToNapM();
+        var text = remaining === null ? "--" : formatDistance(remaining);
+
+        if (recordingState === "recording") {
+            if (snapped) {
+                cablePathStartBtn.innerHTML =
+                    '<i class="bi bi-check-circle me-1"></i>' + (AUTO_SAVE_ON_SNAP ? "Connected to NAP" : "Save path");
+                setHud("0 m", "Snapped to NAP ✓", "Walked " + formatDistance(walkedM), true);
+            } else {
+                cablePathStartBtn.innerHTML =
+                    '<i class="bi bi-stop-circle me-1"></i>Stop &amp; Save · ' + text + " to NAP";
+                setHud(
+                    text,
+                    firstFixSeen ? "to NAP" : "Waiting for GPS… (Subscriber → NAP)",
+                    firstFixSeen ? "Walked " + formatDistance(walkedM) : null,
+                    false
+                );
+            }
+        }
+    }
+
     function setRecordingUiState(state) {
         recordingState = state;
-        cablePathStartBtn.disabled = state === "saving";
+        cablePathStartBtn.disabled = state === "saving" || (state === "recording" && snapped && AUTO_SAVE_ON_SNAP);
         if (state === "idle") {
             cablePathStartBtn.innerHTML = '<i class="bi bi-record-circle me-1"></i>Start Recording';
+            if (hasNap && hasPin) {
+                setHud(formatDistance(distanceM(pinPos, napPos)), "Subscriber → NAP (straight line)", null, false);
+            }
         } else if (state === "recording") {
-            cablePathStartBtn.innerHTML =
-                '<i class="bi bi-stop-circle me-1"></i>Stop &amp; Save (' +
-                pathPoints.length +
-                (pathPoints.length === 1 ? " point)" : " points)");
+            refreshReadouts();
         } else {
             cablePathStartBtn.innerHTML = "Saving…";
         }
     }
 
-    function redrawLiveLine() {
-        var latLngs = pathPoints.map(function (p) {
-            return [p.latitude, p.longitude];
-        });
-        if (!latLngs.length) {
+    function redrawLive() {
+        var latLngs = drawnLatLngs.slice();
+        if (displayPos) {
+            latLngs.push([displayPos.lat, displayPos.lng]);
+        }
+        if (latLngs.length < 1) return;
+
+        if (liveLine) {
+            liveLine.setLatLngs(latLngs);
+        } else {
+            liveLine = L.polyline(latLngs, { color: "#fd7e14", weight: 4 }).addTo(map);
+        }
+
+        // Faint dashed guide from the head of the line to the NAP: the
+        // distance still left to cover.
+        if (hasNap && displayPos && !snapped) {
+            var guide = [[displayPos.lat, displayPos.lng], [napLat, napLng]];
+            if (remainingLine) {
+                remainingLine.setLatLngs(guide);
+            } else {
+                remainingLine = L.polyline(guide, {
+                    color: "#6c757d",
+                    weight: 2,
+                    dashArray: "6 8",
+                    opacity: 0.8,
+                }).addTo(map);
+            }
+        } else if (remainingLine) {
+            map.removeLayer(remainingLine);
+            remainingLine = null;
+        }
+
+        if (displayPos) {
+            var headLL = [displayPos.lat, displayPos.lng];
+            if (headMarker) {
+                headMarker.setLatLng(headLL);
+            } else {
+                headMarker = L.circleMarker(headLL, {
+                    radius: 7,
+                    color: "#fff",
+                    weight: 2,
+                    fillColor: "#fd7e14",
+                    fillOpacity: 1,
+                }).addTo(map);
+            }
+            // Only pan when the head drifts toward the edge, so the map
+            // isn't fighting the animation every tick.
+            if (!map.getBounds().pad(-0.25).contains(headLL)) {
+                map.panTo(headLL);
+            }
+        }
+    }
+
+    // ---- Meter-by-meter animation -------------------------------
+    // GPS fixes arrive every second or so and can be several meters
+    // apart. The displayed head glides toward each fix ANIM_STEP_M at
+    // a time, so the line grows and the remaining distance ticks down
+    // meter by meter instead of jumping.
+    function animTick() {
+        if (!animQueue.length) {
+            stopAnimTimer();
+            if (snapPending && !snapped) {
+                finishSnap();
+            }
             return;
         }
-        // Same end-snapping as the recorded (green) line above: draw
-        // the live trail from the NAP marker's exact coordinates,
-        // through the real recorded GPS points, to the pinned
-        // subscriber marker's exact coordinates -- instead of
-        // stopping wherever the last noisy GPS fix happened to land.
-        var displayLatLngs = latLngs.slice();
-        if (hasNap) {
-            displayLatLngs.unshift([napLat, napLng]);
-        }
-        if (hasPin) {
-            displayLatLngs.push([pinLat, pinLng]);
-        }
-        if (liveLine) {
-            liveLine.setLatLngs(displayLatLngs);
+        var target = animQueue[0];
+        if (!displayPos) {
+            displayPos = { lat: target.lat, lng: target.lng };
+            drawnLatLngs.push([target.lat, target.lng]);
+            animQueue.shift();
         } else {
-            liveLine = L.polyline(displayLatLngs, { color: "#fd7e14", weight: 4 }).addTo(map);
+            var d = distanceM(displayPos, target);
+            if (d <= ANIM_STEP_M) {
+                displayPos = { lat: target.lat, lng: target.lng };
+                drawnLatLngs.push([target.lat, target.lng]);
+                animQueue.shift();
+            } else {
+                var f = ANIM_STEP_M / d;
+                displayPos = {
+                    lat: displayPos.lat + (target.lat - displayPos.lat) * f,
+                    lng: displayPos.lng + (target.lng - displayPos.lng) * f,
+                };
+            }
         }
-        map.panTo(latLngs[latLngs.length - 1]);
+        redrawLive();
+        refreshReadouts();
+    }
+
+    function startAnimTimer() {
+        if (animTimer === null) {
+            animTimer = setInterval(animTick, ANIM_TICK_MS);
+        }
+    }
+
+    function stopAnimTimer() {
+        if (animTimer !== null) {
+            clearInterval(animTimer);
+            animTimer = null;
+        }
+    }
+
+    // Jump the display straight to wherever the queue ends (used when
+    // the technician stops manually mid-animation).
+    function flushAnimation() {
+        stopAnimTimer();
+        while (animQueue.length) {
+            var t = animQueue.shift();
+            drawnLatLngs.push([t.lat, t.lng]);
+            displayPos = { lat: t.lat, lng: t.lng };
+        }
+        redrawLive();
+    }
+
+    function stopWatch() {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+    }
+
+    // Called once the animated line has reached the NAP marker.
+    function finishSnap() {
+        snapped = true;
+        displayPos = { lat: napLat, lng: napLng };
+        redrawLive();
+        refreshReadouts();
+        if (AUTO_SAVE_ON_SNAP) {
+            stopAndSaveRecording();
+        }
     }
 
     window.addEventListener("beforeunload", function (event) {
@@ -310,34 +547,81 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
+    function onFix(position) {
+        if (snapPending) return;
+        if (
+            typeof position.coords.accuracy === "number" &&
+            position.coords.accuracy > MAX_ACCEPTABLE_FIX_ACCURACY_M
+        ) {
+            return;
+        }
+        var cur = { lat: position.coords.latitude, lng: position.coords.longitude };
+
+        if (lastFix) {
+            var step = distanceM(lastFix, cur);
+            if (step < MIN_STEP_M) return; // hasn't really moved
+            walkedM += step;
+        }
+        lastFix = cur;
+        pathPoints.push({ latitude: cur.lat, longitude: cur.lng });
+        animQueue.push(cur);
+
+        var distToNap = distanceM(cur, napPos);
+        if (!firstFixSeen) {
+            firstFixSeen = true;
+            // If recording started right next to the NAP (walking NAP ->
+            // subscriber instead), don't snap until they've moved away.
+            snapArmed = distToNap > SNAP_RADIUS_M;
+        } else if (!snapArmed && distToNap >= SNAP_RADIUS_M * 2) {
+            snapArmed = true;
+        }
+
+        if (snapArmed && distToNap <= SNAP_RADIUS_M) {
+            // Close enough: glide the line the rest of the way onto the
+            // NAP, stop listening to GPS, and let the animation finish.
+            snapPending = true;
+            stopWatch();
+            animQueue.push({ lat: napLat, lng: napLng });
+            pathPoints.push({ latitude: napLat, longitude: napLng });
+        }
+        startAnimTimer();
+    }
+
+    function resetRecordingState() {
+        stopAnimTimer();
+        pathPoints = [];
+        lastFix = null;
+        walkedM = 0;
+        drawnLatLngs = [];
+        animQueue = [];
+        displayPos = null;
+        snapArmed = false;
+        snapPending = false;
+        snapped = false;
+        firstFixSeen = false;
+        [liveLine, remainingLine, headMarker].forEach(function (layer) {
+            if (layer) map.removeLayer(layer);
+        });
+        liveLine = null;
+        remainingLine = null;
+        headMarker = null;
+    }
+
     function startRecording() {
         hideCablePathError();
         if (!navigator.geolocation) {
             showCablePathError("Your browser doesn't support location tracking. Try the mobile app instead.");
             return;
         }
-        pathPoints = [];
-        if (liveLine) {
-            map.removeLayer(liveLine);
-            liveLine = null;
+        if (!hasNap) {
+            showCablePathError("No NAP is linked to this assignment yet, so the distance can't be measured.");
+            return;
         }
+        resetRecordingState();
         setRecordingUiState("recording");
 
         watchId = navigator.geolocation.watchPosition(
-            function (position) {
-                if (
-                    typeof position.coords.accuracy === "number" &&
-                    position.coords.accuracy > MAX_ACCEPTABLE_FIX_ACCURACY_M
-                ) {
-                    return;
-                }
-                pathPoints.push({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                });
-                setRecordingUiState("recording");
-                redrawLiveLine();
-            },
+            onFix,
             function (err) {
                 if (err.code === err.PERMISSION_DENIED) {
                     showCablePathError("Location permission was denied. Allow location access for this site in your browser settings, then try again.");
@@ -349,17 +633,33 @@ document.addEventListener("DOMContentLoaded", function () {
         );
     }
 
+    // After a failed save the GPS watch is already off and the trail is
+    // kept in memory, so re-enable the button as a plain "retry save".
+    function allowSaveRetry() {
+        cablePathStartBtn.disabled = false;
+        cablePathStartBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Retry save';
+    }
+
     function stopAndSaveRecording() {
-        if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-            watchId = null;
-        }
+        stopWatch();
+        flushAnimation();
 
         if (pathPoints.length < 2) {
             showCablePathError("Not enough movement was recorded — try walking the route again.");
-            pathPoints = [];
+            resetRecordingState();
             setRecordingUiState("idle");
             return;
+        }
+
+        // The server (and the green "recorded path" line) expects the
+        // trail in NAP -> subscriber order. Walking from the subscriber
+        // to the NAP records it the other way round, so flip it when the
+        // first point is the one farther from the NAP.
+        var ordered = pathPoints.slice();
+        var first = { lat: ordered[0].latitude, lng: ordered[0].longitude };
+        var last = { lat: ordered[ordered.length - 1].latitude, lng: ordered[ordered.length - 1].longitude };
+        if (distanceM(first, napPos) > distanceM(last, napPos)) {
+            ordered.reverse();
         }
 
         hideCablePathError();
@@ -371,7 +671,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Content-Type": "application/json",
                 "X-CSRFToken": CSRF_TOKEN,
             },
-            body: JSON.stringify({ points: pathPoints }),
+            body: JSON.stringify({ points: ordered }),
         })
             .then(function (resp) {
                 return resp.json().then(function (data) {
@@ -382,6 +682,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (!result.ok) {
                     showCablePathError((result.data && result.data.error) || "Couldn't save the recorded path. Try again.");
                     setRecordingUiState("recording");
+                    allowSaveRetry();
                     return;
                 }
                 window.location.href = mapEl.getAttribute("data-ticket-detail-url");
@@ -389,6 +690,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(function () {
                 showCablePathError("Couldn't save the recorded path. Please check your connection and try again.");
                 setRecordingUiState("recording");
+                allowSaveRetry();
             });
     }
 
