@@ -158,18 +158,6 @@ document.addEventListener("DOMContentLoaded", function () {
         boundsPoints.push([pinLat, pinLng]);
     }
 
-    // Straight-line reference between the two, same "as the crow
-    // flies" idea napmap.js falls back to when no recorded path
-    // exists yet -- dashed so it reads as a placeholder, not the
-    // actual route.
-    if (hasNap && hasPin) {
-        L.polyline([[napLat, napLng], [pinLat, pinLng]], {
-            color: "#6c757d",
-            weight: 2,
-            dashArray: "6 6",
-        }).addTo(map);
-    }
-
     var recordedLine = null;
     if (existingPoints.length >= 2) {
         var existingLatLngs = existingPoints.map(function (p) {
