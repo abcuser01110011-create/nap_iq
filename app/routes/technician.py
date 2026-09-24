@@ -288,6 +288,20 @@ def accept_assignment(assignment_id):
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "accepted"
+
+    # New Installation tickets skip the separate "Start Work" step on
+    # the web dashboard (see ticket_detail.html's two-step layout) --
+    # accepting one now goes straight into the working state, same
+    # end result start_assignment() below would have produced, so
+    # Mark Complete's photo/pin/NAP gating is reachable right away
+    # instead of needing a second click that did nothing meaningful
+    # for this ticket type (no technical_issue to mirror status onto).
+    # Left untouched for every other ticket type, which still goes
+    # through accept -> Start Work -> in_progress as before.
+    if assignment.service_request is not None and assignment.service_request.request_type == "new_installation":
+        assignment.status = "in_progress"
+        profile.status = "busy"
+
     db.session.commit()
 
     if assignment.technical_issue is not None:

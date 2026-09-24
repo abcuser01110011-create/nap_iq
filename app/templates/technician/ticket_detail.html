@@ -11,6 +11,14 @@
     'in_progress': 'text-bg-primary'
 } %}
 
+{# New Installation tickets use a two-step layout: Step 1 is just the
+   ticket details + Accept/Decline; once accepted, the details card
+   disappears and Step 2 (photo, pin location, NAP & port, etc.)
+   appears instead. Every other ticket type is untouched for now and
+   always behaves as "Step 2" (i.e. shows everything, same as before). #}
+{% set show_step1 = job.is_new_installation and job.can_accept %}
+{% set show_step2 = (not job.is_new_installation) or (not job.can_accept) %}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <a href="{{ url_for('technician.index') }}" class="small text-decoration-none">
         <i class="bi bi-arrow-left me-1"></i>Back to My Work
@@ -20,6 +28,7 @@
     </span>
 </div>
 
+{% if not job.is_new_installation or show_step1 %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-3">Ticket Details</h2>
@@ -75,8 +84,9 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
 
-{% if job.assignment.resolution_notes %}
+{% if job.assignment.resolution_notes and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">Resolution Notes</h2>
@@ -85,7 +95,7 @@
 </div>
 {% endif %}
 
-{% if job.show_photo_card %}
+{% if job.show_photo_card and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">Completion Photo</h2>
@@ -114,7 +124,7 @@
 </div>
 {% endif %}
 
-{% if job.is_installation %}
+{% if job.is_installation and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">Pin Location</h2>
@@ -146,7 +156,7 @@
 </div>
 {% endif %}
 
-{% if job.is_new_installation %}
+{% if job.is_new_installation and show_step2 %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">NAP &amp; Port</h2>
@@ -196,7 +206,8 @@
 </div>
 
 {% if job.nap and job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none
-      and (job.can_edit or job.is_closed or job.cable_path_point_count > 0) %}
+      and (job.can_edit or job.is_closed or job.cable_path_point_count > 0)
+      and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">Cable Path (Optional)</h2>
@@ -268,7 +279,15 @@
                 <i class="bi bi-check2 me-1"></i>Accept
             </button>
         </form>
-    {% elif job.can_start %}
+        {% if job.is_new_installation %}
+        {# Plain button only for now -- no decline route/handler wired
+           up yet, on purpose; clicking it does nothing until that
+           workflow is defined. #}
+        <button type="button" class="btn btn-outline-danger" id="declineTicketBtn">
+            <i class="bi bi-x-lg me-1"></i>Decline
+        </button>
+        {% endif %}
+    {% elif job.can_start and not job.is_new_installation %}
         <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=job.assignment.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-info">
