@@ -2012,10 +2012,32 @@
                 if (bestIdx !== null && withinThreshold) {
                     latlngs[bestIdx] = [subscriberLatLng.lat, subscriberLatLng.lng];
                 }
+                return withinThreshold;
             }
 
-            scanForSubscriber(startIndices);
-            scanForSubscriber(endIndices);
+            const startSnapped = scanForSubscriber(startIndices);
+            const endSnapped = scanForSubscriber(endIndices);
+
+            // Same "always visually reach the endpoint" guarantee the
+            // NAP side already gets (see the withinRadius/else branch
+            // above): if nothing near either literal end of the
+            // recorded trail actually fell inside CABLE_PATH_SNAP_METERS,
+            // force the nearer literal end onto the subscriber's exact
+            // pinned coordinates instead of leaving the line stop short,
+            // disconnected from the marker, at wherever the technician's
+            // GPS trail happened to end.
+            if (!startSnapped && !endSnapped) {
+                const idx = first_or_last(latlngs, subscriberLatLng);
+                if (window.console && console.debug) {
+                    console.debug(
+                        "[cable-path-snap] subscriber anchor (" +
+                            subscriberLatLng.lat.toFixed(6) + "," + subscriberLatLng.lng.toFixed(6) +
+                            "): neither end within " + CABLE_PATH_SNAP_METERS +
+                            "m, force-snapping nearest literal end instead"
+                    );
+                }
+                latlngs[idx] = [subscriberLatLng.lat, subscriberLatLng.lng];
+            }
         }
 
         return latlngs;
