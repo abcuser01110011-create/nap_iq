@@ -212,6 +212,10 @@
             <i class="bi bi-record-circle me-1"></i>
             {{ "Re-record" if job.cable_path_point_count > 0 else "Start Recording" }}
         </button>
+        <div id="cablePathConnectedActions" class="justify-content-center gap-2" style="display:none;">
+            <button type="button" id="cablePathRetakeBtn" class="btn btn-outline-secondary btn-lg px-4 shadow">Retake</button>
+            <button type="button" id="cablePathSaveBtn" class="btn btn-primary btn-lg px-4 shadow">Save</button>
+        </div>
         <div id="cablePathError" class="alert alert-danger small py-2 mt-2 d-none" role="alert"></div>
     </div>
 </div>
@@ -381,6 +385,23 @@ document.addEventListener("DOMContentLoaded", function () {
     // NAP -> subscriber order, same shape record_cable_path() expects.
     var cablePathStartBtn = document.getElementById("cablePathStartBtn");
     if (!cablePathStartBtn) return;
+    var cablePathConnectedActions = document.getElementById("cablePathConnectedActions");
+    var cablePathRetakeBtn = document.getElementById("cablePathRetakeBtn");
+    var cablePathSaveBtn = document.getElementById("cablePathSaveBtn");
+
+    // Swaps the bottom action area between the single Start/Stop
+    // button (idle + in-progress walk) and the Retake/Save pair
+    // (once the walk has snapped onto the NAP and the "Connection
+    // successful" dialog has been acknowledged) -- see
+    // showConnectionSuccessDialog()'s Okay handler.
+    function showRecordingControls() {
+        cablePathStartBtn.classList.remove("d-none");
+        if (cablePathConnectedActions) cablePathConnectedActions.style.display = "none";
+    }
+    function showConnectedControls() {
+        cablePathStartBtn.classList.add("d-none");
+        if (cablePathConnectedActions) cablePathConnectedActions.style.display = "flex";
+    }
 
     var MAX_ACCEPTABLE_FIX_ACCURACY_M = 10; // drop poor fixes: they cause the zig-zag
     var MIN_STEP_M = 1;            // ignore fixes that moved < 1 m (GPS jitter)
@@ -459,7 +480,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (recordingState === "recording") {
             if (snapped) {
-                cablePathStartBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Connected to NAP';
                 setHud("0 m", "Snapped to NAP ✓", "Walked " + formatDistance(walkedM), true);
             } else {
                 cablePathStartBtn.innerHTML =
@@ -476,11 +496,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function setRecordingUiState(state) {
         recordingState = state;
-        // Once snapped, the "Connection successful" dialog owns
-        // Retake/Save -- the underlying button is disabled so it can't
-        // be triggered from behind the dialog.
+        // Once snapped, the "Connection successful" dialog (then the
+        // Retake/Save pair) owns the flow -- the Start/Stop button is
+        // disabled so it can't be triggered from behind the dialog.
         cablePathStartBtn.disabled = state === "saving" || (state === "recording" && snapped);
+        if (cablePathRetakeBtn) cablePathRetakeBtn.disabled = state === "saving";
+        if (cablePathSaveBtn) cablePathSaveBtn.disabled = state === "saving";
         if (state === "idle") {
+            showRecordingControls();
             cablePathStartBtn.innerHTML = '<i class="bi bi-record-circle me-1"></i>Start Recording';
             if (hasNap && hasPin) {
                 setHud(formatDistance(distanceM(pinPos, napPos)), "Subscriber → NAP (straight line)", null, false);
@@ -489,6 +512,7 @@ document.addEventListener("DOMContentLoaded", function () {
             refreshReadouts();
         } else {
             cablePathStartBtn.innerHTML = "Saving…";
+            if (cablePathSaveBtn) cablePathSaveBtn.textContent = "Saving…";
         }
     }
 
@@ -630,10 +654,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // ---- "Connection successful" dialog ------------------------------
     // Same lightweight self-contained modal pattern as the start-location
-    // dialog below. Deliberately no backdrop/Escape dismissal: an
-    // accidental tap or key press outside the two buttons must not
-    // silently save OR silently discard a completed recording -- the
-    // technician has to actively choose one.
+    // dialog below. Just an acknowledgement -- Retake/Save live as the
+    // bottom action buttons underneath the map (see
+    // showConnectedControls()), not on the dialog itself.
     var connectionDialogEl = null;
 
     function closeConnectionDialog() {
@@ -645,7 +668,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function onConnectionDialogKeydown(e) {
-        if (e.key === "Escape") e.preventDefault();
+        if (e.key === "Escape") {
+            closeConnectionDialog();
+            showConnectedControls();
+        }
     }
 
     function showConnectionSuccessDialog() {
@@ -658,26 +684,17 @@ document.addEventListener("DOMContentLoaded", function () {
         connectionDialogEl.innerHTML =
             '<div class="cp-dialog">' +
             '<div class="cp-dialog-icon cp-dialog-icon-success"><i class="bi bi-check-circle-fill"></i></div>' +
-            '<h5 class="cp-dialog-title">Connection successful</h5>' +
-            '<p class="cp-dialog-text">The recorded path reached the NAP &mdash; walked ' +
-            formatDistance(walkedM) +
-            ".</p>" +
-            '<p class="cp-dialog-text cp-dialog-hint">Save this recording, or retake it if the walk didn&#39;t go the way you wanted.</p>' +
-            '<div class="cp-dialog-actions">' +
-            '<button type="button" class="btn btn-outline-secondary" data-cp="retake">Retake</button>' +
-            '<button type="button" class="btn btn-primary" data-cp="save">Save</button>' +
+            '<h5 class="cp-dialog-title mb-0">Connection successful</h5>' +
+            '<div class="cp-dialog-actions mt-3">' +
+            '<button type="button" class="btn btn-primary" data-cp="okay">Okay</button>' +
             "</div></div>";
 
         connectionDialogEl.addEventListener("click", function (e) {
             var t = e.target;
             var action = t && t.getAttribute ? t.getAttribute("data-cp") : null;
-            if (action === "retake") {
+            if (action === "okay") {
                 closeConnectionDialog();
-                resetRecordingState();
-                setRecordingUiState("idle");
-            } else if (action === "save") {
-                closeConnectionDialog();
-                stopAndSaveRecording();
+                showConnectedControls();
             }
         });
         document.addEventListener("keydown", onConnectionDialogKeydown);
@@ -883,10 +900,21 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // After a failed save the GPS watch is already off and the trail is
-    // kept in memory, so re-enable the button as a plain "retry save".
+    // kept in memory, so re-enable whichever control is currently on
+    // screen as a plain "retry save" -- the Start/Stop button for a
+    // manual mid-walk save, or the Retake/Save pair once already
+    // snapped onto the NAP.
     function allowSaveRetry() {
-        cablePathStartBtn.disabled = false;
-        cablePathStartBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Retry save';
+        if (snapped) {
+            if (cablePathRetakeBtn) cablePathRetakeBtn.disabled = false;
+            if (cablePathSaveBtn) {
+                cablePathSaveBtn.disabled = false;
+                cablePathSaveBtn.textContent = "Retry Save";
+            }
+        } else {
+            cablePathStartBtn.disabled = false;
+            cablePathStartBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Retry save';
+        }
     }
 
     function stopAndSaveRecording() {
@@ -950,6 +978,18 @@ document.addEventListener("DOMContentLoaded", function () {
             stopAndSaveRecording();
         }
     });
+
+    if (cablePathRetakeBtn) {
+        cablePathRetakeBtn.addEventListener("click", function () {
+            resetRecordingState();
+            setRecordingUiState("idle");
+        });
+    }
+    if (cablePathSaveBtn) {
+        cablePathSaveBtn.addEventListener("click", function () {
+            stopAndSaveRecording();
+        });
+    }
 });
 </script>
 {% endblock %}
