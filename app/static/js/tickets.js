@@ -29,12 +29,11 @@
  *     read-only field auto-filled from the chosen subscriber instead
  *     of a free picker.
  *
- * Priority/Assigned Team/Technician/Scheduled are collected in all
- * three forms, but only Priority (all three), Status (SO/Add NAP),
- * and Port Capacity (Add NAP) map onto real columns today -- the
- * rest are folded into the description/notes text server-side so
- * nothing typed is lost. See the routes' docstrings for the full
- * explanation.
+ * Priority/Assigned Team/Technician are collected in all three forms,
+ * but only Priority (all three), Status (SO/Add NAP), and Port
+ * Capacity (Add NAP) map onto real columns today -- the rest are
+ * folded into the description/notes text server-side so nothing
+ * typed is lost. See the routes' docstrings for the full explanation.
  */
 (function () {
     "use strict";
@@ -740,7 +739,17 @@
         const priorityStatic = document.getElementById("ticketFormPriorityStatic");
         prioritySelect.classList.toggle("d-none", isFiberBreak);
         priorityStatic.classList.toggle("d-none", !isFiberBreak);
-        if (isFiberBreak) prioritySelect.value = "critical";
+        if (isFiberBreak) {
+            prioritySelect.value = "critical";
+        } else if (isSO) {
+            // New Installation and Nap Installation (Add NAP) both
+            // default to Low -- the admin can still raise it manually
+            // before submitting. Repair keeps its existing Medium
+            // default (resetForm()'s form.reset() already leaves the
+            // <select> at whichever option has `selected` in the
+            // markup), unchanged.
+            prioritySelect.value = "low";
+        }
 
         // Status only makes sense as a real choice for SO (a
         // service_request can start anywhere); a brand-new trouble
@@ -990,7 +999,6 @@
             "technicians_label",
             addedTechnicians.map((t) => t.full_name).join(", ")
         );
-        formData.append("scheduled", document.getElementById("ticketFormScheduled").value);
         formData.append("csrf_token", CSRF_TOKEN);
 
         return fetch("/service-requests/quick-add", {
@@ -1042,8 +1050,6 @@
         const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
         if (team) extra.push("Assigned Team: " + team);
         if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
-        const scheduled = document.getElementById("ticketFormScheduled").value;
-        if (scheduled) extra.push("Scheduled: " + scheduled);
         const typed = document.getElementById("ticketFormDescription").value.trim();
         const description = [extra.join("\n"), typed].filter(Boolean).join("\n\n") || "Reported via the GeoMap Tickets menu.";
         formData.append("description", description);
@@ -1066,8 +1072,6 @@
         const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
         if (team) extra.push("Assigned Team: " + team);
         if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
-        const scheduled = document.getElementById("ticketFormScheduled").value;
-        if (scheduled) extra.push("Scheduled: " + scheduled);
         const typed = document.getElementById("ticketFormDescription").value.trim();
         const description = [extra.join("\n"), typed].filter(Boolean).join("\n\n");
         formData.append("description", description);
@@ -1145,9 +1149,6 @@
         }
         if (!addedTechnicians.length) {
             errors.technicians = ["Please add at least one assisting technician."];
-        }
-        if (!document.getElementById("ticketFormScheduled").value) {
-            errors.scheduled = ["Please choose a scheduled date."];
         }
         if (!document.getElementById("ticketFormDescription").value.trim()) {
             errors.description = ["Please enter a description."];
