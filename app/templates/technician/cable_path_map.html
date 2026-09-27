@@ -116,6 +116,12 @@
         justify-content: center;
         font-size: 1.4rem;
     }
+    /* "Connection successful" dialog uses the same shell, green instead
+       of the "too far" dialog's red. */
+    .cp-dialog-icon-success {
+        background: #e6f7ec;
+        color: #198754;
+    }
     .cp-dialog-title { font-weight: 700; margin-bottom: 0.5rem; color: #212529; }
     .cp-dialog-text { font-size: 0.9rem; color: #495057; margin-bottom: 0.75rem; }
     .cp-dialog-hint { margin-bottom: 1rem; }
@@ -379,11 +385,14 @@ document.addEventListener("DOMContentLoaded", function () {
     var MAX_ACCEPTABLE_FIX_ACCURACY_M = 10; // drop poor fixes: they cause the zig-zag
     var MIN_STEP_M = 1;            // ignore fixes that moved < 1 m (GPS jitter)
     var STEP_ACCURACY_FACTOR = 0.4; // ...and anything smaller than 40% of the fix's own error
-    var SNAP_RADIUS_M = 3;         // auto-snap, stop and save inside this distance
+    var SNAP_RADIUS_M = 3;         // auto-snap the line (visually) inside this distance
     var START_RADIUS_M = 3;        // must begin recording this close to the subscriber pin or the NAP
     var ANIM_STEP_M = 1;           // line/distance advance per animation tick
     var ANIM_TICK_MS = 40;
-    var AUTO_SAVE_ON_SNAP = true;  // false = snap, then wait for a tap on Save
+    // Reaching the NAP no longer saves anything by itself -- it just
+    // stops GPS tracking and shows the "Connection successful" dialog
+    // (see finishSnap()/showConnectionSuccessDialog()), and the
+    // technician explicitly picks Retake or Save from there.
 
     var cablePathErrorEl = document.getElementById("cablePathError");
 
@@ -450,8 +459,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (recordingState === "recording") {
             if (snapped) {
-                cablePathStartBtn.innerHTML =
-                    '<i class="bi bi-check-circle me-1"></i>' + (AUTO_SAVE_ON_SNAP ? "Connected to NAP" : "Save path");
+                cablePathStartBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Connected to NAP';
                 setHud("0 m", "Snapped to NAP ✓", "Walked " + formatDistance(walkedM), true);
             } else {
                 cablePathStartBtn.innerHTML =
@@ -468,7 +476,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function setRecordingUiState(state) {
         recordingState = state;
-        cablePathStartBtn.disabled = state === "saving" || (state === "recording" && snapped && AUTO_SAVE_ON_SNAP);
+        // Once snapped, the "Connection successful" dialog owns
+        // Retake/Save -- the underlying button is disabled so it can't
+        // be triggered from behind the dialog.
+        cablePathStartBtn.disabled = state === "saving" || (state === "recording" && snapped);
         if (state === "idle") {
             cablePathStartBtn.innerHTML = '<i class="bi bi-record-circle me-1"></i>Start Recording';
             if (hasNap && hasPin) {
@@ -602,15 +613,75 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Called once the animated line has reached the NAP marker.
+    // Called once the animated line has reached the NAP marker. This
+    // used to call stopAndSaveRecording() straight away; now it just
+    // stops tracking and hands off to the "Connection successful"
+    // dialog, so nothing is actually persisted until the technician
+    // taps Save there (or discards the walk with Retake).
     function finishSnap() {
         snapped = true;
         displayPos = { lat: napLat, lng: napLng };
         redrawLive();
         refreshReadouts();
-        if (AUTO_SAVE_ON_SNAP) {
-            stopAndSaveRecording();
+        stopWatch();
+        flushAnimation();
+        showConnectionSuccessDialog();
+    }
+
+    // ---- "Connection successful" dialog ------------------------------
+    // Same lightweight self-contained modal pattern as the start-location
+    // dialog below. Deliberately no backdrop/Escape dismissal: an
+    // accidental tap or key press outside the two buttons must not
+    // silently save OR silently discard a completed recording -- the
+    // technician has to actively choose one.
+    var connectionDialogEl = null;
+
+    function closeConnectionDialog() {
+        if (connectionDialogEl) {
+            document.removeEventListener("keydown", onConnectionDialogKeydown);
+            connectionDialogEl.parentNode && connectionDialogEl.parentNode.removeChild(connectionDialogEl);
+            connectionDialogEl = null;
         }
+    }
+
+    function onConnectionDialogKeydown(e) {
+        if (e.key === "Escape") e.preventDefault();
+    }
+
+    function showConnectionSuccessDialog() {
+        closeConnectionDialog();
+
+        connectionDialogEl = document.createElement("div");
+        connectionDialogEl.className = "cp-dialog-backdrop";
+        connectionDialogEl.setAttribute("role", "alertdialog");
+        connectionDialogEl.setAttribute("aria-modal", "true");
+        connectionDialogEl.innerHTML =
+            '<div class="cp-dialog">' +
+            '<div class="cp-dialog-icon cp-dialog-icon-success"><i class="bi bi-check-circle-fill"></i></div>' +
+            '<h5 class="cp-dialog-title">Connection successful</h5>' +
+            '<p class="cp-dialog-text">The recorded path reached the NAP &mdash; walked ' +
+            formatDistance(walkedM) +
+            ".</p>" +
+            '<p class="cp-dialog-text cp-dialog-hint">Save this recording, or retake it if the walk didn&#39;t go the way you wanted.</p>' +
+            '<div class="cp-dialog-actions">' +
+            '<button type="button" class="btn btn-outline-secondary" data-cp="retake">Retake</button>' +
+            '<button type="button" class="btn btn-primary" data-cp="save">Save</button>' +
+            "</div></div>";
+
+        connectionDialogEl.addEventListener("click", function (e) {
+            var t = e.target;
+            var action = t && t.getAttribute ? t.getAttribute("data-cp") : null;
+            if (action === "retake") {
+                closeConnectionDialog();
+                resetRecordingState();
+                setRecordingUiState("idle");
+            } else if (action === "save") {
+                closeConnectionDialog();
+                stopAndSaveRecording();
+            }
+        });
+        document.addEventListener("keydown", onConnectionDialogKeydown);
+        document.body.appendChild(connectionDialogEl);
     }
 
     window.addEventListener("beforeunload", function (event) {
