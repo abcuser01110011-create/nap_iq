@@ -24,57 +24,6 @@
         height: 100%;
         width: 100%;
     }
-    .cable-path-legend {
-        position: absolute;
-        top: 0.75rem;
-        right: 0.75rem;
-        z-index: 1000;
-        /* Explicit light box + dark text: the dark theme's inherited
-           text color was near-white and vanished on this white box. */
-        background: #fff;
-        color: #212529;
-        border-radius: 0.375rem;
-        padding: 0.5rem 0.75rem;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-        font-size: 0.8rem;
-    }
-    .cable-path-legend .swatch {
-        display: inline-block;
-        width: 0.7rem;
-        height: 0.7rem;
-        border-radius: 50%;
-        margin-right: 0.35rem;
-    }
-    /* Live distance readout (subscriber -> NAP). Sits top-left so it
-       never collides with the legend (top-right). */
-    .cable-path-hud {
-        position: absolute;
-        top: 0.75rem;
-        left: 0.75rem;
-        z-index: 1000;
-        background: #fff;
-        color: #212529;
-        border-radius: 0.5rem;
-        padding: 0.5rem 0.9rem;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-        min-width: 7.5rem;
-        pointer-events: none;
-    }
-    .cable-path-hud .hud-distance {
-        font-size: 1.6rem;
-        font-weight: 700;
-        line-height: 1.1;
-        font-variant-numeric: tabular-nums;
-    }
-    .cable-path-hud .hud-label,
-    .cable-path-hud .hud-walked {
-        font-size: 0.75rem;
-        color: #6c757d;
-    }
-    .cable-path-hud.snapped .hud-distance,
-    .cable-path-hud.snapped .hud-label {
-        color: #198754;
-    }
     /* Wrapping element for the Start/Stop button + its error banner.
        The banner is positioned absolute (see below) so showing or
        hiding it never changes this wrapper's height -- it overlaps
@@ -182,18 +131,6 @@
                  data-existing-points='{{ (job.cable_path_points or []) | tojson }}'
                  data-cable-path-action="{{ url_for('technician.record_cable_path', assignment_id=job.assignment.id) }}"
                  data-ticket-detail-url="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}"></div>
-            <div id="cablePathHud" class="cable-path-hud d-none">
-                <div class="hud-distance" id="cablePathHudDistance">--</div>
-                <div class="hud-label" id="cablePathHudLabel"></div>
-                <div class="hud-walked d-none" id="cablePathHudWalked"></div>
-            </div>
-            <div class="cable-path-legend">
-                <div><span class="swatch" style="background:#0d6efd;"></span>NAP</div>
-                <div><span class="swatch" style="background:#dc3545;"></span>Pinned subscriber location</div>
-                {% if job.cable_path_points %}
-                <div><span class="swatch" style="background:#198754;"></span>Recorded path</div>
-                {% endif %}
-            </div>
         </div>
     </div>
 </div>
@@ -290,11 +227,64 @@ document.addEventListener("DOMContentLoaded", function () {
         boundsPoints.push([pinLat, pinLng]);
     }
 
+    // ---- Stabilizer --------------------------------------------
+    // Smooths a raw GPS trail using the Ramer-Douglas-Peucker
+    // algorithm: keeps only the points that actually define the
+    // route's shape and drops ones that are just jitter/noise within
+    // CABLE_PATH_SIMPLIFY_TOLERANCE_METERS of the straightened line
+    // between their neighbors. Doesn't change where the technician
+    // walked or what gets saved -- only stops the *drawn* line from
+    // re-tracing every tiny GPS wobble (most noticeable as little
+    // loops/scribbles whenever the technician paused). Mirrors the
+    // stabilizer used when cable paths are rendered on the main NAP
+    // map (see simplifyCablePath() in napmap.js).
+    var CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 0.75;
+
+    function simplifyCablePath(points, toleranceMeters) {
+        if (!Array.isArray(points) || points.length < 3) {
+            return Array.isArray(points) ? points.slice() : points;
+        }
+        var METERS_PER_DEG_LAT = 111320;
+
+        function perpendicularDistanceMeters(point, lineStart, lineEnd) {
+            var latRef = (lineStart[0] * Math.PI) / 180;
+            var mPerDegLng = METERS_PER_DEG_LAT * Math.cos(latRef);
+            function toXY(p) {
+                return [(p[1] - lineStart[1]) * mPerDegLng, (p[0] - lineStart[0]) * METERS_PER_DEG_LAT];
+            }
+            var xy1 = toXY(lineStart), xy2 = toXY(lineEnd), xy0 = toXY(point);
+            var dx = xy2[0] - xy1[0], dy = xy2[1] - xy1[1];
+            var lenSq = dx * dx + dy * dy;
+            if (lenSq === 0) return Math.hypot(xy0[0] - xy1[0], xy0[1] - xy1[1]);
+            var t = ((xy0[0] - xy1[0]) * dx + (xy0[1] - xy1[1]) * dy) / lenSq;
+            var px = xy1[0] + t * dx, py = xy1[1] + t * dy;
+            return Math.hypot(xy0[0] - px, xy0[1] - py);
+        }
+
+        function rdp(pts) {
+            if (pts.length < 3) return pts;
+            var maxDist = 0, maxIndex = 0;
+            var first = pts[0], last = pts[pts.length - 1];
+            for (var i = 1; i < pts.length - 1; i++) {
+                var d = perpendicularDistanceMeters(pts[i], first, last);
+                if (d > maxDist) { maxDist = d; maxIndex = i; }
+            }
+            if (maxDist > toleranceMeters) {
+                var left = rdp(pts.slice(0, maxIndex + 1));
+                var right = rdp(pts.slice(maxIndex));
+                return left.slice(0, -1).concat(right);
+            }
+            return [first, last];
+        }
+
+        return rdp(points);
+    }
+
     var recordedLine = null;
     if (existingPoints.length >= 2) {
-        var existingLatLngs = existingPoints.map(function (p) {
+        var existingLatLngs = simplifyCablePath(existingPoints.map(function (p) {
             return [p.latitude, p.longitude];
-        });
+        }), CABLE_PATH_SIMPLIFY_TOLERANCE_METERS);
         // Raw GPS fixes almost never land exactly on the NAP or the
         // pinned subscriber location, which left the drawn line
         // visibly short of (or drifting past) those icons. Snap the
@@ -522,6 +512,10 @@ document.addEventListener("DOMContentLoaded", function () {
             latLngs.push([displayPos.lat, displayPos.lng]);
         }
         if (latLngs.length < 1) return;
+        // Stabilize the drawn line so pauses/GPS wobble don't render
+        // as little loops; the head marker below still tracks the
+        // true (unsimplified) displayPos.
+        latLngs = simplifyCablePath(latLngs, CABLE_PATH_SIMPLIFY_TOLERANCE_METERS);
 
         if (liveLine) {
             liveLine.setLatLngs(latLngs);
