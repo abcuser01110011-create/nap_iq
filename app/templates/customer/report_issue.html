@@ -109,7 +109,7 @@
         takeBtn.classList.remove('d-none');
     }
 
-    function setPhoto(file) {
+    var setPhoto = function (file) {
         var dt = new DataTransfer();
         dt.items.add(file);
         input.files = dt.files;
@@ -117,7 +117,7 @@
         previewWrap.classList.remove('d-none');
         takeLabel.textContent = 'Retake Photo';
         showError(false);
-    }
+    };
 
     function useFallback(message) {
         stopCamera();
@@ -175,6 +175,88 @@
     });
 
     window.addEventListener('pagehide', stopCamera);
+
+    // ---- Draft persistence -------------------------------------------------
+    // Keeps issue type, description and the captured photo in localStorage so a
+    // failed submit (server re-render) or a page refresh never loses progress.
+    var KEY = 'napiq_issue_draft_v1';
+    var FLAG = 'napiq_issue_submitting';
+    var typeEl = form.querySelector('[name="issue_type"]');
+    var descEl = form.querySelector('[name="description"]');
+    var hasServerErrors = !!form.querySelector('.invalid-feedback.d-block:not(#photoError)');
+    var draft = {};
+
+    function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function load() {
+        try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function save() {
+        draft.type = typeEl ? typeEl.value : '';
+        draft.desc = descEl ? descEl.value : '';
+        store(KEY, JSON.stringify(draft));
+    }
+    function clearDraft() {
+        try { localStorage.removeItem(KEY); sessionStorage.removeItem(FLAG); } catch (e) {}
+    }
+    function dataUrlToFile(url) {
+        var parts = url.split(',');
+        var bin = atob(parts[1]);
+        var arr = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        return new File([arr], 'issue-photo.jpg', { type: 'image/jpeg' });
+    }
+    function fileToDataUrl(file, cb) {
+        var r = new FileReader();
+        r.onload = function () { cb(r.result); };
+        r.readAsDataURL(file);
+    }
+
+    // A previous submit that was not followed by validation errors succeeded
+    // (we were redirected away), so that draft is finished and must be dropped.
+    var submitted = false;
+    try { submitted = sessionStorage.getItem(FLAG) === '1'; } catch (e) {}
+    if (submitted && !hasServerErrors) clearDraft();
+    try { sessionStorage.removeItem(FLAG); } catch (e) {}
+
+    draft = load();
+    if (typeEl && draft.type && !hasServerErrors) typeEl.value = draft.type;
+    if (typeEl && draft.type && hasServerErrors) typeEl.value = typeEl.value || draft.type;
+    if (descEl && draft.desc && !descEl.value.trim()) descEl.value = draft.desc;
+    if (draft.photo && (!input.files || input.files.length === 0)) {
+        try { setPhoto(dataUrlToFile(draft.photo)); } catch (e) {}
+    }
+
+    if (typeEl) typeEl.addEventListener('change', save);
+    if (descEl) descEl.addEventListener('input', save);
+
+    // Save the photo whenever one is taken.
+    var origSetPhoto = setPhoto;
+    setPhoto = function (file) {
+        origSetPhoto(file);
+        fileToDataUrl(file, function (url) { draft.photo = url; save(); });
+    };
+
+    // Client-side "required" check so the page doesn't even reload.
+    var descError = document.createElement('div');
+    descError.className = 'invalid-feedback d-block d-none';
+    descError.textContent = 'This field is required.';
+    if (descEl) descEl.parentNode.appendChild(descError);
+    if (descEl) descEl.addEventListener('input', function () {
+        if (descEl.value.trim()) { descError.classList.add('d-none'); descEl.classList.remove('is-invalid'); }
+    });
+
+    form.addEventListener('submit', function (e) {
+        if (e.defaultPrevented) return;
+        if (descEl && !descEl.value.trim()) {
+            e.preventDefault();
+            descError.classList.remove('d-none');
+            descEl.classList.add('is-invalid');
+            descEl.focus();
+            return;
+        }
+        save();
+        try { sessionStorage.setItem(FLAG, '1'); } catch (e2) {}
+    });
 })();
 </script>
 {% endblock %}
