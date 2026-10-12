@@ -1714,7 +1714,11 @@
         setText("ticketDetailsNap", issue.nap_code);
         setText("ticketDetailsPriority", formatPriorityLabel(issue.priority, issue.issue_type));
         setText("ticketDetailsStatus", formatStatusLabel(issue.status));
-        setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam);
+        // An admin-created ticket records its team in the description
+        // ("Assigned Team: ..."); a customer-reported one is auto-assigned
+        // and only has a real Assignment row, which /api/issues exposes as
+        // assigned_technician -- fall back to that so it is never blank.
+        setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam || issue.assigned_technician);
         setText("ticketDetailsTechnicians", parsed.extras.technicians);
         setText("ticketDetailsCreated", formatDateTime(issue.created_at));
         setText("ticketDetailsDescription", parsed.description);

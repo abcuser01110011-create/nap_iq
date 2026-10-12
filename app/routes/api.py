@@ -44,6 +44,7 @@ service-request-scoped one.
 import json
 
 from flask import Blueprint, jsonify, g, abort, request
+from sqlalchemy.orm import joinedload
 
 from app.auth import role_required
 from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, CablePath
@@ -204,6 +205,27 @@ def issues_json():
 
     issues = query.order_by(TechnicalIssue.created_at.desc()).all()
 
+    # Current assignee per issue (newest non-cancelled assignment), so the
+    # GeoMap's "View Ticket" modal can show who a ticket was dispatched to --
+    # including tickets a customer reported online, which are auto-assigned
+    # (recommendation.auto_assign_recommended_technician()) and so never get
+    # an "Assigned Team: ..." line written into their description.
+    assignee_by_issue_id = {}
+    issue_ids = [issue.id for issue in issues]
+    if issue_ids:
+        rows = (
+            Assignment.query.options(joinedload(Assignment.technician))
+            .filter(
+                Assignment.technical_issue_id.in_(issue_ids),
+                Assignment.status != "cancelled",
+            )
+            .order_by(Assignment.assigned_at.asc(), Assignment.id.asc())
+            .all()
+        )
+        for row in rows:  # ascending, so the newest assignment wins
+            if row.technician is not None:
+                assignee_by_issue_id[row.technical_issue_id] = row.technician.full_name
+
     data = [
         {
             "id": issue.id,
@@ -220,6 +242,7 @@ def issues_json():
             "subscriber_code": issue.subscriber.subscriber_code if issue.subscriber else None,
             "nap_id": issue.nap_id,
             "nap_code": issue.nap.nap_code if issue.nap else None,
+            "assigned_technician": assignee_by_issue_id.get(issue.id),
             "created_at": issue.created_at.isoformat(),
         }
         for issue in issues

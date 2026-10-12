@@ -278,20 +278,24 @@ def _populate_dynamic_choices(form):
 
 def _subscriber_plan_types():
     """Plan names offered by the "+ Tickets" modal's Service Order "Plan"
-    dropdown (partials/ticket_form_modal.html): every distinct
-    Subscriber.plan_type already in use, unioned with the admin-curated
-    Settings > Plans list. Same list naps.py's geomap() builds for the
-    GeoMap's "+ Tickets" button -- every page that includes the modal
-    must pass it in or the dropdown renders empty."""
-    existing_plan_types = {
+    dropdown (partials/ticket_form_modal.html): the admin-curated
+    Settings > Plans list, cheapest first. Removing a plan in Settings
+    therefore stops it being offered here, even if some subscriber record
+    still carries that name. Only if no plan has been curated at all does
+    this fall back to the distinct Subscriber.plan_type values already in
+    use, so the dropdown is never empty on a fresh install. Same list
+    naps.py's geomap() builds for the GeoMap's "+ Tickets" button -- every
+    page that includes the modal must pass it in."""
+    curated = [p.name for p in Plan.query.order_by(Plan.monthly_fee, Plan.name).all()]
+    if curated:
+        return curated
+    return sorted(
         row[0]
         for row in db.session.query(Subscriber.plan_type)
         .filter(Subscriber.plan_type.isnot(None), Subscriber.plan_type != "")
         .distinct()
         .all()
-    }
-    curated_plan_names = {p.name for p in Plan.query.all()}
-    return sorted(existing_plan_types | curated_plan_names)
+    )
 
 
 @issues_bp.route("/")

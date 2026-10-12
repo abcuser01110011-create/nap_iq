@@ -325,15 +325,21 @@ def geomap():
     # ever see the Plan Installation control this datalist backs.
     subscriber_plan_types = []
     if g.user.role == "administrator":
-        existing_plan_types = {
-            row[0]
-            for row in db.session.query(Subscriber.plan_type)
-            .filter(Subscriber.plan_type.isnot(None), Subscriber.plan_type != "")
-            .distinct()
-            .all()
-        }
-        curated_plan_names = {p.name for p in Plan.query.all()}
-        subscriber_plan_types = sorted(existing_plan_types | curated_plan_names)
+        # Settings > Plans is the source of truth: a plan removed there must
+        # stop being offered, even if some subscriber still carries that
+        # name. Only if nothing has been curated does this fall back to the
+        # plan names already in use, so the dropdown is never empty.
+        curated_plan_names = [p.name for p in Plan.query.order_by(Plan.monthly_fee, Plan.name).all()]
+        if curated_plan_names:
+            subscriber_plan_types = curated_plan_names
+        else:
+            subscriber_plan_types = sorted(
+                row[0]
+                for row in db.session.query(Subscriber.plan_type)
+                .filter(Subscriber.plan_type.isnot(None), Subscriber.plan_type != "")
+                .distinct()
+                .all()
+            )
 
     # Settings > App Settings > Default GeoMap Filters: only decides
     # what the Layers/Filters dropdown controls below are initially
