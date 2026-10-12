@@ -276,6 +276,24 @@ def _populate_dynamic_choices(form):
     form.nap_id.choices = [(0, "None")] + [(n.id, f"{n.nap_code} — {n.name}") for n in naps]
 
 
+def _subscriber_plan_types():
+    """Plan names offered by the "+ Tickets" modal's Service Order "Plan"
+    dropdown (partials/ticket_form_modal.html): every distinct
+    Subscriber.plan_type already in use, unioned with the admin-curated
+    Settings > Plans list. Same list naps.py's geomap() builds for the
+    GeoMap's "+ Tickets" button -- every page that includes the modal
+    must pass it in or the dropdown renders empty."""
+    existing_plan_types = {
+        row[0]
+        for row in db.session.query(Subscriber.plan_type)
+        .filter(Subscriber.plan_type.isnot(None), Subscriber.plan_type != "")
+        .distinct()
+        .all()
+    }
+    curated_plan_names = {p.name for p in Plan.query.all()}
+    return sorted(existing_plan_types | curated_plan_names)
+
+
 @issues_bp.route("/")
 @role_required("administrator")
 def list_issues():
@@ -382,6 +400,8 @@ def list_issues():
         priority_filter=priority_filter,
         pending_requests=pending_requests,
         total_open_tickets=total_open_tickets,
+        # Backs the "+ Tickets" modal's Plan dropdown (same as the GeoMap).
+        subscriber_plan_types=_subscriber_plan_types(),
     )
 
 
@@ -910,20 +930,8 @@ def view_issue(issue_id):
             .all()
         )
 
-        # Backs the "Create Ticket" button's "+ Tickets" modal (see
-        # partials/ticket_form_modal.html) — same union of existing
-        # Subscriber.plan_type values + the curated Plan list used by
-        # naps.py's geomap() for the same dropdown, kept in sync by
-        # hand since the two pages don't share a view function.
-        existing_plan_types = {
-            row[0]
-            for row in db.session.query(Subscriber.plan_type)
-            .filter(Subscriber.plan_type.isnot(None), Subscriber.plan_type != "")
-            .distinct()
-            .all()
-        }
-        curated_plan_names = {p.name for p in Plan.query.all()}
-        subscriber_plan_types = sorted(existing_plan_types | curated_plan_names)
+        # Backs the "Create Ticket" button's "+ Tickets" modal.
+        subscriber_plan_types = _subscriber_plan_types()
 
     return render_template(
         "issues/view.html",
