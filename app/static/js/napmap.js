@@ -3127,13 +3127,16 @@
         const quickAddForm = document.getElementById("quickAddForm");
         const quickAddModalEl = document.getElementById("quickAddModal");
 
-        addBtn.addEventListener("click", () => {
-            if (addModeActive) {
-                exitAddMode();
-            } else {
-                enterAddMode();
-            }
-        });
+        // The Add NAP button may be hidden from the page (see naps/map.html).
+        if (addBtn) {
+            addBtn.addEventListener("click", () => {
+                if (addModeActive) {
+                    exitAddMode();
+                } else {
+                    enterAddMode();
+                }
+            });
+        }
 
         bannerCancelBtn.addEventListener("click", exitAddMode);
         modalCancelBtn.addEventListener("click", exitAddMode);
@@ -3166,9 +3169,11 @@
         addModeActive = true;
 
         const btn = document.getElementById("addNapModeBtn");
-        btn.classList.remove("btn-primary");
-        btn.classList.add("btn-outline-danger");
-        btn.innerHTML = '<i class="bi bi-x-lg me-1"></i>Cancel Add NAP';
+        if (btn) {
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-outline-danger");
+            btn.innerHTML = '<i class="bi bi-x-lg me-1"></i>Cancel Add NAP';
+        }
 
         document.getElementById("addModeBanner").classList.remove("d-none");
         document.getElementById("napMap").classList.add("add-mode-cursor");
@@ -3179,9 +3184,11 @@
         addModeActive = false;
 
         const btn = document.getElementById("addNapModeBtn");
-        btn.classList.remove("btn-outline-danger");
-        btn.classList.add("btn-primary");
-        btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add NAP';
+        if (btn) {
+            btn.classList.remove("btn-outline-danger");
+            btn.classList.add("btn-primary");
+            btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Add NAP';
+        }
 
         document.getElementById("addModeBanner").classList.add("d-none");
         document.getElementById("napMap").classList.remove("add-mode-cursor");

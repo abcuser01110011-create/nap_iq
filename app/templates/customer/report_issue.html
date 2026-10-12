@@ -28,11 +28,40 @@
                         {% endfor %}
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label">Photo</label>
-                        <input type="file" name="photo" accept="image/*"
-                               class="form-control" required>
-                        <div class="form-text">Upload a photo from your device, or take one now — required so our team can see what's going on.</div>
+                    {# Photo: required, and taken live with the device camera -- there is
+                       deliberately no "choose from gallery/files" control. The camera is
+                       opened in-page with getUserMedia(); the captured frame is placed
+                       into this hidden file input so the existing server-side upload
+                       (customer.report_issue) works unchanged. If the browser can't open
+                       a camera at all, a capture="environment" input is shown instead,
+                       which opens the phone's native camera app. #}
+                    <div class="mb-4" id="photoBlock">
+                        <label class="form-label">Photo <span class="text-danger">*</span></label>
+                        <input type="file" name="photo" id="photoInput" accept="image/*" class="d-none">
+
+                        <div id="photoPreviewWrap" class="d-none mb-2">
+                            <img id="photoPreview" alt="Captured photo" class="img-fluid rounded border" style="max-height: 320px;">
+                        </div>
+
+                        <div id="cameraLive" class="d-none mb-2">
+                            <video id="cameraVideo" class="w-100 rounded border bg-dark" autoplay playsinline muted style="max-height: 360px;"></video>
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-primary" id="cameraSnapBtn"><i class="bi bi-camera-fill me-1"></i>Capture</button>
+                                <button type="button" class="btn btn-outline-secondary" id="cameraCancelBtn">Cancel</button>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary" id="takePhotoBtn">
+                            <i class="bi bi-camera me-1"></i><span id="takePhotoLabel">Take Photo</span>
+                        </button>
+
+                        <div id="photoFallback" class="d-none mt-2">
+                            <input type="file" id="photoFallbackInput" accept="image/*" capture="environment" class="form-control">
+                            <div class="form-text">Your browser couldn't open the camera here, so use this to open your phone's camera.</div>
+                        </div>
+
+                        <div class="invalid-feedback d-block d-none" id="photoError">Please take a photo of the issue before submitting.</div>
+                        <div class="form-text">Required. Take the photo now with your camera so our team can see what's going on.</div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
@@ -46,4 +75,106 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var form = document.querySelector('form[enctype="multipart/form-data"]');
+    var input = document.getElementById('photoInput');
+    var fallbackWrap = document.getElementById('photoFallback');
+    var fallbackInput = document.getElementById('photoFallbackInput');
+    var takeBtn = document.getElementById('takePhotoBtn');
+    var takeLabel = document.getElementById('takePhotoLabel');
+    var live = document.getElementById('cameraLive');
+    var video = document.getElementById('cameraVideo');
+    var snapBtn = document.getElementById('cameraSnapBtn');
+    var cancelBtn = document.getElementById('cameraCancelBtn');
+    var previewWrap = document.getElementById('photoPreviewWrap');
+    var preview = document.getElementById('photoPreview');
+    var errorEl = document.getElementById('photoError');
+    if (!form || !input) return;
+
+    var stream = null;
+
+    function showError(show, text) {
+        if (text) errorEl.textContent = text;
+        errorEl.classList.toggle('d-none', !show);
+    }
+
+    function stopCamera() {
+        if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+        video.srcObject = null;
+        live.classList.add('d-none');
+        takeBtn.classList.remove('d-none');
+    }
+
+    function setPhoto(file) {
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        preview.src = URL.createObjectURL(file);
+        previewWrap.classList.remove('d-none');
+        takeLabel.textContent = 'Retake Photo';
+        showError(false);
+    }
+
+    function useFallback(message) {
+        stopCamera();
+        fallbackWrap.classList.remove('d-none');
+        if (message) showError(true, message);
+    }
+
+    takeBtn.addEventListener('click', function () {
+        showError(false);
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            useFallback();
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+            .then(function (s) {
+                stream = s;
+                video.srcObject = s;
+                live.classList.remove('d-none');
+                takeBtn.classList.add('d-none');
+                previewWrap.classList.add('d-none');
+            })
+            .catch(function () {
+                useFallback('Camera access was blocked. Allow camera permission for this site, or use the button below.');
+            });
+    });
+
+    snapBtn.addEventListener('click', function () {
+        var w = video.videoWidth, h = video.videoHeight;
+        if (!w || !h) return;
+        var scale = Math.min(1, 1280 / Math.max(w, h));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function (blob) {
+            if (!blob) return;
+            setPhoto(new File([blob], 'issue-photo.jpg', { type: 'image/jpeg' }));
+            stopCamera();
+        }, 'image/jpeg', 0.85);
+    });
+
+    cancelBtn.addEventListener('click', stopCamera);
+
+    // Native-camera fallback (capture="environment" opens the camera app on phones).
+    fallbackInput.addEventListener('change', function () {
+        if (fallbackInput.files && fallbackInput.files[0]) setPhoto(fallbackInput.files[0]);
+    });
+
+    form.addEventListener('submit', function (e) {
+        if (!input.files || input.files.length === 0) {
+            e.preventDefault();
+            showError(true, 'Please take a photo of the issue before submitting.');
+            takeBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+
+    window.addEventListener('pagehide', stopCamera);
+})();
+</script>
 {% endblock %}

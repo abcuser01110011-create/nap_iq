@@ -124,6 +124,11 @@
                 <li><a class="dropdown-item ticket-type-option" href="#" data-category="TN" data-type-value="Repair" data-type-label="Repair">Repair</a></li>
             </ul>
         </div>
+        {# TEMPORARILY HIDDEN (Add NAP + Plan Installation buttons). To bring
+           them back, change `{% if false %}` below to `{% if true %}` (or
+           delete the if/endif lines). napmap.js and nap-install-planner.js
+           both tolerate these buttons being absent. #}
+        {% if false %}
         <button type="button" id="addNapModeBtn" class="btn btn-primary btn-sm shadow-sm">
             <i class="bi bi-plus-lg me-1"></i>Add NAP
         </button>
@@ -136,6 +141,7 @@
         <button type="button" id="planInstallModeBtn" class="btn btn-info btn-sm shadow-sm">
             <i class="bi bi-geo-fill me-1"></i>Plan Installation
         </button>
+        {% endif %}
         {% endif %}
     </div>
 
