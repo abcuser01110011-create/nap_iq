@@ -914,6 +914,14 @@ def _job_source(assignment):
     return assignment.technical_issue, assignment.service_request
 
 
+def _split_extras(text):
+    """(assisted_by_names, clean_description) -- see api_v1/technician.py's
+    _parse_ticket_extras(), which this reuses."""
+    from app.routes.api_v1.technician import _parse_ticket_extras
+    extras, description = _parse_ticket_extras(text)
+    return extras["technicians"], description
+
+
 def _ticket_code(assignment):
     """Mirrors statusLabels.ts's ticketCode() exactly: 'TN 00006' for a
     repair, 'SO 00001' for an installation, zero-padded to 5 digits."""
@@ -1050,7 +1058,11 @@ def _serialize_job(assignment):
         "plan_label": request.plan_label if request else None,
         "contact_number": subscriber.contact_number if subscriber else (request.contact_number if request else None),
         "port_number": displayed_port_number,
-        "description": issue.description if issue else (request.notes if request else None),
+        # Raw text has "Technician(s) requested: ..." etc. folded onto the
+        # front; split into a clean description plus an "Assisted By" list
+        # so the two never run together on screen.
+        "description": _split_extras(issue.description if issue else (request.notes if request else None))[1] or None,
+        "assisted_by": _split_extras(issue.description if issue else (request.notes if request else None))[0],
         "nap": nap_info,
         "nap_label": f"{nap.nap_code} — {nap.name}" if nap else None,
         # Mirrors api_v1/technician.py's _serialize_assignment() field

@@ -266,6 +266,7 @@ body.tm-body {
 
 .tm-info-row { margin-bottom: 8px; }
 .tm-info-label { color: var(--tm-text-faint); font-size: 0.76rem; }
+.tm-info-value.tm-desc-box { margin-top: 6px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; background: rgba(255,255,255,0.05); font-weight: 400; white-space: pre-wrap; }
 .tm-info-value { color: var(--tm-text); font-size: 0.88rem; font-weight: 600; margin-top: 2px; }
 
 .tm-notes-text { color: var(--tm-text-muted); font-size: 0.88rem; line-height: 1.4; }

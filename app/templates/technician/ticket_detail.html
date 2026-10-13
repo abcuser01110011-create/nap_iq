@@ -69,9 +69,14 @@
             <dd class="col-sm-9 text-capitalize">{{ job.priority_label }}</dd>
             {% endif %}
 
+            {% if job.assisted_by %}
+            <dt class="col-sm-3">Assisted By</dt>
+            <dd class="col-sm-9">{{ job.assisted_by|join(", ") }}</dd>
+            {% endif %}
+
             {% if job.description %}
             <dt class="col-sm-3">Description</dt>
-            <dd class="col-sm-9">{{ job.description }}</dd>
+            <dd class="col-sm-9"><div class="border rounded p-2 bg-body-tertiary" style="white-space: pre-wrap;">{{ job.description }}</div></dd>
             {% endif %}
 
             <dt class="col-sm-3">Assigned</dt>
