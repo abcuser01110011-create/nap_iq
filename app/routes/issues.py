@@ -338,6 +338,20 @@ def list_issues():
     assignment_by_issue = {a.technical_issue_id: a for a in open_assignments if a.technical_issue_id}
     assignment_by_request = {a.service_request_id: a for a in open_assignments if a.service_request_id}
 
+    # A finished ticket must keep showing the technician who did the
+    # work instead of falling back to "Unassigned": when there is no
+    # open assignment, use the most recent *completed* one.
+    open_issue_ids = {a.technical_issue_id for a in open_assignments}
+    open_request_ids = {a.service_request_id for a in open_assignments}
+    completed_assignments = Assignment.query.filter(
+        Assignment.status == "completed"
+    ).order_by(Assignment.assigned_at.asc(), Assignment.id.asc()).all()
+    for a in completed_assignments:
+        if a.technical_issue_id and a.technical_issue_id not in open_issue_ids:
+            assignment_by_issue[a.technical_issue_id] = a
+        if a.service_request_id and a.service_request_id not in open_request_ids:
+            assignment_by_request[a.service_request_id] = a
+
     tickets = [
         _ticket_row_from_issue(issue, assignment_by_issue.get(issue.id))
         for issue in _dedupe_fiber_break_tickets(issues)
