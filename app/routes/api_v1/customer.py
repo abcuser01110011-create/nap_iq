@@ -226,12 +226,21 @@ def _current_assigned_technician_name(issue: TechnicalIssue):
     return None
 
 
+def _strip_assist_line(text):
+    """Drops the auto-dispatch "Technician(s) requested: ..." line (an
+    internal Assisted By note) so customers only see what they typed."""
+    text = text or ""
+    if text.startswith("Technician(s) requested: "):
+        return text.split("\n\n", 1)[1] if "\n\n" in text else ""
+    return text
+
+
 def _serialize_issue(issue: TechnicalIssue) -> dict:
     return {
         "id": issue.id,
         "issue_code": issue.issue_code,
         "issue_type": issue.issue_type,
-        "description": issue.description,
+        "description": _strip_assist_line(issue.description),
         "priority": issue.priority,
         "status": issue.status,
         # issue.photo_filename stores the full Cloudinary secure_url

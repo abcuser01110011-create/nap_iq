@@ -467,12 +467,24 @@ def auto_assign_recommended_technician(issue):
     issues its own follow-up commit for the new assignment row and the
     issue's status change.
     """
-    recommendations = get_recommendations(issue, limit=1)
+    recommendations = get_recommendations(issue, limit=2)
     if not recommendations:
         return None
 
     top = recommendations[0]
     technician = top["technician"]
+
+    # "Assisted By": the next-ranked candidate, folded onto the front of
+    # the description in the same "Technician(s) requested: ..." line the
+    # GeoMap "+ Tickets" form writes, so the GeoMap Ticket Details modal
+    # and the field-assistant app (both already parse it) show it with no
+    # schema change. Customer-facing views strip this line.
+    if len(recommendations) > 1:
+        helper = recommendations[1]["technician"]
+        if helper.id != technician.id and not (issue.description or "").startswith("Technician(s) requested: "):
+            issue.description = "Technician(s) requested: {}\n\n{}".format(
+                helper.full_name, issue.description or ""
+            ).rstrip()
 
     assignment = Assignment(
         technical_issue_id=issue.id,

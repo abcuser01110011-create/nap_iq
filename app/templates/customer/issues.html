@@ -52,7 +52,7 @@
                                 {{ issue.status|replace('_', ' ')|capitalize }}
                             </span>
                         </td>
-                        <td class="text-muted small">{{ issue.description or "—" }}</td>
+                        <td class="text-muted small">{% set _d = issue.description or "" %}{% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}{{ _d or "—" }}</td>
                         <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
                     </tr>
                     {% endfor %}
