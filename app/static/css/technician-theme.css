@@ -319,3 +319,21 @@
 .dash-theme-tech .tm-map-link:hover {
     color: #2e7dff;
 }
+
+
+/* ---------------------------------------------------------------------
+   Ticket description box (technician/ticket_detail.html)
+   Was Bootstrap's bg-body-tertiary, which stays light-coloured here and
+   made the (light) text unreadable. Uses the navy theme tokens instead.
+   --------------------------------------------------------------------- */
+.dash-theme-tech .tech-desc-box {
+    padding: 10px 12px;
+    border: 1px solid #1f3a63;
+    border-radius: 10px;
+    background: #1f3a63;
+    color: #ffffff;
+    font-weight: 400;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
