@@ -42,6 +42,14 @@ class Config:
         minutes=int(os.environ.get("SESSION_LIFETIME_MINUTES", "60"))
     )
 
+    # CSRF tokens used to expire after Flask-WTF's default of 1 hour. A
+    # technician working a consolidated ticket keeps the detail page open
+    # while driving between several locations, so "Mark Complete" then
+    # failed with a bare "400 Bad Request: The CSRF token has expired."
+    # None = the token stays valid for as long as the login session does
+    # (it is still bound to the signed session, so protection is intact).
+    WTF_CSRF_TIME_LIMIT = None
+
     # ---- Mobile API token auth (Phase 25) ----
     # Backs app/extensions.py's `jwt` (Flask-JWT-Extended), used only
     # by the api_v1 blueprints for the Technician and Customer mobile

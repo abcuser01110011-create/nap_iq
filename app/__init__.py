@@ -8,9 +8,10 @@ as more blueprints, extensions, and configurations are added in later
 development phases.
 """
 
-from flask import Flask, render_template, g, request, redirect, jsonify
+from flask import Flask, render_template, g, request, redirect, jsonify, flash, url_for
 
 from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import Config
@@ -296,6 +297,18 @@ def create_app(config_class: type = Config) -> Flask:
         """Shown when a logged-in user's role doesn't allow a route
         they reached directly by URL (role_required's 403 path)."""
         return render_template("errors/403.html"), 403
+
+    @app.errorhandler(CSRFError)
+    def csrf_failed(error):
+        """A stale/missing CSRF token (e.g. a page left open too long, or
+        the session expired) used to show a bare \"400 Bad Request\".
+        Send the user back to where they were with a clear message so
+        they can simply retry."""
+        flash("Your page was open too long or your session expired. Please try again.", "warning")
+        target = request.referrer or ""
+        if not target.startswith(request.host_url):
+            target = url_for("main.index") if "main.index" in app.view_functions else "/"
+        return redirect(target)
 
     @app.errorhandler(429)
     def rate_limited(_error):
