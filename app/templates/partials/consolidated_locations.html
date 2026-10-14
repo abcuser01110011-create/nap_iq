@@ -79,10 +79,10 @@
                     {% if loc.priority_label %}<dt>Priority</dt><dd class="text-capitalize">{{ loc.priority_label }}</dd>{% endif %}
                     {% if loc.assisted_by %}<dt>Assisted By</dt><dd>{{ loc.assisted_by|join(', ') }}</dd>{% endif %}
                     {% if loc.description %}<dt>Description</dt><dd><div class="cons-desc">{{ loc.description }}</div></dd>{% endif %}
-                    <dt>Ticket</dt>
-                    <dd>{{ loc.ticket_code }} · reported {{ loc.reported_label }} ·
+                    <dt>Date</dt>
+                    <dd>{{ loc.reported_label }} ·
                         <span class="cons-status {{ loc.status }}">{{ loc.status_label }}</span></dd>
-                    {% if loc.assigned_label %}<dt>Assigned</dt><dd>{{ loc.assigned_label }}</dd>{% endif %}
+                    {% if loc.assigned_tech %}<dt>Assigned</dt><dd>{{ loc.assigned_tech }}</dd>{% endif %}
                 </dl>
 
                 {% if loc.proof_photo or (job.can_edit and cons_upload and not done) %}

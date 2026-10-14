@@ -298,9 +298,9 @@ def build_consolidated_locations(parent_issue, assignment=None):
                 "priority_label": prio_label,
                 "assisted_by": extras["technicians"],
                 "description": clean_desc or None,
-                "assigned_label": (
-                    assignment.assigned_at.strftime("%Y-%m-%d %H:%M")
-                    if assignment is not None and assignment.assigned_at else None
+                "assigned_tech": (
+                    assignment.technician.full_name
+                    if assignment is not None and assignment.technician else None
                 ),
                 "proof_photo": proof,
                 "status": issue.status,
