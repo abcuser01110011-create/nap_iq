@@ -7,7 +7,8 @@
     <span class="tm-chip">{{ job.status_label }}</span>
 </div>
 
-{# ---- Ticket Details -------------------------------------------- #}
+{# ---- Ticket Details (consolidated tickets list every subscriber below instead) ---- #}
+{% if not job.consolidated %}
 <div class="tm-card">
     <div class="tm-card-header-row">
         <p class="tm-card-label mb-0">Ticket Details</p>
@@ -81,6 +82,7 @@
        href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}">Open in Maps</a>
     {% endif %}
 </div>
+{% endif %}
 
 {% include "partials/consolidated_locations.html" %}
 

@@ -28,7 +28,8 @@
     </span>
 </div>
 
-{% if not job.is_new_installation or show_step1 %}
+{# Consolidated tickets list every subscriber in the card below instead. #}
+{% if not job.consolidated and (not job.is_new_installation or show_step1) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-3">Ticket Details</h2>

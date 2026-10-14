@@ -256,11 +256,26 @@ def build_consolidated_locations(parent_issue, assignment=None):
     if parent_issue is None or not parent_issue.child_issues:
         return None
 
+    # Imported here (not at module top) to avoid a utils -> routes circular import.
+    from app.routes.api_v1.technician import _parse_ticket_extras, _subscriber_installed_port_number
+    from app.routes.technician import PRIORITY_LABELS
+
     nap = parent_issue.nap
     members = [parent_issue] + list(parent_issue.child_issues)
     rows = []
     for issue in members:
         sub = issue.subscriber
+        # Per-subscriber details shown in each row's dropdown.
+        extras, clean_desc = _parse_ticket_extras(issue.description)
+        row_nap = issue.nap or (sub.nap if sub else None)
+        if issue.issue_type == "Fiber Break" and issue.priority == "critical":
+            prio_label = "Critical"
+        else:
+            prio_label = PRIORITY_LABELS.get(issue.priority, issue.priority) if issue.priority else None
+        if issue.id == parent_issue.id and assignment is not None and assignment.port_number is not None:
+            port = assignment.port_number
+        else:
+            port = _subscriber_installed_port_number(sub) if sub else None
         # The parent's proof falls back to the assignment's completion photo
         # so a photo uploaded before consolidation still counts.
         proof = issue.proof_photo
@@ -277,6 +292,16 @@ def build_consolidated_locations(parent_issue, assignment=None):
                 "subscriber_name": sub.full_name if sub else None,
                 "address": (sub.address if sub and sub.address else issue.address),
                 "contact_number": sub.contact_number if sub else None,
+                "port_number": port,
+                "nap_label": f"{row_nap.nap_code} — {row_nap.name}" if row_nap else None,
+                "priority": issue.priority,
+                "priority_label": prio_label,
+                "assisted_by": extras["technicians"],
+                "description": clean_desc or None,
+                "assigned_label": (
+                    assignment.assigned_at.strftime("%Y-%m-%d %H:%M")
+                    if assignment is not None and assignment.assigned_at else None
+                ),
                 "proof_photo": proof,
                 "status": issue.status,
                 "status_label": issue.status.replace("_", " ").title(),

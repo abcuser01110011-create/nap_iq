@@ -15,12 +15,22 @@
 .cons-route-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; background:#2e7dff; color:#fff !important; text-decoration:none; border-radius:10px; padding:11px 14px; font-weight:600; font-size:.9rem; margin-bottom:6px; }
 .cons-route-note { color:#8896ab; font-size:.74rem; margin:0 0 12px; }
 .cons-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
-.cons-item { background:#1f3a63; border:1px solid #1f3a63; border-radius:12px; padding:10px 12px; display:flex; gap:10px; transition:border-color .15s, background .15s; }
+.cons-item { background:#1f3a63; border:1px solid #1f3a63; border-radius:12px; padding:0; transition:border-color .15s, background .15s; overflow:hidden; }
+.cons-toggle { width:100%; display:flex; align-items:center; gap:10px; background:transparent; border:0; color:#fff; padding:10px 12px; text-align:left; cursor:pointer; }
+.cons-toggle:focus-visible { outline:2px solid #2e7dff; outline-offset:-2px; }
+.cons-toggle .cons-name { flex:1 1 auto; min-width:0; }
+.cons-chev { flex:0 0 auto; color:#8fb6ff; transition:transform .2s; }
+.cons-item.is-open .cons-chev { transform:rotate(180deg); }
+.cons-details { display:none; padding:0 12px 12px 50px; }
+.cons-item.is-open .cons-details { display:block; }
+.cons-dl { margin:0 0 4px; }
+.cons-dl dt { font-size:.72rem; font-weight:600; color:#8896ab; margin-top:8px; text-transform:none; }
+.cons-dl dd { margin:0; font-size:.85rem; color:#fff; overflow-wrap:anywhere; }
+.cons-dl .cons-desc { background:#122a4d; border-radius:8px; padding:8px 10px; }
 .cons-item.is-active { border-color:#2e7dff; background:#244575; }
 .cons-item.is-done { opacity:.7; }
-.cons-num { flex:0 0 28px; height:28px; border-radius:50%; background:#2e7dff; color:#fff; font-weight:700; font-size:.82rem; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+.cons-num { flex:0 0 28px; height:28px; border-radius:50%; background:#2e7dff; color:#fff; font-weight:700; font-size:.82rem; display:flex; align-items:center; justify-content:center; }
 .cons-item.is-done .cons-num { background:#3ddc97; color:#0b1f3a; }
-.cons-body { flex:1 1 auto; min-width:0; }
 .cons-name { font-weight:600; font-size:.9rem; overflow-wrap:anywhere; }
 .cons-tag { background:#0b1f3a; color:#8fb6ff; border-radius:6px; padding:1px 6px; font-size:.68rem; font-weight:600; margin-left:6px; vertical-align:middle; }
 .cons-meta { color:#c7d0de; font-size:.8rem; margin-top:2px; overflow-wrap:anywhere; }
@@ -80,17 +90,29 @@
         {% for loc in c.locations %}
         {% set done = loc.status in ('resolved', 'closed') %}
         <li class="cons-item {{ 'is-done' if done else '' }}" data-stop="{{ loc.stop }}">
-            <div class="cons-num">{{ loc.stop }}</div>
-            <div class="cons-body">
-                <div class="cons-name">
-                    {{ loc.subscriber_name or 'Unknown subscriber' }}{% if loc.subscriber_code %} <span class="cons-meta faint">({{ loc.subscriber_code }})</span>{% endif %}
-                    {% if loc.is_parent %}<span class="cons-tag">FIRST REPORTED</span>{% endif %}
-                </div>
-                {% if loc.address %}<div class="cons-meta">{{ loc.address }}</div>{% endif %}
-                <div class="cons-meta faint">
-                    {{ loc.ticket_code }} · reported {{ loc.reported_label }} ·
-                    <span class="cons-status {{ loc.status }}">{{ loc.status_label }}</span>
-                </div>
+            <button type="button" class="cons-toggle" aria-expanded="false"
+                    aria-controls="consDetails{{ loc.stop }}">
+                <span class="cons-num">{{ loc.stop }}</span>
+                <span class="cons-name">{{ loc.subscriber_name or 'Unknown subscriber' }}</span>
+                <i class="bi bi-chevron-down cons-chev" aria-hidden="true"></i>
+            </button>
+
+            <div class="cons-details" id="consDetails{{ loc.stop }}">
+                <dl class="cons-dl">
+                    {% if loc.subscriber_code %}<dt>Subscriber</dt><dd>{{ loc.subscriber_code }} — {{ loc.subscriber_name }}{% if loc.is_parent %}<span class="cons-tag">FIRST REPORTED</span>{% endif %}</dd>{% endif %}
+                    {% if loc.address %}<dt>Location</dt><dd>{{ loc.address }}</dd>{% endif %}
+                    {% if loc.contact_number %}<dt>Contact</dt><dd>{{ loc.contact_number }}</dd>{% endif %}
+                    {% if loc.port_number %}<dt>Port Number</dt><dd>Port {{ loc.port_number }}</dd>{% endif %}
+                    {% if loc.nap_label %}<dt>NAP</dt><dd>{{ loc.nap_label }}</dd>{% endif %}
+                    {% if loc.priority_label %}<dt>Priority</dt><dd class="text-capitalize">{{ loc.priority_label }}</dd>{% endif %}
+                    {% if loc.assisted_by %}<dt>Assisted By</dt><dd>{{ loc.assisted_by|join(', ') }}</dd>{% endif %}
+                    {% if loc.description %}<dt>Description</dt><dd><div class="cons-desc">{{ loc.description }}</div></dd>{% endif %}
+                    <dt>Ticket</dt>
+                    <dd>{{ loc.ticket_code }} · reported {{ loc.reported_label }} ·
+                        <span class="cons-status {{ loc.status }}">{{ loc.status_label }}</span></dd>
+                    {% if loc.assigned_label %}<dt>Assigned</dt><dd>{{ loc.assigned_label }}</dd>{% endif %}
+                </dl>
+
                 {% if loc.proof_photo or (job.can_edit and cons_upload and not done) %}
                 <div class="cons-proof">
                     {% if loc.proof_photo %}
@@ -112,6 +134,7 @@
                     {% endif %}
                 </div>
                 {% endif %}
+
                 <div class="cons-actions">
                     {% if loc.lat is not none %}
                     <a class="go" target="_blank" rel="noopener"
@@ -120,7 +143,7 @@
                     <button type="button" class="cons-show" data-stop="{{ loc.stop }}"><i class="bi bi-geo-alt"></i> Show on map</button>
                     {% endif %}
                     {% if loc.contact_number %}
-                    <a href="tel:{{ loc.contact_number }}"><i class="bi bi-telephone"></i> {{ loc.contact_number }}</a>
+                    <a href="tel:{{ loc.contact_number }}"><i class="bi bi-telephone"></i> Call</a>
                     {% endif %}
                 </div>
             </div>
@@ -132,6 +155,19 @@
 <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
 <script>
 (function () {
+    // Dropdown rows: tap a name to expand / collapse its full details.
+    function setOpen(li, open) {
+        li.classList.toggle("is-open", open);
+        var t = li.querySelector(".cons-toggle");
+        if (t) t.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    document.querySelectorAll(".cons-toggle").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var li = btn.closest(".cons-item");
+            setOpen(li, !li.classList.contains("is-open"));
+        });
+    });
+
     var mapEl = document.getElementById("consMap");
     if (!mapEl || typeof L === "undefined") return;
     var stops = {{ c.locations | tojson }};
@@ -180,6 +216,7 @@
             li.classList.toggle("is-active", li.getAttribute("data-stop") === String(stop));
         });
         var li = document.querySelector('.cons-item[data-stop="' + stop + '"]');
+        if (li && !pan) setOpen(li, true);
         if (li && !pan) li.scrollIntoView({ behavior: "smooth", block: "nearest" });
         if (pan && markers[stop]) { map.setView(markers[stop].getLatLng(), Math.max(map.getZoom(), 17)); markers[stop].openPopup(); }
     }
