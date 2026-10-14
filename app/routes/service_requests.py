@@ -442,9 +442,6 @@ def quick_add_request():
     assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
     if assigned_team_label:
         extra_lines.append(f"Assigned Team: {assigned_team_label}")
-    technicians_label = (request.form.get("technicians_label") or "").strip()
-    if technicians_label:
-        extra_lines.append(f"Technician(s) requested: {technicians_label}")
 
     notes_parts = []
     if extra_lines:
@@ -534,9 +531,6 @@ def quick_add_nap_request():
     assigned_team_label = (request.form.get("assigned_team_label") or "").strip()
     if assigned_team_label:
         extra_lines.append(f"Assigned Team: {assigned_team_label}")
-    technicians_label = (request.form.get("technicians_label") or "").strip()
-    if technicians_label:
-        extra_lines.append(f"Technician(s) requested: {technicians_label}")
 
     notes = (form.notes.data or "").strip() or None
     if extra_lines:

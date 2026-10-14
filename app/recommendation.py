@@ -37,13 +37,10 @@ recommended score (if any) is threaded through to
 
 CANDIDATE POOL
 ================
-`Technician.query` rows with `status == 'offline'` are excluded
-entirely — an offline technician isn't working right now, so
-recommending them isn't useful (this matches how `status` is already
-used everywhere else in the app: PHASE9/PHASE10_NOTES.md's dispatch
-workflow only ever flips a technician to 'busy'/'available' while
-they're actively clocked into assignments; 'offline' is a deliberate
-"not working" state a technician/administrator sets elsewhere). Both
+Every `personnel_type == 'technician'` row is a candidate, including
+'offline' ones, so a reported issue is never left without a technician
+just because nobody is clocked in. An offline technician scores 0 on
+availability and so only wins when nobody else is available or busy.
 'available' and 'busy' technicians are scored — a busy technician
 close by with a light-ish load can still legitimately outscore a
 distant idle one; that tradeoff is exactly what the weighted formula
@@ -55,7 +52,7 @@ THE FOUR FACTORS AND THEIR SCORES (each 0-100)
 1. Availability — `technician.status`:
        available -> 100
        busy      -> 40
-   (offline is excluded from the candidate pool entirely, above.)
+       offline   -> 0 (still a candidate, just ranked last)
 
 2. Workload — count of that technician's currently-OPEN assignments
    (status in 'assigned'/'accepted'/'in_progress' — the exact same
@@ -137,7 +134,7 @@ DATABASE QUERIES
 Three queries total, all against tables that already existed before
 this phase (no schema change needed):
   1. `Technician.query` — the full roster, then filtered in Python to
-     drop 'offline' rows (see CANDIDATE POOL above). A roster is
+     keep every row (see CANDIDATE POOL above). A roster is
      small (single/low-double-digit rows for this app's scale), so
      filtering in Python rather than a second WHERE clause keeps this
      module's only technician query identical to the one every other
@@ -354,11 +351,10 @@ def get_recommendations(issue, limit=None):
     # Same restriction app/routes/dispatch.py's
     # _populate_technician_choices() applies to the manual dropdown
     # these recommendations are ultimately submitted through.
-    technicians = [
-        t
-        for t in Technician.query.filter_by(personnel_type="technician").all()
-        if t.status != "offline"
-    ]
+    # Offline technicians are deliberately NOT filtered out: an issue
+    # must always end up with somebody assigned. They simply score lowest
+    # on availability, so any available/busy technician still outranks them.
+    technicians = Technician.query.filter_by(personnel_type="technician").all()
 
     open_assignments = Assignment.query.filter(
         Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES)
@@ -455,8 +451,8 @@ def auto_assign_recommended_technician(issue):
     indistinguishable, once created, from one an Administrator
     dispatched by hand.
 
-    Best-effort only: if the candidate pool is empty (e.g. every
-    technician is currently 'offline'), this does nothing and returns
+    Best-effort only: if the candidate pool is empty (e.g. no
+    technician profiles exist at all), this does nothing and returns
     `None` — the issue simply stays 'pending', exactly as it did
     before this existed, and an Administrator can still dispatch it
     manually from the board. It never raises, and it never blocks the
@@ -467,24 +463,12 @@ def auto_assign_recommended_technician(issue):
     issues its own follow-up commit for the new assignment row and the
     issue's status change.
     """
-    recommendations = get_recommendations(issue, limit=2)
+    recommendations = get_recommendations(issue, limit=1)
     if not recommendations:
         return None
 
     top = recommendations[0]
     technician = top["technician"]
-
-    # "Assisted By": the next-ranked candidate, folded onto the front of
-    # the description in the same "Technician(s) requested: ..." line the
-    # GeoMap "+ Tickets" form writes, so the GeoMap Ticket Details modal
-    # and the field-assistant app (both already parse it) show it with no
-    # schema change. Customer-facing views strip this line.
-    if len(recommendations) > 1:
-        helper = recommendations[1]["technician"]
-        if helper.id != technician.id and not (issue.description or "").startswith("Technician(s) requested: "):
-            issue.description = "Technician(s) requested: {}\n\n{}".format(
-                helper.full_name, issue.description or ""
-            ).rstrip()
 
     assignment = Assignment(
         technical_issue_id=issue.id,

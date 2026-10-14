@@ -1723,7 +1723,6 @@
         // and only has a real Assignment row, which /api/issues exposes as
         // assigned_technician -- fall back to that so it is never blank.
         setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam || issue.assigned_technician);
-        setText("ticketDetailsTechnicians", parsed.extras.technicians);
         setText("ticketDetailsCreated", formatDateTime(issue.created_at));
         setText("ticketDetailsDescription", parsed.description);
 

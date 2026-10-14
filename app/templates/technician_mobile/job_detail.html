@@ -59,12 +59,6 @@
         <div class="tm-info-value">Port {{ job.port_number }}</div>
     </div>
     {% endif %}
-    {% if job.assisted_by %}
-    <div class="tm-info-row">
-        <div class="tm-info-label">Assisted By</div>
-        <div class="tm-info-value">{{ job.assisted_by|join(", ") }}</div>
-    </div>
-    {% endif %}
     {% if job.description %}
     <div class="tm-info-row">
         <div class="tm-info-label">Description</div>

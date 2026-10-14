@@ -765,15 +765,9 @@ export default function JobDetailScreen({ route, navigation }: any) {
           <InfoRow label="Plan" value={assignment.service_request?.plan_label} />
           <InfoRow label="Contact" value={assignment.subscriber?.contact_number ?? assignment.service_request?.contact_number} />
           {/* The ticket form's "Technician" (who this ticket is
-              dispatched to) and, beneath it, "Assisted By" -- the
-              other technicians picked in the ticket form's own
-              "Assisted By" field, listed out in full when there's
-              more than one. Mirrors the admin GeoMap's read-only
-              "View Ticket" modal (naps/map.html) exactly. */}
+              dispatched to). Mirrors the admin GeoMap's read-only
+              "View Ticket" modal (naps/map.html). */}
           <InfoRow label="Technician (Assigned)" value={assignment.assigned_technician} />
-          {assignment.assisted_by.length > 0 && (
-            <InfoRow label="Assisted By" value={assignment.assisted_by.join(", ")} />
-          )}
           {/* Recorded by a technician on-site (own or a prior visit) via
               the port picker below for a new installation, or via
               saveNotes'/completeJob's optional port_number for every

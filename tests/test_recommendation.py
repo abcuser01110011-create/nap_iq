@@ -12,8 +12,8 @@ implicitly (pure logic vs. route behavior):
      final weighted total) independent of anything route/DB-related.
   2. Integration tests via the Flask test client (same in-memory-
      SQLite approach as the rest of this suite — see conftest.py's
-     docstring), covering: the candidate pool excludes offline
-     technicians, the route requires administrator, the "already
+     docstring), covering: the candidate pool includes offline
+     technicians (ranked last), the route requires administrator, the "already
      assigned to X" exclusion, and that confirming a recommendation
      actually creates the assignment with dispatch_score set — while
      the manual dispatch path still leaves dispatch_score NULL.
@@ -143,16 +143,17 @@ def _seed(app, *, second_technician=True, distant=False, offline_technician=Fals
         return issue.id, tech1.id
 
 
-def test_offline_technicians_excluded_from_recommendations(app):
+def test_offline_technicians_included_but_ranked_last(app):
     issue_id, near_tech_id = _seed(app, offline_technician=True)
     with app.app_context():
         issue = TechnicalIssue.query.get(issue_id)
         rows = get_recommendations(issue)
-        # Only the available technician should appear — the offline
-        # one is excluded from the candidate pool entirely.
-        assert len(rows) == 1
+        # The offline technician is still a candidate, just ranked below
+        # the available one.
+        assert len(rows) == 2
         assert rows[0]["technician"].id == near_tech_id
         assert rows[0]["technician_status"] == "available"
+        assert rows[1]["technician_status"] == "offline"
 
 
 def test_closer_technician_ranks_first_when_otherwise_equal(app):

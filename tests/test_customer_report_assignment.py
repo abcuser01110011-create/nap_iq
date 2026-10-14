@@ -15,7 +15,7 @@ from app.recommendation import auto_assign_recommended_technician
 from tests.conftest import login
 
 
-def _world(app, tech_status="available"):
+def _world(app, tech_status="available", with_technician=True):
     nap = Nap(nap_code="N-019", name="Parkside NAP", latitude=14.2790, longitude=121.4130)
     db.session.add(nap)
     db.session.flush()
@@ -28,9 +28,11 @@ def _world(app, tech_status="available"):
         )
         db.session.add(s)
         subs.append(s)
-    tech_user = User.query.filter_by(username="tech1").first()
-    tech = Technician(user_id=tech_user.id, full_name="Tech One", status=tech_status)
-    db.session.add(tech)
+    tech = None
+    if with_technician:
+        tech_user = User.query.filter_by(username="tech1").first()
+        tech = Technician(user_id=tech_user.id, full_name="Tech One", status=tech_status)
+        db.session.add(tech)
     customer = User.query.filter_by(username="customer1").first()
     subs[2].user_id = customer.id
     db.session.commit()
@@ -78,16 +80,30 @@ def test_folded_child_ticket_shows_parent_technician(app, client):
             assert TechnicalIssue.query.get(i).status == "assigned"
 
 
-def test_parent_without_technician_gets_dispatched(app, client):
-    """The oldest ticket was reported while nobody was available, so it has
-    no assignment. When enough tickets pile up and fold into it, the group
-    must still be dispatched once somebody is available."""
+def test_offline_technician_is_still_auto_assigned(app, client):
     with app.app_context():
         nap, subs, tech = _world(app, tech_status="offline")
         a = _report_like_the_route(subs[0], nap, 30)
+        assert a.status == "assigned"
+        assert Assignment.query.filter_by(technical_issue_id=a.id, status="assigned").count() == 1
+
+    login(client, "admin1", "Admin@12345")
+    data = client.get("/api/issues").get_json()
+    assert {row["assigned_technician"] for row in data} == {"Tech One"}
+
+
+def test_parent_without_technician_gets_dispatched(app, client):
+    """The oldest ticket was reported while there was no technician at all,
+    so it has no assignment. When enough tickets pile up and fold into it,
+    the group must still be dispatched once a technician exists."""
+    with app.app_context():
+        nap, subs, _ = _world(app, with_technician=False)
+        a = _report_like_the_route(subs[0], nap, 30)
         b = _report_like_the_route(subs[1], nap, 20)
         assert a.status == "pending" and b.status == "pending"
-        tech.status = "available"
+        tech_user = User.query.filter_by(username="tech1").first()
+        tech = Technician(user_id=tech_user.id, full_name="Tech One", status="available")
+        db.session.add(tech)
         db.session.commit()
         c = _report_like_the_route(subs[2], nap, 10)
         assert Assignment.query.filter(

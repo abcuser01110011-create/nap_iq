@@ -70,11 +70,6 @@
             <dd class="col-sm-9 text-capitalize">{{ job.priority_label }}</dd>
             {% endif %}
 
-            {% if job.assisted_by %}
-            <dt class="col-sm-3">Assisted By</dt>
-            <dd class="col-sm-9">{{ job.assisted_by|join(", ") }}</dd>
-            {% endif %}
-
             {% if job.description %}
             <dt class="col-sm-3">Description</dt>
             <dd class="col-sm-9"><div class="tech-desc-box">{{ job.description }}</div></dd>

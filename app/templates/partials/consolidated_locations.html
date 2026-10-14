@@ -77,7 +77,6 @@
                     {% if loc.port_number %}<dt>Port Number</dt><dd>Port {{ loc.port_number }}</dd>{% endif %}
                     {% if loc.nap_label %}<dt>NAP</dt><dd>{{ loc.nap_label }}</dd>{% endif %}
                     {% if loc.priority_label %}<dt>Priority</dt><dd class="text-capitalize">{{ loc.priority_label }}</dd>{% endif %}
-                    {% if loc.assisted_by %}<dt>Assisted By</dt><dd>{{ loc.assisted_by|join(', ') }}</dd>{% endif %}
                     {% if loc.description %}<dt>Description</dt><dd><div class="cons-desc">{{ loc.description }}</div></dd>{% endif %}
                     <dt>Date</dt>
                     <dd>{{ loc.reported_label }}</dd>

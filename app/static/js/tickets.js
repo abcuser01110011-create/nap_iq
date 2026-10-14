@@ -65,7 +65,6 @@
     let allSubscribers = [];
     let subscribersLoaded = false;
     let selectedSubscriber = null; // {id, subscriber_code, full_name, address, latitude, longitude}
-    let addedTechnicians = []; // [{id, full_name}]
     let allNaps = []; // Fiber Break's NAP picker (loaded lazily, once)
     let napsLoaded = false;
     let selectedNap = null; // {id, nap_code, name, address}
@@ -289,40 +288,6 @@
                 assignedTeamPeople = [];
                 displayText.textContent = "-- Could not load --";
             });
-    }
-
-    // Keeps "Assisted By" from offering (or keeping) whoever is
-    // already picked as the primary "Technician" -- one person
-    // shouldn't be assignable to both roles on the same ticket. Runs
-    // once each dropdown finishes loading, and again every time the
-    // "Technician" selection changes.
-    function applyAssistedByExclusion() {
-        const assignedSelect = document.getElementById("ticketFormAssignedTeam");
-        const techSelect = document.getElementById("ticketFormTechnicianSelect");
-        if (!assignedSelect || !techSelect) return;
-        const excludedId = assignedSelect.value;
-
-        Array.from(techSelect.options).forEach((opt) => {
-            if (!opt.value) return; // always keep the placeholder visible
-            const isExcluded = !!excludedId && String(opt.value) === String(excludedId);
-            opt.hidden = isExcluded;
-            opt.disabled = isExcluded;
-        });
-
-        // Already-selected-but-not-yet-added value in the dropdown
-        // itself just became invalid -- clear it.
-        if (excludedId && String(techSelect.value) === String(excludedId)) {
-            techSelect.value = "";
-        }
-
-        // Already added as an "Assisted By" chip, then picked as the
-        // primary Technician afterwards -- drop the chip, since they
-        // can't be both.
-        if (excludedId) {
-            const before = addedTechnicians.length;
-            addedTechnicians = addedTechnicians.filter((t) => String(t.id) !== String(excludedId));
-            if (addedTechnicians.length !== before) renderTechnicianChips();
-        }
     }
 
     // ------------------------------------------------------------------
@@ -592,36 +557,6 @@
     }
 
     // ------------------------------------------------------------------
-    // Technician chips
-    // ------------------------------------------------------------------
-
-    function renderTechnicianChips() {
-        const box = document.getElementById("ticketFormTechnicianChips");
-        box.innerHTML = addedTechnicians
-            .map(
-                (t) =>
-                    '<span class="badge text-bg-light border d-inline-flex align-items-center gap-1">' +
-                        escapeHtml(t.full_name) +
-                        '<button type="button" class="btn-close btn-close-sm" style="font-size:.6rem;" data-remove-tech="' + t.id + '" aria-label="Remove"></button>' +
-                        "</span>"
-            )
-            .join("");
-    }
-
-    function addTechnicianFromSelect() {
-        const select = document.getElementById("ticketFormTechnicianSelect");
-        const option = select.options[select.selectedIndex];
-        if (!option || !option.value) return;
-        const id = option.value;
-        const assignedId = document.getElementById("ticketFormAssignedTeam").value;
-        if (assignedId && String(id) === String(assignedId)) return; // already the primary Technician
-        if (addedTechnicians.some((t) => String(t.id) === String(id))) return;
-        addedTechnicians.push({ id, full_name: option.getAttribute("data-name") || option.textContent });
-        renderTechnicianChips();
-        select.value = "";
-    }
-
-    // ------------------------------------------------------------------
     // Modal open / reset / category switch
     // ------------------------------------------------------------------
 
@@ -632,7 +567,6 @@
         document.querySelectorAll("#ticketForm .is-invalid").forEach((el) => el.classList.remove("is-invalid"));
         selectedSubscriber = null;
         selectedNap = null;
-        addedTechnicians = [];
         document.getElementById("ticketFormSubscriberId").value = "";
         document.getElementById("ticketFormCustomerName").value = "";
         document.getElementById("ticketFormNapId").value = "";
@@ -771,7 +705,6 @@
         // via Technician Management -- pass "" (no type filter) so
         // every technician AND field assistant shows up here.
         loadAssignedTeamOptions();
-        loadPersonnel("technician", document.getElementById("ticketFormTechnicianSelect"), "-- Select Technician --", applyAssistedByExclusion);
     }
 
     // presetSubscriber (optional): {id, subscriber_code, full_name,
@@ -995,10 +928,6 @@
         formData.append("plan_label", document.getElementById("ticketFormPlan").value);
         formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
-        formData.append(
-            "technicians_label",
-            addedTechnicians.map((t) => t.full_name).join(", ")
-        );
         formData.append("csrf_token", CSRF_TOKEN);
 
         return fetch("/service-requests/quick-add", {
@@ -1021,10 +950,6 @@
         formData.append("priority", document.getElementById("ticketFormPriority").value);
         formData.append("assigned_team_id", document.getElementById("ticketFormAssignedTeam").value || "");
         formData.append("assigned_team_label", selectedOptionLabel(document.getElementById("ticketFormAssignedTeam")));
-        formData.append(
-            "technicians_label",
-            addedTechnicians.map((t) => t.full_name).join(", ")
-        );
         formData.append("csrf_token", CSRF_TOKEN);
 
         return fetch("/service-requests/quick-add-nap", {
@@ -1049,7 +974,6 @@
         if (barangay) extra.push("Barangay: " + barangay);
         const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
         if (team) extra.push("Assigned Team: " + team);
-        if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
         const typed = document.getElementById("ticketFormDescription").value.trim();
         const description = [extra.join("\n"), typed].filter(Boolean).join("\n\n") || "Reported via the GeoMap Tickets menu.";
         formData.append("description", description);
@@ -1071,7 +995,6 @@
         const extra = [];
         const team = selectedOptionLabel(document.getElementById("ticketFormAssignedTeam"));
         if (team) extra.push("Assigned Team: " + team);
-        if (addedTechnicians.length) extra.push("Technician(s) requested: " + addedTechnicians.map((t) => t.full_name).join(", "));
         const typed = document.getElementById("ticketFormDescription").value.trim();
         const description = [extra.join("\n"), typed].filter(Boolean).join("\n\n");
         formData.append("description", description);
@@ -1149,9 +1072,6 @@
         // Common to every type.
         if (!document.getElementById("ticketFormAssignedTeam").value) {
             errors.assigned_team = ["Please assign a technician."];
-        }
-        if (!addedTechnicians.length) {
-            errors.technicians = ["Please add at least one assisting technician."];
         }
         if (!document.getElementById("ticketFormDescription").value.trim()) {
             errors.description = ["Please enter a description."];
@@ -1305,14 +1225,5 @@
             }
         });
 
-        document.getElementById("ticketFormAssignedTeam").addEventListener("change", applyAssistedByExclusion);
-        document.getElementById("ticketFormAddTechnicianBtn").addEventListener("click", addTechnicianFromSelect);
-        document.getElementById("ticketFormTechnicianChips").addEventListener("click", (event) => {
-            const btn = event.target.closest("[data-remove-tech]");
-            if (!btn) return;
-            const id = btn.getAttribute("data-remove-tech");
-            addedTechnicians = addedTechnicians.filter((t) => String(t.id) !== String(id));
-            renderTechnicianChips();
-        });
     });
 })();

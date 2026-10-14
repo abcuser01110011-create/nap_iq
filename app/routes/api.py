@@ -389,8 +389,8 @@ def personnel_json():
     side needed this fix.
 
     Whichever candidate scores highest (an 'offline' technician is
-    never picked, same candidate-pool rule recommendation.py uses,
-    though they still appear in the list for a manual override) is
+    still a candidate but scores lowest on availability, same rule
+    recommendation.py uses) is
     flagged `recommended: true`, so the ticket form's Technician
     dropdown (tickets.js) can pre-select them by default while
     leaving the field fully editable."""
@@ -458,7 +458,7 @@ def personnel_json():
             }
         )
 
-        if p.status != "offline" and recommend_score > best_score:
+        if recommend_score > best_score:
             best_score, best_id = recommend_score, p.id
 
     if best_id is not None:
