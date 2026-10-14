@@ -340,6 +340,10 @@ class TechnicalIssue(db.Model):
         db.ForeignKey("technical_issues.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True,
     )
+    # Technician's proof-of-fix photo for THIS ticket's location (Cloudinary
+    # secure_url). Used by consolidated tickets, where one job covers several
+    # subscribers and each house needs its own proof. NULL until uploaded.
+    proof_photo = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

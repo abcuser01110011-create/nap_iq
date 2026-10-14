@@ -222,6 +222,24 @@ def resolve_consolidated_children(resolved_issue):
     return changed
 
 
+def consolidated_missing_proof_count(parent_issue, assignment):
+    """How many still-open locations of a consolidated job have no proof
+    photo yet (0 for a non-consolidated ticket). complete_assignment()
+    refuses to finish the job while this is above zero."""
+    if parent_issue is None or not parent_issue.child_issues:
+        return 0
+    missing = 0
+    for issue in [parent_issue] + list(parent_issue.child_issues):
+        if issue.status not in OPEN_ISSUE_STATUSES:
+            continue
+        proof = issue.proof_photo
+        if not proof and issue.id == parent_issue.id and assignment is not None:
+            proof = assignment.photo_filename
+        if not proof:
+            missing += 1
+    return missing
+
+
 def _haversine_km(lat1, lng1, lat2, lng2):
     r = 6371.0
     p1, p2 = math.radians(lat1), math.radians(lat2)
@@ -230,7 +248,7 @@ def _haversine_km(lat1, lng1, lat2, lng2):
     return 2 * r * math.asin(math.sqrt(a))
 
 
-def build_consolidated_locations(parent_issue):
+def build_consolidated_locations(parent_issue, assignment=None):
     """View-model for the "Affected locations" section: a list of dicts
     (parent first in the data, then ordered into a suggested visit route
     by nearest-neighbour starting from the NAP). Returns None when the
@@ -243,6 +261,11 @@ def build_consolidated_locations(parent_issue):
     rows = []
     for issue in members:
         sub = issue.subscriber
+        # The parent's proof falls back to the assignment's completion photo
+        # so a photo uploaded before consolidation still counts.
+        proof = issue.proof_photo
+        if not proof and issue.id == parent_issue.id and assignment is not None:
+            proof = assignment.photo_filename
         lat = (sub.latitude if sub and sub.latitude is not None else issue.latitude)
         lng = (sub.longitude if sub and sub.longitude is not None else issue.longitude)
         rows.append(
@@ -254,6 +277,7 @@ def build_consolidated_locations(parent_issue):
                 "subscriber_name": sub.full_name if sub else None,
                 "address": (sub.address if sub and sub.address else issue.address),
                 "contact_number": sub.contact_number if sub else None,
+                "proof_photo": proof,
                 "status": issue.status,
                 "status_label": issue.status.replace("_", " ").title(),
                 "reported_label": issue.created_at.strftime("%b %d, %H:%M") if issue.created_at else "",
@@ -292,7 +316,13 @@ def build_consolidated_locations(parent_issue):
         )
 
     open_count = sum(1 for r in ordered if r["status"] in OPEN_ISSUE_STATUSES)
+    # Resolved/closed locations need no (more) proof; every open one does.
+    missing_proofs = sum(
+        1 for r in ordered if r["status"] in OPEN_ISSUE_STATUSES and not r["proof_photo"]
+    )
     return {
+        "missing_proofs": missing_proofs,
+        "proofs_done": sum(1 for r in ordered if r["proof_photo"]),
         "parent_id": parent_issue.id,
         "issue_type": parent_issue.issue_type,
         "total": len(ordered),

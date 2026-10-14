@@ -2,6 +2,7 @@
 the first-reported one; the parent's detail page lists every location;
 completing the parent resolves them all."""
 
+import io
 from datetime import datetime, timedelta
 
 from app.extensions import db
@@ -106,8 +107,11 @@ def test_detail_page_and_resolve_children(app, client):
         consolidate_nap_issues(c)
         asg = Assignment.query.filter_by(technical_issue_id=a.id).first()
         asg.status = "in_progress"
-        # complete_assignment() refuses to finish a job without a photo.
+        # complete_assignment() refuses to finish a job without a photo,
+        # and a consolidated job needs one per location.
         asg.photo_filename = "https://example.com/proof.jpg"
+        for i in TechnicalIssue.query.all():
+            i.proof_photo = f"https://example.com/proof-{i.id}.jpg"
         db.session.commit()
         aid, a_id = asg.id, a.id
 
@@ -141,3 +145,84 @@ def test_dispatch_board_hides_children(app, client):
     assert html.count("ISS-") >= 1
     assert f"ISS-{a.id:04d}" in html
     assert f"ISS-{c.id:04d}" not in html
+
+
+def test_per_location_proof_photos_gate_completion(app, client, monkeypatch):
+    import app.routes.technician as tech_routes
+
+    counter = {"n": 0}
+
+    def fake_upload(photo, public_id=None, overwrite=True):
+        counter["n"] += 1
+        return {"secure_url": f"https://cdn.example.com/upload/v1/{public_id}.jpg"}
+
+    monkeypatch.setattr(tech_routes.cloudinary.uploader, "upload", fake_upload)
+    monkeypatch.setattr(tech_routes.cloudinary.uploader, "destroy", lambda *a, **k: None)
+
+    with app.app_context():
+        nap, other, subs, tech = _world(app)
+        a = _issue(subs[0], nap, 30, assign_to=tech)
+        b = _issue(subs[1], nap, 20)
+        c = _issue(subs[2], nap, 10)
+        consolidate_nap_issues(c)
+        asg = Assignment.query.filter_by(technical_issue_id=a.id).first()
+        asg.status = "in_progress"
+        db.session.commit()
+        aid, ids = asg.id, [a.id, b.id, c.id]
+        outsider = _issue(subs[3], other, 5)
+        outsider_id = outsider.id
+
+    login(client, "tech1", "Tech@12345")
+
+    def upload(issue_id):
+        return client.post(
+            f"/technician/assignments/{aid}/stops/{issue_id}/photo",
+            data={"photo": (io.BytesIO(b"img"), "house.jpg")},
+            content_type="multipart/form-data", follow_redirects=False,
+        )
+
+    def complete():
+        return client.post(
+            f"/technician/assignments/{aid}/complete",
+            data={"resolution_notes": "Replaced splitter"}, follow_redirects=False,
+        )
+
+    def statuses():
+        with app.app_context():
+            return {i.status for i in TechnicalIssue.query.filter(TechnicalIssue.id.in_(ids))}
+
+    # No photos at all -> blocked.
+    assert complete().status_code in (302, 303)
+    assert "in_progress" in statuses() or "assigned" in statuses()
+    with app.app_context():
+        assert Assignment.query.get(aid).status == "in_progress"
+
+    # Page tells the technician what is missing and offers an upload per stop.
+    html = client.get(f"/technician/tickets/{aid}").get_data(as_text=True)
+    assert "3 still missing" in html and html.count("Add proof photo") == 3
+
+    # Photos for 2 of 3 stops -> still blocked.
+    assert upload(ids[0]).status_code in (302, 303)
+    assert upload(ids[1]).status_code in (302, 303)
+    complete()
+    with app.app_context():
+        assert Assignment.query.get(aid).status == "in_progress"
+        # The parent's photo doubles as the assignment's completion photo.
+        assert Assignment.query.get(aid).photo_filename
+        assert TechnicalIssue.query.get(ids[0]).proof_photo
+        assert TechnicalIssue.query.get(ids[1]).proof_photo
+        assert TechnicalIssue.query.get(ids[2]).proof_photo is None
+    assert "1 still missing" in client.get(f"/technician/tickets/{aid}").get_data(as_text=True)
+
+    # A ticket that is not part of this job can't be photographed.
+    assert upload(outsider_id).status_code == 404
+
+    # Last photo -> job can be completed; every ticket keeps its own proof.
+    upload(ids[2])
+    resp = complete()
+    assert resp.status_code in (302, 303)
+    with app.app_context():
+        assert Assignment.query.get(aid).status == "completed"
+        issues = TechnicalIssue.query.filter(TechnicalIssue.id.in_(ids)).all()
+        assert {i.status for i in issues} == {"resolved"}
+        assert len({i.proof_photo for i in issues}) == 3

@@ -31,6 +31,14 @@
 .cons-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .cons-actions a, .cons-actions button { background:#0b1f3a; color:#fff !important; border:1px solid #2a4a7a; border-radius:8px; padding:5px 10px; font-size:.78rem; text-decoration:none; cursor:pointer; }
 .cons-actions .go { background:#2e7dff; border-color:#2e7dff; }
+.cons-proof { margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cons-proof img { width:72px; height:72px; object-fit:cover; border-radius:8px; border:1px solid #2a4a7a; display:block; }
+.cons-proof-miss { color:#ffc107; font-size:.76rem; font-weight:600; }
+.cons-proof-ok { color:#3ddc97; font-size:.76rem; font-weight:600; }
+.cons-proof form { margin:0; }
+.cons-proof label { background:#2e7dff; color:#fff; border-radius:8px; padding:6px 12px; font-size:.8rem; font-weight:600; cursor:pointer; margin:0; }
+.cons-proof label.alt { background:#0b1f3a; border:1px solid #2a4a7a; }
+.cons-proof input[type=file] { display:none; }
 .cons-pin { background:#2e7dff; color:#fff; border:2px solid #fff; border-radius:50%; width:26px; height:26px; line-height:22px; text-align:center; font-weight:700; font-size:12px; box-shadow:0 1px 4px rgba(0,0,0,.5); }
 .cons-pin.done { background:#3ddc97; color:#0b1f3a; }
 .cons-pin.nap { background:#ffc107; color:#0b1f3a; border-radius:6px; }
@@ -46,6 +54,13 @@
         <strong>{{ c.issue_type }}</strong>. This one job covers all of them —
         completing it resolves every ticket below.
     </p>
+    {% if job.can_edit and cons_upload %}
+    <p class="cons-note">
+        <i class="bi bi-camera me-1"></i>Add a proof photo at <strong>each</strong> location.
+        {% if c.missing_proofs %}<span class="cons-proof-miss">{{ c.missing_proofs }} still missing</span> — Mark Complete unlocks when every open location has one.
+        {% else %}<span class="cons-proof-ok">All proof photos added.</span>{% endif %}
+    </p>
+    {% endif %}
 
     {% if c.nap or c.locations|selectattr('lat')|list %}
     <div class="cons-map" id="consMap" role="img" aria-label="Map of affected locations"></div>
@@ -76,6 +91,27 @@
                     {{ loc.ticket_code }} · reported {{ loc.reported_label }} ·
                     <span class="cons-status {{ loc.status }}">{{ loc.status_label }}</span>
                 </div>
+                {% if loc.proof_photo or (job.can_edit and cons_upload and not done) %}
+                <div class="cons-proof">
+                    {% if loc.proof_photo %}
+                    <a href="{{ loc.proof_photo }}" target="_blank" rel="noopener">
+                        <img src="{{ loc.proof_photo }}" alt="Proof photo for {{ loc.subscriber_name or loc.ticket_code }}" loading="lazy">
+                    </a>
+                    {% endif %}
+                    {% if job.can_edit and cons_upload and not done %}
+                    <form method="post" enctype="multipart/form-data"
+                          action="{{ url_for('technician.upload_stop_photo', assignment_id=job.assignment.id, issue_id=loc.issue_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="{{ 'alt' if loc.proof_photo else '' }}">
+                            <i class="bi bi-camera"></i> {{ 'Replace photo' if loc.proof_photo else 'Add proof photo' }}
+                            <input type="file" name="photo" accept="image/*,.heic" capture="environment" required
+                                   onchange="this.form.submit()">
+                        </label>
+                    </form>
+                    {% if not loc.proof_photo %}<span class="cons-proof-miss">Proof needed</span>{% endif %}
+                    {% endif %}
+                </div>
+                {% endif %}
                 <div class="cons-actions">
                     {% if loc.lat is not none %}
                     <a class="go" target="_blank" rel="noopener"

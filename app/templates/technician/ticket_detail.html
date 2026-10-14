@@ -92,6 +92,7 @@
 {% endif %}
 
 {# Ticket consolidation: every affected location, with map + per-stop navigation #}
+{% set cons_upload = true %}
 {% include "partials/consolidated_locations.html" %}
 
 {% if job.assignment.resolution_notes and (not job.is_new_installation or show_step2) %}
@@ -103,7 +104,9 @@
 </div>
 {% endif %}
 
-{% if job.show_photo_card and (not job.is_new_installation or show_step2) %}
+{# Consolidated tickets collect one proof photo per location instead (see the
+   "Consolidated ticket" card above), so the single completion-photo card is hidden. #}
+{% if job.show_photo_card and not job.consolidated and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">Completion Photo</h2>
@@ -303,7 +306,8 @@
         </button>
         {% set pin_ready = (not job.is_installation) or (job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none) %}
         {% set nap_ready = (not job.is_new_installation) or (job.nap is not none) %}
-        {% if job.assignment.photo_filename and pin_ready and nap_ready %}
+        {% set photo_ready = job.assignment.photo_filename and (not job.consolidated or job.consolidated.missing_proofs == 0) %}
+        {% if photo_ready and pin_ready and nap_ready %}
         <button type="button" class="btn btn-success" id="markCompleteBtn"
                 data-bs-toggle="modal" data-bs-target="#notesModal"
                 data-notes-action="{{ url_for('technician.complete_assignment', assignment_id=job.assignment.id) }}"
@@ -313,8 +317,9 @@
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
         {% else %}
-        {% if not job.assignment.photo_filename %}
-        <button type="button" class="btn btn-success" disabled title="Add a completion photo first">
+        {% if not photo_ready %}
+        <button type="button" class="btn btn-success" disabled
+                title="{{ 'Add a proof photo for every location first' if job.consolidated else 'Add a completion photo first' }}">
             <i class="bi bi-check2-circle me-1"></i>Mark Complete
         </button>
         {% elif not pin_ready %}

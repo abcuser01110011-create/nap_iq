@@ -161,6 +161,9 @@ CREATE TABLE IF NOT EXISTS technical_issues (
     -- issue_type, the first-reported one is the parent and the rest point
     -- at it here. NULL for standalone tickets and for the parent itself.
     parent_issue_id INT NULL,
+    -- Technician's proof-of-fix photo for this ticket's own location
+    -- (Cloudinary URL); one per subscriber on a consolidated ticket.
+    proof_photo     VARCHAR(255) NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                         ON UPDATE CURRENT_TIMESTAMP,

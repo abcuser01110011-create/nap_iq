@@ -105,6 +105,16 @@
                 </a>
                 {% endif %}
 
+                {# Technician's proof-of-fix photo for this location (one per
+                   subscriber on a consolidated ticket). #}
+                {% if issue.proof_photo %}
+                <h6 class="mb-2">Technician proof photo</h6>
+                <a href="{{ issue.proof_photo }}" target="_blank" rel="noopener">
+                    <img src="{{ issue.proof_photo }}" alt="Technician proof photo"
+                         class="img-fluid rounded border mb-4" style="max-height: 320px;">
+                </a>
+                {% endif %}
+
                 <h6 class="mb-2">Description</h6>
                 <div class="p-3 border rounded bg-body-secondary">
                     {{ issue.description or "—" }}
