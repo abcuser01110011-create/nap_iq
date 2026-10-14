@@ -582,7 +582,6 @@
         renderSubscriberResults([]);
         renderNapResults([]);
         renderBarangayResults([]);
-        renderTechnicianChips();
         document.getElementById("ticketFormPriority").disabled = false;
         document.getElementById("ticketFormCreated").value = todayLabel();
         document.getElementById("ticketFormSubmitBtn").disabled = false;
