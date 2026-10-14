@@ -80,8 +80,7 @@
                     {% if loc.assisted_by %}<dt>Assisted By</dt><dd>{{ loc.assisted_by|join(', ') }}</dd>{% endif %}
                     {% if loc.description %}<dt>Description</dt><dd><div class="cons-desc">{{ loc.description }}</div></dd>{% endif %}
                     <dt>Date</dt>
-                    <dd>{{ loc.reported_label }} ·
-                        <span class="cons-status {{ loc.status }}">{{ loc.status_label }}</span></dd>
+                    <dd>{{ loc.reported_label }}</dd>
                     {% if loc.assigned_tech %}<dt>Assigned</dt><dd>{{ loc.assigned_tech }}</dd>{% endif %}
                 </dl>
 
