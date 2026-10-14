@@ -140,7 +140,69 @@ def _withdraw_unstarted_assignments(issue):
     return False
 
 
+def effective_open_assignment(issue):
+    """The open Assignment responsible for `issue`: its own, or -- when it
+    was folded into a consolidated parent ticket -- the parent's.
+
+    A folded child never keeps an assignment of its own (its unstarted
+    ones are cancelled so only one technician is sent), so anything that
+    shows "who is handling this ticket" must look through to the parent,
+    otherwise the child reads as Unassigned even though a technician is
+    on the way."""
+    if issue is None:
+        return None
+    for source in (issue, issue.parent_issue):
+        if source is None:
+            continue
+        for assignment in source.assignments:
+            if assignment.status in _OPEN_ASSIGNMENT_STATUSES:
+                return assignment
+    return None
+
+
+def effective_technician_name(issue):
+    """Full name of the technician handling `issue` (see
+    effective_open_assignment), or None."""
+    assignment = effective_open_assignment(issue)
+    if assignment is not None and assignment.technician is not None:
+        return assignment.technician.full_name
+    return None
+
+
+def _finish_consolidation(parent):
+    """After tickets were folded into `parent`: make sure the group has a
+    technician, and keep every child's status in step with the parent.
+
+    Without the first part, a parent that was reported while nobody was
+    available has no assignment, the children's own assignments were
+    just cancelled, and the whole group ends up with nobody dispatched.
+    """
+    if parent is None:
+        return
+    if parent.status in ("pending", "assigned") and effective_open_assignment(parent) is None:
+        # Imported here to avoid a circular import at module load.
+        from app.recommendation import auto_assign_recommended_technician
+
+        auto_assign_recommended_technician(parent)
+
+    if effective_open_assignment(parent) is not None:
+        for child in parent.child_issues:
+            if child.status == "pending":
+                child.status = "assigned"
+    db.session.commit()
+
+
 def consolidate_nap_issues(new_issue):
+    """Folds `new_issue` into its NAP's consolidated ticket when needed
+    (see _consolidate_nap_issues below) and then makes sure the resulting
+    group has a technician. Same return value as _consolidate_nap_issues."""
+    parent = _consolidate_nap_issues(new_issue)
+    if parent is not None:
+        _finish_consolidation(parent)
+    return parent
+
+
+def _consolidate_nap_issues(new_issue):
     """Call right after a TechnicalIssue has been committed (so it has an
     id). Returns the parent TechnicalIssue if `new_issue` ended up as a
     CHILD of a consolidated ticket (callers then skip dispatching it --

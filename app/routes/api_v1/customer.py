@@ -37,7 +37,11 @@ from flask_jwt_extended import current_user
 from app.extensions import db, limiter
 from app.email_utils import consume_verification, is_email_verified
 from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
-from app.issue_utils import consolidate_nap_issues, resolve_customer_issue_priority
+from app.issue_utils import (
+    consolidate_nap_issues,
+    effective_technician_name,
+    resolve_customer_issue_priority,
+)
 from app.jwt_auth import jwt_role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue, User
 from app.nap_recommendation import recommend_naps
@@ -223,7 +227,8 @@ def _current_assigned_technician_name(issue: TechnicalIssue):
     for assignment in issue.assignments:
         if assignment.status in _OPEN_ASSIGNMENT_STATUSES:
             return assignment.technician.full_name
-    return None
+    # Folded into a consolidated ticket: the parent's technician covers it.
+    return effective_technician_name(issue)
 
 
 def _strip_assist_line(text):

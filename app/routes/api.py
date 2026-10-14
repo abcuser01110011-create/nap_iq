@@ -226,6 +226,28 @@ def issues_json():
             if row.technician is not None:
                 assignee_by_issue_id[row.technical_issue_id] = row.technician.full_name
 
+    # Tickets folded into a consolidated parent have no assignment of their
+    # own -- show the parent's technician (fetched separately since the
+    # parent may not be in `issues`, e.g. for a technician's scoped view).
+    parent_ids = {i.parent_issue_id for i in issues if i.parent_issue_id}
+    if parent_ids:
+        parent_rows = (
+            Assignment.query.options(joinedload(Assignment.technician))
+            .filter(
+                Assignment.technical_issue_id.in_(parent_ids),
+                Assignment.status != "cancelled",
+            )
+            .order_by(Assignment.assigned_at.asc(), Assignment.id.asc())
+            .all()
+        )
+        assignee_by_parent_id = {}
+        for row in parent_rows:
+            if row.technician is not None:
+                assignee_by_parent_id[row.technical_issue_id] = row.technician.full_name
+        for issue in issues:
+            if issue.id not in assignee_by_issue_id and issue.parent_issue_id in assignee_by_parent_id:
+                assignee_by_issue_id[issue.id] = assignee_by_parent_id[issue.parent_issue_id]
+
     data = [
         {
             "id": issue.id,

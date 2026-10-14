@@ -353,6 +353,15 @@ def list_issues():
         if a.service_request_id and a.service_request_id not in open_request_ids:
             assignment_by_request[a.service_request_id] = a
 
+    # A ticket folded into a consolidated parent has no assignment of its
+    # own (only the parent's technician is sent), so show the parent's
+    # technician instead of "Unassigned".
+    for issue in issues:
+        if issue.parent_issue_id and issue.id not in assignment_by_issue:
+            parent_assignment = assignment_by_issue.get(issue.parent_issue_id)
+            if parent_assignment is not None:
+                assignment_by_issue[issue.id] = parent_assignment
+
     tickets = [
         _ticket_row_from_issue(issue, assignment_by_issue.get(issue.id))
         for issue in _dedupe_fiber_break_tickets(issues)

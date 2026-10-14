@@ -140,11 +140,12 @@ def test_dispatch_board_hides_children(app, client):
         _issue(subs[1], nap, 20)
         c = _issue(subs[2], nap, 10)
         consolidate_nap_issues(c)
+        a_id, c_id = a.id, c.id  # read inside the app context (instances detach after it)
     login(client, "admin1", "Admin@12345")
     html = client.get("/dispatch/").get_data(as_text=True)
     assert html.count("ISS-") >= 1
-    assert f"ISS-{a.id:04d}" in html
-    assert f"ISS-{c.id:04d}" not in html
+    assert f"ISS-{a_id:04d}" in html
+    assert f"ISS-{c_id:04d}" not in html
 
 
 def test_per_location_proof_photos_gate_completion(app, client, monkeypatch):
