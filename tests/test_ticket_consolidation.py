@@ -1,0 +1,143 @@
+"""Ticket consolidation: 3+ open same-type tickets on one NAP fold into
+the first-reported one; the parent's detail page lists every location;
+completing the parent resolves them all."""
+
+from datetime import datetime, timedelta
+
+from app.extensions import db
+from app.issue_utils import (
+    CONSOLIDATION_THRESHOLD,
+    consolidate_nap_issues,
+)
+from app.models import Assignment, Nap, Subscriber, Technician, TechnicalIssue, User
+from tests.conftest import login
+
+
+def _world(app, n_subs=5):
+    nap = Nap(nap_code="N-019", name="Parkside NAP", latitude=14.2790, longitude=121.4130)
+    db.session.add(nap)
+    db.session.flush()
+    other_nap = Nap(nap_code="N-020", name="Other NAP", latitude=14.30, longitude=121.40)
+    db.session.add(other_nap)
+    db.session.flush()
+    subs = []
+    for i in range(n_subs):
+        s = Subscriber(
+            subscriber_code=f"SUB-{i:04d}", full_name=f"Sub {i}", address=f"{i} Test St",
+            contact_number=f"0900000000{i}", nap_id=nap.id,
+            latitude=14.2790 + i * 0.0005, longitude=121.4130 + i * 0.0005,
+        )
+        db.session.add(s)
+        subs.append(s)
+    tech_user = User.query.filter_by(username="tech1").first()
+    tech = Technician(user_id=tech_user.id, full_name="Tech One", status="busy")
+    db.session.add(tech)
+    db.session.commit()
+    return nap, other_nap, subs, tech
+
+
+def _issue(sub, nap, minutes, issue_type="No Internet", assign_to=None):
+    i = TechnicalIssue(
+        issue_type=issue_type, status="pending", subscriber_id=sub.id, nap_id=nap.id,
+        created_at=datetime.utcnow() - timedelta(minutes=minutes),
+    )
+    db.session.add(i)
+    db.session.commit()
+    i.issue_code = f"ISS-{i.id:04d}"
+    if assign_to is not None:
+        db.session.add(Assignment(technical_issue_id=i.id, technician_id=assign_to.id, status="assigned"))
+        i.status = "assigned"
+    db.session.commit()
+    return i
+
+
+def test_threshold_folds_into_first_reported(app):
+    with app.app_context():
+        nap, other, subs, tech = _world(app)
+        a = _issue(subs[0], nap, 30, assign_to=tech)
+        b = _issue(subs[1], nap, 20, assign_to=tech)
+        assert consolidate_nap_issues(a) is None
+        assert consolidate_nap_issues(b) is None  # only 2 so far
+        c = _issue(subs[2], nap, 10)
+        parent = consolidate_nap_issues(c)
+        assert CONSOLIDATION_THRESHOLD == 3
+        assert parent.id == a.id
+        db.session.refresh(b)
+        assert b.parent_issue_id == a.id and c.parent_issue_id == a.id
+        assert a.parent_issue_id is None
+        # b's un-started assignment is withdrawn, a's stays
+        assert Assignment.query.filter_by(technical_issue_id=b.id).first().status == "cancelled"
+        assert Assignment.query.filter_by(technical_issue_id=a.id).first().status == "assigned"
+        # 4th ticket joins the existing parent directly
+        d = _issue(subs[3], nap, 1)
+        assert consolidate_nap_issues(d).id == a.id
+
+
+def test_other_type_or_nap_not_grouped(app):
+    with app.app_context():
+        nap, other, subs, tech = _world(app)
+        _issue(subs[0], nap, 30)
+        _issue(subs[1], nap, 20, issue_type="Slow Internet")
+        x = _issue(subs[2], other, 10)
+        assert consolidate_nap_issues(x) is None
+        assert TechnicalIssue.query.filter(TechnicalIssue.parent_issue_id.isnot(None)).count() == 0
+
+
+def test_in_progress_ticket_stays_standalone(app):
+    with app.app_context():
+        nap, other, subs, tech = _world(app)
+        a = _issue(subs[0], nap, 30, assign_to=tech)
+        b = _issue(subs[1], nap, 20, assign_to=tech)
+        Assignment.query.filter_by(technical_issue_id=b.id).first().status = "in_progress"
+        db.session.commit()
+        c = _issue(subs[2], nap, 10)
+        consolidate_nap_issues(c)
+        db.session.refresh(b)
+        assert b.parent_issue_id is None  # technician already on it
+        assert c.parent_issue_id == a.id
+
+
+def test_detail_page_and_resolve_children(app, client):
+    with app.app_context():
+        nap, other, subs, tech = _world(app)
+        a = _issue(subs[0], nap, 30, assign_to=tech)
+        _issue(subs[1], nap, 20)
+        c = _issue(subs[2], nap, 10)
+        consolidate_nap_issues(c)
+        asg = Assignment.query.filter_by(technical_issue_id=a.id).first()
+        asg.status = "in_progress"
+        # complete_assignment() refuses to finish a job without a photo.
+        asg.photo_filename = "https://example.com/proof.jpg"
+        db.session.commit()
+        aid, a_id = asg.id, a.id
+
+    login(client, "tech1", "Tech@12345")
+    for url in (f"/technician/tickets/{aid}", f"/technician/mobile/jobs/{aid}"):
+        html = client.get(url).get_data(as_text=True)
+        assert "Consolidated ticket" in html, url
+        assert "3 location" in html
+        assert "Sub 0" in html and "Sub 1" in html and "Sub 2" in html
+        assert "Start route" in html and "FIRST REPORTED" in html
+
+    resp = client.post(
+        f"/technician/assignments/{aid}/complete",
+        data={"resolution_notes": "Replaced splitter"}, follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    with app.app_context():
+        statuses = {i.status for i in TechnicalIssue.query.all()}
+        assert statuses == {"resolved"}
+
+
+def test_dispatch_board_hides_children(app, client):
+    with app.app_context():
+        nap, other, subs, tech = _world(app)
+        a = _issue(subs[0], nap, 30)
+        _issue(subs[1], nap, 20)
+        c = _issue(subs[2], nap, 10)
+        consolidate_nap_issues(c)
+    login(client, "admin1", "Admin@12345")
+    html = client.get("/dispatch/").get_data(as_text=True)
+    assert html.count("ISS-") >= 1
+    assert f"ISS-{a.id:04d}" in html
+    assert f"ISS-{c.id:04d}" not in html

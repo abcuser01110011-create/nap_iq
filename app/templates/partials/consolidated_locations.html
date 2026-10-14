@@ -1,0 +1,158 @@
+{# Ticket consolidation: "Affected locations" section.
+   Expects `c` = job.consolidated (see issue_utils.build_consolidated_locations()).
+   Shared by technician/ticket_detail.html and technician_mobile/job_detail.html,
+   so it carries its own navy styling and works in both. #}
+{% set c = job.consolidated %}
+{% if c %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+<style>
+.cons-card { background:#122a4d; color:#fff; border:1px solid #1f3a63; border-radius:14px; padding:16px; margin-bottom:1.5rem; }
+.cons-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.cons-title { font-size:.8rem; letter-spacing:.04em; text-transform:uppercase; color:#c7d0de; margin:0; font-weight:600; }
+.cons-chip { background:#1f3a63; color:#8fb6ff; border-radius:999px; padding:3px 10px; font-size:.75rem; font-weight:600; white-space:nowrap; }
+.cons-note { color:#c7d0de; font-size:.82rem; line-height:1.4; margin:0 0 12px; }
+.cons-map { height:260px; border-radius:12px; overflow:hidden; border:1px solid #1f3a63; margin-bottom:12px; background:#0b1f3a; }
+.cons-route-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; background:#2e7dff; color:#fff !important; text-decoration:none; border-radius:10px; padding:11px 14px; font-weight:600; font-size:.9rem; margin-bottom:6px; }
+.cons-route-note { color:#8896ab; font-size:.74rem; margin:0 0 12px; }
+.cons-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.cons-item { background:#1f3a63; border:1px solid #1f3a63; border-radius:12px; padding:10px 12px; display:flex; gap:10px; transition:border-color .15s, background .15s; }
+.cons-item.is-active { border-color:#2e7dff; background:#244575; }
+.cons-item.is-done { opacity:.7; }
+.cons-num { flex:0 0 28px; height:28px; border-radius:50%; background:#2e7dff; color:#fff; font-weight:700; font-size:.82rem; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+.cons-item.is-done .cons-num { background:#3ddc97; color:#0b1f3a; }
+.cons-body { flex:1 1 auto; min-width:0; }
+.cons-name { font-weight:600; font-size:.9rem; overflow-wrap:anywhere; }
+.cons-tag { background:#0b1f3a; color:#8fb6ff; border-radius:6px; padding:1px 6px; font-size:.68rem; font-weight:600; margin-left:6px; vertical-align:middle; }
+.cons-meta { color:#c7d0de; font-size:.8rem; margin-top:2px; overflow-wrap:anywhere; }
+.cons-meta.faint { color:#8896ab; font-size:.74rem; }
+.cons-status { display:inline-block; border-radius:999px; padding:1px 8px; font-size:.7rem; font-weight:600; background:#0b1f3a; color:#ffc107; }
+.cons-status.resolved, .cons-status.closed { color:#3ddc97; }
+.cons-status.in_progress { color:#8fb6ff; }
+.cons-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.cons-actions a, .cons-actions button { background:#0b1f3a; color:#fff !important; border:1px solid #2a4a7a; border-radius:8px; padding:5px 10px; font-size:.78rem; text-decoration:none; cursor:pointer; }
+.cons-actions .go { background:#2e7dff; border-color:#2e7dff; }
+.cons-pin { background:#2e7dff; color:#fff; border:2px solid #fff; border-radius:50%; width:26px; height:26px; line-height:22px; text-align:center; font-weight:700; font-size:12px; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+.cons-pin.done { background:#3ddc97; color:#0b1f3a; }
+.cons-pin.nap { background:#ffc107; color:#0b1f3a; border-radius:6px; }
+</style>
+
+<div class="cons-card" id="consolidatedCard">
+    <div class="cons-head">
+        <p class="cons-title"><i class="bi bi-diagram-3 me-1"></i>Consolidated ticket</p>
+        <span class="cons-chip">{{ c.total }} location{{ '' if c.total == 1 else 's' }} · {{ c.open_count }} open</span>
+    </div>
+    <p class="cons-note">
+        {{ c.total }} subscribers{% if c.nap %} on {{ c.nap.label }}{% endif %} reported
+        <strong>{{ c.issue_type }}</strong>. This one job covers all of them —
+        completing it resolves every ticket below.
+    </p>
+
+    {% if c.nap or c.locations|selectattr('lat')|list %}
+    <div class="cons-map" id="consMap" role="img" aria-label="Map of affected locations"></div>
+    {% endif %}
+
+    {% if c.route_url %}
+    <a class="cons-route-btn" href="{{ c.route_url }}" target="_blank" rel="noopener">
+        <i class="bi bi-signpost-split"></i> Start route · all stops
+    </a>
+    <p class="cons-route-note">
+        Stops are ordered nearest-first from the NAP.
+        {% if c.route_truncated %}Google Maps takes up to 10 stops per route, so the first 10 are included — use the per-stop buttons for the rest.{% endif %}
+    </p>
+    {% endif %}
+
+    <ol class="cons-list">
+        {% for loc in c.locations %}
+        {% set done = loc.status in ('resolved', 'closed') %}
+        <li class="cons-item {{ 'is-done' if done else '' }}" data-stop="{{ loc.stop }}">
+            <div class="cons-num">{{ loc.stop }}</div>
+            <div class="cons-body">
+                <div class="cons-name">
+                    {{ loc.subscriber_name or 'Unknown subscriber' }}{% if loc.subscriber_code %} <span class="cons-meta faint">({{ loc.subscriber_code }})</span>{% endif %}
+                    {% if loc.is_parent %}<span class="cons-tag">FIRST REPORTED</span>{% endif %}
+                </div>
+                {% if loc.address %}<div class="cons-meta">{{ loc.address }}</div>{% endif %}
+                <div class="cons-meta faint">
+                    {{ loc.ticket_code }} · reported {{ loc.reported_label }} ·
+                    <span class="cons-status {{ loc.status }}">{{ loc.status_label }}</span>
+                </div>
+                <div class="cons-actions">
+                    {% if loc.lat is not none %}
+                    <a class="go" target="_blank" rel="noopener"
+                       href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination={{ loc.lat }},{{ loc.lng }}">
+                        <i class="bi bi-cursor-fill"></i> Navigate</a>
+                    <button type="button" class="cons-show" data-stop="{{ loc.stop }}"><i class="bi bi-geo-alt"></i> Show on map</button>
+                    {% endif %}
+                    {% if loc.contact_number %}
+                    <a href="tel:{{ loc.contact_number }}"><i class="bi bi-telephone"></i> {{ loc.contact_number }}</a>
+                    {% endif %}
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script>
+(function () {
+    var mapEl = document.getElementById("consMap");
+    if (!mapEl || typeof L === "undefined") return;
+    var stops = {{ c.locations | tojson }};
+    var nap = {{ c.nap | tojson }};
+
+    var map = L.map(mapEl, { scrollWheelZoom: false, maxZoom: 19 });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    var bounds = [], markers = {};
+    function pinIcon(text, cls) {
+        return L.divIcon({ className: "", iconSize: [26, 26], iconAnchor: [13, 13],
+            html: '<div class="cons-pin ' + (cls || "") + '">' + text + "</div>" });
+    }
+    function popupFor(title, lines) {
+        var box = document.createElement("div");
+        var b = document.createElement("strong"); b.textContent = title; box.appendChild(b);
+        lines.forEach(function (t) { if (!t) return; box.appendChild(document.createElement("br")); box.appendChild(document.createTextNode(t)); });
+        return box;
+    }
+
+    if (nap) {
+        L.marker([nap.lat, nap.lng], { icon: pinIcon("N", "nap") }).addTo(map)
+            .bindPopup(popupFor("NAP", [nap.label]));
+        bounds.push([nap.lat, nap.lng]);
+    }
+    var routeLine = nap ? [[nap.lat, nap.lng]] : [];
+    stops.forEach(function (s) {
+        if (s.lat === null || s.lng === null) return;
+        var done = s.status === "resolved" || s.status === "closed";
+        var m = L.marker([s.lat, s.lng], { icon: pinIcon(s.stop, done ? "done" : "") }).addTo(map)
+            .bindPopup(popupFor("Stop " + s.stop + " · " + (s.subscriber_name || ""), [s.address, s.contact_number, s.ticket_code + " · " + s.status_label]));
+        m.on("click", function () { highlight(s.stop, false); });
+        markers[s.stop] = m;
+        bounds.push([s.lat, s.lng]);
+        routeLine.push([s.lat, s.lng]);
+    });
+    if (routeLine.length > 1) L.polyline(routeLine, { color: "#2e7dff", weight: 3, opacity: .7, dashArray: "6 6" }).addTo(map);
+    if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+    else map.setView([14.28, 121.41], 13);
+    setTimeout(function () { map.invalidateSize(); }, 200);
+
+    function highlight(stop, pan) {
+        document.querySelectorAll(".cons-item").forEach(function (li) {
+            li.classList.toggle("is-active", li.getAttribute("data-stop") === String(stop));
+        });
+        var li = document.querySelector('.cons-item[data-stop="' + stop + '"]');
+        if (li && !pan) li.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        if (pan && markers[stop]) { map.setView(markers[stop].getLatLng(), Math.max(map.getZoom(), 17)); markers[stop].openPopup(); }
+    }
+    document.querySelectorAll(".cons-show").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            highlight(btn.getAttribute("data-stop"), true);
+            mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+    });
+})();
+</script>
+{% endif %}

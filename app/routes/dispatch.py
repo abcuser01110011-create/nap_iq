@@ -293,7 +293,11 @@ def index():
     whom — for repairs and installs alike.
     """
     issues = (
-        TechnicalIssue.query.filter(TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES))
+        TechnicalIssue.query.filter(
+            TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES),
+            # Ticket consolidation: children ride along with their parent.
+            TechnicalIssue.parent_issue_id.is_(None),
+        )
         .order_by(TechnicalIssue.created_at.desc())
         .all()
     )

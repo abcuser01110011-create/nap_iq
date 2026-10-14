@@ -93,7 +93,11 @@ from app.auth import role_required
 from app.models import Technician, Assignment, CablePath, Nap, Subscriber
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify, notify_issue_status_change
-from app.issue_utils import resolve_fiber_break_siblings
+from app.issue_utils import (
+    build_consolidated_locations,
+    resolve_consolidated_children,
+    resolve_fiber_break_siblings,
+)
 from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
@@ -720,6 +724,11 @@ def complete_assignment(assignment_id):
         # resolve them together with the one that was actually dispatched
         # so their markers/tickets don't keep showing the outage as open.
         resolve_fiber_break_siblings(assignment.technical_issue)
+        # Ticket consolidation: a consolidated parent resolves every
+        # child ticket (other subscribers on the NAP) with it, and each
+        # of those subscribers is told their issue is resolved.
+        for child in resolve_consolidated_children(assignment.technical_issue):
+            notify_issue_status_change(child)
         profile.resolved_issues_count = (profile.resolved_issues_count or 0) + 1
         notify_issue_status_change(assignment.technical_issue)
 
@@ -1083,6 +1092,9 @@ def _serialize_job(assignment):
         ),
         "lat": lat,
         "lng": lng,
+        # Ticket consolidation: every affected location when this is the
+        # parent of a consolidated ticket, else None.
+        "consolidated": build_consolidated_locations(issue) if issue else None,
         "is_installation": is_installation,
         "is_new_installation": is_new_installation,
         "can_accept": can_accept,

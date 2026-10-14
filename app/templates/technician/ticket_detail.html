@@ -2,7 +2,7 @@
 {% block title %}{{ job.ticket_code }}{% endblock %}
 {% block body_class %}dash-theme-tech{% endblock %}
 {% block page_title %}{{ job.ticket_code }}{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">{{ job.type_label }}</p>{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ job.type_label }}{% if job.consolidated %} · Consolidated ({{ job.consolidated.total }} locations){% endif %}</p>{% endblock %}
 
 {% block content %}
 {% set assignment_status_classes = {
@@ -90,6 +90,9 @@
     </div>
 </div>
 {% endif %}
+
+{# Ticket consolidation: every affected location, with map + per-stop navigation #}
+{% include "partials/consolidated_locations.html" %}
 
 {% if job.assignment.resolution_notes and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">

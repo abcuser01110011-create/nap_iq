@@ -6,7 +6,10 @@ since both the desktop web technician UI and the mobile app's
 completion flow need the exact same behaviour here.
 """
 
-from app.models import TechnicalIssue
+import math
+
+from app.extensions import db
+from app.models import Assignment, TechnicalIssue
 
 # Same "still open" statuses app/routes/issues.py's _OPEN_ISSUE_STATUSES
 # uses -- kept as its own tuple here (instead of importing that one)
@@ -87,3 +90,223 @@ def resolve_fiber_break_siblings(resolved_issue):
     ).all()
     for sibling in siblings:
         sibling.status = "resolved"
+
+
+# ---------------------------------------------------------------------
+# Ticket consolidation
+# ---------------------------------------------------------------------
+# Once a NAP has this many open tickets of the same issue_type, they are
+# folded into ONE job: the first-reported ticket becomes the parent and
+# every other one becomes a child of it. A field assistant then makes one
+# trip and sees every affected location on the parent's detail page.
+CONSOLIDATION_THRESHOLD = 3
+
+# Fiber Break already has its own NAP-wide grouping (shared issue_code,
+# see resolve_fiber_break_siblings above), so it's left alone here.
+_NOT_CONSOLIDATED_TYPES = {"Fiber Break"}
+
+_OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
+# An assignment the technician hasn't started yet can safely be pulled
+# back when its ticket is folded into a parent.
+_WITHDRAWABLE_ASSIGNMENT_STATUSES = ("assigned", "accepted")
+
+
+def _release_technician_if_idle(technician):
+    if technician is None or technician.status != "busy":
+        return
+    still_open = Assignment.query.filter(
+        Assignment.technician_id == technician.id,
+        Assignment.status.in_(_OPEN_ASSIGNMENT_STATUSES),
+    ).count()
+    if still_open == 0:
+        technician.status = "available"
+
+
+def _withdraw_unstarted_assignments(issue):
+    """Cancels `issue`'s own not-yet-started assignments (it is now
+    covered by its parent's single trip). Returns True if the issue
+    still has an in-progress assignment of its own (i.e. a technician is
+    already out on it), in which case it must NOT be folded in."""
+    own = Assignment.query.filter(
+        Assignment.technical_issue_id == issue.id,
+        Assignment.status.in_(_OPEN_ASSIGNMENT_STATUSES),
+    ).all()
+    if any(a.status == "in_progress" for a in own):
+        return True
+    for a in own:
+        if a.status in _WITHDRAWABLE_ASSIGNMENT_STATUSES:
+            a.status = "cancelled"
+            _release_technician_if_idle(a.technician)
+    return False
+
+
+def consolidate_nap_issues(new_issue):
+    """Call right after a TechnicalIssue has been committed (so it has an
+    id). Returns the parent TechnicalIssue if `new_issue` ended up as a
+    CHILD of a consolidated ticket (callers then skip dispatching it --
+    the parent's technician covers it), or None if it is still a
+    standalone ticket (or is itself the parent).
+
+    Rules, per NAP + issue_type:
+      * If an open consolidated parent already exists, the new ticket
+        simply joins it.
+      * Otherwise, once CONSOLIDATION_THRESHOLD open standalone tickets
+        exist, the oldest one becomes the parent and the rest join it.
+        Tickets that already have a technician in progress stay
+        standalone. Children's not-yet-started assignments are cancelled
+        so only one technician is sent.
+
+    Caller is responsible for the final commit-after (this commits its
+    own changes too, so it is safe to call and move on).
+    """
+    if new_issue is None or new_issue.nap_id is None:
+        return None
+    if new_issue.issue_type in _NOT_CONSOLIDATED_TYPES:
+        return None
+    if new_issue.parent_issue_id is not None:
+        return new_issue.parent_issue
+
+    base = TechnicalIssue.query.filter(
+        TechnicalIssue.nap_id == new_issue.nap_id,
+        TechnicalIssue.issue_type == new_issue.issue_type,
+        TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES),
+        TechnicalIssue.parent_issue_id.is_(None),
+    )
+
+    # 1) Join an existing open parent (a standalone-looking open ticket
+    #    that already has children).
+    existing_parent = (
+        base.filter(
+            TechnicalIssue.id != new_issue.id,
+            TechnicalIssue.id.in_(
+                db.session.query(TechnicalIssue.parent_issue_id).filter(
+                    TechnicalIssue.parent_issue_id.isnot(None)
+                )
+            ),
+        )
+        .order_by(TechnicalIssue.created_at, TechnicalIssue.id)
+        .first()
+    )
+    if existing_parent is not None:
+        if _withdraw_unstarted_assignments(new_issue):
+            return None
+        new_issue.parent_issue_id = existing_parent.id
+        db.session.commit()
+        return existing_parent
+
+    # 2) Threshold reached -> oldest becomes the parent.
+    group = base.order_by(TechnicalIssue.created_at, TechnicalIssue.id).all()
+    if len(group) < CONSOLIDATION_THRESHOLD:
+        return None
+    parent = group[0]
+    for child in group[1:]:
+        if _withdraw_unstarted_assignments(child):
+            continue
+        child.parent_issue_id = parent.id
+    db.session.commit()
+    return parent if new_issue.parent_issue_id == parent.id else None
+
+
+def resolve_consolidated_children(resolved_issue):
+    """When a consolidated parent ticket is resolved, every child ticket
+    still open is resolved with it (same idea as
+    resolve_fiber_break_siblings). Returns the list of children that were
+    changed so the caller can notify their subscribers. Caller commits."""
+    if resolved_issue is None:
+        return []
+    changed = []
+    for child in resolved_issue.child_issues:
+        if child.status in OPEN_ISSUE_STATUSES:
+            child.status = "resolved"
+            changed.append(child)
+    return changed
+
+
+def _haversine_km(lat1, lng1, lat2, lng2):
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lng2 - lng1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def build_consolidated_locations(parent_issue):
+    """View-model for the "Affected locations" section: a list of dicts
+    (parent first in the data, then ordered into a suggested visit route
+    by nearest-neighbour starting from the NAP). Returns None when the
+    ticket has no children, i.e. isn't a consolidated ticket."""
+    if parent_issue is None or not parent_issue.child_issues:
+        return None
+
+    nap = parent_issue.nap
+    members = [parent_issue] + list(parent_issue.child_issues)
+    rows = []
+    for issue in members:
+        sub = issue.subscriber
+        lat = (sub.latitude if sub and sub.latitude is not None else issue.latitude)
+        lng = (sub.longitude if sub and sub.longitude is not None else issue.longitude)
+        rows.append(
+            {
+                "issue_id": issue.id,
+                "ticket_code": f"TN {issue.id:05d}",
+                "is_parent": issue.id == parent_issue.id,
+                "subscriber_code": sub.subscriber_code if sub else None,
+                "subscriber_name": sub.full_name if sub else None,
+                "address": (sub.address if sub and sub.address else issue.address),
+                "contact_number": sub.contact_number if sub else None,
+                "status": issue.status,
+                "status_label": issue.status.replace("_", " ").title(),
+                "reported_label": issue.created_at.strftime("%b %d, %H:%M") if issue.created_at else "",
+                "lat": float(lat) if lat is not None else None,
+                "lng": float(lng) if lng is not None else None,
+            }
+        )
+
+    # Suggested visit order: nearest-neighbour from the NAP (the fault
+    # is usually there, so the tech starts at the NAP and works outward).
+    located = [r for r in rows if r["lat"] is not None]
+    unlocated = [r for r in rows if r["lat"] is None]
+    ordered = []
+    if located:
+        cur = (float(nap.latitude), float(nap.longitude)) if nap else (located[0]["lat"], located[0]["lng"])
+        remaining = list(located)
+        while remaining:
+            nxt = min(remaining, key=lambda r: _haversine_km(cur[0], cur[1], r["lat"], r["lng"]))
+            remaining.remove(nxt)
+            ordered.append(nxt)
+            cur = (nxt["lat"], nxt["lng"])
+    ordered += unlocated
+    for i, r in enumerate(ordered, start=1):
+        r["stop"] = i
+
+    route_pts = [r for r in ordered if r["lat"] is not None]
+    route_url = None
+    if route_pts:
+        # Google Maps URLs allow at most 9 waypoints + 1 destination.
+        pts = route_pts[:10]
+        dest = pts[-1]
+        wp = "|".join(f"{r['lat']},{r['lng']}" for r in pts[:-1])
+        route_url = (
+            "https://www.google.com/maps/dir/?api=1&travelmode=driving"
+            f"&destination={dest['lat']},{dest['lng']}" + (f"&waypoints={wp}" if wp else "")
+        )
+
+    open_count = sum(1 for r in ordered if r["status"] in OPEN_ISSUE_STATUSES)
+    return {
+        "parent_id": parent_issue.id,
+        "issue_type": parent_issue.issue_type,
+        "total": len(ordered),
+        "open_count": open_count,
+        "locations": ordered,
+        "route_url": route_url,
+        "route_truncated": len(route_pts) > 10,
+        "nap": (
+            {
+                "label": f"{nap.nap_code} — {nap.name}",
+                "lat": float(nap.latitude),
+                "lng": float(nap.longitude),
+            }
+            if nap and nap.latitude is not None
+            else None
+        ),
+    }

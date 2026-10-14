@@ -93,7 +93,7 @@ from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
 from app.notifications_utils import notify, notify_issue_status_change
-from app.issue_utils import resolve_fiber_break_siblings
+from app.issue_utils import resolve_consolidated_children, resolve_fiber_break_siblings
 
 api_v1_technician_bp = Blueprint(
     "api_v1_technician", __name__, url_prefix="/api/v1/technician"
@@ -1194,6 +1194,8 @@ def complete_assignment(assignment_id):
         # the one dispatched subscriber's marker, leaving every other
         # connected subscriber's alert showing on the GeoMap forever.
         resolve_fiber_break_siblings(assignment.technical_issue)
+        for child in resolve_consolidated_children(assignment.technical_issue):
+            notify_issue_status_change(child)
         # Named specifically for repairs (see this column's comment in
         # app/models.py) — an installation's completion isn't a
         # "resolved issue", so it isn't counted here. Phase 29's

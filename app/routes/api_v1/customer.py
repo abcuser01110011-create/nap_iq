@@ -37,7 +37,7 @@ from flask_jwt_extended import current_user
 from app.extensions import db, limiter
 from app.email_utils import consume_verification, is_email_verified
 from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
-from app.issue_utils import resolve_customer_issue_priority
+from app.issue_utils import consolidate_nap_issues, resolve_customer_issue_priority
 from app.jwt_auth import jwt_role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue, User
 from app.nap_recommendation import recommend_naps
@@ -542,7 +542,10 @@ def report_issue():
     # technician is available right now, the issue simply stays
     # 'pending' and an Administrator can still dispatch it manually;
     # either way the report itself has already succeeded above.
-    auto_assign_recommended_technician(issue)
+    # Ticket consolidation: joins the NAP's first-reported ticket of
+    # this type once enough are open -- the parent's technician covers it.
+    if consolidate_nap_issues(issue) is None:
+        auto_assign_recommended_technician(issue)
 
     return jsonify(issue=_serialize_issue(issue)), 201
 

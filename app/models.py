@@ -330,6 +330,16 @@ class TechnicalIssue(db.Model):
     photo_filename = db.Column(db.String(255), nullable=True)
     subscriber_id = db.Column(db.Integer, db.ForeignKey("subscribers.id"), nullable=False)
     nap_id = db.Column(db.Integer, db.ForeignKey("naps.id"), nullable=True)
+    # Ticket consolidation: when a NAP collects several open tickets of
+    # the same issue_type (see app/issue_utils.py's
+    # consolidate_nap_issues()), the first-reported one becomes the
+    # "parent" and every later one points at it here. NULL for a normal
+    # standalone ticket and for the parent itself.
+    parent_issue_id = db.Column(
+        db.Integer,
+        db.ForeignKey("technical_issues.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -338,6 +348,14 @@ class TechnicalIssue(db.Model):
     subscriber = db.relationship("Subscriber", back_populates="technical_issues")
     nap = db.relationship("Nap", back_populates="technical_issues")
     assignments = db.relationship("Assignment", back_populates="technical_issue")
+    parent_issue = db.relationship(
+        "TechnicalIssue", remote_side="TechnicalIssue.id", back_populates="child_issues"
+    )
+    child_issues = db.relationship(
+        "TechnicalIssue",
+        back_populates="parent_issue",
+        order_by="TechnicalIssue.created_at",
+    )
 
     def __repr__(self):
         return f"<TechnicalIssue {self.id} ({self.status})>"

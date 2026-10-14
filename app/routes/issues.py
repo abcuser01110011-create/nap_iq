@@ -77,6 +77,7 @@ from decimal import Decimal
 
 from app.extensions import db
 from app.auth import role_required
+from app.issue_utils import consolidate_nap_issues
 from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician, ServiceRequest, Plan
 from app.forms import IssueReportForm
 from app.notifications_utils import notify_issue_status_change, notify_new_issue_reported, notify_issue_updated
@@ -668,7 +669,13 @@ def report_issue():
         # how the seed data's ISS-#### codes are formatted.
         issue.issue_code = f"ISS-{issue.id:04d}"
         notify_new_issue_reported(issue)
-        _dispatch_field_assistant(issue, request.form.get("assigned_team_id"))
+        db.session.commit()
+
+        # Ticket consolidation: if this NAP now has enough open tickets
+        # of this type, it is folded into the first-reported one and
+        # that ticket's technician covers it -- so don't dispatch again.
+        if consolidate_nap_issues(issue) is None:
+            _dispatch_field_assistant(issue, request.form.get("assigned_team_id"))
         db.session.commit()
 
         return (
@@ -980,6 +987,11 @@ def close_issue(issue_id):
 
     issue.status = "closed"
     notify_issue_status_change(issue)
+    # Ticket consolidation: closing the parent signs off its resolved
+    # children too.
+    for child in issue.child_issues:
+        if child.status == "resolved":
+            child.status = "closed"
     db.session.commit()
 
     issue_label = issue.issue_code or f"#{issue.id}"

@@ -77,7 +77,7 @@ from app.extensions import db, limiter
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
-from app.issue_utils import resolve_customer_issue_priority
+from app.issue_utils import consolidate_nap_issues, resolve_customer_issue_priority
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
 from app.recommendation import auto_assign_recommended_technician
@@ -409,8 +409,20 @@ def report_issue():
         # for an Administrator to assign it by hand. Best-effort — if
         # no technician is available right now, the issue simply stays
         # 'pending' and an Administrator can still dispatch it manually.
-        assignment = auto_assign_recommended_technician(issue)
-        if assignment is not None:
+        # Ticket consolidation: joins the NAP's first-reported ticket of
+        # this type once enough are open -- no separate dispatch then.
+        consolidated_into = consolidate_nap_issues(issue)
+        assignment = (
+            None if consolidated_into is not None
+            else auto_assign_recommended_technician(issue)
+        )
+        if consolidated_into is not None:
+            flash(
+                f"Your issue '{issue.issue_code}' was reported. Other subscribers on your "
+                "NAP reported the same problem, so a technician is already handling it.",
+                "success",
+            )
+        elif assignment is not None:
             flash(
                 f"Your issue '{issue.issue_code}' was reported and assigned to "
                 f"{assignment.technician.full_name}.",

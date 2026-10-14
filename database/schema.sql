@@ -157,10 +157,17 @@ CREATE TABLE IF NOT EXISTS technical_issues (
     photo_filename  VARCHAR(255) NULL,
     subscriber_id   INT NOT NULL,
     nap_id          INT,
+    -- Ticket consolidation: when a NAP has 3+ open tickets of the same
+    -- issue_type, the first-reported one is the parent and the rest point
+    -- at it here. NULL for standalone tickets and for the parent itself.
+    parent_issue_id INT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                         ON UPDATE CURRENT_TIMESTAMP,
 
+    CONSTRAINT fk_issues_parent
+        FOREIGN KEY (parent_issue_id) REFERENCES technical_issues(id)
+        ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT fk_issues_subscriber
         FOREIGN KEY (subscriber_id) REFERENCES subscribers(id)
         ON DELETE CASCADE ON UPDATE CASCADE,

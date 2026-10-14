@@ -82,6 +82,8 @@
     {% endif %}
 </div>
 
+{% include "partials/consolidated_locations.html" %}
+
 {# ---- Resolution Notes -------------------------------------------- #}
 {% if job.can_edit or job.is_closed %}
 <div class="tm-card">
