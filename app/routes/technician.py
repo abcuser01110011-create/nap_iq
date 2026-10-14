@@ -95,6 +95,7 @@ from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify, notify_issue_status_change
 from app.issue_utils import (
     build_consolidated_locations,
+    consolidated_missing_proof_count,
     resolve_consolidated_children,
     resolve_fiber_break_siblings,
 )
@@ -675,6 +676,16 @@ def complete_assignment(assignment_id):
         flash("A completion photo is required before this assignment can be marked complete.", "warning")
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
+    # Consolidated ticket: one job covers several subscribers, so every
+    # still-open location needs its own proof photo before it can finish.
+    missing_proofs = consolidated_missing_proof_count(assignment.technical_issue, assignment)
+    if missing_proofs:
+        flash(
+            f"Add a proof photo for every location first ({missing_proofs} still missing).",
+            "warning",
+        )
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
     is_installation = assignment.service_request_id is not None
     if is_installation and (assignment.pin_latitude is None or assignment.pin_longitude is None):
         flash("Pin your on-site location before this installation can be marked complete.", "warning")
@@ -912,6 +923,69 @@ def upload_photo(assignment_id):
     return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
+@technician_bp.route(
+    "/assignments/<int:assignment_id>/stops/<int:issue_id>/photo", methods=["POST"]
+)
+@role_required("technician")
+def upload_stop_photo(assignment_id, issue_id):
+    """Uploads (or replaces) the proof photo for ONE location of a
+    consolidated ticket -- the parent's own house or any child ticket.
+
+    The parent's photo is also stored as the assignment's completion photo
+    so the rest of the app (history, reports, the existing completion
+    check) keeps working unchanged."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+    back = redirect(url_for("technician.ticket_detail", assignment_id=assignment.id) + "#consolidatedCard")
+
+    parent = assignment.technical_issue
+    if parent is None:
+        abort(404)
+    stops = {i.id: i for i in [parent] + list(parent.child_issues)}
+    issue = stops.get(issue_id)
+    if issue is None:
+        abort(404)  # not a location of THIS technician's consolidated job
+
+    if assignment.status not in ("accepted", "in_progress"):
+        flash("A photo can only be added to an assignment you've accepted or started.", "warning")
+        return back
+
+    photo = request.files.get("photo")
+    if photo is None or photo.filename == "":
+        flash("Choose a photo file to upload first.", "warning")
+        return back
+
+    ext = photo.filename.rsplit(".", 1)[-1].lower() if "." in photo.filename else ""
+    if ext not in ALLOWED_PHOTO_EXTENSIONS:
+        flash("Unsupported photo format. Use JPG, PNG, HEIC, or WEBP.", "danger")
+        return back
+
+    public_id = f"stop-photos/issue-{issue.id}-{uuid.uuid4().hex}"
+    try:
+        upload_result = cloudinary.uploader.upload(photo, public_id=public_id, overwrite=True)
+    except Exception:
+        flash("Photo upload failed. Please try again.", "danger")
+        return back
+
+    old_urls = {issue.proof_photo}
+    issue.proof_photo = upload_result["secure_url"]
+    if issue.id == parent.id:
+        old_urls.add(assignment.photo_filename)
+        assignment.photo_filename = upload_result["secure_url"]
+    db.session.commit()
+
+    for old in old_urls - {None, "", upload_result["secure_url"]}:
+        try:
+            old_public_id = old.split("/upload/")[1].rsplit(".", 1)[0]
+            old_public_id = "/".join(old_public_id.split("/")[1:])  # drop version segment
+            cloudinary.uploader.destroy(old_public_id)
+        except Exception:
+            pass
+
+    flash("Proof photo uploaded.", "success")
+    return back
+
+
 # ------------------------------------------------------------------ #
 # Web version of the mobile app (UI only) -- see module docstring     #
 # ------------------------------------------------------------------ #
@@ -1094,7 +1168,7 @@ def _serialize_job(assignment):
         "lng": lng,
         # Ticket consolidation: every affected location when this is the
         # parent of a consolidated ticket, else None.
-        "consolidated": build_consolidated_locations(issue) if issue else None,
+        "consolidated": build_consolidated_locations(issue, assignment) if issue else None,
         "is_installation": is_installation,
         "is_new_installation": is_new_installation,
         "can_accept": can_accept,
