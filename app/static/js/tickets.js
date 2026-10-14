@@ -1121,8 +1121,11 @@
             if (!document.getElementById("ticketFormPlan").value) {
                 errors.plan_label = ["Please select a plan."];
             }
-            if (!document.getElementById("ticketFormContactNumber").value.trim()) {
+            const contactValue = document.getElementById("ticketFormContactNumber").value.trim();
+            if (!contactValue) {
                 errors.contact_number = ["Please enter a contact number."];
+            } else if (!/^\d{11}$/.test(contactValue)) {
+                errors.contact_number = ["Phone number must be exactly 11 digits (numbers only)."];
             }
         }
 

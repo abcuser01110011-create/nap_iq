@@ -28,6 +28,32 @@ from wtforms.validators import (
 
 from app.models import Nap, Subscriber, Technician, User, Plan, USER_ROLES
 
+# ---------------------------------------------------------------------------
+# Phone numbers: exactly 11 digits (e.g. 09171234567), digits only.
+# ---------------------------------------------------------------------------
+PHONE_DIGITS = 11
+PHONE_MESSAGE = "Phone number must be exactly 11 digits (numbers only)."
+PHONE_RENDER_KW = {
+    "maxlength": PHONE_DIGITS,
+    "minlength": PHONE_DIGITS,
+    "inputmode": "numeric",
+    "pattern": r"\d{11}",
+    "title": "11-digit phone number, e.g. 09171234567",
+    "placeholder": "09XXXXXXXXX",
+    "autocomplete": "off",
+    # Strip anything that isn't a digit as the user types / pastes.
+    "oninput": "this.value=this.value.replace(/\\D/g,'').slice(0,11)",
+}
+
+
+def phone_11_digits(form, field):
+    """Reject anything that isn't exactly 11 digits (blank is handled by
+    Optional()/DataRequired() ahead of this validator)."""
+    value = (field.data or "").strip()
+    if value and not (value.isascii() and value.isdigit() and len(value) == PHONE_DIGITS):
+        raise ValidationError(PHONE_MESSAGE)
+
+
 
 class LoginForm(FlaskForm):
     """Login form used by the single, role-aware NAP-IQ sign-in page.
@@ -388,7 +414,8 @@ class UserForm(FlaskForm):
     )
     phone_number = StringField(
         "Phone Number",
-        validators=[Optional(), Length(max=20, message="Phone number must be at most 20 characters.")],
+        validators=[Optional(), phone_11_digits],
+        render_kw=PHONE_RENDER_KW,
     )
     role = SelectField(
         "Role",
@@ -682,7 +709,8 @@ class ProfileForm(FlaskForm):
     )
     phone_number = StringField(
         "Phone Number",
-        validators=[Optional(), Length(max=20, message="Phone number must be at most 20 characters.")],
+        validators=[Optional(), phone_11_digits],
+        render_kw=PHONE_RENDER_KW,
     )
 
     def validate_email(self, field):
@@ -780,7 +808,8 @@ class SubscriberForm(FlaskForm):
     )
     contact_number = StringField(
         "Contact Number",
-        validators=[Optional(), Length(max=20, message="Contact number must be at most 20 characters.")],
+        validators=[Optional(), phone_11_digits],
+        render_kw=PHONE_RENDER_KW,
     )
     email = StringField(
         "Email",
@@ -1012,8 +1041,9 @@ class TechnicianForm(FlaskForm):
         "Contact Number",
         validators=[
             DataRequired(message="Contact number is required."),
-            Length(max=20, message="Contact number must be at most 20 characters."),
+            phone_11_digits,
         ],
+        render_kw=PHONE_RENDER_KW,
     )
     personnel_type = SelectField(
         "Personnel Type",
@@ -1180,7 +1210,8 @@ class CustomerApplyForInstallationForm(FlaskForm):
     )
     contact_number = StringField(
         "Phone Number",
-        validators=[Optional(), Length(max=20, message="Phone number is too long.")],
+        validators=[Optional(), phone_11_digits],
+        render_kw=PHONE_RENDER_KW,
     )
     # `choices` populated dynamically by the route from the current
     # `plans` table, same pattern as SubscriberForm.plan_type.
@@ -1235,8 +1266,9 @@ class CustomerLinkAccountForm(FlaskForm):
         "Phone Number on File",
         validators=[
             DataRequired(message="The phone number on your subscriber account is required."),
-            Length(max=20, message="Phone number is too long."),
+            phone_11_digits,
         ],
+        render_kw=PHONE_RENDER_KW,
     )
 
 
@@ -1424,7 +1456,8 @@ class ServiceRequestForm(FlaskForm):
     )
     contact_number = StringField(
         "Contact Number",
-        validators=[Optional(), Length(max=20, message="Contact number is too long.")],
+        validators=[Optional(), phone_11_digits],
+        render_kw=PHONE_RENDER_KW,
     )
 
     def validate(self, extra_validators=None):
@@ -1495,7 +1528,8 @@ class QuickServiceRequestForm(FlaskForm):
     )
     contact_number = StringField(
         "Contact Number",
-        validators=[Optional(), Length(max=20, message="Contact number is too long.")],
+        validators=[Optional(), phone_11_digits],
+        render_kw=PHONE_RENDER_KW,
     )
     barangay = StringField(
         "Location",

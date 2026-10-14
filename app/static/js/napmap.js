@@ -1246,6 +1246,10 @@
                 // checked one after another.
                 row.addEventListener("click", (event) => {
                     event.preventDefault();
+                    // Mark this row as the selected one (clears the rest).
+                    linesList.querySelectorAll(".napmap-detail-line-row.is-selected")
+                        .forEach((el) => el.classList.remove("is-selected"));
+                    row.classList.add("is-selected");
                     const subscriber = allSubscribers.find((s) => s.id === line.subscriber_id);
                     if (!subscriber) return;
                     focusSubscriber(subscriber);

@@ -1189,6 +1189,48 @@
     border-bottom: none;
 }
 
+/* Hover + "selected" (last clicked) feedback so you can tell which
+   connected line you're pointing at / opened on the map. */
+.napmap-detail-line-row {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    margin: 0 -0.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.napmap-detail-line-row:hover {
+    background-color: rgba(13, 110, 253, 0.08);
+}
+
+.napmap-detail-line-row:hover .napmap-detail-line-chevron {
+    color: var(--bs-primary, #0d6efd);
+    transform: translateX(2px);
+}
+
+.napmap-detail-line-row.is-selected {
+    background-color: rgba(13, 110, 253, 0.14);
+    box-shadow: inset 3px 0 0 var(--bs-primary, #0d6efd);
+}
+
+.napmap-detail-line-row.is-selected .napmap-detail-line-name {
+    font-weight: 600;
+}
+
+.napmap-detail-line-chevron {
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .napmap-detail-line-row:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+[data-bs-theme="dark"] .napmap-detail-line-row.is-selected {
+    background-color: rgba(110, 168, 254, 0.18);
+    box-shadow: inset 3px 0 0 #6ea8fe;
+}
+
 .napmap-detail-line-code {
     background-color: var(--napiq-bg, #f4f6f9);
     border: 1px solid var(--napiq-border, #e6e9ef);

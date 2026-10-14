@@ -321,7 +321,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">{{ form.contact_number.label }}</label>
-                                    {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else ""), placeholder="09XX XXX XXXX") }}
+                                    {{ form.contact_number(class="form-control" ~ (" is-invalid" if form.contact_number.errors else ""), placeholder="09XXXXXXXXX") }}
                                     {% for error in form.contact_number.errors %}
                                         <div class="invalid-feedback d-block">{{ error }}</div>
                                     {% endfor %}

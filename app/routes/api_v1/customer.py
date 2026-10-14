@@ -151,8 +151,8 @@ def _validate_application(data: dict) -> dict:
             errors["email"] = "Please verify this email address before submitting."
 
     phone_number = str(data.get("phone_number") or "").strip() or None
-    if phone_number and len(phone_number) > 20:
-        errors["phone_number"] = "Phone number is too long."
+    if phone_number and not (phone_number.isascii() and phone_number.isdigit() and len(phone_number) == 11):
+        errors["phone_number"] = "Phone number must be exactly 11 digits (numbers only)."
 
     try:
         latitude = float(data.get("latitude"))
@@ -423,6 +423,11 @@ def link_account():
                 **({"subscriber_code": "Subscriber account number is required."} if not code else {}),
                 **({"contact_number": "Phone number is required."} if not phone else {}),
             }
+        ), 400
+
+    if not (phone.isascii() and phone.isdigit() and len(phone) == 11):
+        return jsonify(
+            errors={"contact_number": "Phone number must be exactly 11 digits (numbers only)."}
         ), 400
 
     generic_error = (

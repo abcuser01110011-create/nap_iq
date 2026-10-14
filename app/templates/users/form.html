@@ -83,7 +83,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">{{ form.phone_number.label }} <span class="text-muted small">(optional)</span></label>
-                            {{ form.phone_number(class="form-control" ~ (" is-invalid" if form.phone_number.errors else ""), placeholder="e.g. 0917 123 4567") }}
+                            {{ form.phone_number(class="form-control" ~ (" is-invalid" if form.phone_number.errors else ""), placeholder="e.g. 09171234567") }}
                             {% for error in form.phone_number.errors %}
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}

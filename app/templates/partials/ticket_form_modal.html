@@ -96,7 +96,10 @@
                         <div class="col-6">
                             <label class="form-label small text-muted mb-1">Contact Number <span class="text-danger">*</span></label>
                             <input type="tel" class="form-control" id="ticketFormContactNumber"
-                                   placeholder="09XX XXX XXXX" autocomplete="off">
+                                   placeholder="09XXXXXXXXX" autocomplete="off"
+                                   maxlength="11" minlength="11" inputmode="numeric" pattern="\d{11}"
+                                   title="11-digit phone number, e.g. 09171234567"
+                                   oninput="this.value=this.value.replace(/\D/g,'').slice(0,11)">
                             <div class="invalid-feedback d-block small" data-error-for="contact_number"></div>
                         </div>
                     </div>
