@@ -225,3 +225,26 @@ def test_installation_recommend_page_renders_with_rule(app, client):
     html = resp.get_data(as_text=True)
     assert html.index("Tech Two") < html.index("Tech One")
     assert "No open jobs" in html
+
+
+def test_status_is_busy_when_tickets_open_and_installation_location_counts(app):
+    """Technician with waiting tickets reads busy (not available), and a
+    technician whose only job is an installation still has a known location,
+    so a far-away issue goes to whoever is genuinely nearest."""
+    from app.models import ServiceRequest
+    with app.app_context():
+        naps, subs, t1, t2 = _two_techs(app, t1_pos=(None, None), t2_pos=(None, None))
+        t2.status = "busy"                                   # started an installation at NAP B
+        sr = ServiceRequest(request_type="new_installation", subscriber_id=subs["b"].id,
+                            requested_nap_id=naps["b"].id, status="scheduled")
+        db.session.add(sr)
+        db.session.commit()
+        from app.models import Assignment
+        db.session.add(Assignment(service_request_id=sr.id, technician_id=t2.id, status="in_progress"))
+        db.session.commit()
+        # Tech One gets a repair at NAP A and stays 'available' in the stored column
+        assert _report(subs["a"], naps["a"]) == "Tech One"
+        assert t1.status == "available"
+        assert t1.effective_status == "busy" and t2.effective_status == "busy"
+        # New NAP C is right beside NAP B, where Tech Two's installation is -> Tech Two
+        assert _report(subs["c"], naps["c"]) == "Tech Two"

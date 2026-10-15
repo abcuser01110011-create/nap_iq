@@ -29,8 +29,8 @@
                     <dt class="col-sm-4 text-muted fw-normal">Status</dt>
                     <dd class="col-sm-8">
                         {% set tech_status_classes = {'available': 'text-bg-success', 'busy': 'text-bg-warning', 'offline': 'text-bg-secondary'} %}
-                        <span class="badge {{ tech_status_classes.get(technician.status, 'text-bg-secondary') }}">
-                            {{ technician.status|capitalize }}
+                        <span class="badge {{ tech_status_classes.get(technician.effective_status, 'text-bg-secondary') }}">
+                            {{ technician.effective_status|capitalize }}
                         </span>
                     </dd>
 

@@ -82,8 +82,8 @@
                             'busy': 'disp-badge-high',
                             'offline': 'disp-badge-low'
                         } %}
-                        <span class="disp-badge {{ tech_status_classes.get(technician.status, 'disp-badge-low') }}">
-                            {{ technician.status|capitalize }}
+                        <span class="disp-badge {{ tech_status_classes.get(technician.effective_status, 'disp-badge-low') }}">
+                            {{ technician.effective_status|capitalize }}
                         </span>
                     </td>
                     <td>{{ technician.resolved_issues_count }}</td>

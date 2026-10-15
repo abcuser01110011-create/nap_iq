@@ -79,10 +79,12 @@ def list_technicians():
             )
         )
 
-    if status_filter:
-        query = query.filter(Technician.status == status_filter)
-
     technicians = query.order_by(Technician.full_name.asc()).all()
+
+    # Filter on the derived status (busy = has open tickets), not the stored
+    # column, so the filter matches the badge shown in the table.
+    if status_filter:
+        technicians = [t for t in technicians if t.effective_status == status_filter]
 
     return render_template(
         "technicians/list.html",

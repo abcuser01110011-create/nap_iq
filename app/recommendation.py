@@ -382,11 +382,13 @@ def get_recommendations(issue, limit=None):
             _performance_score(tech, completed_for_tech)
         )
 
-        # Where the technician is: their own saved position, else the job
-        # they are out on. Replaces the saved-position-only distance above.
-        position = _technician_position(tech, open_for_tech)
-        if issue_coords is not None and position is not None:
-            distance_km = round(haversine_km(position[0], position[1], issue_coords[0], issue_coords[1]), 2)
+        # Where the technician is: their saved position and every open job
+        # (installations too). Replaces the saved-position-only distance above.
+        positions = _technician_positions(tech, open_for_tech)
+        if issue_coords is not None and positions:
+            distance_km = round(
+                min(haversine_km(p[0], p[1], issue_coords[0], issue_coords[1]) for p in positions), 2
+            )
             distance_known = True
         else:
             distance_km, distance_known = None, False
@@ -413,7 +415,7 @@ def get_recommendations(issue, limit=None):
 
         row = {
             "technician": tech,
-            "technician_status": tech.status,
+            "technician_status": tech.effective_status,
             "open_assignment_count": len(open_for_tech),
             "availability_score": availability_score,
             "workload_score": workload_score,
@@ -457,21 +459,42 @@ def get_recommendations(issue, limit=None):
     return rows
 
 
-def _technician_position(technician, open_assignments):
-    """Where a technician is, for "nearest" comparisons: their own saved
-    live position when they have one, otherwise the location of the job
-    they are currently out on (a busy technician is, in practice, at or
-    near that job). None when neither is known."""
-    if technician.current_latitude is not None and technician.current_longitude is not None:
-        return (technician.current_latitude, technician.current_longitude)
-    for a in reversed(open_assignments):  # newest first
-        job = a.technical_issue
-        if job is None:
-            continue
-        coords = _issue_coordinates(job)
-        if coords is not None:
-            return coords
+def _assignment_coordinates(assignment):
+    """(lat, lon) of the job an assignment sends a technician to: the
+    repair ticket's location, or -- for an installation -- the request's
+    own pin, its requested NAP, or the subscriber's location/NAP."""
+    job = assignment.technical_issue
+    if job is not None:
+        return _issue_coordinates(job)
+    sr = assignment.service_request
+    if sr is None:
+        return None
+    if sr.latitude is not None and sr.longitude is not None:
+        return (sr.latitude, sr.longitude)
+    nap = getattr(sr, "requested_nap", None)
+    if nap is not None and nap.latitude is not None and nap.longitude is not None:
+        return (nap.latitude, nap.longitude)
+    sub = sr.subscriber
+    if sub is not None:
+        if sub.latitude is not None and sub.longitude is not None:
+            return (sub.latitude, sub.longitude)
+        if sub.nap is not None and sub.nap.latitude is not None and sub.nap.longitude is not None:
+            return (sub.nap.latitude, sub.nap.longitude)
     return None
+
+
+def _technician_positions(technician, open_assignments):
+    """Every place a technician is known to be: their own saved position
+    plus the location of each job they currently have open (installations
+    included). Distance to a new issue is the shortest of these."""
+    positions = []
+    if technician.current_latitude is not None and technician.current_longitude is not None:
+        positions.append((technician.current_latitude, technician.current_longitude))
+    for a in open_assignments:
+        coords = _assignment_coordinates(a)
+        if coords is not None:
+            positions.append(coords)
+    return positions
 
 
 def choose_technician_for_issue(issue):

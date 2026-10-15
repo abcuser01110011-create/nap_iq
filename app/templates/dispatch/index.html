@@ -95,7 +95,7 @@
                                         <option value="0">-- Technician --</option>
                                         {% for tech in technicians %}
                                             {% if not assignment or tech.id != assignment.technician_id %}
-                                            <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.status }})</option>
+                                            <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.effective_status }})</option>
                                             {% endif %}
                                         {% endfor %}
                                     </select>
@@ -214,7 +214,7 @@
                                         <option value="0">-- Technician --</option>
                                         {% for tech in technicians %}
                                             {% if not assignment or tech.id != assignment.technician_id %}
-                                            <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.status }})</option>
+                                            <option value="{{ tech.id }}">{{ tech.full_name }} ({{ tech.effective_status }})</option>
                                             {% endif %}
                                         {% endfor %}
                                     </select>

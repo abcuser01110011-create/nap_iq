@@ -287,6 +287,18 @@ class Technician(db.Model):
     user = db.relationship("User", back_populates="technician_profile")
     assignments = db.relationship("Assignment", back_populates="technician")
 
+    @property
+    def effective_status(self):
+        """What to show/rank by: 'offline' stays offline; otherwise 'busy'
+        while the technician has ANY open assignment (assigned, accepted or
+        in progress), else 'available'. The stored `status` column only
+        flips to 'busy' once a technician starts work, so an auto-assigned
+        technician with several waiting tickets used to read 'available'."""
+        if self.status == "offline":
+            return "offline"
+        has_open = any(a.status in ("assigned", "accepted", "in_progress") for a in self.assignments)
+        return "busy" if has_open else "available"
+
     def __repr__(self):
         return f"<Technician {self.full_name}>"
 
