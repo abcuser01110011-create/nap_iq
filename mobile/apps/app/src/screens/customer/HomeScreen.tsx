@@ -2,13 +2,19 @@ import React, { useCallback, useEffect, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ApiError, type CustomerIssue, type Payment, type ServiceRequest, type Subscriber } from "@nap-iq/api-client";
+import {
+  ApiError,
+  type CustomerIssue,
+  type MonthlyDue,
+  type Payment,
+  type ServiceRequest,
+  type Subscriber,
+} from "@nap-iq/api-client";
 import { useAuth } from "../../auth/AuthContext";
 import { colors } from "../../theme/customer";
 import type { CustomerStackParamList } from "../../navigation/RootNavigator";
 
 const OPEN_ISSUE_STATUSES = new Set(["pending", "assigned", "accepted", "in_progress"]);
-const PENDING_REQUEST_STATUSES = new Set(["pending", "approved", "scheduled"]);
 
 // Phase 29 (auto-activation): the four stages a self-registered
 // application moves through, in order, mirroring
@@ -137,6 +143,7 @@ export default function HomeScreen() {
   const [issues, setIssues] = useState<CustomerIssue[]>([]);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [monthlyDue, setMonthlyDue] = useState<MonthlyDue | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Distinct from `error`: a 404 from client.customer.me() just means
@@ -148,8 +155,9 @@ export default function HomeScreen() {
     setError(null);
     setNoSubscriber(false);
     try {
-      const { subscriber } = await client.customer.me();
+      const { subscriber, monthly_due } = await client.customer.me();
       setSubscriber(subscriber);
+      setMonthlyDue(monthly_due);
 
       // Only fetch the rest of the dashboard once we know there's a
       // subscriber to fetch it for — these all 404 the same way me()
@@ -168,6 +176,7 @@ export default function HomeScreen() {
         setIssues([]);
         setRequests([]);
         setPayments([]);
+        setMonthlyDue(null);
         setNoSubscriber(true);
       } else if (err instanceof ApiError) {
         setError(err.body.error ?? "Couldn't load your account.");
@@ -195,7 +204,6 @@ export default function HomeScreen() {
   };
 
   const openIssueCount = issues.filter((i) => OPEN_ISSUE_STATUSES.has(i.status)).length;
-  const pendingRequestCount = requests.filter((r) => PENDING_REQUEST_STATUSES.has(r.status)).length;
   const lastPayment = payments[0];
 
   const isPendingReview = subscriber?.status === "pending_review";
@@ -252,11 +260,34 @@ export default function HomeScreen() {
               <Text style={styles.statValue}>{openIssueCount}</Text>
               <Text style={styles.statLabel}>Open issues</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{pendingRequestCount}</Text>
-              <Text style={styles.statLabel}>Pending requests</Text>
-            </View>
           </View>
+
+          {monthlyDue && (
+            <View style={[styles.card, monthlyDue.is_due && styles.dueCard]}>
+              <Text style={styles.cardLabel}>Monthly due date</Text>
+              {monthlyDue.due_date ? (
+                <>
+                  <Text style={[styles.cardValue, monthlyDue.is_due && styles.dueText]}>
+                    {new Date(monthlyDue.due_date + "T00:00:00").toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </Text>
+                  <Text style={[styles.rowLabel, monthlyDue.is_due && styles.dueText]}>
+                    {monthlyDue.is_due
+                      ? monthlyDue.days_overdue === 0
+                        ? "Due today"
+                        : `Overdue by ${monthlyDue.days_overdue} day${monthlyDue.days_overdue === 1 ? "" : "s"}`
+                      : `Due in ${monthlyDue.days_until} day${monthlyDue.days_until === 1 ? "" : "s"}`}
+                    {monthlyDue.monthly_fee !== null ? ` · ₱${monthlyDue.monthly_fee.toFixed(2)}` : ""}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.cardValue}>—</Text>
+              )}
+            </View>
+          )}
 
           {lastPayment && (
             <View style={styles.card}>
@@ -302,6 +333,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  dueCard: { backgroundColor: colors.dangerLight, borderColor: colors.danger },
+  dueText: { color: colors.danger },
   statPrimary: { backgroundColor: colors.primaryLight, borderColor: colors.primaryLight },
   statValue: { color: colors.text, fontSize: 24, fontWeight: "800" },
   statLabel: { color: colors.textMuted, fontSize: 12, marginTop: 4 },

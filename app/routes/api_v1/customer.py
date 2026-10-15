@@ -37,6 +37,7 @@ from flask_jwt_extended import current_user
 from app.extensions import db, limiter
 from app.email_utils import consume_verification, is_email_verified
 from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
+from app.billing_utils import monthly_due_info
 from app.issue_utils import (
     consolidate_nap_issues,
     effective_technician_name,
@@ -211,6 +212,18 @@ def _serialize_subscriber(subscriber: Subscriber) -> dict:
 
 
 
+def _serialize_monthly_due(subscriber: Subscriber) -> dict:
+    """Same monthly due date the web portal shows (app/billing_utils.py)."""
+    info = monthly_due_info(subscriber)
+    return {
+        "due_date": info["due_date"].isoformat() if info["due_date"] else None,
+        "is_due": info["is_due"],
+        "days_overdue": info["days_overdue"],
+        "days_until": info["days_until"],
+        "monthly_fee": float(info["monthly_fee"]) if info["monthly_fee"] is not None else None,
+    }
+
+
 # Same tuple app/recommendation.py and app/routes/dispatch.py already
 # use for "still open" — kept in sync by hand, same as those two
 # modules already do with each other.
@@ -290,7 +303,10 @@ def me():
     subscriber = _own_subscriber_or_none()
     if subscriber is None:
         return _no_subscriber_response()
-    return jsonify(subscriber=_serialize_subscriber(subscriber)), 200
+    return jsonify(
+        subscriber=_serialize_subscriber(subscriber),
+        monthly_due=_serialize_monthly_due(subscriber),
+    ), 200
 
 
 @api_v1_customer_bp.route("/apply", methods=["POST"])

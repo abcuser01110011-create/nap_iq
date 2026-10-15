@@ -57,6 +57,7 @@ export default function ProfileScreen() {
           <Row label="Name" value={user?.full_name ?? "—"} />
           <Row label="Username" value={user?.username ?? "—"} />
           <Row label="Email" value={user?.email ?? "—"} />
+          <Row label="Phone number" value={subscriber?.contact_number ?? "—"} />
         </View>
 
         {subscriber && (

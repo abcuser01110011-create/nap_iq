@@ -66,3 +66,15 @@ def test_home_due_date_not_red_when_not_due(app, client):
     html = client.get("/portal/").get_data(as_text=True)
     assert "Monthly due date" in html
     assert "napiq-due-date--due" not in html
+
+
+def test_mobile_me_returns_monthly_due(app, client):
+    with app.app_context():
+        _subscriber(installed_at=date.today() - timedelta(days=90))
+    resp = client.post("/api/v1/auth/login", json={"username": "customer1", "password": "User@12345"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    token = resp.get_json()["access_token"]
+    me = client.get("/api/v1/customer/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+    due = me.get_json()["monthly_due"]
+    assert due["is_due"] is True and due["days_overdue"] > 0 and due["due_date"]

@@ -9,6 +9,7 @@ import type {
   CoverageCheckResult,
   CustomerIssue,
   LoginResponse,
+  MeResponse,
   Payment,
   PlanOption,
   RefreshResponse,
@@ -420,7 +421,7 @@ export class ApiClient {
   // ---- customer surface -------------------------------------------------
 
   readonly customer = {
-    me: () => this.request<{ subscriber: Subscriber }>("/api/v1/customer/me"),
+    me: () => this.request<MeResponse>("/api/v1/customer/me"),
 
     /** Applies for service on behalf of the signed-in account -- the
      * mobile equivalent of the Apply for Service screen's Step 3

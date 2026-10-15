@@ -194,6 +194,21 @@ export interface Subscriber {
   nap: SubscriberNapRef | null;
 }
 
+/** Monthly billing due date (see app/billing_utils.py). `is_due` is true on
+ * the due date and after it -- the app shows it in red. */
+export interface MonthlyDue {
+  due_date: string | null;
+  is_due: boolean;
+  days_overdue: number;
+  days_until: number;
+  monthly_fee: number | null;
+}
+
+export interface MeResponse {
+  subscriber: Subscriber;
+  monthly_due: MonthlyDue;
+}
+
 export interface CustomerIssue {
   id: number;
   issue_code: string;
