@@ -296,32 +296,28 @@ def _performance_score(technician, completed_for_tech):
     return round(score, 1), round(avg_hours, 1), completed_count, True
 
 
+def _rule_label(row, everyone_busy):
+    """Short name of the dispatch rule that put this technician where they
+    are in the list."""
+    if row["tier"] == 0:
+        return "Already working this NAP"
+    if row["tier"] == 1:
+        return "No open jobs"
+    return "Nearest (everyone is busy)" if everyone_busy else "Busy elsewhere"
+
+
 def _build_reason(row):
-    """A short, human-readable sentence explaining the score — shown
-    directly on the recommendation page next to the number, so an
-    Administrator never has to take the score on faith. Names the
-    1-2 factors that most helped or hurt this candidate rather than
-    restating every number (the full breakdown is already in the
-    table columns beside it)."""
-    parts = []
-
-    if row["technician_status"] == "available":
-        parts.append("currently available")
-    else:
-        parts.append(f"currently busy with {row['open_assignment_count']} open job"
-                      f"{'s' if row['open_assignment_count'] != 1 else ''}")
-
+    """One human-readable sentence for the recommendation page."""
+    parts = [row["rule_label"]]
+    n = row["open_assignment_count"]
+    parts.append(f"{n} open job{'s' if n != 1 else ''}")
     if row["distance_known"]:
         parts.append(f"{row['distance_km']} km away")
     else:
         parts.append("distance unknown")
-
-    if row["performance_known"]:
-        parts.append(f"avg {row['avg_resolution_hours']}h to resolve past jobs")
-    else:
-        parts.append("not enough completed-job history yet to score performance")
-
-    return ", ".join(parts).capitalize() + "."
+    if row["technician_status"] == "offline":
+        parts.append("currently offline")
+    return ", ".join(parts) + "."
 
 
 def get_recommendations(issue, limit=None):
@@ -370,6 +366,10 @@ def get_recommendations(issue, limit=None):
     for a in completed_assignments:
         completed_by_technician.setdefault(a.technician_id, []).append(a)
 
+    issue_nap_id = getattr(issue, "nap_id", None)
+    if issue_nap_id is None and getattr(issue, "nap", None) is not None:
+        issue_nap_id = issue.nap.id
+
     rows = []
     for tech in technicians:
         open_for_tech = open_by_technician.get(tech.id, [])
@@ -381,6 +381,27 @@ def get_recommendations(issue, limit=None):
         performance_score, avg_resolution_hours, completed_count, performance_known = (
             _performance_score(tech, completed_for_tech)
         )
+
+        # Where the technician is: their own saved position, else the job
+        # they are out on. Replaces the saved-position-only distance above.
+        position = _technician_position(tech, open_for_tech)
+        if issue_coords is not None and position is not None:
+            distance_km = round(haversine_km(position[0], position[1], issue_coords[0], issue_coords[1]), 2)
+            distance_known = True
+        else:
+            distance_km, distance_known = None, False
+
+        # Dispatch rule tier: 0 = already has an open job on this NAP,
+        # 1 = no open jobs at all, 2 = busy elsewhere.
+        if issue_nap_id is not None and any(
+            a.technical_issue is not None and a.technical_issue.nap_id == issue_nap_id
+            for a in open_for_tech
+        ):
+            tier = 0
+        elif not open_for_tech:
+            tier = 1
+        else:
+            tier = 2
 
         total_score = round(
             (WEIGHT_AVAILABILITY * availability_score)
@@ -405,16 +426,28 @@ def get_recommendations(issue, limit=None):
             "performance_score": performance_score,
             "resolved_issues_count": tech.resolved_issues_count or 0,
             "total_score": total_score,
+            "tier": tier,
         }
-        row["reason"] = _build_reason(row)
         rows.append(row)
 
+    everyone_busy = bool(rows) and all(r["tier"] == 2 for r in rows)
+    for row in rows:
+        row["rule_label"] = _rule_label(row, everyone_busy)
+        row["reason"] = _build_reason(row)
+
     def _sort_key(row):
-        # Higher score first; among ties, known-shorter-distance first
-        # (unknown distance sorts after every known one); then name,
-        # so ordering is always deterministic (see module docstring).
+        # Dispatch rule, not a score: same-NAP technician first, then a
+        # technician with no open jobs, then the rest; inside each group
+        # the nearest first (unknown distance last), then fewest open
+        # jobs, then name -- always deterministic.
         distance_key = row["distance_km"] if row["distance_known"] else float("inf")
-        return (-row["total_score"], distance_key, row["technician"].full_name.lower())
+        return (
+            row["tier"],
+            distance_key,
+            row["open_assignment_count"],
+            row["technician"].full_name.lower(),
+            row["technician"].id,
+        )
 
     rows.sort(key=_sort_key)
 
@@ -424,57 +457,66 @@ def get_recommendations(issue, limit=None):
     return rows
 
 
+def _technician_position(technician, open_assignments):
+    """Where a technician is, for "nearest" comparisons: their own saved
+    live position when they have one, otherwise the location of the job
+    they are currently out on (a busy technician is, in practice, at or
+    near that job). None when neither is known."""
+    if technician.current_latitude is not None and technician.current_longitude is not None:
+        return (technician.current_latitude, technician.current_longitude)
+    for a in reversed(open_assignments):  # newest first
+        job = a.technical_issue
+        if job is None:
+            continue
+        coords = _issue_coordinates(job)
+        if coords is not None:
+            return coords
+    return None
+
+
+def choose_technician_for_issue(issue):
+    """The technician auto-dispatch gives `issue` to: the top row of
+    get_recommendations(), so the automatic choice is always exactly the
+    one the admin Recommend page lists first. The rule (not a score):
+
+      1. A technician who already has an open job on the SAME NAP keeps
+         it (nearest of them, if several).
+      2. Otherwise a technician with NO open jobs (nearest, if several).
+      3. If every technician has open jobs, the NEAREST technician.
+
+    Offline technicians are candidates too. None when no technician
+    profile exists."""
+    rows = get_recommendations(issue, limit=1)
+    return rows[0]["technician"] if rows else None
+
+
 def auto_assign_recommended_technician(issue):
-    """Auto-dispatch — self-reported issues only.
+    """Auto-dispatch -- self-reported issues only.
 
     A `technical_issue` filed through the customer's own "Report an
-    Issue" flow (web portal `app/routes/customer.py:report_issue()`
-    and the mobile app's `app/routes/api_v1/customer.py:report_issue()`)
-    no longer waits on the dispatch board for an Administrator to pick
-    a technician by hand: it's immediately handed to whichever
-    technician `get_recommendations()` ranks first for it, so the
-    ticket lands straight on that technician's job list
-    (`technician/index.html` / `technician_mobile/jobs.html`).
+    Issue" flow (web portal and mobile app) is handed straight to a
+    technician chosen by `choose_technician_for_issue()` (same NAP ->
+    that NAP's technician; different NAP -> a technician with no open
+    job; everyone busy -> the nearest one), so it lands on that
+    technician's job list without an Administrator assigning it.
 
-    Deliberately reuses `get_recommendations()` unchanged rather than a
-    separate "pick one" shortcut, so the technician an issue
-    auto-assigns to is always exactly the one an Administrator would
-    have seen ranked #1 on `dispatch/recommend.html` — same formula,
-    same weights, same candidate pool (see app/recommendation.py's
-    module docstring).
+    Creates the same kind of `assignments` row a manual dispatch does
+    (see app/routes/dispatch.py's `assign()`), with `dispatch_score`
+    left NULL since no score is involved. Returns the Assignment, or
+    `None` when there is no technician profile at all (the issue then
+    stays 'pending' for an Administrator to dispatch by hand).
 
-    Creates the exact same kind of `assignments` row
-    `app/routes/dispatch.py`'s `assign()` route creates for a manual
-    dispatch (same fields, same `issue.status` transition, same
-    `notify_issue_status_change()` call, `dispatch_score` populated
-    from the candidate's `total_score`) so an auto-assigned ticket is
-    indistinguishable, once created, from one an Administrator
-    dispatched by hand.
-
-    Best-effort only: if the candidate pool is empty (e.g. no
-    technician profiles exist at all), this does nothing and returns
-    `None` — the issue simply stays 'pending', exactly as it did
-    before this existed, and an Administrator can still dispatch it
-    manually from the board. It never raises, and it never blocks the
-    customer's report from succeeding.
-
-    Callers are expected to have already `db.session.commit()`-ed the
-    new issue (so it has an `id`) before calling this — this function
-    issues its own follow-up commit for the new assignment row and the
-    issue's status change.
+    Callers must have already committed the issue (so it has an id);
+    this function commits the new assignment and status change itself.
     """
-    recommendations = get_recommendations(issue, limit=1)
-    if not recommendations:
+    technician = choose_technician_for_issue(issue)
+    if technician is None:
         return None
-
-    top = recommendations[0]
-    technician = top["technician"]
 
     assignment = Assignment(
         technical_issue_id=issue.id,
         technician_id=technician.id,
         status="assigned",
-        dispatch_score=top["total_score"],
     )
     issue.status = "assigned"
     db.session.add(assignment)

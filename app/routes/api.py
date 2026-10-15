@@ -458,14 +458,12 @@ def personnel_json():
             }
         )
 
-        if recommend_score > best_score:
-            best_score, best_id = recommend_score, p.id
-
-    if best_id is not None:
-        for row in rows:
-            if row["id"] == best_id:
-                row["recommended"] = True
-                break
+    # Pre-select by the dispatch rule (no NAP/location is known yet while
+    # the form is being filled in): someone with no open jobs first, else
+    # whoever has the fewest, then by name.
+    if rows:
+        best = min(rows, key=lambda r: (r["open_count"], r["full_name"].lower(), r["id"]))
+        best["recommended"] = True
 
     return jsonify(rows)
 
