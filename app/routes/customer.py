@@ -77,6 +77,7 @@ from app.extensions import db, limiter
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
+from app.billing_utils import monthly_due_info
 from app.issue_utils import consolidate_nap_issues, resolve_customer_issue_priority
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
@@ -140,6 +141,7 @@ def index():
         technical_issues=subscriber.technical_issues if subscriber else [],
         service_requests=subscriber.service_requests if subscriber else [],
         payments=subscriber.payments if subscriber else [],
+        due=monthly_due_info(subscriber) if subscriber else None,
     )
 
 

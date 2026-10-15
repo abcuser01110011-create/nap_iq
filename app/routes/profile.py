@@ -26,8 +26,20 @@ from flask import Blueprint, render_template, redirect, url_for, flash, g
 from app.extensions import db
 from app.auth import login_required
 from app.forms import ProfileForm, ChangePasswordForm
+from app.models import Subscriber
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/profile")
+
+
+def _display_phone(user):
+    """The account's own phone number, or -- for a customer login that has
+    none saved -- the contact number on its linked subscriber record (the
+    number given at registration/installation lives there, not on the
+    user row)."""
+    if user.phone_number:
+        return user.phone_number
+    subscriber = Subscriber.query.filter_by(user_id=user.id).first()
+    return subscriber.contact_number if subscriber and subscriber.contact_number else None
 
 
 @profile_bp.route("/")
@@ -36,7 +48,7 @@ def index():
     """Read-only summary of the signed-in account's own info. Any
     authenticated, active account can reach this — no role_required
     restriction, since every role is entitled to see its own profile."""
-    return render_template("profile/index.html")
+    return render_template("profile/index.html", display_phone=_display_phone(g.user))
 
 
 @profile_bp.route("/edit", methods=["GET", "POST"])
@@ -48,6 +60,8 @@ def edit_profile():
     user = g.user
     form = ProfileForm(obj=user)
     form.user_id = user.id  # excludes this record from the email uniqueness check
+    if not form.is_submitted() and not user.phone_number:
+        form.phone_number.data = _display_phone(user)
 
     if form.validate_on_submit():
         user.full_name = form.full_name.data.strip()

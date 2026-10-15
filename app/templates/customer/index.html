@@ -48,9 +48,7 @@
     is unchanged.
 #}
 {% set open_issue_statuses = ['pending', 'assigned', 'accepted', 'in_progress'] %}
-{% set pending_request_statuses = ['pending', 'approved', 'scheduled'] %}
 {% set open_issue_count = technical_issues|selectattr('status', 'in', open_issue_statuses)|list|length %}
-{% set pending_request_count = service_requests|selectattr('status', 'in', pending_request_statuses)|list|length %}
 
 <div class="card shadow-sm mb-3 napiq-account-card">
     <div class="card-body">
@@ -74,7 +72,7 @@
 </div>
 
 <div class="row g-3 mb-3">
-    <div class="col-6">
+    <div class="col-12">
         <a class="dash-stat-card dash-stat-card-link h-100" href="{{ url_for('customer.my_issues') }}">
             <span class="dash-stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></span>
             <div class="dash-stat-body">
@@ -83,14 +81,28 @@
             </div>
         </a>
     </div>
-    <div class="col-6">
-        <a class="dash-stat-card dash-stat-card-link h-100" href="{{ url_for('customer.my_service_requests') }}">
-            <span class="dash-stat-icon stat-icon-blue"><i class="bi bi-clipboard-check-fill"></i></span>
-            <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ pending_request_count }}</span>
-                <span class="dash-stat-label">Pending requests</span>
-            </div>
-        </a>
+</div>
+
+{# Monthly due date: turns red on the due date and after it. #}
+<div class="card shadow-sm mb-3 napiq-account-card{% if due and due.is_due %} napiq-due-card--due{% endif %}">
+    <div class="card-body">
+        <span class="napiq-account-label">Monthly due date</span>
+        {% if due and due.due_date %}
+        <div class="napiq-account-code napiq-due-date{% if due.is_due %} napiq-due-date--due{% endif %}">
+            {{ due.due_date.strftime('%B %d, %Y') }}
+        </div>
+        <span class="napiq-account-row-label{% if due.is_due %} napiq-due-date--due{% endif %}">
+            {% if due.is_due %}
+                <i class="bi bi-exclamation-circle-fill me-1"></i>
+                {% if due.days_overdue == 0 %}Due today{% else %}Overdue by {{ due.days_overdue }} day{{ '' if due.days_overdue == 1 else 's' }}{% endif %}
+            {% else %}
+                Due in {{ due.days_until }} day{{ '' if due.days_until == 1 else 's' }}
+            {% endif %}
+            {% if due.monthly_fee is not none %} &middot; &#8369;{{ '%.2f'|format(due.monthly_fee) }}{% endif %}
+        </span>
+        {% else %}
+        <div class="napiq-account-code">&mdash;</div>
+        {% endif %}
     </div>
 </div>
 
@@ -113,14 +125,6 @@
     <a href="{{ url_for('customer.report_issue') }}" class="btn btn-sm btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Report an Issue
     </a>
-</div>
-
-<div class="alert alert-info mb-0 small">
-    <i class="bi bi-info-circle me-1"></i>
-    You can view your full <a href="{{ url_for('customer.my_issues') }}">issue history</a>,
-    <a href="{{ url_for('customer.my_service_requests') }}">service requests</a>, and
-    <a href="{{ url_for('customer.my_payments') }}">payment history</a> from the sidebar.
-    Paying online isn't available yet — please contact PG Networks support directly for that.
 </div>
 {% endif %}
 {% endblock %}

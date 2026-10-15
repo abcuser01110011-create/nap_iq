@@ -154,3 +154,13 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* Monthly due date: red once the due date is reached/passed. */
+.napiq-due-date--due,
+.napiq-account-code.napiq-due-date--due {
+    color: #d92d20;
+}
+.napiq-due-card--due {
+    border: 1px solid #fda29b;
+    background: #fef3f2;
+}
