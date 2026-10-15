@@ -58,7 +58,7 @@
                         {{ job.status_label }}
                     </span>
                 </div>
-                <div class="tech-ticket-type">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;text-transform:none;white-space:nowrap;">(affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
+                <div class="tech-ticket-type">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;text-transform:none;white-space:nowrap;">(Affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
                 <div class="tech-ticket-location">{{ job.address }}</div>
                 {% if job.priority %}
                 <div class="tech-ticket-priority tech-ticket-priority-{{ job.priority }}">
