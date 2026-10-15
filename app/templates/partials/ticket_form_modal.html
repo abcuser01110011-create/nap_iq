@@ -31,6 +31,22 @@
                         <div class="invalid-feedback d-block small" data-error-for="request_type"></div>
                     </div>
 
+                    {# Repair only: same Issue Type dropdown the subscriber's
+                       "Report an Issue" form offers (CUSTOMER_ISSUE_TYPE_CHOICES
+                       in app/forms.py). Shown/hidden by tickets.js. #}
+                    <div class="mb-2 d-none" id="ticketFormIssueTypeWrapper">
+                        <label class="form-label small text-muted mb-1">Issue Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="ticketFormIssueType">
+                            <option value="No Internet" selected>No Internet</option>
+                            <option value="Slow Internet">Slow Internet</option>
+                            <option value="Cable Problem">Cable Problem</option>
+                            <option value="Router/Modem Problem">Router/Modem Problem</option>
+                            <option value="Connection Problem">Connection Problem</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <div class="invalid-feedback d-block small" data-error-for="issue_type"></div>
+                    </div>
+
                     {# SO: plain free-text customer name -- except "Add NAP",
                        which repurposes this same input for the NAP's planned
                        name (there's no customer involved). Relabeled/

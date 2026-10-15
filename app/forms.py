@@ -280,6 +280,11 @@ ISSUE_TYPE_CHOICES = [
     ("Fiber/Cable Problem", "Fiber/Cable Problem"),
     ("NAP Problem", "NAP Problem"),
     ("Connection Problem", "Connection Problem"),
+    # Same customer-facing types the subscriber "Report an Issue" form
+    # offers (CUSTOMER_ISSUE_TYPE_CHOICES below) so the admin Repair
+    # ticket form can use the identical Issue Type dropdown.
+    ("Cable Problem", "Cable Problem"),
+    ("Router/Modem Problem", "Router/Modem Problem"),
     # GeoMap "+ Tickets" quick-create menu (Trouble Ticket / TN group)
     # adds these on top of the pre-existing list above. issue_type is
     # a plain String(50) column, not a DB-level enum, so adding values

@@ -86,6 +86,15 @@
         return currentCategory === "TN" && currentTypeValue === "Repair";
     }
 
+    // Same priority mapping the customer "Report an Issue" flow uses
+    // (app/issue_utils.py's resolve_customer_issue_priority()) -- only a
+    // starting value here; the admin can still change it.
+    function defaultPriorityForIssueType(issueType) {
+        if (issueType === "No Internet" || issueType === "Cable Problem") return "critical";
+        if (issueType === "Slow Internet" || issueType === "Router/Modem Problem") return "high";
+        return "medium";
+    }
+
     // "Add NAP" is the one SO type that isn't a customer application
     // -- see applyCategory()/submitAddNap() below for what that
     // changes in the form and on submit.
@@ -560,6 +569,12 @@
     // Modal open / reset / category switch
     // ------------------------------------------------------------------
 
+    document.addEventListener("change", (event) => {
+        if (event.target && event.target.id === "ticketFormIssueType") {
+            document.getElementById("ticketFormPriority").value = defaultPriorityForIssueType(event.target.value);
+        }
+    });
+
     function resetForm() {
         document.getElementById("ticketForm").reset();
         document.getElementById("ticketFormGeneralError").classList.add("d-none");
@@ -602,6 +617,14 @@
 
         document.getElementById("ticketFormTitle").textContent =
             category === "SO" ? "Service Order" : "Ticket Number";
+
+        // Repair: show the customer-style Issue Type dropdown.
+        const issueTypeSelect = document.getElementById("ticketFormIssueType");
+        document.getElementById("ticketFormIssueTypeWrapper").classList.toggle("d-none", !isRepair);
+        if (isRepair) {
+            issueTypeSelect.value = "No Internet";
+            document.getElementById("ticketFormPriority").value = defaultPriorityForIssueType(issueTypeSelect.value);
+        }
 
         loadNextTicketCode(category);
 
@@ -960,7 +983,12 @@
 
     function submitTN() {
         const formData = new FormData();
-        formData.append("issue_type", document.getElementById("ticketFormTypeValue").value);
+        formData.append(
+            "issue_type",
+            isRepairForm()
+                ? document.getElementById("ticketFormIssueType").value
+                : document.getElementById("ticketFormTypeValue").value
+        );
         formData.append("subscriber_id", document.getElementById("ticketFormSubscriberId").value || "0");
         formData.append("nap_id", "0");
         formData.append("latitude", selectedSubscriber ? selectedSubscriber.latitude : "");
