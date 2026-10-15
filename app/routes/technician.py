@@ -1169,6 +1169,10 @@ def _serialize_job(assignment):
         # Ticket consolidation: every affected location when this is the
         # parent of a consolidated ticket, else None.
         "consolidated": build_consolidated_locations(issue, assignment) if issue else None,
+        # Number of subscribers covered by a consolidated ticket (parent +
+        # children); None for a normal single-subscriber ticket. Shown next
+        # to the issue type on the job lists.
+        "affected_count": (1 + len(issue.child_issues)) if issue and issue.child_issues else None,
         "is_installation": is_installation,
         "is_new_installation": is_new_installation,
         "can_accept": can_accept,

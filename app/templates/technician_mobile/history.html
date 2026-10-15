@@ -13,7 +13,7 @@
             <span class="tm-job-title">{{ job.ticket_code }}</span>
             <span class="tm-chip {{ 'tm-chip-danger' if job.assignment.status == 'cancelled' else '' }}">{{ job.status_label }}</span>
         </div>
-        <span class="tm-job-type">{{ job.type_label }}</span>
+        <span class="tm-job-type">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;text-transform:none;white-space:nowrap;">(affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</span>
         <div class="tm-job-subtitle">{{ job.subscriber_name or "—" }}</div>
         {% if job.assignment.completed_at %}
             <div class="tm-job-date">Completed {{ job.assignment.completed_at.strftime('%Y-%m-%d') }}</div>
