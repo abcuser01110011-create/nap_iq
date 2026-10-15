@@ -176,6 +176,13 @@ WEIGHT_WORKLOAD = 0.30
 WEIGHT_DISTANCE = 0.35
 WEIGHT_PERFORMANCE = 0.20
 
+# Same-NAP stickiness (a technician already working a NAP keeps new tickets
+# for it) only applies while that technician is not carrying more than this
+# many open jobs above the least-loaded technician. Without this cap one
+# technician snowballs: every report on "their" NAP, and every "nearest"
+# tie-break (their open jobs make them nearest everywhere), lands on them.
+SAME_NAP_MAX_EXTRA_LOAD = 1
+
 # ---- Availability factor ----
 AVAILABILITY_SCORES = {"available": 100, "busy": 40}
 
@@ -432,6 +439,13 @@ def get_recommendations(issue, limit=None):
         }
         rows.append(row)
 
+    # Load balancing: demote a same-NAP technician who is far more loaded
+    # than the lightest-loaded technician.
+    if rows:
+        min_open = min(r["open_assignment_count"] for r in rows)
+        for r in rows:
+            if r["tier"] == 0 and r["open_assignment_count"] > min_open + SAME_NAP_MAX_EXTRA_LOAD:
+                r["tier"] = 2
     everyone_busy = bool(rows) and all(r["tier"] == 2 for r in rows)
     for row in rows:
         row["rule_label"] = _rule_label(row, everyone_busy)
@@ -445,6 +459,8 @@ def get_recommendations(issue, limit=None):
         distance_key = row["distance_km"] if row["distance_known"] else float("inf")
         return (
             row["tier"],
+            # busy-elsewhere group: fewest open jobs first, THEN nearest
+            row["open_assignment_count"] if row["tier"] == 2 else 0,
             distance_key,
             row["open_assignment_count"],
             row["technician"].full_name.lower(),

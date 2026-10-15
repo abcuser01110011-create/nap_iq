@@ -449,7 +449,7 @@ def personnel_json():
             {
                 "id": p.id,
                 "full_name": p.full_name,
-                "status": p.status,
+                "status": p.effective_status,
                 "personnel_type": p.personnel_type,
                 "open_count": len(open_for_p),
                 "completed_count": len(completed_for_p),
