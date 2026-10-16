@@ -72,6 +72,29 @@
     </div>
 </div>
 
+{# Monthly due date: turns red on the due date and after it. #}
+<div class="card shadow-sm mb-3 napiq-account-card{% if due and due.is_due %} napiq-due-card--due{% endif %}">
+    <div class="card-body">
+        <span class="napiq-account-label">Monthly due date</span>
+        {% if due and due.due_date %}
+        <div class="napiq-account-code napiq-due-date{% if due.is_due %} napiq-due-date--due{% endif %}">
+            {{ due.due_date.strftime('%B %d, %Y') }}
+        </div>
+        <span class="napiq-account-row-label{% if due.is_due %} napiq-due-date--due{% endif %}">
+            {% if due.is_due %}
+                <i class="bi bi-exclamation-circle-fill me-1"></i>
+                {% if due.days_overdue == 0 %}Due today{% else %}Overdue by {{ due.days_overdue }} day{{ '' if due.days_overdue == 1 else 's' }}{% endif %}
+            {% else %}
+                Due in {{ due.days_until }} day{{ '' if due.days_until == 1 else 's' }}
+            {% endif %}
+            {% if due.monthly_fee is not none %} &middot; &#8369;{{ '%.2f'|format(due.monthly_fee) }}{% endif %}
+        </span>
+        {% else %}
+        <div class="napiq-account-code">&mdash;</div>
+        {% endif %}
+    </div>
+</div>
+
 {# Reported-issue progress tracker (moved here from the old "Open issues" tile) #}
 <div class="ip-home-wrap mb-3">
     <div class="ip-home-top">
@@ -105,29 +128,6 @@
     </div>
 </div>
 
-{# Monthly due date: turns red on the due date and after it. #}
-<div class="card shadow-sm mb-3 napiq-account-card{% if due and due.is_due %} napiq-due-card--due{% endif %}">
-    <div class="card-body">
-        <span class="napiq-account-label">Monthly due date</span>
-        {% if due and due.due_date %}
-        <div class="napiq-account-code napiq-due-date{% if due.is_due %} napiq-due-date--due{% endif %}">
-            {{ due.due_date.strftime('%B %d, %Y') }}
-        </div>
-        <span class="napiq-account-row-label{% if due.is_due %} napiq-due-date--due{% endif %}">
-            {% if due.is_due %}
-                <i class="bi bi-exclamation-circle-fill me-1"></i>
-                {% if due.days_overdue == 0 %}Due today{% else %}Overdue by {{ due.days_overdue }} day{{ '' if due.days_overdue == 1 else 's' }}{% endif %}
-            {% else %}
-                Due in {{ due.days_until }} day{{ '' if due.days_until == 1 else 's' }}
-            {% endif %}
-            {% if due.monthly_fee is not none %} &middot; &#8369;{{ '%.2f'|format(due.monthly_fee) }}{% endif %}
-        </span>
-        {% else %}
-        <div class="napiq-account-code">&mdash;</div>
-        {% endif %}
-    </div>
-</div>
-
 {% if payments %}
 {% set last_payment = payments[0] %}
 <div class="card shadow-sm mb-3 napiq-account-card">
@@ -144,10 +144,48 @@
 {% endif %}
 
 <div class="d-flex flex-wrap gap-2 mb-3">
+    {% if open_issue %}
+    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#openIssueModal">
+        <i class="bi bi-plus-lg me-1"></i>Report an Issue
+    </button>
+    {% else %}
     <a href="{{ url_for('customer.report_issue') }}" class="btn btn-sm btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Report an Issue
     </a>
+    {% endif %}
 </div>
+{% if open_issue %}
+{# Popup only: opens over the home screen, no page change or reload. #}
+<div class="modal fade" id="openIssueModal" tabindex="-1" aria-labelledby="openIssueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="openIssueModalLabel">
+                    <i class="bi bi-info-circle text-primary me-1"></i>You already reported an issue
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    You have an ongoing report
+                    (<strong>{{ open_issue.issue_code or ('#' ~ open_issue.id) }}</strong>
+                    &ndash; {{ open_issue.issue_type }},
+                    status: <strong>{{ open_issue.status|replace('_', ' ')|capitalize }}</strong>).
+                </p>
+                <p class="mb-0">
+                    Only <strong>one issue report</strong> is allowed at a time. You can report another
+                    issue once your first report is <strong>completed</strong>. You can follow its progress
+                    right here on the home screen or under <em>My Issues</em>.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{{ url_for('customer.my_issues') }}" class="btn btn-primary">View My Issues</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endif %}
 {% endblock %}
 

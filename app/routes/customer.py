@@ -150,6 +150,9 @@ def index():
         service_requests=subscriber.service_requests if subscriber else [],
         payments=subscriber.payments if subscriber else [],
         due=monthly_due_info(subscriber) if subscriber else None,
+        # Oldest open ticket: the home Report button shows a popup instead
+        # of navigating when one exists (one open report at a time).
+        open_issue=open_issue_for_subscriber(subscriber.id) if subscriber else None,
         # Home-screen progress tracker: only issues still being worked on
         # (same tracker data the My Issues history page uses).
         progress_data=[
