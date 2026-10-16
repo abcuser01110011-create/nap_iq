@@ -82,6 +82,7 @@ from app.issue_utils import (
     consolidate_nap_issues,
     effective_technician_name,
     open_issue_for_subscriber,
+    effective_open_assignment,
     resolve_customer_issue_priority,
 )
 from app.nap_recommendation import recommend_naps
@@ -513,13 +514,31 @@ def _issue_progress(issue):
         done, current = 0, 0
     else:  # pending
         done, current = 0, -1
+    tech = None
+    if done < 3:
+        assignment = effective_open_assignment(issue)
+        tech = assignment.technician if assignment is not None else None
+
+    def _num(v):
+        return float(v) if v is not None else None
+
+    # Destination = where the issue was reported, else the subscriber's own
+    # pinned location.
+    sub = issue.subscriber
+    dest_lat = _num(issue.latitude) if issue.latitude is not None else _num(getattr(sub, "latitude", None))
+    dest_lng = _num(issue.longitude) if issue.longitude is not None else _num(getattr(sub, "longitude", None))
     return {
         "id": issue.id,
         "status": status,
         "status_label": status.replace("_", " ").capitalize(),
         "done": done,
         "current": current,
-        "technician": effective_technician_name(issue) if done < 3 else None,
+        "technician": tech.full_name if tech is not None else None,
+        "technician_phone": (tech.contact_number or None) if tech is not None else None,
+        "tech_lat": _num(tech.current_latitude) if tech is not None else None,
+        "tech_lng": _num(tech.current_longitude) if tech is not None else None,
+        "dest_lat": dest_lat,
+        "dest_lng": dest_lng,
     }
 
 
