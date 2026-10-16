@@ -565,7 +565,7 @@ def report_issue():
             existing_issue.address = (form.address.data or "").strip() or None
             existing_issue.latitude = form.latitude.data
             existing_issue.longitude = form.longitude.data
-            existing_issue.nap_id = form.nap_id.data or None  # 0 sentinel -> NULL
+            existing_issue.nap_id = form.nap_id.data or subscriber.nap_id  # 0 sentinel -> subscriber's NAP
             # Status/issue_code are left untouched -- this is the same
             # ticket, not a new one, so it keeps its place in the
             # existing pending/assigned/in_progress workflow.
@@ -669,7 +669,11 @@ def report_issue():
             latitude=form.latitude.data,
             longitude=form.longitude.data,
             subscriber_id=form.subscriber_id.data,
-            nap_id=form.nap_id.data or None,  # 0 sentinel -> NULL
+            # The Repair form sends the 0 sentinel (no NAP picker), so fall
+            # back to the subscriber's own NAP -- same as the customer
+            # report flow -- otherwise ticket consolidation (which groups
+            # by NAP) never sees this ticket.
+            nap_id=form.nap_id.data or subscriber.nap_id,
         )
         db.session.add(issue)
         db.session.commit()  # issue.id is now populated by MySQL

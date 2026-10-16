@@ -40,6 +40,7 @@ from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
 from app.billing_utils import monthly_due_info
 from app.issue_utils import (
     consolidate_nap_issues,
+    open_issue_for_subscriber,
     effective_technician_name,
     resolve_customer_issue_priority,
 )
@@ -507,6 +508,18 @@ def report_issue():
     subscriber = _own_subscriber_or_none()
     if subscriber is None:
         return _no_subscriber_response()
+
+    # One open report at a time (same rule as the web portal).
+    open_issue = open_issue_for_subscriber(subscriber.id)
+    if open_issue is not None:
+        return jsonify(
+            error=(
+                f"You already reported an issue ({open_issue.issue_code or '#' + str(open_issue.id)}). "
+                "Only one report is allowed until it is completed."
+            ),
+            code="open_issue_exists",
+            issue=_serialize_issue(open_issue),
+        ), 409
 
     issue_type = str(request.form.get("issue_type") or "").strip()
     description = str(request.form.get("description") or "").strip()

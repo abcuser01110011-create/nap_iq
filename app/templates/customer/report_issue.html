@@ -5,6 +5,42 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">Let us know about a problem with your service</p>{% endblock %}
 
 {% block content %}
+{% if open_issue %}
+<div class="modal fade" id="openIssueModal" tabindex="-1" aria-labelledby="openIssueModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="openIssueModalLabel">
+                    <i class="bi bi-info-circle text-primary me-1"></i>You already reported an issue
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    You have an ongoing report
+                    (<strong>{{ open_issue.issue_code or ('#' ~ open_issue.id) }}</strong>
+                    &ndash; {{ open_issue.issue_type }},
+                    status: <strong>{{ open_issue.status|replace('_', ' ')|capitalize }}</strong>).
+                </p>
+                <p class="mb-0">
+                    Only <strong>one issue report</strong> is allowed at a time. You can report another
+                    issue once your first report is <strong>completed</strong>. You can follow its progress
+                    under <em>My Issues</em>.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <a href="{{ url_for('customer.index') }}" class="btn btn-outline-secondary">Back to Home</a>
+                <a href="{{ url_for('customer.my_issues') }}" class="btn btn-primary">View My Issues</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    window.addEventListener('load', function () {
+        var el = document.getElementById('openIssueModal');
+        if (el && window.bootstrap) bootstrap.Modal.getOrCreateInstance(el).show();
+    });
+</script>
+{% endif %}
 <div class="row justify-content-center">
     <div class="col-lg-7">
         <div class="card shadow-sm">

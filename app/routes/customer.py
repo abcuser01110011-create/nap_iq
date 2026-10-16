@@ -78,7 +78,12 @@ from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
 from app.billing_utils import monthly_due_info
-from app.issue_utils import consolidate_nap_issues, resolve_customer_issue_priority
+from app.issue_utils import (
+    consolidate_nap_issues,
+    effective_technician_name,
+    open_issue_for_subscriber,
+    resolve_customer_issue_priority,
+)
 from app.nap_recommendation import recommend_naps
 from app.notifications_utils import notify_new_issue_reported
 from app.recommendation import auto_assign_recommended_technician
@@ -357,6 +362,15 @@ def report_issue():
 
     form = CustomerIssueReportForm()
 
+    # One open report at a time: while an earlier report is still not
+    # completed, a new one is refused (the page shows a pop-up explaining
+    # why, with a link to the existing report).
+    open_issue = open_issue_for_subscriber(subscriber.id)
+    if open_issue is not None:
+        return render_template(
+            "customer/report_issue.html", form=form, subscriber=subscriber, open_issue=open_issue
+        )
+
     if form.validate_on_submit():
         # A photo is required (upload from the device's gallery, or
         # take one on the spot — both come through this same file
@@ -463,7 +477,49 @@ def my_issues():
         "customer/issues.html",
         subscriber=subscriber,
         technical_issues=subscriber.technical_issues,
+        progress_data=[_issue_progress(i) for i in subscriber.technical_issues],
     )
+
+
+def _issue_progress(issue):
+    """Progress-tracker view of one of the customer's own issues.
+
+    Three steps: Technician Assigned -> Arriving (the technician has
+    started work on it) -> Completed. `done` is how many steps are
+    finished and `current` the step in progress (-1 when none is, i.e.
+    still waiting for a technician, or everything is finished). Driven by
+    the ticket's status, which the technician workflow keeps up to date
+    ('assigned' -> 'in_progress' -> 'resolved'); a ticket folded into a
+    consolidated one follows its parent's status the same way."""
+    status = issue.status
+    if status in ("resolved", "closed"):
+        done, current = 3, -1
+    elif status == "in_progress":
+        done, current = 1, 1
+    elif status in ("assigned", "accepted"):
+        done, current = 0, 0
+    else:  # pending
+        done, current = 0, -1
+    return {
+        "id": issue.id,
+        "status": status,
+        "status_label": status.replace("_", " ").capitalize(),
+        "done": done,
+        "current": current,
+        "technician": effective_technician_name(issue) if done < 3 else None,
+    }
+
+
+@customer_bp.route("/issues/progress")
+@role_required("user")
+def my_issues_progress():
+    """JSON feed behind the My Issues page's auto-refreshing progress
+    tracker (static/js/customer-issue-progress.js polls it). Only ever
+    returns the signed-in customer's own issues."""
+    subscriber = _own_subscriber_or_none()
+    if subscriber is None:
+        return jsonify(issues=[])
+    return jsonify(issues=[_issue_progress(i) for i in subscriber.technical_issues])
 
 
 @customer_bp.route("/service-requests")

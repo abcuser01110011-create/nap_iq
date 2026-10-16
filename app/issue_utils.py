@@ -140,6 +140,20 @@ def _withdraw_unstarted_assignments(issue):
     return False
 
 
+def open_issue_for_subscriber(subscriber_id):
+    """The subscriber's oldest not-yet-completed ticket, or None. A
+    customer may only have ONE such ticket at a time (the self-service
+    report routes refuse a new report while this returns something)."""
+    return (
+        TechnicalIssue.query.filter(
+            TechnicalIssue.subscriber_id == subscriber_id,
+            TechnicalIssue.status.in_(("pending", "assigned", "accepted", "in_progress")),
+        )
+        .order_by(TechnicalIssue.created_at, TechnicalIssue.id)
+        .first()
+    )
+
+
 def effective_open_assignment(issue):
     """The open Assignment responsible for `issue`: its own, or -- when it
     was folded into a consolidated parent ticket -- the parent's.
