@@ -88,8 +88,8 @@
         d = document.createElement("div");
         d.className = "ip-details";
         d.innerHTML =
-            '<button type="button" class="ip-details-toggle" aria-expanded="false">' +
-            '<span>Progress details</span><i class="bi bi-chevron-down"></i></button>' +
+            '<button type="button" class="ip-details-toggle" aria-expanded="false" aria-label="Show progress details">' +
+            '<i class="bi bi-chevron-down"></i></button>' +
             '<div class="ip-details-body" hidden></div>';
         item.appendChild(d);
         d.querySelector(".ip-details-toggle").addEventListener("click", function () {
@@ -131,12 +131,13 @@
         var d = ensureDetails(issue);
         if (!d) return;
         var st = loc[issue.id] || {};
-        var html = '<div class="ip-d-section"><div class="ip-d-title">Technician Assigned</div>' +
-            row("Name", issue.technician ? esc(issue.technician) : "None") +
-            row("Contact", issue.technician_phone ? '<a href="tel:' + esc(issue.technician_phone) + '">' + esc(issue.technician_phone) + "</a>" : "None") +
-            "</div>";
-        html += '<div class="ip-d-section"><div class="ip-d-title">Arriving</div>';
-        if (issue.current === 1) {
+        var html = "";
+        // Only the details for the step the issue is currently on.
+        if (issue.done >= 3) {
+            html = '<div class="ip-d-title">Completed</div>' +
+                '<div class="ip-d-note">Your issue has been resolved.</div>';
+        } else if (issue.current === 1) {
+            html = '<div class="ip-d-title">Arriving</div>';
             if (st.tech) {
                 html += row("Technician location",
                     '<a href="https://www.openstreetmap.org/?mlat=' + st.tech[0] + "&mlon=" + st.tech[1] + '#map=16/' + st.tech[0] + "/" + st.tech[1] +
@@ -146,14 +147,11 @@
             }
             html += row("Route distance", st.route ? fmtDist(st.route.m) + (st.route.approx ? " (straight-line)" : "") : "Not available");
             if (st.at) html += '<div class="ip-d-note">Updates every 5 minutes &middot; last updated ' + fmtTime(new Date(st.at)) + "</div>";
-        } else if (issue.done >= 3) {
-            html += '<div class="ip-d-note">Technician has arrived.</div>';
         } else {
-            html += '<div class="ip-d-note">Shown once the technician is on the way.</div>';
+            html = '<div class="ip-d-title">Technician Assigned</div>' +
+                row("Name", issue.technician ? esc(issue.technician) : "None") +
+                row("Contact", issue.technician_phone ? '<a href="tel:' + esc(issue.technician_phone) + '">' + esc(issue.technician_phone) + "</a>" : "None");
         }
-        html += "</div>";
-        html += '<div class="ip-d-section"><div class="ip-d-title">Completed</div>' +
-            '<div class="ip-d-note">' + (issue.done >= 3 ? "Your issue has been resolved." : "Pending completion of the work.") + "</div></div>";
         d.querySelector(".ip-details-body").innerHTML = html;
     }
 
