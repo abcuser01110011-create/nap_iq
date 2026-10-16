@@ -128,6 +128,9 @@ def _own_subscriber_or_none():
     return Subscriber.query.filter_by(user_id=g.user.id).first()
 
 
+_ACTIVE_ISSUE_STATUSES = ("pending", "assigned", "accepted", "in_progress")
+
+
 @customer_bp.route("/")
 @role_required("user")
 def index():
@@ -147,6 +150,13 @@ def index():
         service_requests=subscriber.service_requests if subscriber else [],
         payments=subscriber.payments if subscriber else [],
         due=monthly_due_info(subscriber) if subscriber else None,
+        # Home-screen progress tracker: only issues still being worked on
+        # (same tracker data the My Issues history page uses).
+        progress_data=[
+            _issue_progress(i)
+            for i in (subscriber.technical_issues if subscriber else [])
+            if i.status in _ACTIVE_ISSUE_STATUSES
+        ],
     )
 
 

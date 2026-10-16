@@ -44,7 +44,7 @@
                 html += "";
             }
             box.innerHTML = html;
-            var row = box.closest("td");
+            var row = box.closest("td") || box.parentElement;
             var note = row.querySelector(".ip-note");
             if (issue.status === "pending") {
                 if (!note) {
@@ -57,7 +57,8 @@
                 note.remove();
             }
         }
-        var badge = document.querySelector('tr.issue-row[data-issue-id="' + issue.id + '"] .issue-status-badge');
+        var badge = document.querySelector('tr.issue-row[data-issue-id="' + issue.id + '"] .issue-status-badge') ||
+            document.querySelector('.ip-home-item[data-issue-id="' + issue.id + '"] .issue-status-badge');
         if (badge) {
             BADGE_ALL.forEach(function (c) { badge.classList.remove(c); });
             badge.classList.add(BADGE_CLASSES[issue.status] || "text-bg-secondary");

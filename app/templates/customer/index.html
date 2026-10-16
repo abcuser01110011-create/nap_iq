@@ -4,6 +4,10 @@
 {% block page_title %}My Account{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">PG Networks Customer Portal</p>{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
+{% endblock %}
+
 {% block content %}
 {% if subscriber is none %}
 <div class="card shadow-sm napiq-account-card">
@@ -47,9 +51,6 @@
     exists on both surfaces. The hamburger sidebar/topbar shell itself
     is unchanged.
 #}
-{% set open_issue_statuses = ['pending', 'assigned', 'accepted', 'in_progress'] %}
-{% set open_issue_count = technical_issues|selectattr('status', 'in', open_issue_statuses)|list|length %}
-
 <div class="card shadow-sm mb-3 napiq-account-card">
     <div class="card-body">
         <span class="napiq-account-label">Account</span>
@@ -71,15 +72,36 @@
     </div>
 </div>
 
-<div class="row g-3 mb-3">
-    <div class="col-12">
-        <a class="dash-stat-card dash-stat-card-link h-100" href="{{ url_for('customer.my_issues') }}">
-            <span class="dash-stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></span>
-            <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ open_issue_count }}</span>
-                <span class="dash-stat-label">Open issues</span>
-            </div>
+{# Reported-issue progress tracker (moved here from the old "Open issues" tile) #}
+<div class="ip-home-wrap mb-3">
+    <div class="ip-home-top">
+        <a href="{{ url_for('customer.my_issues') }}" class="btn btn-sm btn-outline-primary ip-history-btn">
+            <i class="bi bi-clock-history me-1"></i>View reported issue history
         </a>
+    </div>
+    <div class="card shadow-sm napiq-account-card ip-home-card">
+        <div class="card-body">
+            <span class="napiq-account-label">Reported issue progress</span>
+            {% if progress_data %}
+            <div class="ip-home-list">
+                {% for p in progress_data %}
+                {% set issue = technical_issues|selectattr('id', 'equalto', p.id)|first %}
+                <div class="ip-home-item" data-issue-id="{{ p.id }}">
+                    <div class="ip-home-head">
+                        <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
+                        <span class="text-muted small">{{ issue.issue_type }}</span>
+                        <span class="badge ms-auto issue-status-badge text-bg-secondary">{{ p.status_label }}</span>
+                    </div>
+                    <div class="issue-progress" data-issue-id="{{ p.id }}"></div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0 mt-2">
+                <i class="bi bi-check2-circle me-1"></i>No issues in progress right now.
+            </p>
+            {% endif %}
+        </div>
     </div>
 </div>
 
@@ -126,5 +148,15 @@
         <i class="bi bi-plus-lg me-1"></i>Report an Issue
     </a>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if subscriber is not none and progress_data %}
+<script>
+    window.ISSUE_PROGRESS_INITIAL = {{ progress_data|tojson }};
+    window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
+</script>
+<script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
 {% endif %}
 {% endblock %}
