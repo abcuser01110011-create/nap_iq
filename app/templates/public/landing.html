@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PG Networks &middot; Fiber Internet &mdash; Apply Online</title>
-    <meta name="description" content="Apply for PG Networks fiber internet online, or log in to manage your account.">
+    <meta name="description" content="PG Networks Unli Fibr plans from 15 to 60 Mbps with Whole Home WiFi and free install &amp; activation. Apply online or call 0917 654 8563.">
 
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='img/favicon-192.png') }}">
@@ -37,55 +37,76 @@
     <section class="lp-hero">
         <div class="lp-wrap lp-hero__grid">
             <div class="lp-hero__copy">
-                <span class="lp-pill"><i class="bi bi-wifi"></i> Fiber internet for your home</span>
-                <h1>Get connected with <span>PG Networks</span> fiber.</h1>
-                <p>Apply online in minutes, track your installation, and manage your account, payments and
-                   service issues from one place &mdash; on any device.</p>
+                <span class="lp-ribbon">Subscribe to Unlimited Fibr &amp; get these</span>
+                <h1>Exclusive <span>Offers!</span></h1>
+                <p>Unlimited fiber speed internet connection with whole home WiFi coverage &mdash;
+                   apply online, track your installation and manage your account in one place.</p>
                 <div class="lp-hero__actions">
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--lg">
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink lp-btn--lg">
                         Apply online <i class="bi bi-arrow-right"></i>
                     </a>
-                    <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--outline lp-btn--lg">
-                        <i class="bi bi-person"></i> Account login
-                    </a>
+                    <a href="#plans" class="lp-btn lp-btn--white lp-btn--lg">See Unli Fibr plans</a>
                 </div>
                 <ul class="lp-hero__points">
-                    <li><i class="bi bi-check-circle-fill"></i> No paperwork &mdash; 100% online</li>
-                    <li><i class="bi bi-check-circle-fill"></i> Coverage check built in</li>
-                    <li><i class="bi bi-check-circle-fill"></i> Track technician arrival</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Free install &amp; activation</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Whole Home WiFi</li>
+                    <li><i class="bi bi-check-circle-fill"></i> 24/7 monitoring</li>
                 </ul>
             </div>
-            <div class="lp-hero__card" aria-hidden="true">
-                <div class="lp-signal">
-                    <i class="bi bi-router"></i>
-                    <div class="lp-signal__rings"><span></span><span></span><span></span></div>
-                </div>
-                <div class="lp-hero__stat"><strong>Online</strong><small>application &amp; account</small></div>
+            <div class="lp-hero__tower" aria-hidden="true">
+                <img src="{{ url_for('static', filename='img/tower.svg') }}" alt="" width="320" height="660">
             </div>
         </div>
     </section>
 
-    <section class="lp-section" id="plans">
+    <section class="lp-section lp-section--blue" id="plans">
         <div class="lp-wrap">
-            <h2 class="lp-h2">Choose your plan</h2>
-            <p class="lp-sub">Pick a plan when you apply. Our team confirms coverage for your address.</p>
-            {% if plans %}
-            <div class="lp-plans">
-                {% for plan in plans %}
-                <article class="lp-plan">
-                    <h3>{{ plan.name }}</h3>
-                    {% if plan.monthly_fee is not none %}
-                    <div class="lp-plan__price"><small>&#8369;</small>{{ '{:,.0f}'.format(plan.monthly_fee) }}<span>/month</span></div>
-                    {% else %}
-                    <div class="lp-plan__price lp-plan__price--na">Ask for pricing</div>
-                    {% endif %}
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--block">Apply for this plan</a>
+            <h2 class="lp-h2">Unli Fibr plans</h2>
+            <p class="lp-sub">Whole Home WiFi on every plan. Our team confirms coverage for your address.</p>
+            <div class="lp-offers">
+                <article class="lp-offer">
+                    <div class="lp-offer__speed">15<small>Mbps</small></div>
+                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan Promo 999</strong></div>
+                    <div class="lp-offer__price"><small>&#8369;</small>999</div>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink">Apply</a>
                 </article>
-                {% endfor %}
+                <article class="lp-offer lp-offer--hot">
+                    <span class="lp-offer__tag">Promo</span>
+                    <div class="lp-offer__speed">25<small>Mbps</small></div>
+                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 1500</strong></div>
+                    <div class="lp-offer__price"><small>&#8369;</small>1,500</div>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink">Apply</a>
+                </article>
+                <article class="lp-offer">
+                    <div class="lp-offer__speed">60<small>Mbps</small></div>
+                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 2500</strong></div>
+                    <div class="lp-offer__price"><small>&#8369;</small>2,500</div>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink">Apply</a>
+                </article>
             </div>
-            {% else %}
-            <div class="lp-empty">Plans will be listed here soon. You can still apply online and we'll help you choose.</div>
-            {% endif %}
+
+            <ul class="lp-perks">
+                <li><i class="bi bi-activity"></i> Offering 24/7 Monitoring &amp; Restoration</li>
+                <li><i class="bi bi-wrench-adjustable"></i> Fast &amp; Reliable Maintenance Team</li>
+                <li><i class="bi bi-wifi"></i> Whole Home Wifi Coverage</li>
+            </ul>
+
+            <div class="lp-free">Free Install &amp; Activation</div>
+
+            <div class="lp-contact">
+                <div class="lp-contact__info">
+                    <h3>For inquiries</h3>
+                    <p>Please call or text</p>
+                    <a class="lp-contact__phone" href="tel:09176548563"><i class="bi bi-telephone-fill"></i> 0917 654 8563</a>
+                    <p class="lp-contact__fb">or message us on Facebook:<br>
+                        <a href="https://www.facebook.com/pgnwis" target="_blank" rel="noopener">www.facebook.com/pgnwis</a></p>
+                </div>
+                <a class="lp-contact__card" href="https://www.facebook.com/pgnwis" target="_blank" rel="noopener">
+                    <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="" width="64" height="64">
+                    <span><strong>PGNETWORKS</strong><small>@pgnwis &middot; Internet Service Provider</small></span>
+                    <i class="bi bi-facebook"></i>
+                </a>
+            </div>
         </div>
     </section>
 
@@ -128,10 +149,11 @@
 
 <footer class="lp-footer">
     <div class="lp-wrap lp-footer__row">
-        <span>&copy; PG Networks</span>
+        <span>&copy; PG Networks Technology Inc.</span>
         <a href="{{ url_for('auth.login') }}" class="lp-footer__staff"><i class="bi bi-shield-lock"></i> Staff login</a>
     </div>
 </footer>
+<div class="lp-tagline">You can enjoy Unlimited Fiber Speed Internet Connection</div>
 
 </body>
 </html>
