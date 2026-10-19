@@ -46,7 +46,10 @@
             box.innerHTML = html;
             var row = box.closest("td") || box.parentElement;
             var note = row.querySelector(".ip-note");
-            if (issue.status === "pending") {
+            if (box.closest(".ip-home-item")) {
+                // Home / history cards explain this in the step details panel.
+                if (note) note.remove();
+            } else if (issue.status === "pending") {
                 if (!note) {
                     note = document.createElement("div");
                     note.className = "ip-note";
@@ -281,6 +284,15 @@
             .then(function (data) { if (data) apply(data.issues); })
             .catch(function () { /* keep the last known state; try again next tick */ });
     }
+
+    // History page: the map is built while its panel is collapsed (zero size),
+    // so re-measure and re-fit it once the panel is actually opened.
+    document.addEventListener("shown.bs.collapse", function (e) {
+        var item = e.target.querySelector && e.target.querySelector(".ip-home-item");
+        if (!item) return;
+        var m = maps[item.getAttribute("data-issue-id")];
+        if (m) { m.map.invalidateSize(); fitMap(m); }
+    });
 
     apply(window.ISSUE_PROGRESS_INITIAL);
     setInterval(refresh, REFRESH_MS);

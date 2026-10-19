@@ -51,3 +51,11 @@
 .ip-pin { position: relative; }
 .ip-pin__dot { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
 .ip-pin__tag { position: absolute; left: 0; top: 12px; transform: translateX(-50%); background: #fff; color: #0f1b3d; font-size: .7rem; font-weight: 700; padding: .05rem .4rem; border-radius: 999px; box-shadow: 0 1px 4px rgba(0,0,0,.3); white-space: nowrap; }
+
+/* Reported issue history: collapsed list of issue types, tap to expand */
+.ip-hist-item + .ip-hist-item { border-top: 1px solid var(--bs-border-color, #dee2e6); }
+.ip-hist-toggle { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; border: 0; border-radius: 0; padding: .9rem 1rem; font-weight: 600; text-align: left; background: transparent; }
+.ip-hist-chevron { color: var(--bs-secondary-color, #6c757d); transition: transform .15s ease; }
+.ip-hist-toggle[aria-expanded="true"] .ip-hist-chevron { transform: rotate(180deg); }
+.ip-hist-panel { padding: .25rem 1rem 1rem; }
+.ip-hist-info { margin-top: .9rem; padding-top: .6rem; border-top: 1px solid var(--bs-border-color, #dee2e6); }

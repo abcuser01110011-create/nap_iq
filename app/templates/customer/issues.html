@@ -5,28 +5,8 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">Technical issues reported on your account</p>{% endblock %}
 
 {% block extra_head %}
-<style>
-    .issue-progress { display: flex; align-items: flex-start; max-width: 520px; margin: 0 auto; padding: .25rem 0; }
-    .ip-step { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; position: relative; text-align: center; min-width: 0; }
-    .ip-step:not(:first-child)::before {
-        content: ""; position: absolute; top: 15px; right: 50%; width: 100%; height: 3px;
-        background: var(--bs-border-color, #dee2e6); z-index: 0;
-    }
-    .ip-step.done:not(:first-child)::before, .ip-step.current:not(:first-child)::before { background: #0d8bf2; }
-    .ip-dot {
-        width: 32px; height: 32px; border-radius: 50%; z-index: 1; display: flex; align-items: center;
-        justify-content: center; font-weight: 700; font-size: .85rem; background: var(--bs-body-bg, #fff);
-        border: 2px solid var(--bs-border-color, #ced4da); color: var(--bs-secondary-color, #6c757d);
-    }
-    .ip-step.done .ip-dot { background: #0d8bf2; border-color: #0d8bf2; color: #fff; }
-    .ip-step.current .ip-dot { border-color: #0d8bf2; color: #0d8bf2; box-shadow: 0 0 0 4px rgba(13,139,242,.25); }
-    .ip-step.current .ip-dot.pulse { animation: ipPulse 1.6s ease-in-out infinite; }
-    @keyframes ipPulse { 50% { box-shadow: 0 0 0 7px rgba(13,139,242,.08); } }
-    .ip-label { margin-top: .4rem; font-size: .78rem; font-weight: 600; line-height: 1.2; }
-    .ip-step:not(.done):not(.current) .ip-label { color: var(--bs-secondary-color, #6c757d); font-weight: 500; }
-    .ip-sub { font-size: .72rem; color: var(--bs-secondary-color, #6c757d); }
-    .ip-note { text-align: center; font-size: .75rem; color: var(--bs-secondary-color, #6c757d); margin-top: .25rem; }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -42,52 +22,53 @@
     </div>
     <div class="card-body p-0">
         {% if technical_issues %}
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead>
-                    <tr>
-                        <th>Issue</th>
-                        <th>Type</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Description</th>
-                        <th>Reported</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
-                    {% set issue_status_classes = {
-                        'pending': 'text-bg-secondary',
-                        'assigned': 'text-bg-info',
-                        'in_progress': 'text-bg-primary',
-                        'resolved': 'text-bg-success',
-                        'closed': 'text-bg-dark'
-                    } %}
-                    {% for issue in technical_issues %}
-                    <tr class="issue-row" data-issue-id="{{ issue.id }}">
-                        <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
-                        <td>{{ issue.issue_type }}</td>
-                        <td>
-                            <span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">
-                                {{ issue.priority|capitalize }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge issue-status-badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">
-                                {{ issue.status|replace('_', ' ')|capitalize }}
-                            </span>
-                        </td>
-                        <td class="text-muted small">{% set _d = issue.description or "" %}{% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}{{ _d or "—" }}</td>
-                        <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
-                    </tr>
-                    <tr class="issue-progress-row" data-issue-id="{{ issue.id }}">
-                        <td colspan="6" class="pt-0 pb-3 border-top-0">
+        {# History list: just the issue type per row. Tapping a row opens the
+           same progress view the home screen shows for an ongoing issue
+           (steps, tappable step details, live map), plus the ticket's own
+           details underneath. #}
+        {% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+        {% set issue_status_classes = {
+            'pending': 'text-bg-secondary',
+            'assigned': 'text-bg-info',
+            'accepted': 'text-bg-info',
+            'in_progress': 'text-bg-primary',
+            'resolved': 'text-bg-success',
+            'closed': 'text-bg-dark'
+        } %}
+        <div class="list-group list-group-flush ip-hist-list">
+            {% for issue in technical_issues %}
+            <div class="ip-hist-item">
+                <button type="button" class="list-group-item list-group-item-action ip-hist-toggle collapsed"
+                        data-bs-toggle="collapse" data-bs-target="#issue-detail-{{ issue.id }}"
+                        aria-expanded="false" aria-controls="issue-detail-{{ issue.id }}">
+                    <span class="ip-hist-type">{{ issue.issue_type }}</span>
+                    <i class="bi bi-chevron-down ip-hist-chevron"></i>
+                </button>
+                <div class="collapse" id="issue-detail-{{ issue.id }}">
+                    <div class="ip-hist-panel">
+                        <div class="ip-home-item" data-issue-id="{{ issue.id }}">
+                            <div class="ip-home-head">
+                                <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
+                                <span class="text-muted small">{{ issue.issue_type }}</span>
+                                <span class="badge ms-auto issue-status-badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">{{ issue.status|replace('_', ' ')|capitalize }}</span>
+                            </div>
                             <div class="issue-progress" data-issue-id="{{ issue.id }}"></div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                        <div class="ip-hist-info">
+                            <div class="ip-d-title">Issue details</div>
+                            <div class="ip-d-row"><span class="ip-d-label">Priority</span>
+                                <span class="ip-d-value"><span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">{{ issue.priority|capitalize }}</span></span></div>
+                            <div class="ip-d-row"><span class="ip-d-label">Reported</span>
+                                <span class="ip-d-value">{{ issue.created_at.strftime('%Y-%m-%d') }}</span></div>
+                            {% set _d = issue.description or "" %}
+                            {% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}
+                            <div class="ip-d-row"><span class="ip-d-label">Description</span>
+                                <span class="ip-d-value">{{ _d or "—" }}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="p-4 text-center text-muted">
@@ -104,5 +85,6 @@
     window.ISSUE_PROGRESS_INITIAL = {{ progress_data|tojson }};
     window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
 </script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
 {% endblock %}
