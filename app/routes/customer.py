@@ -71,6 +71,8 @@ import uuid
 
 import cloudinary
 import cloudinary.uploader
+from datetime import timedelta, timezone
+
 from flask import Blueprint, current_app, render_template, redirect, url_for, flash, g, request, jsonify
 
 from app.extensions import db, limiter
@@ -495,6 +497,79 @@ def my_issues():
     )
 
 
+# Timestamps are stored in UTC; the customers are in the Philippines
+# (UTC+8, no daylight saving), so show them in that time.
+_PH_TZ = timezone(timedelta(hours=8))
+
+
+def _ph_datetime(dt):
+    """'Oct 19, 2026 · 3:45 PM' in Philippine time, or None."""
+    if dt is None:
+        return None
+    local = dt.replace(tzinfo=timezone.utc).astimezone(_PH_TZ)
+    return f"{local.strftime('%b')} {local.day}, {local.year} \u00b7 {local.strftime('%I:%M %p').lstrip('0')}"
+
+
+def _duration_label(delta):
+    """'2 days 3 hrs' / '45 mins' for a timedelta; None when negative/missing."""
+    if delta is None or delta.total_seconds() < 0:
+        return None
+    mins = int(delta.total_seconds() // 60)
+    days, rem = divmod(mins, 1440)
+    hours, minutes = divmod(rem, 60)
+    parts = []
+    if days:
+        parts.append(f"{days} day{'' if days == 1 else 's'}")
+    if hours:
+        parts.append(f"{hours} hr{'' if hours == 1 else 's'}")
+    if minutes and not days:
+        parts.append(f"{minutes} min{'' if minutes == 1 else 's'}")
+    return " ".join(parts) or "Less than a minute"
+
+
+def _handling_assignment(issue):
+    """The assignment that is (or was) responsible for `issue`: the open
+    one while it is being worked on, otherwise the most recent
+    non-cancelled one -- so a resolved ticket still shows who fixed it.
+    A ticket folded into a consolidated parent falls back to the parent's."""
+    open_a = effective_open_assignment(issue)
+    if open_a is not None:
+        return open_a
+    for source in (issue, issue.parent_issue):
+        if source is None:
+            continue
+        done = [a for a in source.assignments if a.status != "cancelled"]
+        if done:
+            return max(done, key=lambda a: (a.completed_at or a.assigned_at, a.id))
+    return None
+
+
+def _issue_history(issue):
+    """Everything the issue details page shows, already formatted."""
+    assignment = _handling_assignment(issue)
+    tech = assignment.technician if assignment is not None else None
+    finished = issue.status in ("resolved", "closed")
+
+    completed_at = None
+    if finished:
+        completed_at = (assignment.completed_at if assignment is not None else None) or issue.updated_at
+
+    return {
+        "technician": tech.full_name if tech is not None else None,
+        "technician_phone": (tech.contact_number or None) if tech is not None else None,
+        "reported": _ph_datetime(issue.created_at),
+        "assigned": _ph_datetime(assignment.assigned_at) if assignment is not None else None,
+        "completed": _ph_datetime(completed_at),
+        "duration": _duration_label(completed_at - issue.created_at) if completed_at else None,
+        "finished": finished,
+        "nap_code": issue.nap.nap_code if issue.nap is not None else None,
+        "location": issue.address or (issue.subscriber.address if issue.subscriber else None),
+        "resolution_notes": (assignment.resolution_notes or "").strip() if (assignment is not None and finished) else "",
+        "completion_photo": (issue.proof_photo or (assignment.photo_filename if assignment is not None else None)) if finished else None,
+        "report_photo": issue.photo_filename,
+    }
+
+
 @customer_bp.route("/issues/<int:issue_id>")
 @role_required("user")
 def my_issue_detail(issue_id):
@@ -511,6 +586,7 @@ def my_issue_detail(issue_id):
         subscriber=subscriber,
         issue=issue,
         progress=_issue_progress(issue),
+        history=_issue_history(issue),
     )
 
 
@@ -533,10 +609,8 @@ def _issue_progress(issue):
         done, current = 0, 0
     else:  # pending
         done, current = 0, -1
-    tech = None
-    if done < 3:
-        assignment = effective_open_assignment(issue)
-        tech = assignment.technician if assignment is not None else None
+    assignment = effective_open_assignment(issue) if done < 3 else _handling_assignment(issue)
+    tech = assignment.technician if assignment is not None else None
 
     def _num(v):
         return float(v) if v is not None else None

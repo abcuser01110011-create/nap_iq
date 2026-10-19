@@ -58,3 +58,7 @@
 .ip-hist-type { font-weight: 600; }
 .ip-hist-chevron { color: var(--bs-secondary-color, #6c757d); }
 .ip-hist-info { margin-top: .9rem; padding-top: .6rem; border-top: 1px solid var(--bs-border-color, #dee2e6); }
+.ip-notes-text { white-space: pre-line; font-size: .85rem; color: inherit; }
+.ip-photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; }
+.ip-photo { display: flex; flex-direction: column; gap: .25rem; text-decoration: none; font-size: .75rem; color: var(--bs-secondary-color, #6c757d); text-align: center; }
+.ip-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .5rem; border: 1px solid var(--bs-border-color, #dee2e6); }

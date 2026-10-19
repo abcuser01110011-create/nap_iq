@@ -33,17 +33,82 @@
             </div>
             <div class="issue-progress" data-issue-id="{{ issue.id }}"></div>
         </div>
+        {% set h = history %}
+        {% set _d = issue.description or "" %}
+        {% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}
+
+        <div class="ip-hist-info">
+            <div class="ip-d-title">Assigned technician</div>
+            {% if h.technician %}
+            <div class="ip-d-row"><span class="ip-d-label">Name</span>
+                <span class="ip-d-value">{{ h.technician }}</span></div>
+            <div class="ip-d-row"><span class="ip-d-label">Contact</span>
+                <span class="ip-d-value">{% if h.technician_phone %}<a href="tel:{{ h.technician_phone }}">{{ h.technician_phone }}</a>{% else %}&mdash;{% endif %}</span></div>
+            {% else %}
+            <div class="ip-d-note">No technician assigned yet.</div>
+            {% endif %}
+        </div>
+
+        <div class="ip-hist-info">
+            <div class="ip-d-title">Timeline</div>
+            <div class="ip-d-row"><span class="ip-d-label">Reported</span>
+                <span class="ip-d-value">{{ h.reported }}</span></div>
+            <div class="ip-d-row"><span class="ip-d-label">Technician assigned</span>
+                <span class="ip-d-value">{{ h.assigned or "—" }}</span></div>
+            <div class="ip-d-row"><span class="ip-d-label">Completed</span>
+                <span class="ip-d-value">{{ h.completed or "Not yet completed" }}</span></div>
+            {% if h.duration %}
+            <div class="ip-d-row"><span class="ip-d-label">Time to resolve</span>
+                <span class="ip-d-value">{{ h.duration }}</span></div>
+            {% endif %}
+        </div>
+
         <div class="ip-hist-info">
             <div class="ip-d-title">Issue details</div>
+            <div class="ip-d-row"><span class="ip-d-label">Ticket no.</span>
+                <span class="ip-d-value">{{ issue.issue_code or ('#' ~ issue.id) }}</span></div>
+            <div class="ip-d-row"><span class="ip-d-label">Issue type</span>
+                <span class="ip-d-value">{{ issue.issue_type }}</span></div>
             <div class="ip-d-row"><span class="ip-d-label">Priority</span>
                 <span class="ip-d-value"><span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">{{ issue.priority|capitalize }}</span></span></div>
-            <div class="ip-d-row"><span class="ip-d-label">Reported</span>
-                <span class="ip-d-value">{{ issue.created_at.strftime('%Y-%m-%d') }}</span></div>
-            {% set _d = issue.description or "" %}
-            {% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}
+            {% if h.nap_code %}
+            <div class="ip-d-row"><span class="ip-d-label">NAP box</span>
+                <span class="ip-d-value">{{ h.nap_code }}</span></div>
+            {% endif %}
+            {% if h.location %}
+            <div class="ip-d-row"><span class="ip-d-label">Location</span>
+                <span class="ip-d-value">{{ h.location }}</span></div>
+            {% endif %}
             <div class="ip-d-row"><span class="ip-d-label">Description</span>
                 <span class="ip-d-value">{{ _d or "—" }}</span></div>
         </div>
+
+        {% if h.resolution_notes %}
+        <div class="ip-hist-info">
+            <div class="ip-d-title">Technician's notes</div>
+            <div class="ip-d-note ip-notes-text">{{ h.resolution_notes }}</div>
+        </div>
+        {% endif %}
+
+        {% if h.report_photo or h.completion_photo %}
+        <div class="ip-hist-info">
+            <div class="ip-d-title">Photos</div>
+            <div class="ip-photos">
+                {% if h.report_photo %}
+                <a href="{{ h.report_photo }}" target="_blank" rel="noopener" class="ip-photo">
+                    <img src="{{ h.report_photo }}" alt="Photo you attached to this report" loading="lazy">
+                    <span>Your report</span>
+                </a>
+                {% endif %}
+                {% if h.completion_photo %}
+                <a href="{{ h.completion_photo }}" target="_blank" rel="noopener" class="ip-photo">
+                    <img src="{{ h.completion_photo }}" alt="Technician's photo after the fix" loading="lazy">
+                    <span>After the fix</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
