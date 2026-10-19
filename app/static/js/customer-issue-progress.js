@@ -98,12 +98,17 @@
             if (open) body.removeAttribute("hidden"); else body.setAttribute("hidden", "");
             this.setAttribute("aria-expanded", open ? "true" : "false");
             d.classList.toggle("open", open);
+            if (open) setTimeout(function () {
+                var m = maps[issue.id];
+                if (m) { m.map.invalidateSize(); fitMap(m); }
+            }, 60);
         });
         return d;
     }
 
     function updateLocation(issue) {
-        var st = loc[issue.id] || (loc[issue.id] = { at: 0, tech: null, route: null, busy: false });
+        var st = loc[issue.id] || (loc[issue.id] = { at: 0, tech: null, route: null, issue: issue });
+        st.issue = issue;
         var now = Date.now();
         if (issue.current !== 1) { return; }
         if (st.at && now - st.at < LOC_REFRESH_MS) { return; }
@@ -112,15 +117,71 @@
         st.route = null;
         if (st.tech && issue.dest_lat != null && issue.dest_lng != null) {
             var straight = haversine(st.tech[0], st.tech[1], issue.dest_lat, issue.dest_lng);
-            st.route = { m: straight, approx: true };
-            var url = OSRM + st.tech[1] + "," + st.tech[0] + ";" + issue.dest_lng + "," + issue.dest_lat + "?overview=false";
+            st.route = { m: straight, approx: true, line: null };
+            var stamp = st.at;
+            var url = OSRM + st.tech[1] + "," + st.tech[0] + ";" + issue.dest_lng + "," + issue.dest_lat + "?overview=full&geometries=geojson";
             fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+                if (stamp !== st.at) return;   // a newer refresh superseded this one
                 if (data && data.routes && data.routes[0]) {
-                    st.route = { m: data.routes[0].distance, approx: false };
-                    renderDetails(issue);
+                    var rt = data.routes[0];
+                    st.route = {
+                        m: rt.distance, approx: false,
+                        line: rt.geometry.coordinates.map(function (c) { return [c[1], c[0]]; })
+                    };
+                    renderDetails(st.issue);
                 }
             }).catch(function () {});
         }
+    }
+
+    /* ---------- Live map (Arriving step) ---------- */
+    var maps = {};   // issue id -> { map, tech, dest, line }
+
+    function destroyMap(id) {
+        if (maps[id]) { maps[id].map.remove(); delete maps[id]; }
+    }
+
+    function dot(color, label) {
+        return L.divIcon({
+            className: "ip-pin",
+            html: '<span class="ip-pin__dot" style="background:' + color + '"></span><span class="ip-pin__tag">' + label + "</span>",
+            iconSize: [0, 0]
+        });
+    }
+
+    function fitMap(m) {
+        var pts = [];
+        if (m.tech) pts.push(m.tech.getLatLng());
+        if (m.dest) pts.push(m.dest.getLatLng());
+        if (pts.length > 1) m.map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 17 });
+        else if (pts.length === 1) m.map.setView(pts[0], 16);
+    }
+
+    function updateMap(issue, el) {
+        if (typeof L === "undefined" || issue.dest_lat == null || issue.dest_lng == null) return false;
+        var st = loc[issue.id] || {};
+        var m = maps[issue.id];
+        if (m && m.el !== el) { destroyMap(issue.id); m = null; }
+        if (!m) {
+            var map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+            m = maps[issue.id] = { map: map, el: el, tech: null, dest: null, line: null };
+            m.dest = L.marker([issue.dest_lat, issue.dest_lng], { icon: dot("#16a34a", "You") }).addTo(map);
+        }
+        if (st.tech) {
+            if (m.tech) m.tech.setLatLng(st.tech);
+            else m.tech = L.marker(st.tech, { icon: dot("#0d8bf2", "Technician") }).addTo(m.map);
+        } else if (m.tech) { m.map.removeLayer(m.tech); m.tech = null; }
+        if (m.line) { m.map.removeLayer(m.line); m.line = null; }
+        if (st.tech && st.route) {
+            m.line = st.route.line
+                ? L.polyline(st.route.line, { color: "#0d8bf2", weight: 5, opacity: .85 })
+                : L.polyline([st.tech, [issue.dest_lat, issue.dest_lng]], { color: "#0d8bf2", weight: 4, dashArray: "6 8" });
+            m.line.addTo(m.map);
+        }
+        var sig = (st.tech ? st.tech.join(",") : "") + "|" + (st.route && st.route.line ? "r" : "s");
+        if (m.sig !== sig) { m.sig = sig; fitMap(m); }
+        return true;
     }
 
     function row(label, value) {
@@ -132,21 +193,29 @@
         if (!d) return;
         var st = loc[issue.id] || {};
         var html = "";
+        if (issue.current !== 1) destroyMap(issue.id);
         // Only the details for the step the issue is currently on.
         if (issue.done >= 3) {
             html = '<div class="ip-d-title">Completed</div>' +
                 '<div class="ip-d-note">Your issue has been resolved.</div>';
         } else if (issue.current === 1) {
-            html = '<div class="ip-d-title">Arriving</div>';
-            if (st.tech) {
-                html += row("Technician location",
-                    '<a href="https://www.openstreetmap.org/?mlat=' + st.tech[0] + "&mlon=" + st.tech[1] + '#map=16/' + st.tech[0] + "/" + st.tech[1] +
-                    '" target="_blank" rel="noopener">' + st.tech[0].toFixed(5) + ", " + st.tech[1].toFixed(5) + "</a>");
-            } else {
-                html += row("Technician location", "Not available yet");
+            var body = d.querySelector(".ip-details-body");
+            var wrap = body.querySelector(".ip-arriving");
+            if (!wrap) {
+                body.innerHTML = '<div class="ip-arriving"><div class="ip-d-title">Arriving</div>' +
+                    '<div class="ip-map" role="img" aria-label="Map showing the technician and your location"></div>' +
+                    '<div class="ip-arr-info"></div></div>';
+                wrap = body.querySelector(".ip-arriving");
             }
-            html += row("Route distance", st.route ? fmtDist(st.route.m) + (st.route.approx ? " (straight-line)" : "") : "Not available");
-            if (st.at) html += '<div class="ip-d-note">Updates every 5 minutes &middot; last updated ' + fmtTime(new Date(st.at)) + "</div>";
+            var info = "";
+            info += row("Technician", issue.technician ? esc(issue.technician) : "None");
+            info += row("Route distance", st.route ? fmtDist(st.route.m) + (st.route.approx ? " (straight-line)" : "") : "Not available");
+            if (!st.tech) info += '<div class="ip-d-note">Technician location not available yet.</div>';
+            if (st.at) info += '<div class="ip-d-note">Updates every 5 minutes &middot; last updated ' + fmtTime(new Date(st.at)) + "</div>";
+            wrap.querySelector(".ip-arr-info").innerHTML = info;
+            var mapEl = wrap.querySelector(".ip-map");
+            if (!updateMap(issue, mapEl)) mapEl.style.display = "none";
+            return;
         } else {
             html = '<div class="ip-d-title">Technician Assigned</div>' +
                 row("Name", issue.technician ? esc(issue.technician) : "None") +

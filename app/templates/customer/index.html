@@ -5,6 +5,7 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">PG Networks Customer Portal</p>{% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 {% endblock %}
 
@@ -195,6 +196,7 @@
     window.ISSUE_PROGRESS_INITIAL = {{ progress_data|tojson }};
     window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
 </script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
 {% endif %}
 {% endblock %}

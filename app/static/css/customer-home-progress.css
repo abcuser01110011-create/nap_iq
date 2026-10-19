@@ -45,3 +45,10 @@
 .ip-d-value { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .ip-d-note { font-size: .78rem; color: var(--bs-secondary-color, #6c757d); }
 @media (max-width: 400px) { .ip-d-value { text-align: left; width: 100%; } }
+
+/* Arriving: live map */
+.ip-map { width: 100%; height: 260px; border-radius: .6rem; overflow: hidden; border: 1px solid var(--bs-border-color, #dee2e6); margin-bottom: .6rem; z-index: 0; }
+@media (max-width: 400px) { .ip-map { height: 220px; } }
+.ip-pin { position: relative; }
+.ip-pin__dot { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+.ip-pin__tag { position: absolute; left: 0; top: 12px; transform: translateX(-50%); background: #fff; color: #0f1b3d; font-size: .7rem; font-weight: 700; padding: .05rem .4rem; border-radius: 999px; box-shadow: 0 1px 4px rgba(0,0,0,.3); white-space: nowrap; }
