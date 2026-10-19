@@ -41,3 +41,6 @@ body.lpm-open { overflow: hidden; }
 @keyframes lpm-pop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .lpm__backdrop, .lpm__panel { animation: none; } }
 @media (prefers-color-scheme: dark) { /* modals intentionally stay light, matching the landing page */ }
+
+/* How-to-apply: 5 steps */
+.lp-steps { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
