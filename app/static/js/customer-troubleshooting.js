@@ -44,6 +44,7 @@
     // ---- auto slide every 3s; loops back to the first card ----
     function tick() {
         if (hovering || touching || modalOpen || document.hidden || Date.now() < resumeAt) return;
+        if (root.matches(":hover") || root.contains(document.activeElement)) return;
         if (maxScroll() <= 4) return; // everything already visible
         if (track.scrollLeft >= maxScroll() - 4) goTo(0); else goTo(currentIndex() + 1);
     }
@@ -54,6 +55,9 @@
     next.addEventListener("click", function () { pauseBriefly(); goTo(currentIndex() + 1); });
     track.addEventListener("scroll", function () { window.requestAnimationFrame(update); }, { passive: true });
     root.addEventListener("mouseenter", function () { hovering = true; });
+    root.addEventListener("mouseover", function () { hovering = true; });
+    root.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse" || e.pointerType === "pen") hovering = true; });
+    root.addEventListener("pointerleave", function () { hovering = false; pauseBriefly(); });
     root.addEventListener("mouseleave", function () { hovering = false; pauseBriefly(); });
     root.addEventListener("focusin", function () { hovering = true; });
     root.addEventListener("focusout", function () { hovering = false; pauseBriefly(); });

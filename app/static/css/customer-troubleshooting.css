@@ -42,3 +42,16 @@ button.ts-card:hover, button.ts-card:focus-visible { transform: translateY(-3px)
 .ts-steps-list { margin: 0; padding-left: 1.25rem; display: grid; gap: .75rem; }
 .ts-steps-list li { line-height: 1.5; }
 .ts-steps-list li::marker { font-weight: 700; color: var(--ts-accent, #0D3B85); }
+
+/* ---- v3: one wide, centered card at a time ---- */
+.ts-guide { max-width: 560px; margin-left: auto; margin-right: auto; }
+.ts-head { align-items: center; }
+.ts-track { gap: 1rem; scroll-snap-type: x mandatory; }
+.ts-card, .ts-card:hover { flex: 0 0 100%; width: 100%; max-width: 100%; scroll-snap-align: center; scroll-snap-stop: always; align-items: center; text-align: center; padding: 1.5rem 1.25rem 1.4rem; }
+button.ts-card { text-align: center; }
+.ts-card .ts-icon { align-self: center; width: 56px; height: 56px; font-size: 1.7rem; border-radius: 16px; }
+.ts-card h3 { font-size: 1.15rem; }
+.ts-card p { font-size: .92rem; }
+.ts-card--cta .btn { align-self: center; }
+.ts-more { margin-top: .5rem; }
+.ts-dots { margin-top: .5rem; }
