@@ -42,10 +42,12 @@
                 <p>Unlimited fiber speed internet connection with whole home WiFi coverage &mdash;
                    apply online, track your installation and manage your account in one place.</p>
                 <div class="lp-hero__actions">
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink lp-btn--lg">
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--white lp-btn--lg">
                         Apply online <i class="bi bi-arrow-right"></i>
                     </a>
-                    <a href="#plans" class="lp-btn lp-btn--white lp-btn--lg">See Unli Fibr plans</a>
+                    <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--outline-light lp-btn--lg">
+                        <i class="bi bi-person"></i> Account login
+                    </a>
                 </div>
                 <ul class="lp-hero__points">
                     <li><i class="bi bi-check-circle-fill"></i> Free install &amp; activation</li>
@@ -68,20 +70,20 @@
                     <div class="lp-offer__speed">15<small>Mbps</small></div>
                     <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan Promo 999</strong></div>
                     <div class="lp-offer__price"><small>&#8369;</small>999</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink">Apply</a>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold">Apply</a>
                 </article>
                 <article class="lp-offer lp-offer--hot">
                     <span class="lp-offer__tag">Promo</span>
                     <div class="lp-offer__speed">25<small>Mbps</small></div>
                     <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 1500</strong></div>
                     <div class="lp-offer__price"><small>&#8369;</small>1,500</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink">Apply</a>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold">Apply</a>
                 </article>
                 <article class="lp-offer">
                     <div class="lp-offer__speed">60<small>Mbps</small></div>
                     <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 2500</strong></div>
                     <div class="lp-offer__price"><small>&#8369;</small>2,500</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--pink">Apply</a>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold">Apply</a>
                 </article>
             </div>
 
