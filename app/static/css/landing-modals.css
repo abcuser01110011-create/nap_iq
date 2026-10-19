@@ -45,23 +45,33 @@ body.lpm-open { overflow: hidden; }
 /* How-to-apply: 5 steps */
 .lp-steps { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 
-/* ===== Hero: image as full-bleed background, transparent header on top ===== */
-.lp-header { position: absolute; top: 0; left: 0; right: 0; background: transparent; border-bottom: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
-.lp-brand { color: #fff; text-shadow: 0 2px 8px rgba(8,18,37,.5); }
-.lp-nav a { color: rgba(255,255,255,.88); text-shadow: 0 1px 6px rgba(8,18,37,.5); }
+/* ===== Hero: clean split layout. Text left, poster image large on the right ===== */
+.lp-header { position: absolute; top: 0; left: 0; right: 0; background: transparent; border-bottom: 0; backdrop-filter: none; -webkit-backdrop-filter: none; z-index: 30; }
+.lp-brand { color: #fff; }
+.lp-nav a { color: rgba(255,255,255,.88); }
 .lp-nav a:hover { color: var(--lp-gold); }
 .lp-header .lp-btn--ghost { color: #fff; }
 .lp-header .lp-btn--ghost:hover { background: rgba(255,255,255,.16); }
 .lp-header .lp-btn--primary { background: var(--lp-gold); color: #081225; box-shadow: 0 8px 18px -8px rgba(244,180,26,.8); }
 .lp-header .lp-btn--primary:hover { background: #FFC83D; color: #081225; }
 
-.lp-hero { display: flex; align-items: center; min-height: clamp(660px, 48vw, 900px); padding: 6.5rem 0 3.5rem; background: #0A2F6B linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%); }
+.lp-hero { --hero-head: 64px; display: flex; align-items: center; min-height: max(640px, calc(36vw + var(--hero-head))); padding: var(--hero-head) 0 0; background: #02296B; }
 .lp-hero::before { content: none; }
-.lp-hero::after { content: ""; position: absolute; top: 0; right: 0; height: 100%; width: min(100%, calc(100% * 1.5)); max-width: calc(clamp(660px, 48vw, 900px) * 1.5); background: url('../img/hero-banner.jpg') right center / cover no-repeat; -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.5) 28%, #000 55%); mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.5) 28%, #000 55%); pointer-events: none; }
+/* The poster, shown whole (never cropped) on the right, sized to the space
+   left of the text. Its left edge fades into the hero background. */
+.lp-hero::after { content: ""; position: absolute; top: var(--hero-head); bottom: 0; right: 0; width: 54vw; background: url('../img/hero-banner.jpg') right center / contain no-repeat; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12%), linear-gradient(180deg, transparent 0, #000 7%); -webkit-mask-composite: source-in; mask-image: linear-gradient(90deg, transparent 0, #000 12%), linear-gradient(180deg, transparent 0, #000 7%); mask-composite: intersect; pointer-events: none; }
 .lp-hero__grid { position: relative; z-index: 1; width: 100%; display: block; }
-.lp-hero__copy { max-width: 560px; }
-.lp-hero h1, .lp-hero p, .lp-hero__points { text-shadow: 0 2px 14px rgba(8,18,37,.55); }
-@media (max-width: 899px) {
-  .lp-hero { min-height: 0; padding: 6rem 0 3rem; }
-  .lp-hero::after { width: 100%; max-width: none; opacity: .38; -webkit-mask-image: none; mask-image: none; background-position: 70% center; }
+.lp-hero__copy { max-width: 480px; padding: 2rem 0; }
+.lp-hero h1 { font-size: clamp(2.4rem, 4.2vw, 4rem); }
+.lp-hero p { max-width: 460px; }
+.lp-hero__actions .lp-btn--lg { padding: .75rem 1.3rem; }
+.lp-hero__points { flex-direction: column; gap: .45rem; }
+@media (min-width: 900px) { .lp-hero__points { flex-direction: column; flex-wrap: nowrap; } }
+
+/* Narrow screens: poster on top (full width, uncropped), text below. */
+@media (max-width: 999px) {
+  .lp-hero { flex-direction: column; align-items: stretch; min-height: 0; padding: var(--hero-head) 0 2rem; }
+  .lp-hero::after { position: relative; order: -1; top: auto; bottom: auto; right: auto; width: 100%; aspect-ratio: 3 / 2; background-size: cover; -webkit-mask-image: linear-gradient(180deg, #000 80%, transparent 100%); mask-image: linear-gradient(180deg, #000 80%, transparent 100%); }
+  .lp-hero__copy { max-width: none; padding: 1rem 0 0; }
+  .lp-hero__points { flex-direction: row; flex-wrap: wrap; }
 }
