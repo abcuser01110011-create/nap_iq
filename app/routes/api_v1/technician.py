@@ -578,7 +578,7 @@ def start_assignment(assignment_id):
     if assignment is None:
         return jsonify(error="Assignment not found."), 404
 
-    if assignment.status != "accepted":
+    if assignment.status not in ("assigned", "accepted"):
         return jsonify(error="That assignment needs to be accepted before you can start work on it."), 409
 
     assignment.status = "in_progress"

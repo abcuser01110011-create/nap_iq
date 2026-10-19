@@ -12,12 +12,12 @@
 } %}
 
 {# New Installation tickets use a two-step layout: Step 1 is just the
-   ticket details + Accept/Decline; once accepted, the details card
+   ticket details + Start Work/Decline; once started, the details card
    disappears and Step 2 (photo, pin location, NAP & port, etc.)
    appears instead. Every other ticket type is untouched for now and
    always behaves as "Step 2" (i.e. shows everything, same as before). #}
-{% set show_step1 = job.is_new_installation and job.can_accept %}
-{% set show_step2 = (not job.is_new_installation) or (not job.can_accept) %}
+{% set show_step1 = job.is_new_installation and job.can_start %}
+{% set show_step2 = (not job.is_new_installation) or (not job.can_start) %}
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <a href="{{ url_for('technician.index') }}" class="small text-decoration-none">
@@ -272,11 +272,11 @@
 {% endif %}
 
 <div class="d-flex flex-wrap gap-2">
-    {% if job.can_accept %}
-        <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=job.assignment.id) }}">
+    {% if job.can_start %}
+        <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=job.assignment.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-outline-primary">
-                <i class="bi bi-check2 me-1"></i>Accept
+            <button type="submit" class="btn btn-outline-info">
+                <i class="bi bi-play-fill me-1"></i>Start Work
             </button>
         </form>
         {% if job.is_new_installation %}
@@ -287,14 +287,9 @@
             <i class="bi bi-x-lg me-1"></i>Decline
         </button>
         {% endif %}
-    {% elif job.can_start and not job.is_new_installation %}
-        <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=job.assignment.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-outline-info">
-                <i class="bi bi-play-fill me-1"></i>Start Work
-            </button>
-        </form>
-        {% if not job.consolidated %}
+        {# Notes can only be saved once work has started (or on a legacy
+           'accepted' job), so keep it hidden on a fresh 'assigned' job. #}
+        {% if not job.consolidated and not job.is_new_installation and job.assignment.status == 'accepted' %}
         <button type="button" class="btn btn-outline-secondary"
                 data-bs-toggle="modal" data-bs-target="#notesModal"
                 data-notes-action="{{ url_for('technician.save_notes', assignment_id=job.assignment.id) }}"

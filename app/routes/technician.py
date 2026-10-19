@@ -320,7 +320,8 @@ def accept_assignment(assignment_id):
 @technician_bp.route("/assignments/<int:assignment_id>/start", methods=["POST"])
 @role_required("technician")
 def start_assignment(assignment_id):
-    """Marks work as actually underway. Only valid from 'accepted'.
+    """Marks work as actually underway. Valid from 'assigned' (or a legacy
+    'accepted').
     Mirrors the status onto the linked technical_issue (so it shows as
     'in_progress' everywhere else in the app — the dashboard, the
     issue detail page, etc.) and marks the technician 'busy'.
@@ -340,8 +341,11 @@ def start_assignment(assignment_id):
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
-    if assignment.status != "accepted":
-        flash("That assignment needs to be accepted before you can start work on it.", "warning")
+    # There is no separate Accept step any more: a freshly dispatched
+    # ('assigned') job can be started directly. 'accepted' is still allowed
+    # so rows accepted before this change can be started too.
+    if assignment.status not in ("assigned", "accepted"):
+        flash("That assignment can't be started anymore.", "warning")
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "in_progress"
@@ -1097,7 +1101,7 @@ def _serialize_job(assignment):
     lng = (subscriber.longitude if subscriber else None) or (issue.longitude if issue else None) or (request.longitude if request else None)
 
     can_accept = assignment.status == "assigned"
-    can_start = assignment.status == "accepted"
+    can_start = assignment.status in ("assigned", "accepted")
     can_edit = assignment.status in ("accepted", "in_progress")
     can_complete = assignment.status == "in_progress"
     is_closed = assignment.status in CLOSED_ASSIGNMENT_STATUSES

@@ -166,16 +166,13 @@
 
 {# ---- Actions -------------------------------------------------------- #}
 <div class="tm-actions">
-    {% if job.can_accept %}
-        <button type="button" class="tm-btn-primary" disabled>Accept job</button>
-    {% endif %}
     {% if job.can_start %}
         <button type="button" class="tm-btn-primary" disabled>Start job</button>
     {% endif %}
     {% if job.can_complete %}
         <button type="button" class="tm-btn-primary tm-btn-success" disabled>Mark complete</button>
     {% endif %}
-    {% if job.can_accept or job.can_start or job.can_complete %}
+    {% if job.can_start or job.can_complete %}
         <p class="tm-ui-only-note">
             This is the web UI preview — actions aren't wired up yet.
             Use <a href="{{ url_for('technician.index') }}" style="color: var(--tm-primary);">My Work</a> to actually update this job for now.
