@@ -19,7 +19,8 @@
             credentials: "same-origin",
         }).then(function (resp) {
             return resp.json().catch(function () { return {}; }).then(function (data) {
-                return { ok: resp.ok, status: resp.status, data: data };
+                // A redirected (HTML) response is never a success here.
+                return { ok: resp.ok && !resp.redirected, status: resp.status, data: data };
             });
         });
     }
@@ -115,13 +116,10 @@
                 return;
             }
             loginSubmit.disabled = false;
-            if (r.status === 429) {
-                loginAlert.textContent = "Too many attempts. Please wait a minute and try again.";
-                show(loginAlert, true);
-            } else if (r.data && r.data.errors) {
+            if (r.data && r.data.errors) {
                 showErrors(loginForm, r.data.errors);
             } else {
-                loginAlert.textContent = (r.data && r.data.message) || "Couldn't log you in right now. Please try again.";
+                loginAlert.textContent = (r.data && r.data.message) || ("Couldn't log you in right now (error " + r.status + "). Please refresh the page and try again.");
                 show(loginAlert, true);
             }
         }).catch(function () {
@@ -278,4 +276,16 @@
     });
 
     document.getElementById("applyGoLogin").addEventListener("click", function () { openModal(loginModal, lastTrigger); });
+
+    // ---------- Auto-open the Log in popup (?login=1) + flash toast ----------
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("login") === "1") {
+        openModal(loginModal, null);
+        params.delete("login");
+        var qs = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (qs ? "?" + qs : "") + window.location.hash);
+    }
+    document.querySelectorAll("[data-landing-toast]").forEach(function (t) {
+        setTimeout(function () { t.classList.add("is-hiding"); setTimeout(function () { t.remove(); }, 400); }, 3500);
+    });
 })();

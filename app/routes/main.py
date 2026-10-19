@@ -8,6 +8,7 @@ and the /database-test diagnostic route.
 
 import re
 import secrets
+from functools import wraps
 
 from flask import (
     Blueprint, current_app, jsonify, redirect, render_template, request,
@@ -18,6 +19,7 @@ from app.extensions import db, limiter
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, User
 from app.nap_recommendation import recommend_naps
+from flask_wtf.csrf import CSRFError
 from sqlalchemy import text
 
 main_bp = Blueprint("main", __name__)
@@ -82,6 +84,37 @@ _GENERIC_LOGIN_ERROR = (
 )
 
 
+def _safe_json(view):
+    """Any unexpected error inside a popup endpoint becomes a JSON 500
+    (and is logged with its traceback) instead of an HTML error page the
+    popup can't read."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        try:
+            return view(*args, **kwargs)
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            current_app.logger.exception("Landing popup endpoint failed: %s", request.path)
+            return jsonify(
+                ok=False,
+                message="Something went wrong on our side. Please try again in a moment.",
+            ), 500
+    return wrapped
+
+
+@main_bp.errorhandler(CSRFError)
+def _public_csrf_failed(_error):
+    return jsonify(
+        ok=False,
+        message="Your page was open too long or your session expired. Please refresh the page and try again.",
+    ), 400
+
+
+@main_bp.errorhandler(429)
+def _public_rate_limited(_error):
+    return jsonify(ok=False, message="Too many attempts. Please wait a minute and try again."), 429
+
+
 def _json_body():
     return request.get_json(silent=True) or {}
 
@@ -97,6 +130,7 @@ def _unique_username(base):
 
 @main_bp.route("/public/account-login", methods=["POST"])
 @limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"])
+@_safe_json
 def public_account_login():
     """Popup "Log in": subscriber account number + phone number on file.
 
@@ -167,6 +201,7 @@ def public_account_login():
 
 @main_bp.route("/public/apply/coverage-check", methods=["POST"])
 @limiter.limit("30 per hour")
+@_safe_json
 def public_apply_coverage_check():
     """Popup "Apply online" step 1: is this point covered? (read-only)"""
     data = _json_body()
@@ -184,6 +219,7 @@ def public_apply_coverage_check():
 
 @main_bp.route("/public/apply", methods=["POST"])
 @limiter.limit(lambda: current_app.config["REGISTER_RATE_LIMIT_PER_IP"])
+@_safe_json
 def public_apply():
     """Popup "Apply online" step 2: submit the installation application.
 

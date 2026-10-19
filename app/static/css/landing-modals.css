@@ -75,3 +75,9 @@ body.lpm-open { overflow: hidden; }
   .lp-hero__copy { max-width: none; padding: 1rem 0 0; }
   .lp-hero__points { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* Flash toast (e.g. "You have been logged out.") */
+.lp-toasts { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 120; display: grid; gap: .5rem; width: min(92vw, 420px); }
+.lp-toast { display: flex; align-items: center; gap: .55rem; padding: .7rem 1rem; border-radius: 12px; background: #fff; color: var(--lp-ink); font-weight: 600; font-size: .92rem; box-shadow: 0 16px 40px -14px rgba(8,18,37,.6); border-left: 5px solid var(--lp-blue); transition: opacity .35s ease, transform .35s ease; }
+.lp-toast--success { border-left-color: #16A34A; } .lp-toast--danger { border-left-color: #DC2626; } .lp-toast--warning { border-left-color: var(--lp-gold); }
+.lp-toast.is-hiding { opacity: 0; transform: translateY(-8px); }

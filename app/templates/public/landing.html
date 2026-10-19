@@ -18,6 +18,18 @@
 </head>
 <body class="lp">
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% set shown = messages | rejectattr("1", "equalto", "Please log in to continue.") | list %}
+    {% if shown %}
+    <div class="lp-toasts" role="status">
+        {% for category, message in shown %}
+        <div class="lp-toast lp-toast--{{ 'danger' if category in ('danger', 'error') else category }}" data-landing-toast>{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
+
+
 <header class="lp-header">
     <div class="lp-wrap lp-header__row">
         <a href="{{ url_for('main.index') }}" class="lp-brand">

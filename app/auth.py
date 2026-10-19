@@ -76,8 +76,10 @@ def db_get_user(user_id):
 def _login_redirect():
     """Send a logged-out visitor to the right sign-in page: subscribers'
     /portal pages -> account login, everything else -> staff login."""
-    endpoint = "auth.customer_login" if request.path.startswith("/portal") else "auth.login"
-    return redirect(url_for(endpoint, next=request.path))
+    if request.path.startswith("/portal"):
+        # Subscribers sign in from the landing page's Log in popup.
+        return redirect(url_for("main.index", login=1))
+    return redirect(url_for("auth.login", next=request.path))
 
 
 def login_required(view):
