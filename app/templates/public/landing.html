@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>PG Networks &middot; Fiber Internet &mdash; Apply Online</title>
     <meta name="description" content="PG Networks Unli Fibr plans from 15 to 60 Mbps with Whole Home WiFi and free install &amp; activation. Apply online or call 0917 654 8563.">
 
@@ -12,6 +13,8 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
     <link href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/landing.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/landing-modals.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}" rel="stylesheet">
 </head>
 <body class="lp">
 
@@ -27,8 +30,8 @@
             <a href="#why">Why us</a>
         </nav>
         <div class="lp-header__cta">
-            <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--ghost">Log in</a>
-            <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary">Apply now</a>
+            <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--ghost" data-open-modal="login">Log in</a>
+            <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary" data-open-modal="apply">Apply now</a>
         </div>
     </div>
 </header>
@@ -42,10 +45,10 @@
                 <p>Unlimited fiber speed internet connection with whole home WiFi coverage &mdash;
                    apply online, track your installation and manage your account in one place.</p>
                 <div class="lp-hero__actions">
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--white lp-btn--lg">
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--white lp-btn--lg" data-open-modal="apply">
                         Apply online <i class="bi bi-arrow-right"></i>
                     </a>
-                    <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--outline-light lp-btn--lg">
+                    <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--outline-light lp-btn--lg" data-open-modal="login">
                         <i class="bi bi-person"></i> Account login
                     </a>
                 </div>
@@ -70,20 +73,20 @@
                     <div class="lp-offer__speed">15<small>Mbps</small></div>
                     <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan Promo 999</strong></div>
                     <div class="lp-offer__price"><small>&#8369;</small>999</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold">Apply</a>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="Unli Fibr Plan Promo 999">Apply</a>
                 </article>
                 <article class="lp-offer lp-offer--hot">
                     <span class="lp-offer__tag">Promo</span>
                     <div class="lp-offer__speed">25<small>Mbps</small></div>
                     <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 1500</strong></div>
                     <div class="lp-offer__price"><small>&#8369;</small>1,500</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold">Apply</a>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="Unli Fibr Plan 1500">Apply</a>
                 </article>
                 <article class="lp-offer">
                     <div class="lp-offer__speed">60<small>Mbps</small></div>
                     <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 2500</strong></div>
                     <div class="lp-offer__price"><small>&#8369;</small>2,500</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold">Apply</a>
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="Unli Fibr Plan 2500">Apply</a>
                 </article>
             </div>
 
@@ -121,7 +124,7 @@
                 <li><span>3</span><h3>We install</h3><p>A technician is assigned. Follow their progress right from your account.</p></li>
             </ol>
             <div class="lp-center">
-                <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--lg">Start your application</a>
+                <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--lg" data-open-modal="apply">Start your application</a>
             </div>
         </div>
     </section>
@@ -144,7 +147,7 @@
                 <h2>Already a subscriber?</h2>
                 <p>Log in to view your account, pay, or report an issue.</p>
             </div>
-            <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--light lp-btn--lg">Log in to my account</a>
+            <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--light lp-btn--lg" data-open-modal="login">Log in to my account</a>
         </div>
     </section>
 </main>
@@ -156,6 +159,110 @@
     </div>
 </footer>
 <div class="lp-tagline">You can enjoy Unlimited Fiber Speed Internet Connection</div>
+
+<!-- ============ Log in popup ============ -->
+<div class="lpm" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle" hidden>
+    <div class="lpm__backdrop" data-close-modal></div>
+    <div class="lpm__panel">
+        <button type="button" class="lpm__close" data-close-modal aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        <div class="lpm__head">
+            <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="" class="lpm__logo">
+            <h2 id="loginModalTitle">Log in to your account</h2>
+            <p>Enter your subscriber account number and the phone number on file. We use both together to confirm it&rsquo;s really your account.</p>
+        </div>
+        <form id="loginForm" novalidate>
+            <div class="lpm__alert" id="loginAlert" role="alert" hidden></div>
+            <div class="lpm__field">
+                <label for="loginCode">Subscriber / Account Number</label>
+                <input type="text" id="loginCode" name="subscriber_code" maxlength="20" placeholder="e.g. SUB-0123" autocomplete="off" autocapitalize="characters">
+                <div class="lpm__error" data-error-for="subscriber_code"></div>
+            </div>
+            <div class="lpm__field">
+                <label for="loginPhone">Phone Number on File</label>
+                <input type="text" id="loginPhone" name="contact_number" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" autocomplete="tel">
+                <div class="lpm__error" data-error-for="contact_number"></div>
+            </div>
+            <button type="submit" class="lp-btn lp-btn--primary lp-btn--block lp-btn--lg" id="loginSubmit">
+                <i class="bi bi-box-arrow-in-right"></i> Log in
+            </button>
+        </form>
+        <div class="lpm__foot">
+            <p>Not sure of your account number? Please contact PG Networks support at <a href="tel:09176548563">0917 654 8563</a>.</p>
+            <p>Don&rsquo;t have an account yet? <a href="{{ url_for('auth.register') }}" data-switch-modal="apply">Apply online</a></p>
+            <p><a href="{{ url_for('auth.customer_login') }}">Log in with username &amp; password instead</a></p>
+        </div>
+    </div>
+</div>
+
+<!-- ============ Apply online popup ============ -->
+<div class="lpm" id="applyModal" role="dialog" aria-modal="true" aria-labelledby="applyModalTitle" hidden>
+    <div class="lpm__backdrop" data-close-modal></div>
+    <div class="lpm__panel lpm__panel--wide">
+        <button type="button" class="lpm__close" data-close-modal aria-label="Close"><i class="bi bi-x-lg"></i></button>
+        <div class="lpm__head">
+            <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="" class="lpm__logo">
+            <h2 id="applyModalTitle">Apply for installation</h2>
+            <p>Tell us where to install your PG Networks connection.</p>
+        </div>
+
+        <div id="applyStepLocation">
+            <h3 class="lpm__step">Step 1 &mdash; Confirm your installation location</h3>
+            <p class="lpm__hint">We use your device&rsquo;s current location to check PG Networks coverage at your address. It&rsquo;s only used for this application and isn&rsquo;t tracked afterward.</p>
+            <div id="applyMap" class="lpm__map"></div>
+            <div class="lpm__alert" id="applyLocationError" role="alert" hidden></div>
+            <div class="lpm__result" id="applyCoverageResult"></div>
+            <div class="lpm__actions lpm__actions--start">
+                <button type="button" id="applyDetectBtn" class="lp-btn lp-btn--outline"><i class="bi bi-geo-alt"></i> Detect my location</button>
+                <button type="button" id="applyCheckCoverageBtn" class="lp-btn lp-btn--primary" hidden>Check coverage</button>
+            </div>
+        </div>
+
+        <form id="applyDetailsForm" novalidate hidden>
+            <h3 class="lpm__step">Step 2 &mdash; Your details</h3>
+            <div class="lpm__alert" id="applyAlert" role="alert" hidden></div>
+            <div class="lpm__field">
+                <label for="applyName">Full Name</label>
+                <input type="text" id="applyName" name="full_name" maxlength="100" autocomplete="name">
+                <div class="lpm__error" data-error-for="full_name"></div>
+            </div>
+            <div class="lpm__field">
+                <label for="applyAddress">Installation Address</label>
+                <input type="text" id="applyAddress" name="address" maxlength="255" autocomplete="street-address">
+                <div class="lpm__error" data-error-for="address"></div>
+            </div>
+            <div class="lpm__field">
+                <label for="applyPhone">Phone Number</label>
+                <input type="text" id="applyPhone" name="contact_number" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" autocomplete="tel">
+                <div class="lpm__error" data-error-for="contact_number"></div>
+            </div>
+            <div class="lpm__field">
+                <label for="applyPlan">Plan</label>
+                <select id="applyPlan" name="plan_name">
+                    <option value="">-- No preference --</option>
+                    {% for p in plans %}
+                    <option value="{{ p.name }}">{{ p.name }}{% if p.monthly_fee is not none %} &mdash; &#8369;{{ '{:,.2f}'.format(p.monthly_fee) }}/mo{% endif %}</option>
+                    {% endfor %}
+                </select>
+                <div class="lpm__error" data-error-for="plan_name"></div>
+            </div>
+            <div class="lpm__actions">
+                <button type="button" class="lp-btn lp-btn--ghost" data-close-modal>Cancel</button>
+                <button type="submit" class="lp-btn lp-btn--primary" id="applySubmit"><i class="bi bi-send"></i> Submit Application</button>
+            </div>
+        </form>
+
+        <div id="applySuccess" class="lpm__success" hidden>
+            <i class="bi bi-check-circle-fill"></i>
+            <h3>Application submitted!</h3>
+            <p>Your application number is <strong id="applyCode"></strong>. We&rsquo;ll review it and notify you once it&rsquo;s approved.</p>
+            <p class="lpm__hint">Keep this number &mdash; you can log in with it and your phone number to track your installation.</p>
+            <button type="button" class="lp-btn lp-btn--primary" id="applyGoLogin">Log in to my account</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/landing-modals.js') }}"></script>
 
 </body>
 </html>

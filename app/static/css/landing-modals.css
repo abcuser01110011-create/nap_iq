@@ -1,0 +1,43 @@
+/* Landing page popups: Log in + Apply online. Uses landing.css tokens. */
+body.lpm-open { overflow: hidden; }
+.lpm { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.lpm[hidden] { display: none; }
+.lpm__backdrop { position: absolute; inset: 0; background: rgba(8,18,37,.6); backdrop-filter: blur(3px); animation: lpm-fade .15s ease; }
+.lpm__panel { position: relative; width: 100%; max-width: 420px; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); overflow-y: auto; background: #fff; color: var(--lp-ink); border-radius: 18px; padding: 1.6rem 1.5rem 1.4rem; box-shadow: 0 30px 70px -20px rgba(8,18,37,.7); animation: lpm-pop .18s ease; }
+.lpm__panel--wide { max-width: 560px; }
+.lpm__close { position: absolute; top: .7rem; right: .7rem; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--lp-alt); color: var(--lp-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.lpm__close:hover { background: var(--lp-line); color: var(--lp-ink); }
+.lpm__head { text-align: center; margin-bottom: 1.1rem; }
+.lpm__logo { width: 52px; height: 52px; object-fit: contain; }
+.lpm__head h2 { margin: .4rem 0 .3rem; font-size: 1.35rem; }
+.lpm__head p, .lpm__hint { margin: 0; color: var(--lp-muted); font-size: .88rem; }
+.lpm__hint { margin-bottom: .8rem; }
+.lpm__step { font-size: 1rem; margin: 0 0 .4rem; }
+.lpm__field { margin-bottom: .9rem; }
+.lpm__field label { display: block; font-weight: 600; font-size: .88rem; margin-bottom: .3rem; }
+.lpm__field input, .lpm__field select { width: 100%; padding: .65rem .8rem; font: inherit; border: 1.5px solid var(--lp-line); border-radius: 10px; background: #fff; color: var(--lp-ink); }
+.lpm__field input:focus, .lpm__field select:focus { outline: none; border-color: var(--lp-blue); box-shadow: 0 0 0 3px rgba(13,59,133,.15); }
+.lpm__field.is-invalid input, .lpm__field.is-invalid select { border-color: #dc2626; }
+.lpm__error { color: #dc2626; font-size: .8rem; margin-top: .25rem; min-height: 0; }
+.lpm__alert { background: #FEE2E2; color: #991B1B; border-radius: 10px; padding: .6rem .8rem; font-size: .86rem; margin-bottom: .9rem; }
+.lpm__alert[hidden] { display: none; }
+.lpm__foot { margin-top: 1rem; text-align: center; font-size: .84rem; color: var(--lp-muted); }
+.lpm__foot p { margin: .35rem 0; }
+.lpm__foot a { color: var(--lp-blue); font-weight: 600; }
+.lpm__map { height: 240px; border-radius: 12px; border: 1px solid var(--lp-line); margin-bottom: .8rem; z-index: 0; }
+.lpm__result { font-size: .88rem; margin-bottom: .6rem; }
+.lpm__result.ok { color: #15803D; } .lpm__result.bad { color: #B91C1C; }
+.lpm__actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .4rem; }
+.lpm__actions--start { justify-content: flex-start; flex-wrap: wrap; }
+.lpm__actions [hidden] { display: none; }
+#applyDetailsForm { margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--lp-line); }
+#applyDetailsForm[hidden], #applyStepLocation[hidden], .lpm__success[hidden] { display: none; }
+.lpm__success { text-align: center; }
+.lpm__success > i { font-size: 3rem; color: #16A34A; }
+.lpm__success h3 { margin: .4rem 0; }
+.lpm__success p { margin: .4rem 0; }
+.lp-btn[disabled] { opacity: .65; cursor: not-allowed; transform: none; }
+@keyframes lpm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lpm-pop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lpm__backdrop, .lpm__panel { animation: none; } }
+@media (prefers-color-scheme: dark) { /* modals intentionally stay light, matching the landing page */ }
