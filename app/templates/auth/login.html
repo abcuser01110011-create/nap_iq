@@ -86,8 +86,6 @@
             {% if portal == 'customer' %}
             <a href="{{ url_for('auth.register') }}" class="login-register-link">Don't have an account? Apply online</a>
             <a href="{{ url_for('main.index') }}" class="login-register-link">&larr; Back to home</a>
-            {% else %}
-            <a href="{{ url_for('auth.customer_login') }}" class="login-register-link">Subscriber? Go to account login</a>
             {% endif %}
         </form>
     </div>
