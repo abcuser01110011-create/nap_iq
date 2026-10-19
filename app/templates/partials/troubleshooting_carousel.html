@@ -1,61 +1,123 @@
-{# Basic troubleshooting guide carousel shown under the Report an Issue button.
-   Pure HTML + static/css/customer-troubleshooting.css + static/js/customer-troubleshooting.js
-   (no extra dependencies). Pass `report_url` and (optional) `has_open_issue`. #}
+{# Troubleshooting guide: one card per issue type. Clicking a card opens a popup with the
+   fix steps. Auto-slides every 3 seconds (pauses on hover/touch/popup).
+   Uses static/css/customer-troubleshooting.css + static/js/customer-troubleshooting.js.
+   Pass `report_url` and (optional) `has_open_issue`. #}
 <section class="ts-guide mb-4" id="tsGuide" aria-labelledby="tsGuideTitle">
     <div class="ts-head">
         <div>
             <h2 class="ts-title" id="tsGuideTitle"><i class="bi bi-lightbulb me-1"></i>Troubleshooting guide</h2>
-            <p class="ts-sub">Internet not working? Try these quick fixes before reporting an issue.</p>
+            <p class="ts-sub">Pick the problem you&rsquo;re having to see how to fix it.</p>
         </div>
         <div class="ts-nav" aria-label="Guide navigation">
-            <button type="button" class="ts-arrow" data-ts-prev aria-label="Previous tip"><i class="bi bi-chevron-left"></i></button>
-            <button type="button" class="ts-arrow" data-ts-next aria-label="Next tip"><i class="bi bi-chevron-right"></i></button>
+            <button type="button" class="ts-arrow" data-ts-prev aria-label="Previous"><i class="bi bi-chevron-left"></i></button>
+            <button type="button" class="ts-arrow" data-ts-next aria-label="Next"><i class="bi bi-chevron-right"></i></button>
         </div>
     </div>
 
-    <div class="ts-track" tabindex="0" aria-roledescription="carousel">
-        <article class="ts-card">
-            <span class="ts-step">Step 1</span>
-            <div class="ts-icon"><i class="bi bi-power"></i></div>
-            <h3>Restart your router</h3>
-            <p>Unplug the power adapter, wait <strong>30 seconds</strong>, then plug it back in. Give it 2&ndash;3 minutes to fully start before testing again.</p>
-        </article>
-        <article class="ts-card">
-            <span class="ts-step">Step 2</span>
-            <div class="ts-icon"><i class="bi bi-hdd-network"></i></div>
-            <h3>Check the lights &amp; cables</h3>
-            <p>Make sure the power and fiber cables are firmly plugged in and not bent or pinched. A <strong>red or blinking LOS/alarm light</strong> usually means a fiber problem &mdash; don&rsquo;t touch the fiber cable, report it instead.</p>
-        </article>
-        <article class="ts-card">
-            <span class="ts-step">Step 3</span>
-            <div class="ts-icon"><i class="bi bi-wifi"></i></div>
-            <h3>Reconnect to your WiFi</h3>
-            <p>On your phone or laptop, turn WiFi off and on, or &ldquo;forget&rdquo; the network and connect again with your WiFi password. Move closer to the router if the signal is weak.</p>
-        </article>
-        <article class="ts-card">
-            <span class="ts-step">Step 4</span>
-            <div class="ts-icon"><i class="bi bi-laptop"></i></div>
-            <h3>Try another device</h3>
-            <p>Check if the problem is on one device only or on all of them. If just one device is affected, restart that device. If everything is offline, the problem is with the connection.</p>
-        </article>
-        <article class="ts-card">
-            <span class="ts-step">Step 5</span>
-            <div class="ts-icon"><i class="bi bi-receipt"></i></div>
-            <h3>Check your account</h3>
-            <p>Look at your <strong>Amount To Pay</strong> and due date above. An overdue bill can pause your service &mdash; once your payment is settled, your connection should return.</p>
-        </article>
-        <article class="ts-card ts-card--cta">
-            <span class="ts-step">Still no luck?</span>
-            <div class="ts-icon"><i class="bi bi-tools"></i></div>
-            <h3>Report an issue</h3>
-            <p>If nothing above worked, send us a report and a technician will be assigned. You can follow the progress right here on your home screen.</p>
-            {% if has_open_issue %}
-            <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#openIssueModal">Report an Issue</button>
-            {% else %}
-            <a href="{{ report_url }}" class="btn btn-sm btn-light">Report an Issue</a>
-            {% endif %}
-        </article>
+    <div class="ts-track" aria-roledescription="carousel">
+        <button type="button" class="ts-card" data-ts-open="no-internet" data-ts-title="No Internet">
+            <span class="ts-step">Issue 1</span>
+            <span class="ts-icon"><i class="bi bi-wifi-off"></i></span>
+            <h3>No Internet</h3>
+            <p>Can't go online at all</p>
+            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        </button>
+        <button type="button" class="ts-card" data-ts-open="slow-internet" data-ts-title="Slow Internet">
+            <span class="ts-step">Issue 2</span>
+            <span class="ts-icon"><i class="bi bi-speedometer2"></i></span>
+            <h3>Slow Internet</h3>
+            <p>Pages and videos load slowly</p>
+            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        </button>
+        <button type="button" class="ts-card" data-ts-open="cable-problem" data-ts-title="Cable Problem">
+            <span class="ts-step">Issue 3</span>
+            <span class="ts-icon"><i class="bi bi-plug"></i></span>
+            <h3>Cable Problem</h3>
+            <p>Damaged or loose cable</p>
+            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        </button>
+        <button type="button" class="ts-card" data-ts-open="router-modem" data-ts-title="Router/Modem Problem">
+            <span class="ts-step">Issue 4</span>
+            <span class="ts-icon"><i class="bi bi-router"></i></span>
+            <h3>Router/Modem Problem</h3>
+            <p>Router lights off, hot, or restarting</p>
+            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        </button>
+        <button type="button" class="ts-card" data-ts-open="connection-problem" data-ts-title="Connection Problem">
+            <span class="ts-step">Issue 5</span>
+            <span class="ts-icon"><i class="bi bi-reception-2"></i></span>
+            <h3>Connection Problem</h3>
+            <p>WiFi keeps disconnecting</p>
+            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        </button>
     </div>
 
-    <div class="ts-dots" role="tablist" aria-label="Guide steps"></div>
+    <div class="ts-dots" aria-hidden="true"></div>
+    <template data-ts-steps="no-internet">
+<ol class="ts-steps-list">
+    <li><strong>Check the power.</strong> Make sure the router&rsquo;s power light is on and the adapter is plugged in firmly. Try a different outlet.</li>
+    <li><strong>Look at the fiber light.</strong> A <strong>red or blinking LOS/alarm light</strong> means the fiber line has a problem. Don&rsquo;t touch or bend the fiber cable &mdash; report it instead.</li>
+    <li><strong>Restart the router.</strong> Unplug the power for 30 seconds, plug it back in, and wait 2&ndash;3 minutes.</li>
+    <li><strong>Test another device.</strong> If everything is offline, the problem is the connection. If only one device is offline, restart it and reconnect to WiFi.</li>
+    <li><strong>Check your account.</strong> An unpaid bill past its due date can pause your service. Check your Amount To Pay above.</li>
+    <li><strong>Still offline?</strong> Report an issue so a technician can be assigned.</li>
+</ol>
+    </template>
+    <template data-ts-steps="slow-internet">
+<ol class="ts-steps-list">
+    <li><strong>Run a speed test</strong> close to the router (use a cable if you can) and compare it with your plan speed.</li>
+    <li><strong>Free up the connection.</strong> Pause big downloads, game updates and HD streaming, and disconnect devices you aren&rsquo;t using.</li>
+    <li><strong>Improve the WiFi signal.</strong> Move closer to the router. Keep it in an open, central spot, away from thick walls, microwaves and cordless phones.</li>
+    <li><strong>Restart the router.</strong> Unplug for 30 seconds, plug back in, and wait 2&ndash;3 minutes.</li>
+    <li><strong>Restart your device</strong> and close apps or browser tabs you don&rsquo;t need.</li>
+    <li><strong>Still slow at all times?</strong> Report an issue and tell us the speed you measured.</li>
+</ol>
+    </template>
+    <template data-ts-steps="cable-problem">
+<ol class="ts-steps-list">
+    <li><strong>Look for visible damage.</strong> Check the cable for sharp bends, kinks, cuts, or spots where it is pinched by a door or furniture.</li>
+    <li><strong>Don&rsquo;t bend, pull or cut the fiber.</strong> Keep it away from foot traffic, and never try to repair or splice it yourself.</li>
+    <li><strong>Check the connectors.</strong> Make sure the plug at the router is seated firmly and the power cable is snug. Never look directly into the end of a fiber cable.</li>
+    <li><strong>Check the LOS light.</strong> If it is red or blinking, the fiber line is likely damaged.</li>
+    <li><strong>Damaged or LOS red?</strong> Stop and report an issue &mdash; a technician will inspect and repair it.</li>
+</ol>
+    </template>
+    <template data-ts-steps="router-modem">
+<ol class="ts-steps-list">
+    <li><strong>Check the power.</strong> Make sure the adapter is firmly plugged in, then try another outlet.</li>
+    <li><strong>Check the lights.</strong> Note which lights (power, PON/LOS, internet, WiFi) are off, red or blinking &mdash; this helps the technician.</li>
+    <li><strong>Restart the router.</strong> Unplug for 30 seconds, plug back in, and wait 2&ndash;3 minutes.</li>
+    <li><strong>Keep it cool.</strong> Don&rsquo;t cover the router, and keep it in a ventilated place away from direct sun.</li>
+    <li><strong>Don&rsquo;t press the reset button.</strong> A factory reset erases your settings, so only do it if a technician tells you to.</li>
+    <li><strong>No lights, overheating, or keeps restarting?</strong> Report an issue.</li>
+</ol>
+    </template>
+    <template data-ts-steps="connection-problem">
+<ol class="ts-steps-list">
+    <li><strong>Toggle WiFi.</strong> Turn WiFi off and on on your device, or switch airplane mode on and off.</li>
+    <li><strong>Forget and rejoin.</strong> Remove the WiFi network from your device and connect again with the correct password.</li>
+    <li><strong>Compare devices.</strong> If only one device drops, restart it. If all of them drop, the problem is the router or the line.</li>
+    <li><strong>Reduce interference.</strong> Move closer to the router and away from microwaves, cordless phones and thick walls.</li>
+    <li><strong>Restart the router.</strong> Unplug for 30 seconds, plug back in, and wait 2&ndash;3 minutes.</li>
+    <li><strong>Keeps happening?</strong> Report an issue and tell us when it disconnects.</li>
+</ol>
+    </template>
 </section>
+
+{# Steps popup #}
+<div class="modal fade" id="tsModal" tabindex="-1" aria-labelledby="tsModalTitle" aria-hidden="true" data-has-open-issue="{{ '1' if has_open_issue else '0' }}" data-report-url="{{ report_url }}">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tsModalTitle"><i class="bi bi-tools text-primary me-1"></i><span data-ts-modal-title>How to fix it</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" data-ts-modal-body></div>
+            <div class="modal-footer">
+                <span class="small text-muted me-auto">Still not fixed?</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary btn-sm" data-ts-report><i class="bi bi-plus-lg me-1"></i>Report an Issue</button>
+            </div>
+        </div>
+    </div>
+</div>

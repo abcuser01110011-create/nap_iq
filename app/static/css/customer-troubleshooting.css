@@ -31,3 +31,14 @@
 .ts-dot.is-active { width: 22px; background: var(--ts-accent); }
 @media (min-width: 992px) { .ts-card { flex-basis: 280px; } }
 @media (prefers-reduced-motion: reduce) { .ts-track { scroll-behavior: auto; } }
+
+/* ---- v2: cards are buttons (one per issue type) + steps popup ---- */
+button.ts-card { text-align: left; font: inherit; color: inherit; cursor: pointer; width: auto; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+button.ts-card:hover, button.ts-card:focus-visible { transform: translateY(-3px); border-color: var(--ts-accent); box-shadow: 0 14px 26px -16px rgba(13,59,133,.55); outline: none; }
+.ts-card .ts-icon { align-self: flex-start; }
+.ts-more { margin-top: auto; padding-top: .6rem; font-size: .84rem; font-weight: 700; color: var(--ts-accent); }
+.ts-more i { transition: transform .15s ease; }
+.ts-card:hover .ts-more i { transform: translateX(3px); }
+.ts-steps-list { margin: 0; padding-left: 1.25rem; display: grid; gap: .75rem; }
+.ts-steps-list li { line-height: 1.5; }
+.ts-steps-list li::marker { font-weight: 700; color: var(--ts-accent, #0D3B85); }
