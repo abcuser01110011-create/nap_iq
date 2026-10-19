@@ -7,6 +7,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-troubleshooting.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -139,6 +140,12 @@
     </a>
     {% endif %}
 </div>
+
+{# Basic troubleshooting guide (carousel) under the Report an Issue button #}
+{% with report_url=url_for('customer.report_issue'), has_open_issue=open_issue %}
+{% include "partials/troubleshooting_carousel.html" %}
+{% endwith %}
+
 {% if open_issue %}
 {# Popup only: opens over the home screen, no page change or reload. #}
 <div class="modal fade" id="openIssueModal" tabindex="-1" aria-labelledby="openIssueModalLabel" aria-hidden="true">
@@ -175,6 +182,9 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{% if subscriber is not none %}
+<script src="{{ url_for('static', filename='js/customer-troubleshooting.js') }}"></script>
+{% endif %}
 {% if subscriber is not none and progress_data %}
 <script>
     window.ISSUE_PROGRESS_INITIAL = {{ progress_data|tojson }};

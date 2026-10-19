@@ -1,0 +1,61 @@
+{# Basic troubleshooting guide carousel shown under the Report an Issue button.
+   Pure HTML + static/css/customer-troubleshooting.css + static/js/customer-troubleshooting.js
+   (no extra dependencies). Pass `report_url` and (optional) `has_open_issue`. #}
+<section class="ts-guide mb-4" id="tsGuide" aria-labelledby="tsGuideTitle">
+    <div class="ts-head">
+        <div>
+            <h2 class="ts-title" id="tsGuideTitle"><i class="bi bi-lightbulb me-1"></i>Troubleshooting guide</h2>
+            <p class="ts-sub">Internet not working? Try these quick fixes before reporting an issue.</p>
+        </div>
+        <div class="ts-nav" aria-label="Guide navigation">
+            <button type="button" class="ts-arrow" data-ts-prev aria-label="Previous tip"><i class="bi bi-chevron-left"></i></button>
+            <button type="button" class="ts-arrow" data-ts-next aria-label="Next tip"><i class="bi bi-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <div class="ts-track" tabindex="0" aria-roledescription="carousel">
+        <article class="ts-card">
+            <span class="ts-step">Step 1</span>
+            <div class="ts-icon"><i class="bi bi-power"></i></div>
+            <h3>Restart your router</h3>
+            <p>Unplug the power adapter, wait <strong>30 seconds</strong>, then plug it back in. Give it 2&ndash;3 minutes to fully start before testing again.</p>
+        </article>
+        <article class="ts-card">
+            <span class="ts-step">Step 2</span>
+            <div class="ts-icon"><i class="bi bi-hdd-network"></i></div>
+            <h3>Check the lights &amp; cables</h3>
+            <p>Make sure the power and fiber cables are firmly plugged in and not bent or pinched. A <strong>red or blinking LOS/alarm light</strong> usually means a fiber problem &mdash; don&rsquo;t touch the fiber cable, report it instead.</p>
+        </article>
+        <article class="ts-card">
+            <span class="ts-step">Step 3</span>
+            <div class="ts-icon"><i class="bi bi-wifi"></i></div>
+            <h3>Reconnect to your WiFi</h3>
+            <p>On your phone or laptop, turn WiFi off and on, or &ldquo;forget&rdquo; the network and connect again with your WiFi password. Move closer to the router if the signal is weak.</p>
+        </article>
+        <article class="ts-card">
+            <span class="ts-step">Step 4</span>
+            <div class="ts-icon"><i class="bi bi-laptop"></i></div>
+            <h3>Try another device</h3>
+            <p>Check if the problem is on one device only or on all of them. If just one device is affected, restart that device. If everything is offline, the problem is with the connection.</p>
+        </article>
+        <article class="ts-card">
+            <span class="ts-step">Step 5</span>
+            <div class="ts-icon"><i class="bi bi-receipt"></i></div>
+            <h3>Check your account</h3>
+            <p>Look at your <strong>Amount To Pay</strong> and due date above. An overdue bill can pause your service &mdash; once your payment is settled, your connection should return.</p>
+        </article>
+        <article class="ts-card ts-card--cta">
+            <span class="ts-step">Still no luck?</span>
+            <div class="ts-icon"><i class="bi bi-tools"></i></div>
+            <h3>Report an issue</h3>
+            <p>If nothing above worked, send us a report and a technician will be assigned. You can follow the progress right here on your home screen.</p>
+            {% if has_open_issue %}
+            <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#openIssueModal">Report an Issue</button>
+            {% else %}
+            <a href="{{ report_url }}" class="btn btn-sm btn-light">Report an Issue</a>
+            {% endif %}
+        </article>
+    </div>
+
+    <div class="ts-dots" role="tablist" aria-label="Guide steps"></div>
+</section>

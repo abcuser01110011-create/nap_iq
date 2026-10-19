@@ -1,0 +1,33 @@
+/* Troubleshooting guide carousel (customer home). Scroll-snap based, theme-aware. */
+.ts-guide { --ts-accent: #0D3B85; }
+[data-bs-theme="dark"] .ts-guide { --ts-accent: #4C7FD1; }
+.ts-head { display: flex; align-items: flex-end; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+.ts-title { font-size: 1.05rem; font-weight: 700; margin: 0; }
+.ts-title i { color: #F4B41A; }
+.ts-sub { margin: .15rem 0 0; font-size: .85rem; color: var(--bs-secondary-color); }
+.ts-nav { display: flex; gap: .4rem; flex-shrink: 0; }
+.ts-arrow { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); color: var(--bs-body-color); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s, opacity .15s; }
+.ts-arrow:hover:not(:disabled) { background: var(--bs-tertiary-bg); }
+.ts-arrow:disabled { opacity: .4; cursor: default; }
+
+.ts-track { display: flex; gap: .85rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; padding: .15rem .1rem .6rem; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.ts-track::-webkit-scrollbar { display: none; }
+.ts-track:focus-visible { outline: 2px solid var(--ts-accent); outline-offset: 2px; border-radius: 12px; }
+
+.ts-card { position: relative; flex: 0 0 min(300px, 82%); scroll-snap-align: start; background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); border-radius: 16px; padding: 1.1rem 1.1rem 1.2rem; box-shadow: 0 6px 18px -14px rgba(8,18,37,.5); display: flex; flex-direction: column; gap: .35rem; }
+.ts-card h3 { font-size: 1rem; font-weight: 700; margin: .35rem 0 0; }
+.ts-card p { font-size: .88rem; margin: 0; color: var(--bs-secondary-color); line-height: 1.5; }
+.ts-step { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ts-accent); }
+.ts-icon { width: 46px; height: 46px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--ts-accent); background: rgba(13,59,133,.1); margin-top: .3rem; }
+[data-bs-theme="dark"] .ts-icon { background: rgba(76,127,209,.18); }
+.ts-card--cta { background: linear-gradient(150deg, #0D3B85, #082A63); border-color: transparent; }
+.ts-card--cta h3, .ts-card--cta .ts-step { color: #fff; }
+.ts-card--cta p { color: rgba(255,255,255,.82); }
+.ts-card--cta .ts-icon { background: rgba(255,255,255,.16); color: #F4B41A; }
+.ts-card--cta .btn { align-self: flex-start; margin-top: .6rem; font-weight: 600; }
+
+.ts-dots { display: flex; justify-content: center; gap: .4rem; margin-top: .2rem; }
+.ts-dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: var(--bs-border-color); cursor: pointer; transition: width .2s, background .2s; }
+.ts-dot.is-active { width: 22px; background: var(--ts-accent); }
+@media (min-width: 992px) { .ts-card { flex-basis: 280px; } }
+@media (prefers-reduced-motion: reduce) { .ts-track { scroll-behavior: auto; } }
