@@ -262,6 +262,15 @@
 </div>
 {% endif %}
 
+{% if job.assignment.status == 'in_progress' %}
+<div id="liveLocation" class="alert alert-info py-2 small d-flex align-items-center gap-2"
+     data-url="{{ url_for('technician.update_live_location', assignment_id=job.assignment.id) }}"
+     data-csrf="{{ csrf_token() }}">
+    <i class="bi bi-geo-alt-fill"></i>
+    <span id="liveLocationStatus">Starting live location sharing… keep this page open and allow location access.</span>
+</div>
+{% endif %}
+
 <div class="d-flex flex-wrap gap-2">
     {% if job.can_accept %}
         <form method="post" action="{{ url_for('technician.accept_assignment', assignment_id=job.assignment.id) }}">
@@ -369,6 +378,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/technician-live-location.js') }}"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var modalEl = document.getElementById("notesModal");

@@ -371,6 +371,14 @@ export class ApiClient {
         `/api/v1/technician/assignments/${assignmentId}/pin-location`,
         { method: "POST", body: { latitude, longitude } }
       ),
+    /** Live-tracking heartbeat: posts the technician's current GPS fix
+     * every few minutes while a job is in progress, so the customer's
+     * Arriving map can show where they are. */
+    updateLiveLocation: (assignmentId: number, latitude: number, longitude: number) =>
+      this.request<{ ok: boolean; updated_at: string }>(
+        `/api/v1/technician/assignments/${assignmentId}/location`,
+        { method: "POST", body: { latitude, longitude } }
+      ),
     /** Saves the GPS breadcrumb trail the technician walked while
      * running the drop cable from the NAP to the subscriber's
      * premises (see JobDetailScreen.tsx's "Cable path" card and

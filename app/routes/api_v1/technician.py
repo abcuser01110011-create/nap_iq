@@ -858,6 +858,43 @@ def upload_assignment_signature(assignment_id):
     return jsonify(assignment=_serialize_assignment(assignment)), 200
 
 
+@api_v1_technician_bp.route("/assignments/<int:assignment_id>/location", methods=["POST"])
+@jwt_role_required("technician")
+def update_live_location(assignment_id):
+    """Live-tracking heartbeat from the mobile app. While a job is
+    'in_progress' the app posts its GPS fix here every 5 minutes; it is
+    stored on technicians.current_latitude/current_longitude, which the
+    customer's Arriving map reads (see customer.py _issue_progress).
+    Mirrors technician.py's update_live_location()."""
+    profile = _get_own_profile_or_404()
+    if profile is None:
+        return jsonify(error="No technician profile is linked to this account yet."), 404
+
+    assignment = _get_own_assignment_or_404(profile, assignment_id)
+    if assignment is None:
+        return jsonify(error="Assignment not found."), 404
+
+    if assignment.status != "in_progress":
+        return jsonify(error="Live location is only shared while a job is in progress."), 409
+
+    data = request.get_json(silent=True) or {}
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return jsonify(error="latitude and longitude are required numbers."), 400
+
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        return jsonify(error="latitude/longitude are out of range."), 400
+
+    profile.current_latitude = latitude
+    profile.current_longitude = longitude
+    profile.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify(ok=True, updated_at=profile.updated_at.isoformat() + "Z"), 200
+
+
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/pin-location", methods=["POST"])
 @jwt_role_required("technician")
 def pin_assignment_location(assignment_id):

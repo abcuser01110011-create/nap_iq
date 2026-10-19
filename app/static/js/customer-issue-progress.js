@@ -111,7 +111,10 @@
         st.issue = issue;
         var now = Date.now();
         if (issue.current !== 1) { return; }
-        if (st.at && now - st.at < LOC_REFRESH_MS) { return; }
+        // Only throttle once we actually have a technician fix; until then
+        // keep checking on every feed refresh so the map appears as soon as
+        // the technician's first location arrives.
+        if (st.at && st.tech && now - st.at < LOC_REFRESH_MS) { return; }
         st.at = now;
         st.tech = (issue.tech_lat != null && issue.tech_lng != null) ? [issue.tech_lat, issue.tech_lng] : null;
         st.route = null;

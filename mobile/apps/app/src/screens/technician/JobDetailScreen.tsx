@@ -169,6 +169,43 @@ export default function JobDetailScreen({ route, navigation }: any) {
   const [pathError, setPathError] = useState<string | null>(null);
   const locationSubscriptionRef = React.useRef<Location.LocationSubscription | null>(null);
 
+  // Live tracking: while this job is in progress and the screen is open,
+  // send the technician's position to the server right away and then
+  // every 5 minutes, so the customer's Arriving map can show it. Failures
+  // (offline, permission denied) are ignored and retried on the next tick.
+  const LIVE_LOCATION_INTERVAL_MS = 5 * 60 * 1000;
+  useEffect(() => {
+    if (assignment.status !== "in_progress") return;
+    let cancelled = false;
+
+    const sendLiveLocation = async () => {
+      try {
+        if (!isOnline) return;
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (cancelled) return;
+        await client.technician.updateLiveLocation(
+          assignment.id,
+          position.coords.latitude,
+          position.coords.longitude
+        );
+      } catch {
+        // keep going; next tick will retry
+      }
+    };
+
+    sendLiveLocation();
+    const timer = setInterval(sendLiveLocation, LIVE_LOCATION_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignment.id, assignment.status, isOnline]);
+
   // Stop any live GPS watch if the technician backs out of this screen
   // mid-recording (e.g. to check the map) rather than leaving it
   // running in the background and draining the battery for a job

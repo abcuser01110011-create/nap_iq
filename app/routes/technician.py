@@ -359,6 +359,42 @@ def start_assignment(assignment_id):
     return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
 
+@technician_bp.route("/assignments/<int:assignment_id>/location", methods=["POST"])
+@role_required("technician")
+def update_live_location(assignment_id):
+    """Live-tracking heartbeat. While a job is 'in_progress' the
+    technician's browser (static/js/technician-live-location.js) posts
+    its GPS fix here every 5 minutes. It's stored on the technician's
+    own profile row (technicians.current_latitude/current_longitude --
+    the columns the customer's Arriving map and the dispatch
+    recommendation already read), so the customer portal's progress
+    feed (customer.py _issue_progress) picks it up on its next poll.
+    Same validation as pin-location above, different target: this is
+    the technician's position, not a pinned job-site coordinate."""
+    profile = _get_own_profile_or_403()
+    assignment = _get_own_assignment_or_403(profile, assignment_id)
+
+    if assignment.status != "in_progress":
+        return {"error": "Live location is only shared while a job is in progress."}, 409
+
+    data = request.get_json(silent=True) or {}
+    try:
+        latitude = float(data.get("latitude"))
+        longitude = float(data.get("longitude"))
+    except (TypeError, ValueError):
+        return {"error": "latitude and longitude are required numbers."}, 400
+
+    if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+        return {"error": "latitude/longitude are out of range."}, 400
+
+    profile.current_latitude = latitude
+    profile.current_longitude = longitude
+    profile.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return {"ok": True, "updated_at": profile.updated_at.isoformat() + "Z"}, 200
+
+
 @technician_bp.route("/assignments/<int:assignment_id>/pin-location", methods=["POST"])
 @role_required("technician")
 def pin_assignment_location(assignment_id):
