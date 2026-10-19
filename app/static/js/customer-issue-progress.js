@@ -31,7 +31,7 @@
             sub = '<span class="ip-sub">' + esc(issue.technician) + "</span>";
         }
         if (index === 1 && issue.current === 1) sub = '<span class="ip-sub">Technician is on the way</span>';
-        return '<div class="ip-step ' + cls + '"><div class="ip-dot' + pulse + '">' + dot + "</div>" +
+        return '<div class="ip-step ' + cls + '" data-step="' + index + '" role="button" tabindex="0"><div class="ip-dot' + pulse + '">' + dot + "</div>" +
             '<div class="ip-label">' + STEPS[index] + "</div>" + sub + "</div>";
     }
 
@@ -67,7 +67,7 @@
     }
 
 
-    /* ---------- Home-screen details dropdown (per issue) ---------- */
+    /* ---------- Home-screen step details (per issue, always visible) ---------- */
     var LOC_REFRESH_MS = 5 * 60 * 1000;   // technician location + route refresh
     var OSRM = "https://router.project-osrm.org/route/v1/driving/";
     var loc = {};                          // issue id -> { at, tech, route }
@@ -80,6 +80,23 @@
         return 2 * R * Math.asin(Math.sqrt(h));
     }
 
+    /* Which step's details are showing, per issue. Defaults to the step the
+       issue is currently on; tapping a step overrides it until the issue
+       moves on to a new step. */
+    var sel = {};   // issue id -> { step, forCurrent }
+
+    function defaultStep(issue) {
+        if (issue.done >= 3) return 2;
+        return issue.current >= 0 ? issue.current : 0;
+    }
+
+    function selectedStep(issue) {
+        var s = sel[issue.id];
+        if (s && s.forCurrent === issue.current && s.forDone === issue.done) return s.step;
+        delete sel[issue.id];
+        return defaultStep(issue);
+    }
+
     function ensureDetails(issue) {
         var item = document.querySelector('.ip-home-item[data-issue-id="' + issue.id + '"]');
         if (!item) return null;
@@ -87,24 +104,30 @@
         if (d) return d;
         d = document.createElement("div");
         d.className = "ip-details";
-        d.innerHTML =
-            '<button type="button" class="ip-details-toggle" aria-expanded="false" aria-label="Show progress details">' +
-            '<i class="bi bi-chevron-down"></i></button>' +
-            '<div class="ip-details-body" hidden></div>';
+        d.innerHTML = '<div class="ip-details-body"></div>';
         item.appendChild(d);
-        d.querySelector(".ip-details-toggle").addEventListener("click", function () {
-            var body = d.querySelector(".ip-details-body");
-            var open = body.hasAttribute("hidden");
-            if (open) body.removeAttribute("hidden"); else body.setAttribute("hidden", "");
-            this.setAttribute("aria-expanded", open ? "true" : "false");
-            d.classList.toggle("open", open);
-            if (open) setTimeout(function () {
-                var m = maps[issue.id];
-                if (m) { m.map.invalidateSize(); fitMap(m); }
-            }, 60);
-        });
         return d;
     }
+
+    function pickStep(stepEl) {
+        var item = stepEl.closest(".ip-home-item");
+        if (!item) return;
+        var id = item.getAttribute("data-issue-id");
+        var st = loc[id];
+        if (!st || !st.issue) return;
+        sel[id] = { step: parseInt(stepEl.getAttribute("data-step"), 10), forCurrent: st.issue.current, forDone: st.issue.done };
+        renderDetails(st.issue);
+    }
+
+    document.addEventListener("click", function (e) {
+        var el = e.target.closest && e.target.closest(".ip-home-item .ip-step");
+        if (el) pickStep(el);
+    });
+    document.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        var el = e.target.closest && e.target.closest(".ip-home-item .ip-step");
+        if (el) { e.preventDefault(); pickStep(el); }
+    });
 
     function updateLocation(issue) {
         var st = loc[issue.id] || (loc[issue.id] = { at: 0, tech: null, route: null, issue: issue });
@@ -195,36 +218,57 @@
         var d = ensureDetails(issue);
         if (!d) return;
         var st = loc[issue.id] || {};
-        var html = "";
-        if (issue.current !== 1) destroyMap(issue.id);
-        // Only the details for the step the issue is currently on.
-        if (issue.done >= 3) {
-            html = '<div class="ip-d-title">Completed</div>' +
-                '<div class="ip-d-note">Your issue has been resolved.</div>';
-        } else if (issue.current === 1) {
-            var body = d.querySelector(".ip-details-body");
-            var wrap = body.querySelector(".ip-arriving");
-            if (!wrap) {
-                body.innerHTML = '<div class="ip-arriving"><div class="ip-d-title">Arriving</div>' +
-                    '<div class="ip-map" role="img" aria-label="Map showing the technician and your location"></div>' +
-                    '<div class="ip-arr-info"></div></div>';
-                wrap = body.querySelector(".ip-arriving");
+        var step = selectedStep(issue);
+        var body = d.querySelector(".ip-details-body");
+
+        // Highlight the step being viewed.
+        var steps = d.parentElement.querySelectorAll(".ip-step");
+        for (var i = 0; i < steps.length; i++) steps[i].classList.toggle("selected", i === step);
+
+        if (step !== 1) destroyMap(issue.id);
+
+        if (step === 0) {
+            if (issue.status === "pending") {
+                body.innerHTML = '<div class="ip-d-title">Technician Assigned</div>' +
+                    '<div class="ip-d-note">Waiting for a technician to be assigned.</div>';
+            } else {
+                body.innerHTML = '<div class="ip-d-title">Technician Assigned</div>' +
+                    row("Name", issue.technician ? esc(issue.technician) : "None") +
+                    row("Contact", issue.technician_phone ? '<a href="tel:' + esc(issue.technician_phone) + '">' + esc(issue.technician_phone) + "</a>" : "None");
             }
-            var info = "";
-            info += row("Technician", issue.technician ? esc(issue.technician) : "None");
-            info += row("Route distance", st.route ? fmtDist(st.route.m) + (st.route.approx ? " (straight-line)" : "") : "Not available");
-            if (!st.tech) info += '<div class="ip-d-note">Technician location not available yet.</div>';
-            if (st.at) info += '<div class="ip-d-note">Updates every 5 minutes &middot; last updated ' + fmtTime(new Date(st.at)) + "</div>";
-            wrap.querySelector(".ip-arr-info").innerHTML = info;
-            var mapEl = wrap.querySelector(".ip-map");
-            if (!updateMap(issue, mapEl)) mapEl.style.display = "none";
-            return;
+        } else if (step === 1) {
+            if (issue.current === 1) {
+                var wrap = body.querySelector(".ip-arriving");
+                if (!wrap) {
+                    body.innerHTML = '<div class="ip-arriving"><div class="ip-d-title">Arriving</div>' +
+                        '<div class="ip-map" role="img" aria-label="Map showing the technician and your location"></div>' +
+                        '<div class="ip-arr-info"></div></div>';
+                    wrap = body.querySelector(".ip-arriving");
+                }
+                var info = "";
+                info += row("Technician", issue.technician ? esc(issue.technician) : "None");
+                info += row("Route distance", st.route ? fmtDist(st.route.m) + (st.route.approx ? " (straight-line)" : "") : "Not available");
+                if (!st.tech) info += '<div class="ip-d-note">Technician location not available yet.</div>';
+                if (st.at) info += '<div class="ip-d-note">Updates every 5 minutes &middot; last updated ' + fmtTime(new Date(st.at)) + "</div>";
+                wrap.querySelector(".ip-arr-info").innerHTML = info;
+                var mapEl = wrap.querySelector(".ip-map");
+                var fresh = !maps[issue.id];
+                if (!updateMap(issue, mapEl)) mapEl.style.display = "none";
+                else if (fresh) setTimeout(function () {
+                    var m = maps[issue.id];
+                    if (m) { m.map.invalidateSize(); fitMap(m); }
+                }, 60);
+            } else if (issue.done >= 3) {
+                body.innerHTML = '<div class="ip-d-title">Arriving</div>' +
+                    '<div class="ip-d-note">The technician has arrived and finished the visit.</div>';
+            } else {
+                body.innerHTML = '<div class="ip-d-title">Arriving</div>' +
+                    '<div class="ip-d-note">The technician is not on the way yet. You\u2019ll see the live map here once they are.</div>';
+            }
         } else {
-            html = '<div class="ip-d-title">Technician Assigned</div>' +
-                row("Name", issue.technician ? esc(issue.technician) : "None") +
-                row("Contact", issue.technician_phone ? '<a href="tel:' + esc(issue.technician_phone) + '">' + esc(issue.technician_phone) + "</a>" : "None");
+            body.innerHTML = '<div class="ip-d-title">Completed</div>' +
+                '<div class="ip-d-note">' + (issue.done >= 3 ? "Your issue has been resolved." : "Not completed yet.") + "</div>";
         }
-        d.querySelector(".ip-details-body").innerHTML = html;
     }
 
     function renderHomeDetails(issue) { updateLocation(issue); renderDetails(issue); }

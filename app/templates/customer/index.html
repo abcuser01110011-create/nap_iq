@@ -103,10 +103,10 @@
             <i class="bi bi-clock-history me-1"></i>View reported issue history
         </a>
     </div>
+    {% if progress_data %}
     <div class="card shadow-sm napiq-account-card ip-home-card">
         <div class="card-body">
             <span class="napiq-account-label">Reported issue progress</span>
-            {% if progress_data %}
             <div class="ip-home-list">
                 {% for p in progress_data %}
                 {% set issue = technical_issues|selectattr('id', 'equalto', p.id)|first %}
@@ -120,13 +120,9 @@
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <p class="text-muted small mb-0 mt-2">
-                <i class="bi bi-check2-circle me-1"></i>No issues in progress right now.
-            </p>
-            {% endif %}
         </div>
     </div>
+    {% endif %}
 </div>
 
 {% if payments %}

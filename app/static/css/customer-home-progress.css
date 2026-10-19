@@ -32,12 +32,11 @@
     .ip-sub { font-size: .65rem; }
 }
 
-/* Progress details dropdown: centered arrow under a single divider line */
-.ip-details { margin-top: .6rem; border-top: 1px solid var(--bs-border-color, #dee2e6); }
-.ip-details-toggle { width: 100%; display: flex; justify-content: center; align-items: center; padding: .35rem 0; background: transparent; border: 0; color: var(--bs-secondary-color, #6c757d); font-size: 1rem; line-height: 1; }
-.ip-details-toggle:hover, .ip-details-toggle:focus-visible { color: var(--bs-body-color, inherit); }
-.ip-details-toggle i { transition: transform .15s ease; }
-.ip-details.open .ip-details-toggle i { transform: rotate(180deg); }
+/* Step details: fixed panel under the steps (tap a step to switch) */
+.ip-home-item .ip-step { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ip-home-item .ip-step:focus-visible { outline: 2px solid #0d8bf2; outline-offset: 2px; border-radius: .4rem; }
+.ip-step.selected .ip-label { color: #0d8bf2; text-decoration: underline; text-underline-offset: 3px; }
+.ip-details { margin-top: .6rem; padding-top: .6rem; border-top: 1px solid var(--bs-border-color, #dee2e6); }
 .ip-details-body { padding: .25rem .25rem .25rem; }
 .ip-d-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--bs-secondary-color, #6c757d); margin-bottom: .35rem; }
 .ip-d-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .1rem .75rem; font-size: .85rem; padding: .15rem 0; }
