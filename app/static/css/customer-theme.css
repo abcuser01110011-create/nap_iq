@@ -164,3 +164,48 @@
     border: 1px solid #fda29b;
     background: #fef3f2;
 }
+
+/* ---------------------------------------------------------------- */
+/* CUSTOMER HOME: greeting + account-number pill + "Amount To Pay"   */
+/* card (customer/index.html).                                       */
+/* ---------------------------------------------------------------- */
+.dash-theme-customer {
+    --napiq-teal: #00756f;
+}
+.napiq-acct-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+.napiq-acct-hi { flex: 1 0 100%; font-size: 1.05rem; font-weight: 700; color: #101828; }
+.napiq-acct-pill {
+    display: inline-flex; align-items: center; gap: .6rem;
+    padding: .55rem 1.1rem; border: 1.5px solid var(--napiq-teal); border-radius: 999px;
+    color: var(--napiq-teal); font-size: 1.15rem; font-weight: 600; letter-spacing: .02em;
+    background: var(--napiq-surface, #fff); max-width: 100%;
+}
+.napiq-acct-pill-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.napiq-acct-pill-chevron { font-size: .9rem; }
+.napiq-acct-meta { flex: 1 0 100%; display: flex; justify-content: space-between; align-items: center; gap: .75rem; font-size: .75rem; color: #101828; text-transform: uppercase; }
+.napiq-acct-status { display: inline-flex; align-items: center; gap: .4rem; text-transform: none; font-size: .85rem; color: var(--napiq-text-muted); }
+.napiq-acct-dot { width: 10px; height: 10px; border-radius: 50%; background: #12b76a; box-shadow: 0 0 0 3px rgba(18,183,106,.25); }
+.napiq-acct-dot--off { background: #98a2b3; box-shadow: 0 0 0 3px rgba(152,162,179,.25); }
+
+.napiq-pay-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1rem 1.1rem; background: var(--napiq-surface, #fff);
+    border-radius: .75rem; box-shadow: 0 2px 8px rgba(16,24,40,.12);
+}
+.napiq-pay-label { display: block; font-size: .8rem; color: var(--napiq-text-muted); }
+.napiq-pay-amount { font-size: 1.5rem; font-weight: 500; color: #101828; margin: .2rem 0 .5rem; }
+.napiq-pay-peso { color: var(--napiq-teal); font-weight: 700; margin-right: .35rem; }
+.napiq-pay-due { font-size: .72rem; color: #101828; }
+.napiq-pay-btn {
+    border: 0; border-radius: .5rem; background: var(--napiq-teal); color: #fff;
+    font-size: .8rem; font-weight: 600; letter-spacing: .05em;
+    padding: 1rem 1.6rem; min-width: 8.5rem; cursor: pointer;
+}
+.napiq-pay-btn:hover, .napiq-pay-btn:focus-visible { filter: brightness(1.12); }
+.napiq-pay-btn:active { transform: translateY(1px); }
+.napiq-pay-card--due { border: 1px solid #fda29b; background: #fef3f2; }
+.napiq-pay-card--due .napiq-pay-amount,
+.napiq-pay-card--due .napiq-pay-due { color: #d92d20; }
+@media (max-width: 400px) {
+    .napiq-pay-btn { padding: .9rem 1rem; min-width: 7rem; }
+}

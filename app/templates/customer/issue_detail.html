@@ -1,0 +1,58 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Issue {{ issue.issue_code or ('#' ~ issue.id) }}{% endblock %}
+{% block body_class %}dash-theme-customer{% endblock %}
+{% block page_title %}Issue History{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ issue.issue_type }}</p>{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+{% set issue_status_classes = {
+    'pending': 'text-bg-secondary',
+    'assigned': 'text-bg-info',
+    'accepted': 'text-bg-info',
+    'in_progress': 'text-bg-primary',
+    'resolved': 'text-bg-success',
+    'closed': 'text-bg-dark'
+} %}
+<a href="{{ url_for('customer.my_issues') }}" class="btn btn-sm btn-outline-secondary mb-3">
+    <i class="bi bi-arrow-left me-1"></i>Back to history
+</a>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="ip-home-item" data-issue-id="{{ issue.id }}">
+            <div class="ip-home-head">
+                <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
+                <span class="text-muted small">{{ issue.issue_type }}</span>
+                <span class="badge ms-auto issue-status-badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">{{ issue.status|replace('_', ' ')|capitalize }}</span>
+            </div>
+            <div class="issue-progress" data-issue-id="{{ issue.id }}"></div>
+        </div>
+        <div class="ip-hist-info">
+            <div class="ip-d-title">Issue details</div>
+            <div class="ip-d-row"><span class="ip-d-label">Priority</span>
+                <span class="ip-d-value"><span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">{{ issue.priority|capitalize }}</span></span></div>
+            <div class="ip-d-row"><span class="ip-d-label">Reported</span>
+                <span class="ip-d-value">{{ issue.created_at.strftime('%Y-%m-%d') }}</span></div>
+            {% set _d = issue.description or "" %}
+            {% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}
+            <div class="ip-d-row"><span class="ip-d-label">Description</span>
+                <span class="ip-d-value">{{ _d or "—" }}</span></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    window.ISSUE_PROGRESS_INITIAL = {{ [progress]|tojson }};
+    window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
+</script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
+{% endblock %}

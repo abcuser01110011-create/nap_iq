@@ -495,6 +495,25 @@ def my_issues():
     )
 
 
+@customer_bp.route("/issues/<int:issue_id>")
+@role_required("user")
+def my_issue_detail(issue_id):
+    """History/details page for one of the signed-in customer's own
+    issues (opened from the My Issues list). Scoped to the customer's own
+    subscriber record, so another customer's issue id is a plain 404."""
+    subscriber = _own_subscriber_or_none()
+    if subscriber is None:
+        return _no_subscriber_redirect()
+
+    issue = TechnicalIssue.query.filter_by(id=issue_id, subscriber_id=subscriber.id).first_or_404()
+    return render_template(
+        "customer/issue_detail.html",
+        subscriber=subscriber,
+        issue=issue,
+        progress=_issue_progress(issue),
+    )
+
+
 def _issue_progress(issue):
     """Progress-tracker view of one of the customer's own issues.
 

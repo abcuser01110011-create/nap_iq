@@ -52,48 +52,36 @@
     exists on both surfaces. The hamburger sidebar/topbar shell itself
     is unchanged.
 #}
-<div class="card shadow-sm mb-3 napiq-account-card">
-    <div class="card-body">
-        <span class="napiq-account-label">Account number: {{ subscriber.subscriber_code }}</span>
-        <div class="napiq-account-code">{{ subscriber.full_name }}</div>
-        <div class="napiq-account-row">
-            <div class="napiq-account-row-item">
-                <span class="napiq-account-row-label">Plan</span>
-                <span class="napiq-account-row-value">{{ subscriber.plan_type or "—" }}</span>
-            </div>
-            <div class="napiq-account-row-item">
-                <span class="napiq-account-row-label">Status</span>
-                <span class="napiq-account-row-value">{{ subscriber.status|replace('_', ' ') }}</span>
-            </div>
-            <div class="napiq-account-row-item">
-                <span class="napiq-account-row-label">NAP</span>
-                <span class="napiq-account-row-value">{{ subscriber.nap.nap_code if subscriber.nap else "—" }}</span>
-            </div>
-        </div>
+{# Greeting + account number pill + plan/status (matches the mobile account header). #}
+<div class="napiq-acct-head mb-3">
+    <div class="napiq-acct-hi">Hi {{ (subscriber.full_name or current_user.full_name or '').split(' ')[0]|upper }}</div>
+    <div class="napiq-acct-pill" role="group" aria-label="Account number">
+        <span class="napiq-acct-pill-code">{{ subscriber.subscriber_code }}</span>
+        <i class="bi bi-chevron-down napiq-acct-pill-chevron" aria-hidden="true"></i>
+    </div>
+    <div class="napiq-acct-meta">
+        <span class="napiq-acct-plan">{{ subscriber.plan_type or "—" }}</span>
+        <span class="napiq-acct-status">
+            <span class="napiq-acct-dot{% if subscriber.status != 'active' %} napiq-acct-dot--off{% endif %}"></span>
+            {{ subscriber.status|replace('_', ' ')|capitalize }}
+        </span>
     </div>
 </div>
 
-{# Monthly due date: turns red on the due date and after it. #}
-<div class="card shadow-sm mb-3 napiq-account-card{% if due and due.is_due %} napiq-due-card--due{% endif %}">
-    <div class="card-body">
-        <span class="napiq-account-label">Monthly due date</span>
-        {% if due and due.due_date %}
-        <div class="napiq-account-code napiq-due-date{% if due.is_due %} napiq-due-date--due{% endif %}">
-            {{ due.due_date.strftime('%B %d, %Y') }}
+{# Amount to pay + due date. Turns red on the due date and after it.
+   The Pay Now button is clickable but intentionally does nothing yet. #}
+<div class="napiq-pay-card mb-3{% if due and due.is_due %} napiq-pay-card--due{% endif %}">
+    <div class="napiq-pay-info">
+        <span class="napiq-pay-label">Amount To Pay</span>
+        <div class="napiq-pay-amount">
+            <span class="napiq-pay-peso">&#8369;</span>
+            {% if due and due.monthly_fee is not none %}{{ '%.2f'|format(due.monthly_fee) }}{% else %}&mdash;{% endif %}
         </div>
-        <span class="napiq-account-row-label{% if due.is_due %} napiq-due-date--due{% endif %}">
-            {% if due.is_due %}
-                <i class="bi bi-exclamation-circle-fill me-1"></i>
-                {% if due.days_overdue == 0 %}Due today{% else %}Overdue by {{ due.days_overdue }} day{{ '' if due.days_overdue == 1 else 's' }}{% endif %}
-            {% else %}
-                Due in {{ due.days_until }} day{{ '' if due.days_until == 1 else 's' }}
-            {% endif %}
-            {% if due.monthly_fee is not none %} &middot; &#8369;{{ '%.2f'|format(due.monthly_fee) }}{% endif %}
-        </span>
-        {% else %}
-        <div class="napiq-account-code">&mdash;</div>
+        {% if due and due.due_date %}
+        <span class="napiq-pay-due">Due Date: {{ due.due_date.strftime('%b') }} {{ due.due_date.day }}, {{ due.due_date.year }}</span>
         {% endif %}
     </div>
+    <button type="button" class="napiq-pay-btn" id="payNowBtn">PAY NOW</button>
 </div>
 
 {# Reported-issue progress tracker (moved here from the old "Open issues" tile) #}
