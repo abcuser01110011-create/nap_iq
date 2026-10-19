@@ -62,3 +62,5 @@
 .ip-photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; }
 .ip-photo { display: flex; flex-direction: column; gap: .25rem; text-decoration: none; font-size: .75rem; color: var(--bs-secondary-color, #6c757d); text-align: center; }
 .ip-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: .5rem; border: 1px solid var(--bs-border-color, #dee2e6); }
+.ip-proof { display: block; }
+.ip-proof img { width: 100%; max-height: 420px; object-fit: cover; border-radius: .6rem; border: 1px solid var(--bs-border-color, #dee2e6); }

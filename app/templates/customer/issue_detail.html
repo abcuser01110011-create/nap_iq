@@ -5,12 +5,11 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ issue.issue_type }}</p>{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 {% endblock %}
 
 {% block content %}
-{% set priority_classes = {'low': 'text-bg-secondary', 'medium': 'text-bg-primary', 'high': 'text-bg-warning', 'critical': 'text-bg-danger'} %}
+{% set h = history %}
 {% set issue_status_classes = {
     'pending': 'text-bg-secondary',
     'assigned': 'text-bg-info',
@@ -25,17 +24,11 @@
 
 <div class="card shadow-sm mb-3">
     <div class="card-body">
-        <div class="ip-home-item" data-issue-id="{{ issue.id }}">
-            <div class="ip-home-head">
-                <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
-                <span class="text-muted small">{{ issue.issue_type }}</span>
-                <span class="badge ms-auto issue-status-badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">{{ issue.status|replace('_', ' ')|capitalize }}</span>
-            </div>
-            <div class="issue-progress" data-issue-id="{{ issue.id }}"></div>
+        <div class="ip-home-head">
+            <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
+            <span class="text-muted small">{{ issue.issue_type }}</span>
+            <span class="badge ms-auto {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">{{ issue.status|replace('_', ' ')|capitalize }}</span>
         </div>
-        {% set h = history %}
-        {% set _d = issue.description or "" %}
-        {% if _d.startswith("Technician(s) requested: ") %}{% set _d = (_d.split("\n\n", 1)[1] if "\n\n" in _d else "") %}{% endif %}
 
         <div class="ip-hist-info">
             <div class="ip-d-title">Assigned technician</div>
@@ -50,74 +43,23 @@
         </div>
 
         <div class="ip-hist-info">
-            <div class="ip-d-title">Timeline</div>
+            <div class="ip-d-title">Dates</div>
             <div class="ip-d-row"><span class="ip-d-label">Reported</span>
                 <span class="ip-d-value">{{ h.reported }}</span></div>
-            <div class="ip-d-row"><span class="ip-d-label">Technician assigned</span>
-                <span class="ip-d-value">{{ h.assigned or "—" }}</span></div>
             <div class="ip-d-row"><span class="ip-d-label">Completed</span>
                 <span class="ip-d-value">{{ h.completed or "Not yet completed" }}</span></div>
-            {% if h.duration %}
-            <div class="ip-d-row"><span class="ip-d-label">Time to resolve</span>
-                <span class="ip-d-value">{{ h.duration }}</span></div>
-            {% endif %}
         </div>
 
         <div class="ip-hist-info">
-            <div class="ip-d-title">Issue details</div>
-            <div class="ip-d-row"><span class="ip-d-label">Ticket no.</span>
-                <span class="ip-d-value">{{ issue.issue_code or ('#' ~ issue.id) }}</span></div>
-            <div class="ip-d-row"><span class="ip-d-label">Issue type</span>
-                <span class="ip-d-value">{{ issue.issue_type }}</span></div>
-            <div class="ip-d-row"><span class="ip-d-label">Priority</span>
-                <span class="ip-d-value"><span class="badge {{ priority_classes.get(issue.priority, 'text-bg-secondary') }}">{{ issue.priority|capitalize }}</span></span></div>
-            {% if h.nap_code %}
-            <div class="ip-d-row"><span class="ip-d-label">NAP box</span>
-                <span class="ip-d-value">{{ h.nap_code }}</span></div>
+            <div class="ip-d-title">Completion proof</div>
+            {% if h.completion_photo %}
+            <a href="{{ h.completion_photo }}" target="_blank" rel="noopener" class="ip-proof">
+                <img src="{{ h.completion_photo }}" alt="Technician's proof photo after the fix" loading="lazy">
+            </a>
+            {% else %}
+            <div class="ip-d-note">No completion photo yet.</div>
             {% endif %}
-            {% if h.location %}
-            <div class="ip-d-row"><span class="ip-d-label">Location</span>
-                <span class="ip-d-value">{{ h.location }}</span></div>
-            {% endif %}
-            <div class="ip-d-row"><span class="ip-d-label">Description</span>
-                <span class="ip-d-value">{{ _d or "—" }}</span></div>
         </div>
-
-        {% if h.resolution_notes %}
-        <div class="ip-hist-info">
-            <div class="ip-d-title">Technician's notes</div>
-            <div class="ip-d-note ip-notes-text">{{ h.resolution_notes }}</div>
-        </div>
-        {% endif %}
-
-        {% if h.report_photo or h.completion_photo %}
-        <div class="ip-hist-info">
-            <div class="ip-d-title">Photos</div>
-            <div class="ip-photos">
-                {% if h.report_photo %}
-                <a href="{{ h.report_photo }}" target="_blank" rel="noopener" class="ip-photo">
-                    <img src="{{ h.report_photo }}" alt="Photo you attached to this report" loading="lazy">
-                    <span>Your report</span>
-                </a>
-                {% endif %}
-                {% if h.completion_photo %}
-                <a href="{{ h.completion_photo }}" target="_blank" rel="noopener" class="ip-photo">
-                    <img src="{{ h.completion_photo }}" alt="Technician's photo after the fix" loading="lazy">
-                    <span>After the fix</span>
-                </a>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-    window.ISSUE_PROGRESS_INITIAL = {{ [progress]|tojson }};
-    window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
-</script>
-<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
-<script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
 {% endblock %}
