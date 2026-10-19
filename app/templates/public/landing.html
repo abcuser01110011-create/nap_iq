@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PG Networks &middot; Fiber Internet &mdash; Apply Online</title>
+    <meta name="description" content="Apply for PG Networks fiber internet online, or log in to manage your account.">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='img/favicon-192.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/landing.css') }}" rel="stylesheet">
+</head>
+<body class="lp">
+
+<header class="lp-header">
+    <div class="lp-wrap lp-header__row">
+        <a href="{{ url_for('main.index') }}" class="lp-brand">
+            <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="" class="lp-brand__logo">
+            <span>PG Networks</span>
+        </a>
+        <nav class="lp-nav" aria-label="Sections">
+            <a href="#plans">Plans</a>
+            <a href="#how">How it works</a>
+            <a href="#why">Why us</a>
+        </nav>
+        <div class="lp-header__cta">
+            <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--ghost">Log in</a>
+            <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary">Apply now</a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="lp-hero">
+        <div class="lp-wrap lp-hero__grid">
+            <div class="lp-hero__copy">
+                <span class="lp-pill"><i class="bi bi-wifi"></i> Fiber internet for your home</span>
+                <h1>Get connected with <span>PG Networks</span> fiber.</h1>
+                <p>Apply online in minutes, track your installation, and manage your account, payments and
+                   service issues from one place &mdash; on any device.</p>
+                <div class="lp-hero__actions">
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--lg">
+                        Apply online <i class="bi bi-arrow-right"></i>
+                    </a>
+                    <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--outline lp-btn--lg">
+                        <i class="bi bi-person"></i> Account login
+                    </a>
+                </div>
+                <ul class="lp-hero__points">
+                    <li><i class="bi bi-check-circle-fill"></i> No paperwork &mdash; 100% online</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Coverage check built in</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Track technician arrival</li>
+                </ul>
+            </div>
+            <div class="lp-hero__card" aria-hidden="true">
+                <div class="lp-signal">
+                    <i class="bi bi-router"></i>
+                    <div class="lp-signal__rings"><span></span><span></span><span></span></div>
+                </div>
+                <div class="lp-hero__stat"><strong>Online</strong><small>application &amp; account</small></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="lp-section" id="plans">
+        <div class="lp-wrap">
+            <h2 class="lp-h2">Choose your plan</h2>
+            <p class="lp-sub">Pick a plan when you apply. Our team confirms coverage for your address.</p>
+            {% if plans %}
+            <div class="lp-plans">
+                {% for plan in plans %}
+                <article class="lp-plan">
+                    <h3>{{ plan.name }}</h3>
+                    {% if plan.monthly_fee is not none %}
+                    <div class="lp-plan__price"><small>&#8369;</small>{{ '{:,.0f}'.format(plan.monthly_fee) }}<span>/month</span></div>
+                    {% else %}
+                    <div class="lp-plan__price lp-plan__price--na">Ask for pricing</div>
+                    {% endif %}
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--block">Apply for this plan</a>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="lp-empty">Plans will be listed here soon. You can still apply online and we'll help you choose.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="lp-section lp-section--alt" id="how">
+        <div class="lp-wrap">
+            <h2 class="lp-h2">How to apply</h2>
+            <ol class="lp-steps">
+                <li><span>1</span><h3>Create your account</h3><p>Choose a username and password &mdash; it takes under a minute.</p></li>
+                <li><span>2</span><h3>Check coverage &amp; apply</h3><p>Pin your address, pick a plan and submit your installation request.</p></li>
+                <li><span>3</span><h3>We install</h3><p>A technician is assigned. Follow their progress right from your account.</p></li>
+            </ol>
+            <div class="lp-center">
+                <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--primary lp-btn--lg">Start your application</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="lp-section" id="why">
+        <div class="lp-wrap">
+            <h2 class="lp-h2">Everything in one account</h2>
+            <div class="lp-features">
+                <div class="lp-feature"><i class="bi bi-calendar-check"></i><h3>Billing &amp; due dates</h3><p>See your monthly due date and payment history.</p></div>
+                <div class="lp-feature"><i class="bi bi-tools"></i><h3>Report an issue</h3><p>Report a problem with a photo and follow the fix step by step.</p></div>
+                <div class="lp-feature"><i class="bi bi-geo-alt"></i><h3>Technician tracking</h3><p>Know who is assigned and how far away they are.</p></div>
+                <div class="lp-feature"><i class="bi bi-phone"></i><h3>Works on any device</h3><p>Phone, tablet or desktop &mdash; the same account everywhere.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="lp-cta">
+        <div class="lp-wrap lp-cta__row">
+            <div>
+                <h2>Already a subscriber?</h2>
+                <p>Log in to view your account, pay, or report an issue.</p>
+            </div>
+            <a href="{{ url_for('auth.customer_login') }}" class="lp-btn lp-btn--light lp-btn--lg">Log in to my account</a>
+        </div>
+    </section>
+</main>
+
+<footer class="lp-footer">
+    <div class="lp-wrap lp-footer__row">
+        <span>&copy; PG Networks</span>
+        <a href="{{ url_for('auth.login') }}" class="lp-footer__staff"><i class="bi bi-shield-lock"></i> Staff login</a>
+    </div>
+</footer>
+
+</body>
+</html>

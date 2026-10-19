@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Sign In &middot; PG Networks</title>
+    <title>{% if portal == 'customer' %}Account Login{% else %}Staff Sign In{% endif %} &middot; PG Networks</title>
 
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
@@ -24,7 +24,7 @@
         <div class="login-brand">
             <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="PG Networks" class="login-brand__mark">
             <h1 class="login-brand__title">PG Networks</h1>
-            <p class="login-brand__subtitle">Sign in to continue</p>
+            <p class="login-brand__subtitle">{% if portal == 'customer' %}Log in to your PG Networks account{% else %}Staff &amp; administrator sign in{% endif %}</p>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% set shown = messages | rejectattr("1", "equalto", "Please log in to continue.") | list %}
@@ -42,7 +42,7 @@
             {% endwith %}
         </div>
 
-        <form method="post" action="{{ url_for('auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin">
+        <form method="post" action="{{ url_for('auth.customer_login' if portal == 'customer' else 'auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin">
             {{ form.hidden_tag() }}
 
             <div class="login-field">
@@ -83,7 +83,12 @@
                 Sign in<i class="bi bi-arrow-right"></i>
             </button>
 
-            <a href="{{ url_for('auth.register') }}" class="login-register-link">Don't have an account? Register now</a>
+            {% if portal == 'customer' %}
+            <a href="{{ url_for('auth.register') }}" class="login-register-link">Don't have an account? Apply online</a>
+            <a href="{{ url_for('main.index') }}" class="login-register-link">&larr; Back to home</a>
+            {% else %}
+            <a href="{{ url_for('auth.customer_login') }}" class="login-register-link">Subscriber? Go to account login</a>
+            {% endif %}
         </form>
     </div>
 </div>

@@ -88,29 +88,22 @@ def _next_url_allowed_for_role(next_url: str, role: str) -> bool:
     return allowed_roles is None or role in allowed_roles
 
 
-@auth_bp.route("/login", methods=["GET", "POST"])
-# Phase 18 — brute-force protection (SECURITY_CHECKLIST.md's previously-
-# open "Rate limiting on /login" gap). Two independent limits, both
-# scoped to POST only (methods=["POST"]) so a slow page-refresh loop on
-# the plain GET form never counts against either budget:
-#   - per remote IP (Limiter's default key_func) — stops one source
-#     hammering any/many accounts.
-#   - per submitted username (_login_username_key) — stops many IPs
-#     (e.g. a botnet) grinding a single account, which a pure per-IP
-#     limit alone would not catch.
-# Limit values come from app/config.py (LOGIN_RATE_LIMIT_PER_IP /
-# _PER_USERNAME) via a lambda so they're read from current_app.config
-# at request time rather than frozen at import time.
-@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"], methods=["POST"])
-@limiter.limit(
-    lambda: current_app.config["LOGIN_RATE_LIMIT_PER_USERNAME"],
-    key_func=_login_username_key,
-    methods=["POST"],
-)
-def login():
-    """Shows and processes the sign-in form."""
-    # Already signed in? Don't show the login form again — send them
-    # straight to their role's home page.
+def _login_limits(view):
+    """Phase 18 brute-force protection (see config.py): per-IP and
+    per-username limits, POST only. Shared by both sign-in pages."""
+    view = limiter.limit(
+        lambda: current_app.config["LOGIN_RATE_LIMIT_PER_USERNAME"],
+        key_func=_login_username_key,
+        methods=["POST"],
+    )(view)
+    return limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"], methods=["POST"])(view)
+
+
+def _handle_login(portal):
+    """Shared sign-in handler. `portal` is "staff" (administrator, staff,
+    technician, collector... every role except 'user') or "customer"
+    (role 'user' only, i.e. subscribers)."""
+    # Already signed in? Send them straight to their role's home page.
     if g.get("user") is not None:
         return redirect(url_for("auth.home"))
 
@@ -120,18 +113,20 @@ def login():
         username = form.username.data.strip()
         user = User.query.filter_by(username=username).first()
 
-        # Same generic message whether the username doesn't exist or
-        # the password is wrong, and no early-return that would let a
-        # timing difference hint at which case it was — this keeps the
-        # login form from being usable to enumerate valid usernames.
+        # Same generic message whether the username doesn't exist or the
+        # password is wrong (no username enumeration).
         if user is None or not user.check_password(form.password.data):
             flash("Invalid username or password.", "danger")
         elif user.status != "active":
             flash("This account has been deactivated. Please contact an administrator.", "danger")
+        elif (portal == "staff") == (user.role == "user"):
+            # Correct credentials, wrong door. Only said after the
+            # password checked out, so it can't be used to probe accounts.
+            if portal == "staff":
+                flash("This sign-in is for staff only. Subscribers, please use the account login.", "danger")
+            else:
+                flash("This sign-in is for subscribers only. Staff, please use the staff login.", "danger")
         else:
-            # session.clear() first: guarantees no leftover data from a
-            # previous session (e.g. a different account on a shared
-            # browser) survives into this one.
             session.clear()
             session["user_id"] = user.id
             session.permanent = True  # subject to PERMANENT_SESSION_LIFETIME
@@ -143,7 +138,21 @@ def login():
                 return redirect(next_url)
             return redirect(url_for("auth.home"))
 
-    return render_template("auth/login.html", form=form)
+    return render_template("auth/login.html", form=form, portal=portal)
+
+
+@auth_bp.route("/login", methods=["GET", "POST"])
+@_login_limits
+def login():
+    """Staff / administrator sign-in (every role except subscribers)."""
+    return _handle_login("staff")
+
+
+@auth_bp.route("/account/login", methods=["GET", "POST"])
+@_login_limits
+def customer_login():
+    """Subscriber account sign-in, linked from the public landing page."""
+    return _handle_login("customer")
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -211,9 +220,11 @@ def logout():
     """Ends the current session. POST-only (submitted via a small form
     with a CSRF token in the nav bar) so a logout can't be triggered
     by, e.g., an <img> tag or link on another site."""
+    was_subscriber = g.get("user") is not None and g.user.role == "user"
     session.clear()
     flash("You have been logged out.", "success")
-    return redirect(url_for("auth.login"))
+    # Subscribers go back to the public landing page, staff to /login.
+    return redirect(url_for("main.index" if was_subscriber else "auth.login"))
 
 
 @auth_bp.route("/home")

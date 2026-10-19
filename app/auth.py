@@ -73,6 +73,13 @@ def db_get_user(user_id):
     return User.query.get(user_id)
 
 
+def _login_redirect():
+    """Send a logged-out visitor to the right sign-in page: subscribers'
+    /portal pages -> account login, everything else -> staff login."""
+    endpoint = "auth.customer_login" if request.path.startswith("/portal") else "auth.login"
+    return redirect(url_for(endpoint, next=request.path))
+
+
 def login_required(view):
     """Requires any authenticated, active account — no role check."""
 
@@ -80,7 +87,7 @@ def login_required(view):
     def wrapped_view(*args, **kwargs):
         if g.get("user") is None:
             flash("Please log in to continue.", "warning")
-            return redirect(url_for("auth.login", next=request.path))
+            return _login_redirect()
         return view(*args, **kwargs)
 
     return wrapped_view
@@ -103,7 +110,7 @@ def role_required(*roles):
         def wrapped_view(*args, **kwargs):
             if g.get("user") is None:
                 flash("Please log in to continue.", "warning")
-                return redirect(url_for("auth.login", next=request.path))
+                return _login_redirect()
             if g.user.role not in roles:
                 abort(403)
             return view(*args, **kwargs)

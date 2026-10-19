@@ -6,10 +6,11 @@ module yet. For this foundation phase, this is just a landing route
 and the /database-test diagnostic route.
 """
 
-from flask import Blueprint, jsonify, redirect, url_for, g
+from flask import Blueprint, jsonify, redirect, render_template, url_for, g
 
 from app.extensions import db
 from app.auth import role_required
+from app.models import Plan
 from sqlalchemy import text
 
 main_bp = Blueprint("main", __name__)
@@ -23,7 +24,10 @@ def index():
     Dashboard the way it did before this phase."""
     if g.get("user") is not None:
         return redirect(url_for("auth.home"))
-    return redirect(url_for("auth.login"))
+    # Guests get the public landing page (online application + account
+    # login). Staff sign in at /login.
+    plans = Plan.query.order_by(Plan.monthly_fee.is_(None), Plan.monthly_fee, Plan.name).all()
+    return render_template("public/landing.html", plans=plans)
 
 
 @main_bp.route("/database-test")
