@@ -77,13 +77,15 @@
         <span class="napiq-pay-label">Amount To Pay</span>
         <div class="napiq-pay-amount">
             <span class="napiq-pay-peso">&#8369;</span>
-            {% if due and due.monthly_fee is not none %}{{ '%.2f'|format(due.monthly_fee) }}{% else %}&mdash;{% endif %}
+            {% if due %}{{ '%.2f'|format(due.amount_due) }}{% else %}0.00{% endif %}
         </div>
         {% if due and due.due_date %}
         <span class="napiq-pay-due">Due Date: {{ due.due_date.strftime('%b') }} {{ due.due_date.day }}, {{ due.due_date.year }}</span>
+        {% elif due and not due.installed %}
+        <span class="napiq-pay-due">Due date is set one month after installation</span>
         {% endif %}
     </div>
-    <button type="button" class="napiq-pay-btn" id="payNowBtn">PAY NOW</button>
+    <button type="button" class="napiq-pay-btn" id="payNowBtn"{% if not (due and due.can_pay) %} disabled aria-disabled="true"{% endif %}>PAY NOW</button>
 </div>
 
 {% if app_progress %}

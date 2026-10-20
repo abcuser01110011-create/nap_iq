@@ -202,6 +202,7 @@
     padding: 1rem 1.6rem; min-width: 8.5rem; cursor: pointer;
 }
 .napiq-pay-btn:hover, .napiq-pay-btn:focus-visible { filter: brightness(1.12); }
+.napiq-pay-btn:disabled { background: #98a2b3; cursor: not-allowed; opacity: .7; filter: none; transform: none; }
 .napiq-pay-btn:active { transform: translateY(1px); }
 .napiq-pay-card--due { border: 1px solid #fda29b; background: #fef3f2; }
 .napiq-pay-card--due .napiq-pay-amount,
