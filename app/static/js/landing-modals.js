@@ -126,7 +126,7 @@
             contact_number: loginForm.contact_number.value.trim(),
         };
         var local = {};
-        if (!body.subscriber_code) local.subscriber_code = "Your subscriber account number is required.";
+        if (!body.subscriber_code) local.subscriber_code = "Your account number or full name is required.";
         if (!/^\d{11}$/.test(body.contact_number)) local.contact_number = "Phone number must be exactly 11 digits (numbers only).";
         if (Object.keys(local).length) { showErrors(loginForm, local); return; }
 

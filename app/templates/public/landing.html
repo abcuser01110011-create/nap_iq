@@ -179,13 +179,13 @@
         <div class="lpm__head">
             <img src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="" class="lpm__logo">
             <h2 id="loginModalTitle">Log in to your account</h2>
-            <p>Enter your subscriber account number and the phone number on file. We use both together to confirm it&rsquo;s really your account.</p>
+            <p>Enter your subscriber account number (or full name) and the phone number on file. We use both together to confirm it&rsquo;s really your account.</p>
         </div>
         <form id="loginForm" novalidate>
             <div class="lpm__alert" id="loginAlert" role="alert" hidden></div>
             <div class="lpm__field">
-                <label for="loginCode">Subscriber / Account Number</label>
-                <input type="text" id="loginCode" name="subscriber_code" maxlength="20" placeholder="e.g. SUB-0123" autocomplete="off" autocapitalize="characters">
+                <label for="loginCode">Account Number or Full Name</label>
+                <input type="text" id="loginCode" name="subscriber_code" maxlength="150" placeholder="e.g. SUB-0123 or your full name" autocomplete="off">
                 <div class="lpm__error" data-error-for="subscriber_code"></div>
             </div>
             <div class="lpm__field">
