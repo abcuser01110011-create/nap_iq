@@ -77,7 +77,7 @@ from flask import Blueprint, current_app, render_template, redirect, url_for, fl
 
 from app.extensions import db, limiter
 from app.auth import role_required
-from app.models import Plan, ServiceRequest, Subscriber, TechnicalIssue
+from app.models import Assignment, Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
 from app.billing_utils import monthly_due_info
 from app.issue_utils import (
@@ -163,6 +163,9 @@ def index():
             for i in (subscriber.technical_issues if subscriber else [])
             if i.status in _ACTIVE_ISSUE_STATUSES
         ],
+        # New applicants (status "pending review") see their installation
+        # application tracker instead of the issue buttons.
+        app_progress=_application_progress(subscriber),
     )
 
 
@@ -633,6 +636,97 @@ def _issue_progress(issue):
         "dest_lat": dest_lat,
         "dest_lng": dest_lng,
     }
+
+
+_APPLICATION_STEPS = ("Pending", "Technician Assigned", "Arriving", "Completed")
+
+
+def _application_progress(subscriber):
+    """Installation-application tracker for a newly applied subscriber.
+
+    Four steps: Pending -> Technician Assigned -> Arriving -> Completed.
+    Only returned while the subscriber is still "pending review" and has
+    a new-installation request; `None` otherwise (so existing subscribers
+    keep the normal home screen). Same `done` / `current` convention as
+    _issue_progress(): `done` = finished steps, `current` = step in
+    progress (-1 when none).
+
+    Driven by the request + the technician's assignment: no assignment
+    -> Pending (or "approved, assigning a technician" once an admin
+    approved it); assigned/accepted -> Technician Assigned; in progress
+    -> Arriving; completed -> Completed."""
+    if subscriber is None or subscriber.status != "pending_review":
+        return None
+    requests = [r for r in subscriber.service_requests if r.request_type == "new_installation"]
+    if not requests:
+        return None
+    sr = requests[0]  # relationship is newest-first
+
+    assignment = (
+        Assignment.query.filter(
+            Assignment.service_request_id == sr.id,
+            Assignment.status != "cancelled",
+        )
+        .order_by(Assignment.assigned_at.desc(), Assignment.id.desc())
+        .first()
+    )
+    tech = assignment.technician if assignment is not None else None
+
+    rejected = sr.status == "rejected"
+    if rejected:
+        done, current, stage = 0, -1, "rejected"
+    elif sr.status in ("completed", "closed") or (assignment is not None and assignment.status == "completed"):
+        done, current, stage = 4, -1, "completed"
+    elif assignment is not None and assignment.status == "in_progress":
+        done, current, stage = 2, 2, "arriving"
+    elif assignment is not None:  # assigned / accepted
+        done, current, stage = 1, 1, "assigned"
+    elif sr.status in ("approved", "scheduled"):
+        done, current, stage = 1, 1, "approved"
+    else:
+        done, current, stage = 0, 0, "pending"
+
+    phone = (tech.contact_number or None) if tech is not None else None
+    messages = {
+        "pending": ("Application under review",
+                    "Your application is being reviewed by our admin. We'll assign a technician as soon as it's approved."),
+        "approved": ("Application approved",
+                     "Good news! Your application was approved and we're assigning a technician to your installation."),
+        "assigned": ("Technician assigned",
+                     f"{tech.full_name if tech else 'A technician'} has been assigned to install your connection."),
+        "arriving": ("Technician is on the way",
+                     "Our technician is heading to your address now. Please be available to receive them."),
+        "completed": ("Installation completed",
+                      "Your connection is installed and ready. Welcome to PG Networks!"),
+        "rejected": ("Application not approved",
+                     "We couldn't approve this application. Please contact PG Networks support at 0917 654 8563 for help."),
+    }
+    title, message = messages[stage]
+    labels = {
+        "pending": "Pending review", "approved": "Approved", "assigned": "Technician assigned",
+        "arriving": "Arriving", "completed": "Completed", "rejected": "Not approved",
+    }
+    return {
+        "stage": stage,
+        "status_label": labels[stage],
+        "done": done,
+        "current": current,
+        "steps": list(_APPLICATION_STEPS),
+        "title": title,
+        "message": message,
+        "technician": tech.full_name if tech is not None and stage in ("assigned", "arriving") else None,
+        "technician_phone": phone if stage in ("assigned", "arriving") else None,
+    }
+
+
+@customer_bp.route("/application/progress")
+@role_required("user")
+def application_progress():
+    """JSON feed behind the home screen's installation-application tracker
+    (static/js/customer-application-progress.js polls it and refreshes
+    the page when the stage changes)."""
+    progress = _application_progress(_own_subscriber_or_none())
+    return jsonify(progress=progress)
 
 
 @customer_bp.route("/issues/progress")

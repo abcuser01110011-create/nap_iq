@@ -1,0 +1,15 @@
+/* Customer home: installation application tracker (new applicants).
+   Reuses the .issue-progress / .ip-step look from customer-home-progress.css. */
+.app-prog-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .75rem; }
+.app-prog-badge { font-weight: 600; background: #6c757d; color: #fff; }
+.app-prog-badge--approved, .app-prog-badge--assigned { background: #0dcaf0; color: #052c36; }
+.app-prog-badge--arriving { background: #0d6efd; }
+.app-prog-badge--completed { background: #198754; }
+.app-prog-badge--rejected { background: #dc3545; }
+.app-prog-steps { max-width: 100%; }
+.app-prog-note { margin-top: .9rem; padding: .75rem .9rem; border-radius: .7rem; background: var(--bs-tertiary-bg, #f1f4f9); border-left: 4px solid #0d8bf2; display: flex; flex-direction: column; gap: .15rem; font-size: .88rem; }
+.app-prog-note strong { font-size: .92rem; }
+.app-prog-note span { color: var(--bs-secondary-color, #6c757d); line-height: 1.45; }
+.app-prog-note--completed { border-left-color: #198754; }
+.app-prog-note--rejected { border-left-color: #dc3545; }
+.app-prog-call { margin-top: .35rem; font-weight: 600; text-decoration: none; }

@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-troubleshooting.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-application-progress.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -85,6 +86,36 @@
     <button type="button" class="napiq-pay-btn" id="payNowBtn">PAY NOW</button>
 </div>
 
+{% if app_progress %}
+{# New applicant: installation application tracker (replaces the issue history button). #}
+<div class="ip-home-wrap mb-3">
+    <div class="card shadow-sm napiq-account-card ip-home-card">
+        <div class="card-body">
+            <div class="app-prog-head">
+                <span class="napiq-account-label mb-0">Installation progress</span>
+                <span class="badge app-prog-badge app-prog-badge--{{ app_progress.stage }}">{{ app_progress.status_label }}</span>
+            </div>
+            <div class="issue-progress app-prog-steps" id="appProgress" data-url="{{ url_for('customer.application_progress') }}" data-stage="{{ app_progress.stage }}" data-done="{{ app_progress.done }}" data-current="{{ app_progress.current }}">
+                {% for label in app_progress.steps %}
+                {% set cls = 'done' if loop.index0 < app_progress.done else ('current' if loop.index0 == app_progress.current else '') %}
+                <div class="ip-step {{ cls }}">
+                    <div class="ip-dot{% if cls == 'current' %} pulse{% endif %}">{% if cls == 'done' %}<i class="bi bi-check-lg"></i>{% else %}{{ loop.index }}{% endif %}</div>
+                    <div class="ip-label">{{ label }}</div>
+                    {% if loop.index0 == 1 and app_progress.technician %}<span class="ip-sub">{{ app_progress.technician }}</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="app-prog-note app-prog-note--{{ app_progress.stage }}">
+                <strong>{{ app_progress.title }}</strong>
+                <span>{{ app_progress.message }}</span>
+                {% if app_progress.technician_phone %}
+                <a class="app-prog-call" href="tel:{{ app_progress.technician_phone }}"><i class="bi bi-telephone me-1"></i>{{ app_progress.technician_phone }}</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
 {# Reported-issue progress tracker (moved here from the old "Open issues" tile) #}
 <div class="ip-home-wrap mb-3">
     <div class="ip-home-top">
@@ -114,6 +145,8 @@
     {% endif %}
 </div>
 
+{% endif %}
+
 {% if payments %}
 {% set last_payment = payments[0] %}
 <div class="card shadow-sm mb-3 napiq-account-card">
@@ -129,6 +162,7 @@
 </div>
 {% endif %}
 
+{% if not app_progress %}
 <div class="d-flex flex-wrap gap-2 mb-3">
     {% if open_issue %}
     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#openIssueModal">
@@ -145,6 +179,7 @@
 {% with report_url=url_for('customer.report_issue'), has_open_issue=open_issue %}
 {% include "partials/troubleshooting_carousel.html" %}
 {% endwith %}
+{% endif %}
 
 {% if open_issue %}
 {# Popup only: opens over the home screen, no page change or reload. #}
@@ -182,6 +217,9 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{% if app_progress %}
+<script src="{{ url_for('static', filename='js/customer-application-progress.js') }}"></script>
+{% endif %}
 {% if subscriber is not none %}
 <script src="{{ url_for('static', filename='js/customer-troubleshooting.js') }}"></script>
 {% endif %}
