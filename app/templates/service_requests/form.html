@@ -226,7 +226,7 @@
 
                 <hr class="my-4">
                 <h6 class="text-muted mb-3">Notes</h6>
-                <p class="mb-0">{{ service_request.notes or "—" }}</p>
+                <p class="mb-0" style="white-space: pre-line;">{{ service_request.notes or "—" }}</p>
 
                 {# Approve/Reject only for pending requests that have no technician assigned yet
                    (e.g. online applications). Once a technician/team is assigned the request
