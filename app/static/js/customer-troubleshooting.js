@@ -65,6 +65,82 @@
     track.addEventListener("touchend", function () { touching = false; pauseBriefly(); }, { passive: true });
     window.addEventListener("resize", update);
 
+    // ---- swipe animation: drag with mouse/pen, depth effect while sliding, intro hint ----
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var drag = null, suppressClick = false;
+
+    function applyDepth() {
+        var mid = track.scrollLeft + track.clientWidth / 2;
+        cards.forEach(function (c) {
+            var dist = Math.min(1, Math.abs((c.offsetLeft - track.offsetLeft + c.offsetWidth / 2) - mid) / (c.offsetWidth * 0.9));
+            c.style.setProperty("--ts-s", (1 - dist * 0.07).toFixed(3));
+            c.style.setProperty("--ts-o", (1 - dist * 0.45).toFixed(3));
+        });
+    }
+    track.addEventListener("scroll", function () { window.requestAnimationFrame(applyDepth); }, { passive: true });
+    window.addEventListener("resize", applyDepth);
+
+    track.addEventListener("pointerdown", function (e) {
+        if (e.pointerType === "touch" || e.button !== 0) return; // touch already swipes natively
+        drag = { x: e.clientX, left: track.scrollLeft, moved: false, id: e.pointerId, lastX: e.clientX, lastT: performance.now(), v: 0 };
+    });
+    track.addEventListener("pointermove", function (e) {
+        if (!drag || e.pointerId !== drag.id) return;
+        var dx = e.clientX - drag.x;
+        if (!drag.moved && Math.abs(dx) > 6) {
+            drag.moved = true;
+            track.classList.add("is-dragging");
+            try { track.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+        if (!drag.moved) return;
+        var now = performance.now();
+        drag.v = (e.clientX - drag.lastX) / Math.max(1, now - drag.lastT);
+        drag.lastX = e.clientX; drag.lastT = now;
+        track.scrollLeft = drag.left - dx;
+    });
+    function endDrag(e) {
+        if (!drag || (e && e.pointerId !== drag.id)) return;
+        var d = drag; drag = null;
+        if (!d.moved) return;
+        track.classList.remove("is-dragging");
+        try { track.releasePointerCapture(d.id); } catch (_) {}
+        suppressClick = true;
+        window.setTimeout(function () { suppressClick = false; }, 0);
+        var i = currentIndex();
+        var dx = (e ? e.clientX : d.lastX) - d.x;
+        if (d.v < -0.4 || dx < -50) i = Math.min(cards.length - 1, Math.floor((track.scrollLeft) / Math.max(1, cards[1] ? offsetOf(1) : 1)) + 1);
+        else if (d.v > 0.4 || dx > 50) i = Math.max(0, Math.ceil((track.scrollLeft) / Math.max(1, cards[1] ? offsetOf(1) : 1)) - 1);
+        pauseBriefly();
+        goTo(i);
+    }
+    track.addEventListener("pointerup", endDrag);
+    track.addEventListener("pointercancel", endDrag);
+    track.addEventListener("click", function (e) { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+
+    // Hint: a hand swipes across the first card once, and the card gives a small nudge.
+    function playHint() {
+        if (reduceMotion || track.scrollLeft > 4 || maxScroll() <= 4) return;
+        try { if (window.sessionStorage.getItem("tsHintSeen")) return; window.sessionStorage.setItem("tsHintSeen", "1"); } catch (_) {}
+        var hint = document.createElement("div");
+        hint.className = "ts-swipe-hint";
+        hint.setAttribute("aria-hidden", "true");
+        hint.innerHTML = '<i class="bi bi-hand-index-thumb-fill"></i>';
+        track.parentNode.insertBefore(hint, track.nextSibling);
+        pauseBriefly();
+        track.classList.add("is-nudging");
+        track.scrollTo({ left: Math.min(70, maxScroll()), behavior: "smooth" });
+        window.setTimeout(function () { track.scrollTo({ left: 0, behavior: "smooth" }); }, 650);
+        window.setTimeout(function () { track.classList.remove("is-nudging"); }, 1300);
+        window.setTimeout(function () { if (hint.parentNode) hint.parentNode.removeChild(hint); }, 1800);
+    }
+    if ("IntersectionObserver" in window) {
+        var io = new IntersectionObserver(function (entries) {
+            if (entries[0].isIntersecting) { io.disconnect(); window.setTimeout(playHint, 500); }
+        }, { threshold: 0.6 });
+        io.observe(track);
+    }
+    applyDepth();
+
     // ---- steps popup ----
     if (modalEl) {
         var titleEl = modalEl.querySelector("[data-ts-modal-title]");
