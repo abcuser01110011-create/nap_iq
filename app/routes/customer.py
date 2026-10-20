@@ -80,6 +80,7 @@ from app.auth import role_required
 from app.models import Assignment, Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
 from app.billing_utils import monthly_due_info
+from app.subscriber_lookup import find_subscriber_for_link
 from app.issue_utils import (
     consolidate_nap_issues,
     effective_technician_name,
@@ -329,10 +330,10 @@ def link_account():
     form = CustomerLinkAccountForm()
 
     if form.validate_on_submit():
-        code = form.subscriber_code.data.strip().upper()
         phone = form.contact_number.data.strip()
 
-        subscriber = Subscriber.query.filter_by(subscriber_code=code).first()
+        # Account number OR full name, plus the matching phone number.
+        subscriber = find_subscriber_for_link(form.subscriber_code.data, phone)
 
         generic_error = (
             "We couldn't find a subscriber record matching that account number "
@@ -340,7 +341,7 @@ def link_account():
             "support for help linking your account."
         )
 
-        if subscriber is None or (subscriber.contact_number or "").strip() != phone:
+        if subscriber is None:
             flash(generic_error, "danger")
         elif subscriber.user_id is not None:
             flash(generic_error, "danger")

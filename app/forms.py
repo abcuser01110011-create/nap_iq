@@ -1261,10 +1261,10 @@ class CustomerLinkAccountForm(FlaskForm):
     """
 
     subscriber_code = StringField(
-        "Subscriber / Account Number",
+        "Account Number or Full Name",
         validators=[
-            DataRequired(message="Your subscriber account number is required."),
-            Length(max=20, message="Account number is too long."),
+            DataRequired(message="Your account number or full name is required."),
+            Length(max=150, message="Account number or name is too long."),
         ],
     )
     contact_number = StringField(

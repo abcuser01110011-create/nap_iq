@@ -38,6 +38,7 @@ from app.extensions import db, limiter
 from app.email_utils import consume_verification, is_email_verified
 from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
 from app.billing_utils import monthly_due_info
+from app.subscriber_lookup import find_subscriber_for_link
 from app.issue_utils import (
     consolidate_nap_issues,
     open_issue_for_subscriber,
@@ -439,7 +440,7 @@ def link_account():
         return jsonify(error="Your login is already linked to a subscriber record."), 409
 
     data = request.get_json(silent=True) or {}
-    code = str(data.get("subscriber_code") or "").strip().upper()
+    code = str(data.get("subscriber_code") or "").strip()  # account number OR full name
     phone = str(data.get("contact_number") or "").strip()
 
     if not code or not phone:
@@ -461,13 +462,9 @@ def link_account():
         "support for help linking your account."
     )
 
-    subscriber = Subscriber.query.filter_by(subscriber_code=code).first()
+    subscriber = find_subscriber_for_link(code, phone)
 
-    if (
-        subscriber is None
-        or (subscriber.contact_number or "").strip() != phone
-        or subscriber.user_id is not None
-    ):
+    if subscriber is None or subscriber.user_id is not None:
         return jsonify(error=generic_error), 400
 
     subscriber.user_id = current_user.id

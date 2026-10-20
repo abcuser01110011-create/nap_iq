@@ -10,7 +10,7 @@
         <div class="card shadow-sm">
             <div class="card-body p-4">
                 <p class="text-muted small mb-4">
-                    Enter your PG Networks subscriber account number and the phone number
+                    Enter your PG Networks account number (or your full name as registered) and the phone number
                     on file for that account. We use both together to confirm it's really
                     yours before linking it to this login.
                 </p>
@@ -20,7 +20,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">{{ form.subscriber_code.label }}</label>
-                        {{ form.subscriber_code(class="form-control" ~ (" is-invalid" if form.subscriber_code.errors else ""), placeholder="e.g. SUB-0123", autofocus=true) }}
+                        {{ form.subscriber_code(class="form-control" ~ (" is-invalid" if form.subscriber_code.errors else ""), placeholder="e.g. SUB-0123 or your full name", autofocus=true) }}
                         {% for error in form.subscriber_code.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
