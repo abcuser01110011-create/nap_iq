@@ -25,17 +25,17 @@
     /* Re-point the app's shared design tokens (style.css / dashboard.css)
        at the same values technician-mobile.css uses, so every component
        already built on var(--napiq-*) re-themes for free. */
-    --napiq-primary: #2e7dff;
-    --napiq-primary-dark: #1f3a63;
-    --napiq-surface: #122a4d;
-    --napiq-bg: #0b1f3a;
-    --napiq-border: #1f3a63;
+    --napiq-primary: #4C7FD1;
+    --napiq-primary-dark: #1B3A73;
+    --napiq-surface: #0E2652;
+    --napiq-bg: #081225;
+    --napiq-border: #1B3A73;
     --napiq-text-muted: #c7d0de;
 
     --napiq-success: #3ddc97;
     --napiq-warning: #ffc107;
     --napiq-danger: #ff6b6b;
-    --napiq-info: #2e7dff;
+    --napiq-info: #4C7FD1;
 
     color-scheme: dark;
 }
@@ -50,7 +50,7 @@
 /* ---------------------------------------------------------------- */
 
 .dash-theme-tech .dash-sidebar {
-    background: linear-gradient(180deg, #122a4d 0%, #08182e 100%);
+    background: linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%);
 }
 
 .dash-theme-tech .dash-topbar {
@@ -200,11 +200,11 @@
 
 .dash-theme-tech .btn-outline-primary {
     color: #8fb6ff;
-    border-color: #2e7dff;
+    border-color: #4C7FD1;
 }
 
 .dash-theme-tech .btn-outline-primary:hover {
-    background-color: #2e7dff;
+    background-color: #4C7FD1;
     color: #ffffff;
 }
 
@@ -245,7 +245,7 @@
 
 .dash-theme-tech .list-group-item-action:hover,
 .dash-theme-tech .list-group-item-action:focus {
-    background-color: #16315a;
+    background-color: #123066;
     color: #ffffff;
 }
 
@@ -273,8 +273,8 @@
 }
 
 .dash-theme-tech .tech-assign-card:hover {
-    background: #16315a;
-    border-color: #2e4d80;
+    background: #123066;
+    border-color: #2A4F8F;
 }
 
 .dash-theme-tech .tech-assign-issue {
@@ -302,8 +302,8 @@
 }
 
 .dash-theme-tech .tech-ticket-card:hover {
-    background: #16315a;
-    border-color: #2e4d80;
+    background: #123066;
+    border-color: #2A4F8F;
 }
 
 .dash-theme-tech .tech-ticket-code {
@@ -317,7 +317,7 @@
 
 .dash-theme-tech .tm-map-link,
 .dash-theme-tech .tm-map-link:hover {
-    color: #2e7dff;
+    color: #4C7FD1;
 }
 
 
@@ -328,12 +328,20 @@
    --------------------------------------------------------------------- */
 .dash-theme-tech .tech-desc-box {
     padding: 10px 12px;
-    border: 1px solid #1f3a63;
+    border: 1px solid #1B3A73;
     border-radius: 10px;
-    background: #1f3a63;
+    background: #1B3A73;
     color: #ffffff;
     font-weight: 400;
     line-height: 1.4;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+}
+
+/* Landing-page accents: gold active marker in the sidebar (matches landing.css). */
+.dash-theme-tech .dash-nav-link.active {
+    box-shadow: inset 3px 0 0 #F4B41A;
+}
+.dash-theme-tech .dash-nav-link.active i {
+    color: #F4B41A;
 }

@@ -12,15 +12,15 @@
    ===================================================================== */
 
 :root {
-    --tm-bg: #0B1F3A;
-    --tm-card: #122A4D;
-    --tm-card-alt: #1F3A63;
-    --tm-border: #1F3A63;
+    --tm-bg: #081225;
+    --tm-card: #0E2652;
+    --tm-card-alt: #1B3A73;
+    --tm-border: #1B3A73;
     --tm-text: #FFFFFF;
     --tm-text-muted: #C7D0DE;
     --tm-text-faint: #8896AB;
-    --tm-primary: #2E7DFF;
-    --tm-primary-light: #1F3A63;
+    --tm-primary: #4C7FD1;
+    --tm-primary-light: #1B3A73;
     --tm-primary-chip-text: #8FB6FF;
     --tm-danger: #FF6B6B;
     --tm-danger-light: #3A1F2A;
@@ -42,7 +42,7 @@ html, body {
 
 body.tm-body {
     margin: 0;
-    background: #060f20; /* letterbox behind the phone frame on wide screens */
+    background: #040A16; /* letterbox behind the phone frame on wide screens */
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     display: flex;
     justify-content: center;

@@ -55,3 +55,9 @@ button.ts-card { text-align: center; }
 .ts-card--cta .btn { align-self: center; }
 .ts-more { margin-top: .5rem; }
 .ts-dots { margin-top: .5rem; }
+
+/* ---- v4: poster-style image cards (static/img/troubleshooting/*.jpg) ---- */
+.ts-guide { max-width: 640px; }
+.ts-card.ts-card--img, .ts-card.ts-card--img:hover { padding: 0; gap: 0; overflow: hidden; border: 0; border-radius: 18px; background: #0D3B85; line-height: 0; box-shadow: 0 14px 30px -18px rgba(8, 18, 37, .7); }
+.ts-card--img img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+button.ts-card.ts-card--img:hover, button.ts-card.ts-card--img:focus-visible { transform: translateY(-3px); box-shadow: 0 20px 34px -18px rgba(8, 18, 37, .8); outline: 3px solid #F4B41A; outline-offset: 2px; }

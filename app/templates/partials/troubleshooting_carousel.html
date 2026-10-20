@@ -15,40 +15,20 @@
     </div>
 
     <div class="ts-track" aria-roledescription="carousel">
-        <button type="button" class="ts-card" data-ts-open="no-internet" data-ts-title="No Internet">
-            <span class="ts-step">Issue 1</span>
-            <span class="ts-icon"><i class="bi bi-wifi-off"></i></span>
-            <h3>No Internet</h3>
-            <p>Can't go online at all</p>
-            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        <button type="button" class="ts-card ts-card--img" data-ts-open="no-internet" data-ts-title="No Internet" aria-label="No Internet - view fix steps">
+            <img src="{{ url_for('static', filename='img/troubleshooting/no-internet.jpg') }}" alt="No Internet? Fix it now" loading="lazy" draggable="false">
         </button>
-        <button type="button" class="ts-card" data-ts-open="slow-internet" data-ts-title="Slow Internet">
-            <span class="ts-step">Issue 2</span>
-            <span class="ts-icon"><i class="bi bi-speedometer2"></i></span>
-            <h3>Slow Internet</h3>
-            <p>Pages and videos load slowly</p>
-            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        <button type="button" class="ts-card ts-card--img" data-ts-open="slow-internet" data-ts-title="Slow Internet" aria-label="Slow Internet - view fix steps">
+            <img src="{{ url_for('static', filename='img/troubleshooting/slow-internet.jpg') }}" alt="Slow Internet? Fix it now" loading="lazy" draggable="false">
         </button>
-        <button type="button" class="ts-card" data-ts-open="cable-problem" data-ts-title="Cable Problem">
-            <span class="ts-step">Issue 3</span>
-            <span class="ts-icon"><i class="bi bi-plug"></i></span>
-            <h3>Cable Problem</h3>
-            <p>Damaged or loose cable</p>
-            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        <button type="button" class="ts-card ts-card--img" data-ts-open="cable-problem" data-ts-title="Cable Problem" aria-label="Cable Problem - view fix steps">
+            <img src="{{ url_for('static', filename='img/troubleshooting/cable-problem.jpg') }}" alt="Cable Problem? Fix it now" loading="lazy" draggable="false">
         </button>
-        <button type="button" class="ts-card" data-ts-open="router-modem" data-ts-title="Router/Modem Problem">
-            <span class="ts-step">Issue 4</span>
-            <span class="ts-icon"><i class="bi bi-router"></i></span>
-            <h3>Router/Modem Problem</h3>
-            <p>Router lights off, hot, or restarting</p>
-            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        <button type="button" class="ts-card ts-card--img" data-ts-open="router-modem" data-ts-title="Router/Modem Problem" aria-label="Router/Modem Problem - view fix steps">
+            <img src="{{ url_for('static', filename='img/troubleshooting/router-modem.jpg') }}" alt="Router/Modem Problem? Fix it now" loading="lazy" draggable="false">
         </button>
-        <button type="button" class="ts-card" data-ts-open="connection-problem" data-ts-title="Connection Problem">
-            <span class="ts-step">Issue 5</span>
-            <span class="ts-icon"><i class="bi bi-reception-2"></i></span>
-            <h3>Connection Problem</h3>
-            <p>WiFi keeps disconnecting</p>
-            <span class="ts-more">View steps <i class="bi bi-arrow-right"></i></span>
+        <button type="button" class="ts-card ts-card--img" data-ts-open="connection-problem" data-ts-title="Connection Problem" aria-label="Connection Problem - view fix steps">
+            <img src="{{ url_for('static', filename='img/troubleshooting/connection-problem.jpg') }}" alt="Connection Problem? Fix it now" loading="lazy" draggable="false">
         </button>
     </div>
 
