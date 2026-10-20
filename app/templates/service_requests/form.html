@@ -236,7 +236,9 @@
                 <div class="d-flex justify-content-end gap-2">
                     <form method="post" id="approveRequestForm"
                           action="{{ url_for('service_requests.approve_request', request_id=service_request.id) }}"
-                          data-dispatch-url="{{ url_for('dispatch.index') }}">
+                          data-dispatch-url="{{ url_for('dispatch.index') }}"
+                          data-options-url="{{ url_for('dispatch.request_technician_options', request_id=service_request.id) }}"
+                          data-assign-url="{{ url_for('dispatch.assign_request_json', request_id=service_request.id) }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-success">
                             <i class="bi bi-check-lg me-1"></i>Approve

@@ -98,13 +98,14 @@
             <div class="issue-progress app-prog-steps" id="appProgress" data-url="{{ url_for('customer.application_progress') }}" data-stage="{{ app_progress.stage }}" data-done="{{ app_progress.done }}" data-current="{{ app_progress.current }}">
                 {% for label in app_progress.steps %}
                 {% set cls = 'done' if loop.index0 < app_progress.done else ('current' if loop.index0 == app_progress.current else '') %}
-                <div class="ip-step {{ cls }}">
+                <div class="ip-step {{ cls }}" data-step="{{ loop.index0 }}" role="button" tabindex="0">
                     <div class="ip-dot{% if cls == 'current' %} pulse{% endif %}">{% if cls == 'done' %}<i class="bi bi-check-lg"></i>{% else %}{{ loop.index }}{% endif %}</div>
                     <div class="ip-label">{{ label }}</div>
                     {% if loop.index0 == 1 and app_progress.technician %}<span class="ip-sub">{{ app_progress.technician }}</span>{% endif %}
                 </div>
                 {% endfor %}
             </div>
+            <div class="ip-details app-prog-details"><div class="ip-details-body"></div></div>
             <div class="app-prog-note app-prog-note--{{ app_progress.stage }}">
                 <strong>{{ app_progress.title }}</strong>
                 <span>{{ app_progress.message }}</span>
@@ -218,6 +219,8 @@
 
 {% block extra_scripts %}
 {% if app_progress %}
+<script>window.APP_PROGRESS_INITIAL = {{ app_progress|tojson }};</script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
 <script src="{{ url_for('static', filename='js/customer-application-progress.js') }}"></script>
 {% endif %}
 {% if subscriber is not none %}

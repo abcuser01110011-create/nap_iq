@@ -706,6 +706,14 @@ def _application_progress(subscriber):
         "pending": "Pending review", "approved": "Approved", "assigned": "Technician assigned",
         "arriving": "Arriving", "completed": "Completed", "rejected": "Not approved",
     }
+    def _num(v):
+        return float(v) if v is not None else None
+
+    show_tech = tech is not None and stage in ("assigned", "arriving", "completed")
+    # Destination = where the installation is: the request's pin, else the
+    # subscriber's own saved location.
+    dest_lat = _num(sr.latitude) if sr.latitude is not None else _num(subscriber.latitude)
+    dest_lng = _num(sr.longitude) if sr.longitude is not None else _num(subscriber.longitude)
     return {
         "stage": stage,
         "status_label": labels[stage],
@@ -714,8 +722,13 @@ def _application_progress(subscriber):
         "steps": list(_APPLICATION_STEPS),
         "title": title,
         "message": message,
-        "technician": tech.full_name if tech is not None and stage in ("assigned", "arriving") else None,
-        "technician_phone": phone if stage in ("assigned", "arriving") else None,
+        "technician": tech.full_name if show_tech and stage != "completed" else None,
+        "technician_phone": phone if show_tech and stage != "completed" else None,
+        "tech_lat": _num(tech.current_latitude) if tech is not None and stage == "arriving" else None,
+        "tech_lng": _num(tech.current_longitude) if tech is not None and stage == "arriving" else None,
+        "dest_lat": dest_lat,
+        "dest_lng": dest_lng,
+        "submitted": sr.created_at.strftime("%b %d, %Y") if getattr(sr, "created_at", None) else None,
     }
 
 

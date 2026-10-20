@@ -78,7 +78,7 @@ choosing a different one is just clicking a different row's button.
 
 from types import SimpleNamespace
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request
 
 from app.extensions import db
 from app.auth import role_required
@@ -568,6 +568,91 @@ def assign_request(request_id):
                 flash(message, "danger")
 
     return redirect(request.referrer or url_for("dispatch.index"))
+
+
+@dispatch_bp.route("/requests/<int:request_id>/technician-options")
+@role_required("administrator")
+def request_technician_options(request_id):
+    """JSON list behind the "Assign a technician" popup that opens right
+    after an administrator approves a service request
+    (static/js/service-request-approve.js). Every dispatchable technician
+    (same roster the manual dropdown uses), best pick first, each tagged
+    Recommended / Available / Busy / Offline. Purely a read."""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    rows = get_recommendations(_service_request_recommendation_source(service_request))
+
+    technicians = []
+    for index, row in enumerate(rows):
+        tech = row["technician"]
+        open_jobs = row["open_assignment_count"]
+        if index == 0:
+            status, label = "recommended", "Recommended"
+        elif row["technician_status"] == "offline":
+            status, label = "offline", "Offline"
+        elif open_jobs > 0 or row["technician_status"] == "busy":
+            status, label = "busy", "Busy"
+        else:
+            status, label = "available", "Available"
+        technicians.append({
+            "id": tech.id,
+            "name": tech.full_name,
+            "phone": getattr(tech, "contact_number", None) or None,
+            "status": status,
+            "status_label": label,
+            "open_jobs": open_jobs,
+            "distance_km": row["distance_km"] if row["distance_known"] else None,
+            "reason": row.get("reason"),
+        })
+
+    return jsonify(
+        request_id=service_request.id,
+        dispatchable=service_request.status in DISPATCHABLE_REQUEST_STATUSES,
+        already_assigned=_current_open_assignment_for_request(service_request.id) is not None,
+        technicians=technicians,
+    )
+
+
+@dispatch_bp.route("/requests/<int:request_id>/assign-json", methods=["POST"])
+@role_required("administrator")
+def assign_request_json(request_id):
+    """AJAX counterpart of assign_request() for the post-approval popup:
+    same rules (request must be 'scheduled', no open assignment yet) and
+    the same Assignment row, answered with JSON instead of a redirect."""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+
+    if service_request.status not in DISPATCHABLE_REQUEST_STATUSES:
+        return jsonify(
+            ok=False,
+            message="This request isn't scheduled yet, so a technician can't be dispatched. "
+                    "Use the Dispatch Board once it is.",
+        ), 409
+    if _current_open_assignment_for_request(service_request.id) is not None:
+        return jsonify(ok=False, message="A technician is already assigned to this request."), 409
+
+    data = request.get_json(silent=True) or {}
+    try:
+        technician_id = int(data.get("technician_id"))
+    except (TypeError, ValueError):
+        return jsonify(ok=False, message="Please select a technician."), 400
+
+    technician = Technician.query.filter_by(id=technician_id, personnel_type="technician").first()
+    if technician is None:
+        return jsonify(ok=False, message="That technician isn't available for dispatch."), 404
+
+    score = None
+    for row in get_recommendations(_service_request_recommendation_source(service_request)):
+        if row["technician"].id == technician.id:
+            score = row["total_score"]
+            break
+
+    db.session.add(Assignment(
+        service_request_id=service_request.id,
+        technician_id=technician.id,
+        status="assigned",
+        dispatch_score=score,
+    ))
+    db.session.commit()
+    return jsonify(ok=True, message=f"Technician {technician.full_name} was assigned.")
 
 
 @dispatch_bp.route("/requests/<int:request_id>/reassign", methods=["POST"])
