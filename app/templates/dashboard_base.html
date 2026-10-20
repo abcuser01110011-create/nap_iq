@@ -56,6 +56,9 @@
     {% if current_user and current_user.role == 'user' %}
     <link href="{{ url_for('static', filename='css/customer-theme.css') }}" rel="stylesheet">
     {% endif %}
+    {% if current_user and current_user.role == 'administrator' %}
+    <link href="{{ url_for('static', filename='css/admin-theme.css') }}" rel="stylesheet">
+    {% endif %}
     {% block extra_head %}{% endblock %}
 </head>
 {#

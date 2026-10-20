@@ -1,0 +1,86 @@
+/* =====================================================================
+   NAP-IQ Administrator theme -- landing-page palette
+   (matches static/css/landing.css and customer-theme.css)
+   Royal blue #0D3B85 / deep blue #082A63 / navy #081225 / gold #F4B41A /
+   sky #4C7FD1, slate neutrals, pill buttons.
+   Loaded only for the Administrator role (see dashboard_base.html) and
+   only in LIGHT mode: every rule is scoped to html:not([data-bs-theme="dark"])
+   so the existing dark-mode toggle keeps working untouched.
+   ===================================================================== */
+
+html:not([data-bs-theme="dark"]) {
+    --lp-blue: #0D3B85; --lp-blue-dark: #082A63; --lp-navy: #081225;
+    --lp-gold: #F4B41A; --lp-sky: #4C7FD1; --lp-ink: #0F172A;
+    --lp-muted: #64748B; --lp-alt: #F1F5F9; --lp-line: #E2E8F0;
+
+    --napiq-primary: var(--lp-blue);
+    --napiq-primary-dark: var(--lp-blue-dark);
+    --napiq-bg: var(--lp-alt);
+    --napiq-border: var(--lp-line);
+    --napiq-text-muted: var(--lp-muted);
+    --bs-link-color: #0D3B85;
+    --bs-link-hover-color: #082A63;
+}
+html:not([data-bs-theme="dark"]) body.dash-body {
+    background-color: var(--lp-alt);
+    color: var(--lp-ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Sidebar: landing hero gradient, gold active marker */
+html:not([data-bs-theme="dark"]) .dash-sidebar {
+    background: linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%);
+}
+html:not([data-bs-theme="dark"]) .dash-nav-link { color: #CBD5E1; }
+html:not([data-bs-theme="dark"]) .dash-nav-link:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+html:not([data-bs-theme="dark"]) .dash-nav-link.active {
+    background: rgba(255, 255, 255, .14); color: #fff;
+    box-shadow: inset 3px 0 0 var(--lp-gold);
+}
+html:not([data-bs-theme="dark"]) .dash-nav-link.active i { color: var(--lp-gold); }
+
+/* Top bar + cards */
+html:not([data-bs-theme="dark"]) .dash-topbar { border-bottom: 1px solid var(--lp-line); }
+html:not([data-bs-theme="dark"]) .dash-topbar-title h1 { color: var(--lp-ink); }
+html:not([data-bs-theme="dark"]) .dash-body .card {
+    border: 1px solid var(--lp-line); border-radius: 14px;
+    box-shadow: 0 12px 28px -22px rgba(15, 27, 61, .5);
+}
+html:not([data-bs-theme="dark"]) .dash-body .table thead th { color: var(--lp-blue); }
+
+/* Buttons: pill shaped, royal blue */
+html:not([data-bs-theme="dark"]) .dash-body .btn-primary {
+    background-color: var(--lp-blue); border-color: var(--lp-blue);
+    border-radius: 999px; font-weight: 600;
+    box-shadow: 0 8px 18px -10px rgba(13, 59, 133, .6);
+}
+html:not([data-bs-theme="dark"]) .dash-body .btn-primary:hover,
+html:not([data-bs-theme="dark"]) .dash-body .btn-primary:focus {
+    background-color: var(--lp-blue-dark); border-color: var(--lp-blue-dark);
+}
+html:not([data-bs-theme="dark"]) .dash-body .btn-outline-primary {
+    color: var(--lp-blue); border-color: var(--lp-blue); border-radius: 999px; font-weight: 600;
+}
+html:not([data-bs-theme="dark"]) .dash-body .btn-outline-primary:hover,
+html:not([data-bs-theme="dark"]) .dash-body .btn-outline-primary:focus {
+    background-color: var(--lp-blue); border-color: var(--lp-blue); color: #fff;
+}
+html:not([data-bs-theme="dark"]) .dash-body .btn-outline-secondary,
+html:not([data-bs-theme="dark"]) .dash-body .btn-secondary { border-radius: 999px; }
+html:not([data-bs-theme="dark"]) .dash-body .btn-sm { font-size: .82rem; }
+
+/* Form focus + pagination + tabs in the same blue */
+html:not([data-bs-theme="dark"]) .dash-body .form-control:focus,
+html:not([data-bs-theme="dark"]) .dash-body .form-select:focus {
+    border-color: var(--lp-sky); box-shadow: 0 0 0 .2rem rgba(76, 127, 209, .25);
+}
+html:not([data-bs-theme="dark"]) .dash-body .page-item.active .page-link {
+    background-color: var(--lp-blue); border-color: var(--lp-blue); color: #fff;
+}
+html:not([data-bs-theme="dark"]) .dash-body .page-link { color: var(--lp-blue); }
+html:not([data-bs-theme="dark"]) .dash-body .nav-pills .nav-link.active,
+html:not([data-bs-theme="dark"]) .dash-body .nav-tabs .nav-link.active { color: var(--lp-blue); }
+html:not([data-bs-theme="dark"]) .dash-body .nav-pills .nav-link.active { background-color: var(--lp-blue); color: #fff; }
+html:not([data-bs-theme="dark"]) .dash-body .text-primary { color: var(--lp-blue) !important; }
+html:not([data-bs-theme="dark"]) .dash-body .bg-primary { background-color: var(--lp-blue) !important; }
+html:not([data-bs-theme="dark"]) .dash-body .border-primary { border-color: var(--lp-blue) !important; }
