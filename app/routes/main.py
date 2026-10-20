@@ -98,10 +98,11 @@ def _safe_json(view):
             return view(*args, **kwargs)
         except Exception:  # noqa: BLE001
             db.session.rollback()
-            current_app.logger.exception("Landing popup endpoint failed: %s", request.path)
+            ref = secrets.token_hex(3).upper()
+            current_app.logger.exception("Landing popup endpoint failed [ref %s]: %s", ref, request.path)
             return jsonify(
                 ok=False,
-                message="Something went wrong on our side. Please try again in a moment.",
+                message=f"Something went wrong on our side. Please try again in a moment. (Ref: {ref})",
             ), 500
     return wrapped
 
@@ -286,8 +287,8 @@ def public_apply():
         subscriber_code=f"PENDING-{secrets.token_hex(6)}",  # <=20 chars, replaced below
         full_name=full_name,
         address=address,
-        latitude=latitude,
-        longitude=longitude,
+        latitude=round(latitude, 7),
+        longitude=round(longitude, 7),
         contact_number=phone,
         plan_type=plan_name,
         nap_id=None,
@@ -301,10 +302,17 @@ def public_apply():
     db.session.add(ServiceRequest(
         request_type="new_installation",
         subscriber_id=subscriber.id,
-        latitude=latitude,
-        longitude=longitude,
         status="pending",
-        notes=f"Self-registered via public landing page. Plan requested: {plan_name or 'not specified'}.",
+        priority="low",
+        latitude=round(latitude, 7),
+        longitude=round(longitude, 7),
+        # Applicant details + plan, so the staff Service Request page shows
+        # them the same way it does for walk-in requests.
+        full_name=full_name,
+        address=address,
+        contact_number=phone,
+        plan_label=plan_name,
+        notes="Self-registered via public landing page.",
     ))
     db.session.commit()
 

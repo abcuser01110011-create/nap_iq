@@ -228,7 +228,10 @@
                 <h6 class="text-muted mb-3">Notes</h6>
                 <p class="mb-0">{{ service_request.notes or "—" }}</p>
 
-                {% if service_request.status == 'pending' %}
+                {# Approve/Reject only for pending requests that have no technician assigned yet
+                   (e.g. online applications). Once a technician/team is assigned the request
+                   goes straight to the technician, so there is nothing left to approve. #}
+                {% if service_request.status == 'pending' and not dispatch_assignment %}
                 <hr class="my-4">
                 <div class="d-flex justify-content-end gap-2">
                     <form method="post" id="approveRequestForm"
