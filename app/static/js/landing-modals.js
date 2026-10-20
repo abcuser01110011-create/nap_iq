@@ -11,18 +11,39 @@
 
     var lastTrigger = null;
 
-    function postJSON(url, body) {
+    function parse(resp) {
+        return resp.json().catch(function () { return {}; }).then(function (data) {
+            // A redirected (HTML) response is never a success here.
+            return { ok: resp.ok && !resp.redirected, status: resp.status, data: data };
+        });
+    }
+
+    function sendPost(url, body) {
         return fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF, Accept: "application/json" },
             body: JSON.stringify(body),
             credentials: "same-origin",
-        }).then(function (resp) {
-            return resp.json().catch(function () { return {}; }).then(function (data) {
-                // A redirected (HTML) response is never a success here.
-                return { ok: resp.ok && !resp.redirected, status: resp.status, data: data };
-            });
+            cache: "no-store",
+        }).then(parse);
+    }
+
+    // POST; if the page's CSRF token no longer matches the visitor's session
+    // (stale cached page, phones resuming a tab...), fetch a fresh one and retry once.
+    function postJSON(url, body) {
+        return sendPost(url, body).then(function (r) {
+            if (r.status === 400 && r.data && r.data.code === "csrf") {
+                return fetch("/public/csrf-token", { credentials: "same-origin", cache: "no-store" })
+                    .then(function (t) { return t.json(); })
+                    .then(function (t) { if (t && t.token) CSRF = t.token; return sendPost(url, body); })
+                    .catch(function () { return r; });
+            }
+            return r;
         });
+    }
+
+    function getJSON(url) {
+        return fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" }, cache: "no-store" }).then(parse);
     }
 
     function show(el, on) { if (on) el.removeAttribute("hidden"); else el.setAttribute("hidden", ""); }
@@ -211,9 +232,9 @@
         if (!currentFix) return;
         show(locError, false);
         checkBtn.disabled = true; checkBtn.textContent = "Checking…";
-        postJSON("/public/apply/coverage-check", { latitude: currentFix.lat, longitude: currentFix.lng }).then(function (r) {
+        getJSON("/public/apply/coverage-check?latitude=" + encodeURIComponent(currentFix.lat) + "&longitude=" + encodeURIComponent(currentFix.lng)).then(function (r) {
             checkBtn.disabled = false; checkBtn.textContent = "Check coverage";
-            if (!r.ok) { locError_((r.data && r.data.error) || (r.status === 429 ? "Too many checks. Please try again later." : "Couldn't check coverage right now.")); return; }
+            if (!r.ok) { locError_((r.data && (r.data.error || r.data.message)) || ("Couldn't check coverage right now (error " + r.status + "). Please try again.")); return; }
             if (r.data.available) {
                 var km = typeof r.data.distance_km === "number" ? " (" + r.data.distance_km.toFixed(1) + " km from the nearest NAP)" : "";
                 setResult('<i class="bi bi-check-circle-fill"></i> Good news — this location is within coverage' + km + ".", true);
@@ -226,7 +247,7 @@
             }
         }).catch(function () {
             checkBtn.disabled = false; checkBtn.textContent = "Check coverage";
-            locError_("Couldn't check coverage right now. Please check your connection and try again.");
+            locError_("We couldn't reach the server to check coverage. Please check your internet connection and try again.");
         });
     });
 

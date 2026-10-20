@@ -11,15 +11,15 @@ import secrets
 from functools import wraps
 
 from flask import (
-    Blueprint, current_app, jsonify, redirect, render_template, request,
-    session, url_for, g, flash,
+    Blueprint, current_app, jsonify, make_response, redirect, render_template,
+    request, session, url_for, g, flash,
 )
 
 from app.extensions import db, limiter
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, User
 from app.nap_recommendation import recommend_naps
-from flask_wtf.csrf import CSRFError
+from flask_wtf.csrf import CSRFError, generate_csrf
 from sqlalchemy import text
 
 main_bp = Blueprint("main", __name__)
@@ -36,7 +36,11 @@ def index():
     # Guests get the public landing page (online application + account
     # login). Staff sign in at /login.
     plans = Plan.query.order_by(Plan.monthly_fee.is_(None), Plan.monthly_fee, Plan.name).all()
-    return render_template("public/landing.html", plans=plans)
+    resp = make_response(render_template("public/landing.html", plans=plans))
+    # The page embeds a per-session CSRF token; a cached copy (common on
+    # phones / mobile data) would carry a token that no longer matches.
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
 
 
 @main_bp.route("/database-test")
@@ -106,6 +110,7 @@ def _safe_json(view):
 def _public_csrf_failed(_error):
     return jsonify(
         ok=False,
+        code="csrf",
         message="Your page was open too long or your session expired. Please refresh the page and try again.",
     ), 400
 
@@ -126,6 +131,15 @@ def _unique_username(base):
         n += 1
         candidate = f"{base}-{n}"
     return candidate
+
+
+@main_bp.route("/public/csrf-token")
+def public_csrf_token():
+    """Fresh CSRF token for the landing popups (used to retry once when the
+    page's original token no longer matches the visitor's session)."""
+    resp = jsonify(token=generate_csrf())
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @main_bp.route("/public/account-login", methods=["POST"])
@@ -199,22 +213,25 @@ def public_account_login():
     return jsonify(ok=True, redirect=url_for("auth.home"))
 
 
-@main_bp.route("/public/apply/coverage-check", methods=["POST"])
-@limiter.limit("30 per hour")
+@main_bp.route("/public/apply/coverage-check", methods=["GET"])
+@limiter.limit("60 per hour")
 @_safe_json
 def public_apply_coverage_check():
-    """Popup "Apply online" step 1: is this point covered? (read-only)"""
-    data = _json_body()
+    """Popup "Apply online" step 1: is this point covered? Read-only, so it
+    is a GET (no CSRF token to expire; works the same on phones)."""
     try:
-        latitude = float(data.get("latitude"))
-        longitude = float(data.get("longitude"))
+        latitude = float(request.args.get("latitude"))
+        longitude = float(request.args.get("longitude"))
     except (TypeError, ValueError):
+        return jsonify(error="Valid latitude and longitude are required."), 400
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
         return jsonify(error="Valid latitude and longitude are required."), 400
 
     matches = recommend_naps(latitude, longitude, limit=1)
-    if not matches:
-        return jsonify(available=False), 200
-    return jsonify(available=True, distance_km=matches[0]["distance_km"]), 200
+    resp = jsonify(available=bool(matches),
+                   **({"distance_km": matches[0]["distance_km"]} if matches else {}))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, 200
 
 
 @main_bp.route("/public/apply", methods=["POST"])
