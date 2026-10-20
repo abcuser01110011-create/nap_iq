@@ -79,3 +79,7 @@ button.ts-card.ts-card--img:hover, button.ts-card.ts-card--img:focus-visible { t
     100% { opacity: 0; transform: translateX(-90px) scale(.9); }
 }
 @media (prefers-reduced-motion: reduce) { .ts-swipe-hint { display: none; } .ts-card { scale: 1; opacity: 1; } }
+
+/* v6: infinite loop - instant jump from the cloned last slide back to the first */
+.ts-track.is-jumping { scroll-behavior: auto; scroll-snap-type: none; }
+.ts-arrow:disabled { opacity: 1; }

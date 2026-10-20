@@ -10,6 +10,14 @@
     var next = root.querySelector("[data-ts-next]");
     var modalEl = document.getElementById("tsModal");
     var dots = [];
+    var count = cards.length;
+    // Infinite loop: a clone of the first card sits after the last one. When the slide reaches the
+    // clone we silently jump back to the real first card, so it always keeps swiping forward.
+    var clone = cards[0].cloneNode(true);
+    clone.setAttribute("aria-hidden", "true");
+    clone.tabIndex = -1;
+    track.appendChild(clone);
+    var allCards = cards.concat([clone]);
     var timer = null, hovering = false, touching = false, modalOpen = false, resumeAt = 0;
 
     cards.forEach(function (card, i) {
@@ -19,41 +27,61 @@
         dots.push(d);
     });
 
-    function offsetOf(i) { return cards[i].offsetLeft - cards[0].offsetLeft; }
+    function offsetOf(i) { return allCards[i].offsetLeft - cards[0].offsetLeft; }
     function maxScroll() { return track.scrollWidth - track.clientWidth; }
     function goTo(i) {
-        i = Math.max(0, Math.min(cards.length - 1, i));
+        i = Math.max(0, Math.min(count, i));
         track.scrollTo({ left: Math.min(offsetOf(i), maxScroll()), behavior: "smooth" });
     }
-    function currentIndex() {
+    function jumpTo(x) {
+        track.classList.add("is-jumping");
+        track.scrollLeft = x;
+        window.requestAnimationFrame(function () { track.classList.remove("is-jumping"); });
+    }
+    function rawIndex() {
         var x = track.scrollLeft, best = 0, bestDist = Infinity;
-        cards.forEach(function (c, i) {
+        allCards.forEach(function (c, i) {
             var dist = Math.abs(offsetOf(i) - x);
             if (dist < bestDist) { best = i; bestDist = dist; }
         });
-        if (track.scrollLeft >= maxScroll() - 4 && maxScroll() > 4) best = cards.length - 1;
         return best;
     }
+    function currentIndex() { return rawIndex() % count; }
     function update() {
         var i = currentIndex();
         dots.forEach(function (d, n) { d.classList.toggle("is-active", n === i); });
-        prev.disabled = track.scrollLeft <= 4;
-        next.disabled = track.scrollLeft >= maxScroll() - 4;
     }
+    // Once the clone is fully in view, jump back to the real first card (looks identical).
+    var wrapTimer = null;
+    function wrapIfNeeded() {
+        if (Math.abs(track.scrollLeft - Math.min(offsetOf(count), maxScroll())) <= 2) jumpTo(0);
+    }
+    function goPrev() {
+        var i = rawIndex();
+        if (i <= 0 || track.scrollLeft <= 2) {
+            jumpTo(Math.min(offsetOf(count), maxScroll()));
+            window.requestAnimationFrame(function () { goTo(count - 1); });
+        } else { goTo(i - 1); }
+    }
+    function goNext() { goTo(rawIndex() + 1); }
 
     // ---- auto slide every 3s; loops back to the first card ----
     function tick() {
         if (hovering || touching || modalOpen || document.hidden || Date.now() < resumeAt) return;
         if (root.matches(":hover") || root.contains(document.activeElement)) return;
         if (maxScroll() <= 4) return; // everything already visible
-        if (track.scrollLeft >= maxScroll() - 4) goTo(0); else goTo(currentIndex() + 1);
+        goNext();
     }
     function startAuto() { if (!timer) timer = window.setInterval(tick, AUTOPLAY_MS); }
     function pauseBriefly() { resumeAt = Date.now() + AUTOPLAY_MS; }
 
-    prev.addEventListener("click", function () { pauseBriefly(); goTo(currentIndex() - 1); });
-    next.addEventListener("click", function () { pauseBriefly(); goTo(currentIndex() + 1); });
-    track.addEventListener("scroll", function () { window.requestAnimationFrame(update); }, { passive: true });
+    prev.addEventListener("click", function () { pauseBriefly(); goPrev(); });
+    next.addEventListener("click", function () { pauseBriefly(); goNext(); });
+    track.addEventListener("scroll", function () {
+        window.requestAnimationFrame(update);
+        window.clearTimeout(wrapTimer);
+        wrapTimer = window.setTimeout(wrapIfNeeded, 90);
+    }, { passive: true });
     root.addEventListener("mouseenter", function () { hovering = true; });
     root.addEventListener("mouseover", function () { hovering = true; });
     root.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse" || e.pointerType === "pen") hovering = true; });
@@ -71,7 +99,7 @@
 
     function applyDepth() {
         var mid = track.scrollLeft + track.clientWidth / 2;
-        cards.forEach(function (c) {
+        allCards.forEach(function (c) {
             var dist = Math.min(1, Math.abs((c.offsetLeft - track.offsetLeft + c.offsetWidth / 2) - mid) / (c.offsetWidth * 0.9));
             c.style.setProperty("--ts-s", (1 - dist * 0.07).toFixed(3));
             c.style.setProperty("--ts-o", (1 - dist * 0.45).toFixed(3));
@@ -106,10 +134,10 @@
         try { track.releasePointerCapture(d.id); } catch (_) {}
         suppressClick = true;
         window.setTimeout(function () { suppressClick = false; }, 0);
-        var i = currentIndex();
+        var i = rawIndex();
         var dx = (e ? e.clientX : d.lastX) - d.x;
-        if (d.v < -0.4 || dx < -50) i = Math.min(cards.length - 1, Math.floor((track.scrollLeft) / Math.max(1, cards[1] ? offsetOf(1) : 1)) + 1);
-        else if (d.v > 0.4 || dx > 50) i = Math.max(0, Math.ceil((track.scrollLeft) / Math.max(1, cards[1] ? offsetOf(1) : 1)) - 1);
+        if (d.v < -0.4 || dx < -50) i = Math.min(count, Math.floor(track.scrollLeft / Math.max(1, offsetOf(1))) + 1);
+        else if (d.v > 0.4 || dx > 50) i = Math.max(0, Math.ceil(track.scrollLeft / Math.max(1, offsetOf(1))) - 1);
         pauseBriefly();
         goTo(i);
     }
@@ -154,7 +182,7 @@
             return window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
         }
 
-        cards.forEach(function (card) {
+        allCards.forEach(function (card) {
             card.addEventListener("click", function () {
                 var key = card.getAttribute("data-ts-open");
                 var tpl = root.querySelector('template[data-ts-steps="' + key + '"]');
