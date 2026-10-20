@@ -210,3 +210,92 @@
 @media (max-width: 400px) {
     .napiq-pay-btn { padding: .9rem 1rem; min-width: 7rem; }
 }
+
+/* ================================================================= */
+/* LANDING-PAGE PALETTE (matches static/css/landing.css)             */
+/* Royal blue #0D3B85 / deep blue #082A63 / navy #081225 / gold      */
+/* #F4B41A / sky #4C7FD1, slate neutrals, pill buttons. Loaded last  */
+/* so it overrides the older blue/teal accents above.                */
+/* ================================================================= */
+.dash-theme-customer {
+    --lp-blue: #0D3B85; --lp-blue-dark: #082A63; --lp-navy: #081225;
+    --lp-gold: #F4B41A; --lp-sky: #4C7FD1; --lp-ink: #0F172A;
+    --lp-muted: #64748B; --lp-alt: #F1F5F9; --lp-line: #E2E8F0;
+
+    --napiq-primary: var(--lp-blue);
+    --napiq-primary-dark: var(--lp-blue-dark);
+    --napiq-bg: var(--lp-alt);
+    --napiq-border: var(--lp-line);
+    --napiq-text-muted: var(--lp-muted);
+    --napiq-info: var(--lp-blue);
+    --napiq-teal: var(--lp-blue);
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+.dash-theme-customer.dash-body { color: var(--lp-ink); }
+
+/* Sidebar: same royal-blue -> navy gradient as the landing hero, gold active marker */
+.dash-theme-customer .dash-sidebar {
+    background: linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%);
+}
+.dash-theme-customer .dash-nav-link { color: #CBD5E1; }
+.dash-theme-customer .dash-nav-link:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.dash-theme-customer .dash-nav-link.active {
+    background: rgba(255, 255, 255, .14); color: #fff;
+    box-shadow: inset 3px 0 0 var(--lp-gold);
+}
+.dash-theme-customer .dash-nav-link.active i { color: var(--lp-gold); }
+
+/* Top bar */
+.dash-theme-customer .dash-topbar { border-bottom: 1px solid var(--lp-line); }
+.dash-theme-customer .dash-topbar-title h1 { color: var(--lp-ink); }
+
+/* Cards */
+.dash-theme-customer .card,
+.dash-theme-customer .napiq-pay-card {
+    border-color: var(--lp-line); border-radius: 14px;
+    box-shadow: 0 12px 28px -22px rgba(15, 27, 61, .5);
+}
+
+/* Home: greeting, account pill, plan/status */
+.dash-theme-customer .napiq-acct-hi { color: var(--lp-ink); font-weight: 800; }
+.dash-theme-customer .napiq-acct-pill { border-color: var(--lp-blue); color: var(--lp-blue); }
+.dash-theme-customer .napiq-acct-plan { color: var(--lp-ink); font-weight: 600; }
+
+/* Home: Amount To Pay */
+.dash-theme-customer .napiq-pay-peso { color: var(--lp-blue); }
+.dash-theme-customer .napiq-pay-btn {
+    background: var(--lp-blue); border-radius: 999px; font-weight: 700;
+    box-shadow: 0 8px 18px -8px rgba(13, 59, 133, .6);
+}
+.dash-theme-customer .napiq-pay-btn:hover,
+.dash-theme-customer .napiq-pay-btn:focus-visible { background: var(--lp-blue-dark); filter: none; transform: translateY(-1px); }
+.dash-theme-customer .napiq-pay-btn:disabled {
+    background: #94A3B8; box-shadow: none; transform: none; cursor: not-allowed; opacity: .75;
+}
+
+/* Home: installation progress */
+.dash-theme-customer .ip-step.done:not(:first-child)::before,
+.dash-theme-customer .ip-step.current:not(:first-child)::before { background: var(--lp-blue); }
+.dash-theme-customer .ip-step.done .ip-dot { background: var(--lp-blue); border-color: var(--lp-blue); color: #fff; }
+.dash-theme-customer .ip-step.current .ip-dot {
+    border-color: var(--lp-gold); color: var(--lp-blue); box-shadow: 0 0 0 4px rgba(244, 180, 26, .3);
+}
+.dash-theme-customer .ip-step.selected .ip-label { color: var(--lp-blue); }
+.dash-theme-customer .ip-home-item .ip-step:focus-visible,
+.dash-theme-customer .app-prog-steps .ip-step:focus-visible { outline-color: var(--lp-gold); }
+.dash-theme-customer .app-prog-badge { background: var(--lp-muted); }
+.dash-theme-customer .app-prog-badge--approved,
+.dash-theme-customer .app-prog-badge--assigned { background: var(--lp-sky); color: #fff; }
+.dash-theme-customer .app-prog-badge--arriving { background: var(--lp-blue); color: #fff; }
+.dash-theme-customer .app-prog-note { background: var(--lp-alt); border-left-color: var(--lp-gold); }
+.dash-theme-customer .app-prog-call,
+.dash-theme-customer .ip-d-value a { color: var(--lp-blue); }
+
+/* Buttons / links elsewhere in customer pages */
+.dash-theme-customer .btn-primary {
+    background: var(--lp-blue); border-color: var(--lp-blue); border-radius: 999px; font-weight: 600;
+}
+.dash-theme-customer .btn-primary:hover,
+.dash-theme-customer .btn-primary:focus { background: var(--lp-blue-dark); border-color: var(--lp-blue-dark); }
+.dash-theme-customer .btn-outline-primary { color: var(--lp-blue); border-color: var(--lp-blue); border-radius: 999px; }
+.dash-theme-customer .btn-outline-primary:hover { background: var(--lp-blue); border-color: var(--lp-blue); color: #fff; }
