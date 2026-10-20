@@ -106,13 +106,15 @@
                 {% endfor %}
             </div>
             <div class="ip-details app-prog-details"><div class="ip-details-body"></div></div>
-            <div class="app-prog-note app-prog-note--{{ app_progress.stage }}">
+            {% if app_progress.stage == 'arriving' %}
+            <div class="app-prog-note app-prog-note--{{ app_progress.stage }}" id="appProgNote">
                 <strong>{{ app_progress.title }}</strong>
                 <span>{{ app_progress.message }}</span>
                 {% if app_progress.technician_phone %}
                 <a class="app-prog-call" href="tel:{{ app_progress.technician_phone }}"><i class="bi bi-telephone me-1"></i>{{ app_progress.technician_phone }}</a>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

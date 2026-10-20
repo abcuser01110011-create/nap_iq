@@ -18,3 +18,4 @@
 .app-prog-steps .ip-step { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .app-prog-steps .ip-step:focus-visible { outline: 2px solid #0d8bf2; outline-offset: 2px; border-radius: .4rem; }
 .app-prog-details { margin-top: .8rem; }
+.app-prog-note[hidden] { display: none; }

@@ -111,6 +111,9 @@
         var steps = box.querySelectorAll(".ip-step");
         for (var i = 0; i < steps.length; i++) steps[i].classList.toggle("selected", i === step);
         if (step !== ARRIVING) destroyMap();
+        // "Technician is on the way" note: only while the Arriving step is shown.
+        var note = document.getElementById("appProgNote");
+        if (note) note.hidden = !(s.stage === "arriving" && step === ARRIVING);
 
         if (step === 0) {
             var body = '<div class="ip-d-title">Pending</div>';
