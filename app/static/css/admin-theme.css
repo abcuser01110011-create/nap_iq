@@ -32,7 +32,8 @@ html:not([data-bs-theme="dark"]) .dash-sidebar {
     background: linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%);
 }
 html:not([data-bs-theme="dark"]) .dash-nav-link { color: #CBD5E1; }
-html:not([data-bs-theme="dark"]) .dash-nav-link:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+html:not([data-bs-theme="dark"]) .dash-nav-link:hover { background: rgba(244, 180, 26, .16); color: var(--lp-gold); }
+html:not([data-bs-theme="dark"]) .dash-nav-link:hover i { color: var(--lp-gold); }
 html:not([data-bs-theme="dark"]) .dash-nav-link.active {
     background: rgba(255, 255, 255, .14); color: #fff;
     box-shadow: inset 3px 0 0 var(--lp-gold);
@@ -84,3 +85,65 @@ html:not([data-bs-theme="dark"]) .dash-body .nav-pills .nav-link.active { backgr
 html:not([data-bs-theme="dark"]) .dash-body .text-primary { color: var(--lp-blue) !important; }
 html:not([data-bs-theme="dark"]) .dash-body .bg-primary { background-color: var(--lp-blue) !important; }
 html:not([data-bs-theme="dark"]) .dash-body .border-primary { border-color: var(--lp-blue) !important; }
+
+/* =====================================================================
+   Yellow (gold) hover theme -- cards, panels, rows, small controls.
+   Cards: low-opacity gold fill + solid gold border on hover.
+   Covers: stat cards, NAP Status / Technical Issue summary panels,
+   dash panels (Recent Issues, Workload, GeoMap...), Bootstrap .card,
+   technician ticket cards.
+   ===================================================================== */
+html:not([data-bs-theme="dark"]) {
+    --lp-gold-soft: rgba(244, 180, 26, .10);   /* card hover fill (low opacity) */
+    --lp-gold-row:  rgba(244, 180, 26, .14);   /* row / small-control hover fill */
+}
+
+html:not([data-bs-theme="dark"]) .dash-stat-card,
+html:not([data-bs-theme="dark"]) .summary-panel,
+html:not([data-bs-theme="dark"]) .dash-panel,
+html:not([data-bs-theme="dark"]) .dash-body .card,
+html:not([data-bs-theme="dark"]) .tech-ticket-card {
+    transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .15s ease;
+}
+
+html:not([data-bs-theme="dark"]) .dash-stat-card:hover,
+html:not([data-bs-theme="dark"]) .dash-stat-card-link:hover,
+html:not([data-bs-theme="dark"]) .dash-stat-card-link:focus-visible,
+html:not([data-bs-theme="dark"]) .summary-panel:hover,
+html:not([data-bs-theme="dark"]) .dash-panel:hover,
+html:not([data-bs-theme="dark"]) .dash-body .card:hover,
+html:not([data-bs-theme="dark"]) .tech-ticket-card:hover {
+    background: var(--lp-gold-soft);
+    border: 1px solid var(--lp-gold);          /* solid gold border */
+    box-shadow: 0 12px 28px -20px rgba(244, 180, 26, .55);
+}
+html:not([data-bs-theme="dark"]) .dash-stat-card-link:focus-visible {
+    outline: 2px solid var(--lp-gold);
+    outline-offset: 2px;
+}
+
+/* Rows, list items, dropdowns, pills, icon buttons */
+html:not([data-bs-theme="dark"]) .subs-row:hover td,
+html:not([data-bs-theme="dark"]) .disp-row:hover td,
+html:not([data-bs-theme="dark"]) .dash-body .table-hover > tbody > tr:hover > *,
+html:not([data-bs-theme="dark"]) .notif-dropdown-item:hover,
+html:not([data-bs-theme="dark"]) .dash-icon-btn:hover,
+html:not([data-bs-theme="dark"]) .dash-sidebar-toggle:hover,
+html:not([data-bs-theme="dark"]) .subs-pill:hover,
+html:not([data-bs-theme="dark"]) .disp-nav-link:hover,
+html:not([data-bs-theme="dark"]) .dash-body .dropdown-item:hover,
+html:not([data-bs-theme="dark"]) .dash-body .list-group-item-action:hover,
+html:not([data-bs-theme="dark"]) .dash-body .page-link:hover {
+    background-color: var(--lp-gold-row);
+    --bs-table-hover-bg: var(--lp-gold-row);
+    --bs-table-bg-state: var(--lp-gold-row);
+}
+html:not([data-bs-theme="dark"]) .dash-icon-btn:hover,
+html:not([data-bs-theme="dark"]) .dash-sidebar-toggle:hover { color: #8A6100; }
+html:not([data-bs-theme="dark"]) .subs-pill-active:hover { background: var(--lp-blue); color: #fff; }
+
+/* Links */
+html:not([data-bs-theme="dark"]) .nap-status-panel-footer a:hover,
+html:not([data-bs-theme="dark"]) .disp-primary-link:hover,
+html:not([data-bs-theme="dark"]) .tm-map-link:hover,
+html:not([data-bs-theme="dark"]) .dash-body a:not(.btn):not(.dash-nav-link):not(.dash-stat-card):hover { color: #B8860B; }
