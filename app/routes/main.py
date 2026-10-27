@@ -37,7 +37,7 @@ def index():
     # Guests get the public landing page (online application + account
     # login). Staff sign in at /login.
     plans = Plan.query.order_by(Plan.monthly_fee.is_(None), Plan.monthly_fee, Plan.name).all()
-    resp = make_response(render_template("public/landing.html", plans=plans))
+    resp = make_response(render_template("pages/landing.html", plans=plans))
     # The page embeds a per-session CSRF token; a cached copy (common on
     # phones / mobile data) would carry a token that no longer matches.
     resp.headers["Cache-Control"] = "no-store, max-age=0"
@@ -77,7 +77,7 @@ def database_test():
 # ---------------------------------------------------------------------------
 # Landing-page popups (Log in / Apply online)
 # ---------------------------------------------------------------------------
-# These JSON endpoints back the two modals on public/landing.html
+# These JSON endpoints back the two modals on pages/landing.html
 # (static/js/landing-modals.js). Both are public (no login needed) and
 # CSRF-protected through the X-CSRFToken header like every other POST.
 
