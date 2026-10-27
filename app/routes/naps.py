@@ -28,6 +28,7 @@ Routes:
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify, g, abort
 
 from app.extensions import db
+from app.query_utils import filter_enum_eq
 from sqlalchemy import func
 from app.auth import role_required
 from app.models import (
@@ -205,7 +206,7 @@ def list_naps():
         )
 
     if status_filter:
-        query = query.filter(Nap.status == status_filter)
+        query = filter_enum_eq(query, Nap.status, status_filter)
 
     naps = query.order_by(Nap.name.asc()).all()
 

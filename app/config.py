@@ -20,6 +20,32 @@ def _get_bool(env_var: str, default: str = "True") -> bool:
     return os.environ.get(env_var, default).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _normalize_database_url(raw: str) -> str:
+    """Turns a Supabase/Postgres connection string into a SQLAlchemy URL.
+
+    Supabase (and most hosts) hand out ``postgresql://...`` or the older
+    ``postgres://...``; SQLAlchemy 2.x rejects the latter and needs the
+    driver spelled out, so both become ``postgresql+psycopg2://...``.
+    ``sslmode=require`` is appended for any non-local host because
+    Supabase only accepts TLS connections.
+    """
+    url = raw.strip()
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            url = "postgresql+psycopg2://" + url[len(prefix):]
+            break
+    is_local = any(h in url for h in ("@localhost", "@127.0.0.1", "@/"))
+    if url.startswith("postgresql") and "sslmode=" not in url and not is_local:
+        url += ("&" if "?" in url else "?") + "sslmode=require"
+    return url
+
+
+# Set DATABASE_URL (Supabase -> Project Settings -> Database -> Connection
+# string) to run on Postgres. When it is NOT set, the app falls back to the
+# original MYSQL_* settings below, so local dev / the test-suite are unchanged.
+_DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+
+
 class Config:
     """Base configuration shared by the whole application."""
 
@@ -177,24 +203,37 @@ class Config:
         "EMAIL_VERIFICATION_SEND_RATE_LIMIT", "3 per 5 minutes"
     )
 
-    # ---- MySQL connection settings ----
-
-    # ---- MySQL connection settings ----
+    # ---- Database connection settings ----
+    # Production (Vercel + Supabase): DATABASE_URL, a Postgres URL. Use
+    # Supabase's *Transaction pooler* string (port 6543) -- serverless
+    # functions open a fresh connection per invocation and would exhaust
+    # Supabase's direct-connection limit otherwise.
+    # Local dev: leave DATABASE_URL unset and the MYSQL_* values are used.
     MYSQL_HOST = os.environ.get("MYSQL_HOST", "localhost")
     MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
     MYSQL_USER = os.environ.get("MYSQL_USER", "root")
     MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
     MYSQL_DB = os.environ.get("MYSQL_DB", "nap_iq")
 
-    # SQLAlchemy connects to MySQL through the PyMySQL driver.
-    SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}"
-        f"@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
-    )
+    if _DATABASE_URL:
+        SQLALCHEMY_DATABASE_URI = _normalize_database_url(_DATABASE_URL)
+    else:
+        # SQLAlchemy connects to MySQL through the PyMySQL driver.
+        SQLALCHEMY_DATABASE_URI = (
+            f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}"
+            f"@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
+        )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Verifies connections are alive before using them from the pool.
-    # Prevents "MySQL server has gone away" errors after idle periods.
+    # Prevents "server has gone away" errors after idle periods.
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
     }
+    # On Vercel (sets VERCEL=1) every invocation is short-lived, so a
+    # client-side pool just leaks connections between cold starts. Let
+    # Supabase's pooler (PgBouncer) do the pooling instead.
+    if os.environ.get("VERCEL") and _DATABASE_URL:
+        from sqlalchemy.pool import NullPool
+
+        SQLALCHEMY_ENGINE_OPTIONS["poolclass"] = NullPool

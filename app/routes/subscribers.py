@@ -40,6 +40,7 @@ from decimal import Decimal, InvalidOperation
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 from app.extensions import db
+from app.query_utils import filter_enum_eq
 from app.auth import role_required
 from app.models import Subscriber, Nap, Plan, ServiceRequest
 from app.forms import SubscriberForm, MapQuickInstallSubscriberForm
@@ -100,7 +101,7 @@ def list_subscribers():
         )
 
     if status_filter:
-        query = query.filter(Subscriber.status == status_filter)
+        query = filter_enum_eq(query, Subscriber.status, status_filter)
 
     subscribers = query.order_by(Subscriber.full_name.asc()).all()
 

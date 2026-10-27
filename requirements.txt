@@ -4,6 +4,13 @@ Flask-WTF==1.2.1
 Flask-Limiter==3.8.0
 Flask-JWT-Extended==4.6.0
 PyMySQL==1.1.1
+
+# Supabase = PostgreSQL. app/config.py uses it whenever DATABASE_URL is set.
+# (PyMySQL is kept for local MySQL dev and scripts/migrate_mysql_to_postgres.py.)
+psycopg2-binary==2.9.10
+
+# Only used if RATELIMIT_STORAGE_URI points at Redis (e.g. Upstash) -- see .env.example.
+redis==5.0.8
 cryptography==43.0.0
 python-dotenv==1.0.1
 email-validator==2.2.0

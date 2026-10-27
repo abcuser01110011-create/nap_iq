@@ -35,6 +35,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import current_user
 
 from app.extensions import db, limiter
+from sqlalchemy import func
 from app.email_utils import consume_verification, is_email_verified
 from app.forms import CUSTOMER_ISSUE_TYPE_CHOICES
 from app.billing_utils import monthly_due_info
@@ -147,7 +148,7 @@ def _validate_application(data: dict) -> dict:
     if email:
         if len(email) > 100 or not _EMAIL_RE.match(email):
             errors["email"] = "Enter a valid email address."
-        elif current_user.email != email and User.query.filter_by(email=email).first() is not None:
+        elif current_user.email != email and User.query.filter(func.lower(User.email) == email.lower()).first() is not None:
             errors["email"] = "This email is already registered."
         elif not is_email_verified(email, purpose=_APPLICATION_EMAIL_PURPOSE):
             # Applicant must have completed the send-code / verify-code

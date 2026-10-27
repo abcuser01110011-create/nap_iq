@@ -55,6 +55,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, redirect, url_for, request, flash, g
 
 from app.extensions import db
+from app.query_utils import filter_enum_eq
 from app.auth import role_required
 from app.models import Payment, Subscriber
 from app.forms import RecordPaymentForm
@@ -98,10 +99,10 @@ def list_payments():
         )
 
     if method_filter:
-        query = query.filter(Payment.payment_method == method_filter)
+        query = filter_enum_eq(query, Payment.payment_method, method_filter)
 
     if status_filter:
-        query = query.filter(Payment.status == status_filter)
+        query = filter_enum_eq(query, Payment.status, status_filter)
 
     payments = query.order_by(Payment.payment_date.desc(), Payment.created_at.desc()).all()
 

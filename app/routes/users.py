@@ -29,6 +29,7 @@ Routes:
 from flask import Blueprint, render_template, redirect, url_for, request, flash, g
 
 from app.extensions import db
+from app.query_utils import filter_enum_eq
 from app.auth import role_required
 from app.models import User, Subscriber
 from app.forms import UserForm, AddUserForm, ResetPasswordForm, ROLE_CHOICES
@@ -84,7 +85,7 @@ def list_users():
         )
 
     if role_filter:
-        query = query.filter(User.role == role_filter)
+        query = filter_enum_eq(query, User.role, role_filter)
 
     if status_filter in ("active", "inactive", "suspended"):
         query = query.filter(User.status == status_filter)

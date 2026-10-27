@@ -147,7 +147,10 @@ def open_issue_for_subscriber(subscriber_id):
     return (
         TechnicalIssue.query.filter(
             TechnicalIssue.subscriber_id == subscriber_id,
-            TechnicalIssue.status.in_(("pending", "assigned", "accepted", "in_progress")),
+            # NOTE: "accepted" is an *assignment* status, not a technical_issues.status
+            # value. MySQL silently ignored it inside IN (...); PostgreSQL rejects the
+            # query ("invalid input value for enum issue_status"), so it must not be here.
+            TechnicalIssue.status.in_(("pending", "assigned", "in_progress")),
         )
         .order_by(TechnicalIssue.created_at, TechnicalIssue.id)
         .first()

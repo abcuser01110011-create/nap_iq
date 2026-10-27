@@ -70,6 +70,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from datetime import datetime
 
 from app.extensions import db
+from app.query_utils import filter_enum_eq
 from app.auth import role_required
 from app.models import ServiceRequest, Subscriber, Nap, Assignment, Technician
 from app.forms import ServiceRequestForm, QuickServiceRequestForm, QuickAddNapRequestForm
@@ -328,10 +329,10 @@ def list_requests():
         )
 
     if type_filter:
-        query = query.filter(ServiceRequest.request_type == type_filter)
+        query = filter_enum_eq(query, ServiceRequest.request_type, type_filter)
 
     if status_filter:
-        query = query.filter(ServiceRequest.status == status_filter)
+        query = filter_enum_eq(query, ServiceRequest.status, status_filter)
 
     requests_ = query.order_by(ServiceRequest.created_at.desc()).all()
 

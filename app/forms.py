@@ -7,6 +7,7 @@ NapForm powers both the Add and Edit pages), and unit-test later.
 """
 
 from flask_wtf import FlaskForm
+from sqlalchemy import func
 from wtforms import (
     StringField,
     PasswordField,
@@ -107,7 +108,7 @@ class SelfRegisterForm(FlaskForm):
     )
 
     def validate_username(self, field):
-        if User.query.filter_by(username=field.data.strip()).first() is not None:
+        if User.query.filter(func.lower(User.username) == field.data.strip().lower()).first() is not None:
             raise ValidationError("This username is already taken. Choose a different one.")
 
 
@@ -458,7 +459,7 @@ class UserForm(FlaskForm):
 
     def validate_username(self, field):
         """Ensures username is unique, excluding the record being edited."""
-        query = User.query.filter(User.username == field.data.strip())
+        query = User.query.filter(func.lower(User.username) == field.data.strip().lower())
         if self.user_id is not None:
             query = query.filter(User.id != self.user_id)
         if query.first() is not None:
@@ -470,7 +471,7 @@ class UserForm(FlaskForm):
         multiple accounts with no email at all is fine."""
         if not field.data:
             return
-        query = User.query.filter(User.email == field.data.strip())
+        query = User.query.filter(func.lower(User.email) == field.data.strip().lower())
         if self.user_id is not None:
             query = query.filter(User.id != self.user_id)
         if query.first() is not None:
@@ -723,7 +724,7 @@ class ProfileForm(FlaskForm):
         the signed-in account's own id."""
         if not field.data:
             return
-        query = User.query.filter(User.email == field.data.strip())
+        query = User.query.filter(func.lower(User.email) == field.data.strip().lower())
         if self.user_id is not None:
             query = query.filter(User.id != self.user_id)
         if query.first() is not None:
@@ -1107,7 +1108,7 @@ class TechnicianForm(FlaskForm):
         if not username:
             self.username.errors.append("Username is required for mobile login.")
             ok = False
-        elif User.query.filter_by(username=username).first() is not None:
+        elif User.query.filter(func.lower(User.username) == username.lower()).first() is not None:
             self.username.errors.append("This username is already taken. Choose a different one.")
             ok = False
 

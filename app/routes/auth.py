@@ -23,6 +23,7 @@ from app.forms import LoginForm, SelfRegisterForm
 from app.models import User
 from app.auth import login_required, ROLE_HOME_ENDPOINT
 from app.extensions import db, limiter
+from sqlalchemy import func
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -111,7 +112,8 @@ def _handle_login(portal):
 
     if form.validate_on_submit():
         username = form.username.data.strip()
-        user = User.query.filter_by(username=username).first()
+        # Case-insensitive, like MySQL's default collation was (phone keyboards auto-capitalise).
+        user = User.query.filter(func.lower(User.username) == username.lower()).first()
 
         # Same generic message whether the username doesn't exist or the
         # password is wrong (no username enumeration).

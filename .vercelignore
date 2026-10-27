@@ -1,0 +1,16 @@
+# Not needed at runtime -- keeps the deployed function small and uploads fast.
+mobile/
+tests/
+database/
+scripts/
+*.md
+dev_screenshot.py
+dev_seed_server.py
+dev_visual_check.db
+railway.json
+.env
+.venv/
+venv/
+node_modules/
+__pycache__/
+*.pyc

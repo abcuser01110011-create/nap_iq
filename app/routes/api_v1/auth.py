@@ -27,6 +27,7 @@ from flask_jwt_extended import (
 )
 
 from app.extensions import db, limiter
+from sqlalchemy import func
 from app.jwt_auth import MOBILE_API_ROLES
 from app.models import RevokedToken, User
 from app.email_utils import send_verification_code, verify_code
@@ -93,7 +94,7 @@ def _validate_registration(data: dict) -> dict:
     username = str(data.get("username") or "").strip()
     if not (3 <= len(username) <= 50):
         errors["username"] = "Username must be between 3 and 50 characters."
-    elif User.query.filter_by(username=username).first() is not None:
+    elif User.query.filter(func.lower(User.username) == username.lower()).first() is not None:
         errors["username"] = "This username is already taken. Choose a different one."
 
     password = str(data.get("password") or "")
@@ -126,7 +127,8 @@ def login():
     if not username or not password:
         return jsonify(error="Username and password are required."), 400
 
-    user = User.query.filter_by(username=username).first()
+    # Case-insensitive, like MySQL's default collation was (phone keyboards auto-capitalise).
+    user = User.query.filter(func.lower(User.username) == username.lower()).first()
 
     # Same generic message whether the username doesn't exist or the
     # password is wrong, no early-return timing tell — mirrors
