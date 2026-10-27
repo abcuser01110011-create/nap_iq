@@ -94,8 +94,8 @@ html:not([data-bs-theme="dark"]) .dash-body .border-primary { border-color: var(
    technician ticket cards.
    ===================================================================== */
 html:not([data-bs-theme="dark"]) {
-    --lp-gold-soft: rgba(244, 180, 26, .10);   /* card hover fill (low opacity) */
-    --lp-gold-row:  rgba(244, 180, 26, .14);   /* row / small-control hover fill */
+    --lp-gold-soft: rgba(244, 180, 26, .22);   /* card hover fill (low opacity) */
+    --lp-gold-row:  rgba(244, 180, 26, .24);   /* row / small-control hover fill */
 }
 
 html:not([data-bs-theme="dark"]) .dash-stat-card,
