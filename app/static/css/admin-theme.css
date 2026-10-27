@@ -94,8 +94,8 @@ html:not([data-bs-theme="dark"]) .dash-body .border-primary { border-color: var(
    technician ticket cards.
    ===================================================================== */
 html:not([data-bs-theme="dark"]) {
-    --lp-gold-soft: rgba(244, 180, 26, .22);   /* card hover fill (low opacity) */
-    --lp-gold-row:  rgba(244, 180, 26, .24);   /* row / small-control hover fill */
+    --lp-gold-soft: #F4B41A;   /* card hover fill (low opacity) */
+    --lp-gold-row:  #F4B41A;   /* row / small-control hover fill */
 }
 
 html:not([data-bs-theme="dark"]) .dash-stat-card,
@@ -147,3 +147,29 @@ html:not([data-bs-theme="dark"]) .nap-status-panel-footer a:hover,
 html:not([data-bs-theme="dark"]) .disp-primary-link:hover,
 html:not([data-bs-theme="dark"]) .tm-map-link:hover,
 html:not([data-bs-theme="dark"]) .dash-body a:not(.btn):not(.dash-nav-link):not(.dash-stat-card):hover { color: #B8860B; }
+
+/* Full-gold hover: keep text readable on the solid gold fill */
+html:not([data-bs-theme="dark"]) .dash-stat-card:hover,
+html:not([data-bs-theme="dark"]) .dash-stat-card-link:hover,
+html:not([data-bs-theme="dark"]) .summary-panel:hover,
+html:not([data-bs-theme="dark"]) .dash-panel:hover,
+html:not([data-bs-theme="dark"]) .dash-body .card:hover,
+html:not([data-bs-theme="dark"]) .tech-ticket-card:hover {
+    color: var(--lp-navy);
+}
+html:not([data-bs-theme="dark"]) .dash-stat-card:hover *:not(.badge):not(i),
+html:not([data-bs-theme="dark"]) .summary-panel:hover *:not(.badge):not(i),
+html:not([data-bs-theme="dark"]) .dash-panel:hover *:not(.badge):not(i),
+html:not([data-bs-theme="dark"]) .dash-body .card:hover *:not(.badge):not(i),
+html:not([data-bs-theme="dark"]) .tech-ticket-card:hover *:not(.badge):not(i) {
+    color: var(--lp-navy) !important;
+}
+html:not([data-bs-theme="dark"]) .summary-panel:hover .summary-panel-header,
+html:not([data-bs-theme="dark"]) .dash-panel:hover .dash-panel-header {
+    border-bottom-color: rgba(8, 18, 37, .25);
+}
+html:not([data-bs-theme="dark"]) .subs-row:hover td,
+html:not([data-bs-theme="dark"]) .disp-row:hover td,
+html:not([data-bs-theme="dark"]) .dash-body .table-hover > tbody > tr:hover > *,
+html:not([data-bs-theme="dark"]) .notif-dropdown-item:hover,
+html:not([data-bs-theme="dark"]) .dash-body .dropdown-item:hover { color: var(--lp-navy); }
