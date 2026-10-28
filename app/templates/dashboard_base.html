@@ -446,31 +446,24 @@
     })();
 
     // Icon-only sidebar rail (desktop). Hover expands it to show labels;
-    // it returns to icons only after the pointer has been away for 60s.
+    // it returns to icons only as soon as the pointer leaves.
     (function () {
         const sidebar = document.getElementById('dashSidebar');
         if (!sidebar) return;
         const root = document.documentElement;
-        const COLLAPSE_DELAY_MS = 60000;
-        let timer = null;
 
         function isDesktop() { return window.innerWidth >= 992; }
 
         function open() {
-            clearTimeout(timer);
             if (isDesktop()) root.classList.add('dash-sidebar-open');
         }
 
-        function scheduleClose() {
-            clearTimeout(timer);
-            timer = setTimeout(function () {
-                root.classList.remove('dash-sidebar-open');
-            }, COLLAPSE_DELAY_MS);
+        function close() {
+            root.classList.remove('dash-sidebar-open');
         }
 
         sidebar.addEventListener('mouseenter', open);
-        sidebar.addEventListener('mouseleave', scheduleClose);
-        sidebar.addEventListener('focusin', open);
+        sidebar.addEventListener('mouseleave', close);
 
         window.addEventListener('resize', function () {
             root.classList.toggle('dash-sidebar-collapsed', isDesktop());
