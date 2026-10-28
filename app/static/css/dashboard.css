@@ -223,25 +223,41 @@ html.dash-sidebar-collapsed .dash-shell {
     --napiq-sidebar-width: 76px;
 }
 
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-brand {
-    padding: 1.15rem 0.5rem;
+/* Rail <-> expanded: nothing is re-laid-out, so nothing jumps. Icons keep
+   a fixed x position in both states (the paddings below are tuned so the
+   icons sit centered in the 76px rail); labels stay in the DOM and are
+   simply clipped by the sidebar's overflow and faded in/out. */
+html.dash-sidebar-collapsed .dash-sidebar {
+    overflow: hidden;
 }
 
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-brand a {
-    justify-content: center;
+.dash-brand-text,
+.dash-nav-link span,
+.dash-badge-count,
+.dash-soon-badge {
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
 }
 
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-brand-text,
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-nav-link span,
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-badge-count,
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-nav-link {
-    justify-content: center;
-    gap: 0;
-    padding: 0.6rem;
+.dash-sidebar-brand {
+    padding: 1.15rem 1.2rem;
+    overflow: hidden;
+}
+
+.dash-nav {
+    overflow-x: hidden;
+}
+
+.dash-nav-link {
+    padding: 0.6rem 0.75rem 0.6rem 1rem;
 }
 
 .dash-nav-divider-push {
@@ -2221,35 +2237,49 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-nav-link {
 
 
 /* ---------------------------------------------------------------- */
-/* SIDEBAR BOTTOM ACTIONS: plain red Logout text + Profile icon       */
+/* SIDEBAR BOTTOM ACTIONS: plain red Logout + Profile                 */
 /* ---------------------------------------------------------------- */
 
 .dash-sidebar-actions {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem 0.5rem;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0 0.75rem 0.75rem;
 }
 
 .dash-logout-form {
-    flex: 1;
     margin: 0;
 }
 
-.dash-logout-btn {
-    display: inline-flex;
+.dash-logout-btn,
+.dash-profile-btn {
+    width: 100%;
+    display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 0.75rem;
+    gap: 0.7rem;
+    padding: 0.6rem 0.75rem 0.6rem 1rem;
     border: 0;
     border-radius: 0.5rem;
     background: transparent;
-    color: #ff6b6b;
-    font-size: 0.95rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
     transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dash-logout-btn i,
+.dash-profile-btn i {
+    font-size: 1.05rem;
+    width: 1.2rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.dash-logout-btn {
+    color: #ff6b6b;
+    font-weight: 600;
 }
 
 .dash-logout-btn:hover,
@@ -2259,34 +2289,24 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-nav-link {
 }
 
 .dash-profile-btn {
-    flex: 0 0 auto;
-    width: 38px;
-    height: 38px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 1.35rem;
-    text-decoration: none;
-    transition: background 0.15s ease, color 0.15s ease;
+    color: #cfe1f0;
 }
 
 .dash-profile-btn:hover,
 .dash-profile-btn.active {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.1);
     color: #fff;
 }
 
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-actions {
-    flex-direction: column;
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-logout-btn span,
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-btn span {
+    opacity: 0;
 }
 
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-logout-btn span {
-    display: none;
+.dash-logout-btn span,
+.dash-profile-btn span {
+    transition: opacity 0.15s ease;
 }
-
 
 /* Hover-expanded sidebar: overlays the page (main content keeps its
    76px margin, so nothing reflows) and shows labels. */
