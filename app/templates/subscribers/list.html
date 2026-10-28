@@ -90,7 +90,7 @@
                     subscriber.user.username if subscriber.user else "",
                     subscriber.status|replace('_', ' '),
                 ]|select|join(' ')|lower %}
-                <tr class="subs-row" data-search="{{ search_blob }}" onclick="window.location='{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}';">
+                <tr class="subs-row" data-search="{{ search_blob }}" data-detail-url="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id, partial=1) }}" style="cursor: pointer;">
                     <td>
                         <div class="subs-name">{{ subscriber.full_name }}</div>
                         <div class="subs-subtext">{{ subscriber.address or "No address on file" }}</div>
@@ -144,6 +144,95 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<div class="modal fade" id="subscriberDetailModal" tabindex="-1" aria-label="Subscriber details" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <span class="text-muted small">Subscriber details</span>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 pb-4" id="subscriberDetailBody"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Subscriber details popup: clicking a row opens a modal immediately
+    // and fills it from a background fetch (no page navigation/reload).
+    // Details are cached after the first load and prefetched when the
+    // pointer hovers a row, so most clicks open with the content already
+    // there.
+    (function () {
+        var modalEl = document.getElementById('subscriberDetailModal');
+        var bodyEl = document.getElementById('subscriberDetailBody');
+        var tbody = document.getElementById('subsTableBody');
+        if (!modalEl || !bodyEl || !tbody) return;
+
+        var cache = {};
+        var pending = {};
+        var current = null;
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+        var ERROR = '<div class="text-center text-muted py-5">Could not load subscriber details. Please try again.</div>';
+
+        function load(url) {
+            if (cache[url]) return Promise.resolve(cache[url]);
+            if (pending[url]) return pending[url];
+            pending[url] = fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.text();
+                })
+                .then(function (html) {
+                    cache[url] = html;
+                    delete pending[url];
+                    return html;
+                })
+                .catch(function (err) {
+                    delete pending[url];
+                    throw err;
+                });
+            return pending[url];
+        }
+
+        function rowUrl(target) {
+            var row = target.closest && target.closest('tr.subs-row');
+            return row ? row.getAttribute('data-detail-url') : null;
+        }
+
+        tbody.addEventListener('mouseover', function (e) {
+            var url = rowUrl(e.target);
+            if (url) load(url).catch(function () {});
+        });
+
+        tbody.addEventListener('click', function (e) {
+            if (e.target.closest('a, button')) return; // Edit button etc.
+            var url = rowUrl(e.target);
+            if (!url) return;
+            current = url;
+            if (cache[url]) {
+                bodyEl.innerHTML = cache[url];
+            } else {
+                bodyEl.innerHTML = SPINNER;
+            }
+            modal.show();
+            if (!cache[url]) {
+                load(url).then(function (html) {
+                    if (current === url) bodyEl.innerHTML = html;
+                }).catch(function () {
+                    if (current === url) bodyEl.innerHTML = ERROR;
+                });
+            }
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            current = null;
+            bodyEl.innerHTML = '';
+        });
+    })();
+</script>
+
 <script>
     // Instant client-side filtering as the admin types — filters the
     // rows already on the page (name, address, code, connected NAP,

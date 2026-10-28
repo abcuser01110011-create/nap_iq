@@ -392,6 +392,13 @@ def view_subscriber(subscriber_id):
             if sub.id == subscriber.id:
                 port_number = port
                 break
+    # The Subscribers list opens this same detail view in a popup
+    # (fetched in the background, no page reload) -- it asks for just
+    # the card contents via ?partial=1.
+    if request.args.get("partial"):
+        return render_template(
+            "subscribers/_detail_body.html", subscriber=subscriber, port_number=port_number
+        )
     return render_template("subscribers/view.html", subscriber=subscriber, port_number=port_number)
 
 

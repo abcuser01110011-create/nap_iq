@@ -1,0 +1,115 @@
+{% set sub_status_classes = {
+    'active': 'text-bg-success',
+    'inactive': 'text-bg-secondary',
+    'disconnected': 'text-bg-danger',
+    'pending_review': 'text-bg-warning'
+} %}
+
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <div class="text-muted small">{{ subscriber.subscriber_code }}</div>
+        <h3 class="mb-0">{{ subscriber.full_name }}</h3>
+    </div>
+    <span class="badge fs-6 {{ sub_status_classes.get(subscriber.status, 'text-bg-secondary') }}">
+        {{ subscriber.status|replace('_', ' ')|capitalize }}
+    </span>
+</div>
+
+<h6 class="text-muted mb-3">Service Account</h6>
+<dl class="row mb-0">
+    <dt class="col-sm-4 text-muted fw-normal">Plan</dt>
+    <dd class="col-sm-8">{{ subscriber.plan_type or "—" }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Installed</dt>
+    <dd class="col-sm-8">{{ subscriber.installed_at.strftime('%B %d, %Y') if subscriber.installed_at else "—" }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Contact</dt>
+    <dd class="col-sm-8">{{ subscriber.contact_number or "—" }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Email</dt>
+    <dd class="col-sm-8">{{ subscriber.email or "—" }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
+    <dd class="col-sm-8">{{ subscriber.address or "—" }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Linked Login</dt>
+    <dd class="col-sm-8 d-flex align-items-center justify-content-between gap-2">
+        <span>
+            {% if subscriber.user %}
+                {{ subscriber.user.username }}
+            {% else %}
+                Not linked
+            {% endif %}
+        </span>
+        {% if subscriber.user %}
+        <form method="post" action="{{ url_for('users.delete_user', user_id=subscriber.user.id) }}"
+              onsubmit="return confirm('Permanently delete the login account \'' + {{ subscriber.user.username|tojson }} + '\'? This cannot be undone — the account will be gone for good and will never be able to log in again.');"
+              style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm" title="Permanently delete linked login account">
+                <i class="bi bi-trash"></i>
+            </button>
+        </form>
+        {% endif %}
+    </dd>
+</dl>
+
+<hr class="my-4">
+
+<h6 class="text-muted mb-3">Connected NAP</h6>
+{% if subscriber.nap %}
+<dl class="row mb-0">
+    <dt class="col-sm-4 text-muted fw-normal">NAP Code</dt>
+    <dd class="col-sm-8">{{ subscriber.nap.nap_code }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Name</dt>
+    <dd class="col-sm-8">{{ subscriber.nap.name }}</dd>
+
+    <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
+    <dd class="col-sm-8">{{ port_number if port_number is not none else "—" }}</dd>
+</dl>
+{% else %}
+<p class="text-muted mb-0">Not currently connected to a NAP.</p>
+{% endif %}
+
+<hr class="my-4">
+
+<h6 class="text-muted mb-3">Technical Issues ({{ subscriber.technical_issues|length }})</h6>
+<div class="table-responsive mb-4">
+    <table class="table table-sm align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Issue</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Reported</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for issue in subscriber.technical_issues %}
+            <tr>
+                <td>{{ issue.issue_code or ('#' ~ issue.id) }}</td>
+                <td>{{ issue.issue_type }}</td>
+                <td>{{ issue.status|replace('_',' ')|capitalize }}</td>
+                <td>{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="text-center text-muted">No technical issues reported.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="d-flex justify-content-end gap-2">
+    {% if subscriber.latitude is not none and subscriber.longitude is not none %}
+    <a href="{{ url_for('naps.geomap', navigate_type='subscriber', navigate_id=subscriber.id) }}" class="btn btn-outline-success">
+        <i class="bi bi-signpost-split me-1"></i>Navigate
+    </a>
+    {% endif %}
+    <a href="{{ url_for('subscribers.edit_subscriber', subscriber_id=subscriber.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil me-1"></i>Edit
+    </a>
+</div>
