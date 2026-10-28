@@ -2371,7 +2371,6 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-btn span {
     background: var(--lp-blue, #0D3B85);
     color: var(--lp-gold, #F4B41A);
     border-radius: 0.55rem;
-    box-shadow: inset 0 -3px 0 var(--lp-gold, #F4B41A);
     cursor: default;
 }
 
