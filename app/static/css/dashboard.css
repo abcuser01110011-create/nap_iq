@@ -2221,14 +2221,15 @@ html.dash-sidebar-collapsed .dash-shell {
 
 
 /* ---------------------------------------------------------------- */
-/* SIDEBAR BOTTOM ACTIONS: red Logout + Profile icon                  */
+/* SIDEBAR BOTTOM ACTIONS: plain red Logout text + Profile icon       */
 /* ---------------------------------------------------------------- */
 
 .dash-sidebar-actions {
     display: flex;
-    align-items: stretch;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.5rem;
-    padding: 0 0.25rem 0.25rem;
+    padding: 0.25rem 0.5rem 0.5rem;
 }
 
 .dash-logout-form {
@@ -2237,56 +2238,51 @@ html.dash-sidebar-collapsed .dash-shell {
 }
 
 .dash-logout-btn {
-    width: 100%;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.6rem 0.75rem;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
     border: 0;
     border-radius: 0.5rem;
-    background: #dc2626;
-    color: #fff;
+    background: transparent;
+    color: #ff6b6b;
+    font-size: 0.95rem;
     font-weight: 600;
-    transition: background 0.15s ease;
+    letter-spacing: 0.01em;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
 .dash-logout-btn:hover,
 .dash-logout-btn:focus-visible {
-    background: #b91c1c;
-    color: #fff;
+    background: rgba(255, 107, 107, 0.12);
+    color: #ff8787;
 }
 
 .dash-profile-btn {
     flex: 0 0 auto;
-    width: 42px;
+    width: 38px;
+    height: 38px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0.5rem;
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-    font-size: 1.25rem;
+    border-radius: 50%;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1.35rem;
     text-decoration: none;
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
 .dash-profile-btn:hover,
 .dash-profile-btn.active {
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.12);
     color: #fff;
 }
 
-/* Narrow icon rail: stack the two buttons vertically. */
 html.dash-sidebar-collapsed .dash-sidebar-actions {
     flex-direction: column;
 }
 
 html.dash-sidebar-collapsed .dash-logout-btn span {
     display: none;
-}
-
-html.dash-sidebar-collapsed .dash-profile-btn {
-    width: auto;
-    padding: 0.5rem 0;
 }
