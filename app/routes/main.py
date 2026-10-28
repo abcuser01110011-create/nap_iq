@@ -26,6 +26,30 @@ from sqlalchemy import text
 main_bp = Blueprint("main", __name__)
 
 
+_PLAN_SPEED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(mbps|gbps|mb|gb)\b", re.IGNORECASE)
+
+
+def _plan_cards(plans):
+    """Shapes the admin-managed `Plan` rows (Settings > Plans) for the
+    public landing page's plan list. The table only stores a name and a
+    monthly fee, so the big speed figure is read out of the name when it
+    contains one (e.g. "Fiber 50Mbps" -> 50 Mbps); plans without a speed
+    in their name simply show the name and price."""
+    cards = []
+    for p in plans:
+        m = _PLAN_SPEED_RE.search(p.name or "")
+        speed = unit = None
+        if m:
+            speed = m.group(1)
+            unit = "Gbps" if m.group(2).lower().startswith("g") else "Mbps"
+        price = None
+        if p.monthly_fee is not None:
+            fee = float(p.monthly_fee)
+            price = f"{fee:,.0f}" if fee == int(fee) else f"{fee:,.2f}"
+        cards.append({"name": p.name, "speed": speed, "unit": unit, "price": price})
+    return cards
+
+
 @main_bp.route("/")
 def index():
     """Redirects to the right place depending on whether anyone is
@@ -37,7 +61,7 @@ def index():
     # Guests get the public landing page (online application + account
     # login). Staff sign in at /login.
     plans = Plan.query.order_by(Plan.monthly_fee.is_(None), Plan.monthly_fee, Plan.name).all()
-    resp = make_response(render_template("pages/landing.html", plans=plans))
+    resp = make_response(render_template("pages/landing.html", plans=plans, plan_cards=_plan_cards(plans)))
     # The page embeds a per-session CSRF token; a cached copy (common on
     # phones / mobile data) would carry a token that no longer matches.
     resp.headers["Cache-Control"] = "no-store, max-age=0"

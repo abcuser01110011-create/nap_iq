@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>PG Networks &middot; Fiber Internet &mdash; Apply Online</title>
-    <meta name="description" content="PG Networks Unli Fibr plans from 15 to 60 Mbps with Whole Home WiFi and free install &amp; activation. Apply online or call 0917 654 8563.">
+    <meta name="description" content="PG Networks Unli Fibr plans with Whole Home WiFi and free install &amp; activation. Apply online or call 0917 654 8563.">
 
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='img/favicon-192.png') }}">
@@ -49,7 +49,7 @@
 </header>
 
 <main>
-    <section class="lp-hero" aria-label="PG Networks fast and reliable internet: 15, 25 and 60 Mbps plans">
+    <section class="lp-hero" aria-label="PG Networks fast and reliable internet">
         <div class="lp-wrap lp-hero__grid">
             <div class="lp-hero__copy">
                 <span class="lp-ribbon">Subscribe to Unlimited Fibr &amp; get these</span>
@@ -78,25 +78,30 @@
             <h2 class="lp-h2">Unli Fibr plans</h2>
             <p class="lp-sub">Whole Home WiFi on every plan. Our team confirms coverage for your address.</p>
             <div class="lp-offers">
+                {# Plans come straight from the admin's Settings > Plans list,
+                   so adding/removing one there updates this page at once. #}
+                {% for card in plan_cards %}
                 <article class="lp-offer">
-                    <div class="lp-offer__speed">15<small>Mbps</small></div>
-                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan Promo 999</strong></div>
-                    <div class="lp-offer__price"><small>&#8369;</small>999</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="Unli Fibr Plan Promo 999">Apply</a>
+                    {% if card.speed %}
+                    <div class="lp-offer__speed">{{ card.speed }}<small>{{ card.unit }}</small></div>
+                    {% else %}
+                    <div class="lp-offer__speed"><i class="bi bi-wifi" aria-hidden="true"></i></div>
+                    {% endif %}
+                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>{{ card.name }}</strong></div>
+                    {% if card.price %}
+                    <div class="lp-offer__price"><small>&#8369;</small>{{ card.price }}</div>
+                    {% else %}
+                    <div class="lp-offer__price lp-offer__price--ask">Call for price</div>
+                    {% endif %}
+                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="{{ card.name }}">Apply</a>
                 </article>
-                <article class="lp-offer lp-offer--hot">
-                    <span class="lp-offer__tag">Promo</span>
-                    <div class="lp-offer__speed">25<small>Mbps</small></div>
-                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 1500</strong></div>
-                    <div class="lp-offer__price"><small>&#8369;</small>1,500</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="Unli Fibr Plan 1500">Apply</a>
-                </article>
-                <article class="lp-offer">
-                    <div class="lp-offer__speed">60<small>Mbps</small></div>
-                    <div class="lp-offer__plan"><span>Whole Home Wifi</span><strong>Unli Fibr Plan 2500</strong></div>
-                    <div class="lp-offer__price"><small>&#8369;</small>2,500</div>
-                    <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn--gold" data-open-modal="apply" data-plan="Unli Fibr Plan 2500">Apply</a>
-                </article>
+                {% else %}
+                <div class="lp-offers-empty">
+                    <i class="bi bi-wifi-off" aria-hidden="true"></i>
+                    <strong>No plans available yet</strong>
+                    <span>We&rsquo;re updating our Unli Fibr plans. Please check back soon, or call or text us at 0917 654 8563.</span>
+                </div>
+                {% endfor %}
             </div>
 
             <ul class="lp-perks">

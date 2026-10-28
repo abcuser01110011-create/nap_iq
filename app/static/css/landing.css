@@ -149,3 +149,10 @@ body.lp { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, "Helveti
 /* Bottom tagline strip */
 .lp-tagline { background: var(--lp-blue); color: #fff; text-align: center; font-style: italic; font-weight: 600; font-size: .9rem; padding: .7rem 1rem; }
 .lp-brand { white-space: nowrap; }
+
+/* Empty state shown when the admin hasn't added any plans yet */
+.lp-offers-empty { display: grid; justify-items: center; gap: .4rem; text-align: center; background: #0E1B33; border: 1px dashed rgba(255,255,255,.28); border-radius: var(--lp-radius); padding: 2rem 1.2rem; color: #CBD5E1; }
+.lp-offers-empty i { font-size: 2rem; color: var(--lp-gold); }
+.lp-offers-empty strong { font-size: 1.15rem; color: #fff; }
+.lp-offer__speed i { font-size: 2.4rem; color: var(--lp-gold); }
+.lp-offer__price--ask { font-size: 1.1rem; }
