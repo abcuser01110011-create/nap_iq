@@ -140,10 +140,9 @@
             </tbody>
         </table>
     </div>
-    <div class="subs-pager d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-3 border-top" id="subsPager" hidden>
-        <span class="text-muted small" id="subsPagerInfo"></span>
+    <div class="subs-pager" id="subsPager" hidden>
         <nav aria-label="Subscribers pages">
-            <ul class="pagination pagination-sm mb-0" id="subsPagerList"></ul>
+            <ul class="subs-pager-list" id="subsPagerList"></ul>
         </nav>
     </div>
 </div>
@@ -256,7 +255,6 @@
         var noMatchQuery = document.getElementById('subsNoMatchQuery');
         var recordCount = document.getElementById('subsRecordCount');
         var pager = document.getElementById('subsPager');
-        var pagerInfo = document.getElementById('subsPagerInfo');
         var pagerList = document.getElementById('subsPagerList');
 
         var PAGE_SIZE = 10;
@@ -266,12 +264,14 @@
         function pageItem(label, target, opts) {
             opts = opts || {};
             var li = document.createElement('li');
-            li.className = 'page-item' + (opts.active ? ' active' : '') + (opts.disabled ? ' disabled' : '');
+            li.className = 'subs-pager-item' + (opts.active ? ' is-active' : '') + (opts.disabled ? ' is-disabled' : '') + (opts.gap ? ' is-gap' : '');
             var a = document.createElement('a');
-            a.className = 'page-link';
+            a.className = 'subs-pager-link';
             a.href = '#';
             a.innerHTML = label;
             if (opts.aria) a.setAttribute('aria-label', opts.aria);
+            if (opts.active) a.setAttribute('aria-current', 'page');
+            if (opts.disabled) { a.setAttribute('aria-disabled', 'true'); a.tabIndex = -1; }
             a.addEventListener('click', function (e) {
                 e.preventDefault();
                 if (opts.disabled || opts.active) return;
@@ -300,9 +300,8 @@
             pager.hidden = total <= PAGE_SIZE;
             if (total <= PAGE_SIZE) return;
 
-            pagerInfo.textContent = 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total;
             pagerList.innerHTML = '';
-            pagerList.appendChild(pageItem('&laquo;', page - 1, { disabled: page === 1, aria: 'Previous page' }));
+            pagerList.appendChild(pageItem('prev', page - 1, { disabled: page === 1, aria: 'Previous page' }));
 
             // Compact window: first, last, current +/- 1, with ellipses.
             var shown = {};
@@ -311,12 +310,12 @@
             });
             var last = 0;
             Object.keys(shown).map(Number).sort(function (x, y) { return x - y; }).forEach(function (n) {
-                if (n - last > 1) pagerList.appendChild(pageItem('&hellip;', n, { disabled: true }));
+                if (n - last > 1) pagerList.appendChild(pageItem('&hellip;', n, { disabled: true, gap: true }));
                 pagerList.appendChild(pageItem(String(n), n, { active: n === page }));
                 last = n;
             });
 
-            pagerList.appendChild(pageItem('&raquo;', page + 1, { disabled: page === pages, aria: 'Next page' }));
+            pagerList.appendChild(pageItem('next', page + 1, { disabled: page === pages, aria: 'Next page' }));
         }
 
         function applyFilter() {

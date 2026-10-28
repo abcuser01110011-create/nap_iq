@@ -2316,3 +2316,102 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-btn span {
         box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
     }
 }
+
+
+/* ---------------------------------------------------------------- */
+/* SUBSCRIBERS PAGER: centered pill, "prev 1 2 3 ... next"            */
+/* Blue + gold palette (falls back to the same hex values).           */
+/* ---------------------------------------------------------------- */
+
+.subs-pager {
+    display: flex;
+    justify-content: center;
+    padding: 1.1rem 1rem 1.25rem;
+    border-top: 1px solid var(--napiq-border);
+}
+
+.subs-pager[hidden] {
+    display: none;
+}
+
+.subs-pager-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.3rem;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    background: #eef3fb;
+    border-radius: 999px;
+}
+
+.subs-pager-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.2rem;
+    height: 2.2rem;
+    padding: 0 0.8rem;
+    border-radius: 999px;
+    color: var(--lp-blue, #0D3B85);
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.subs-pager-link:hover {
+    background: #dbe6f7;
+    color: var(--lp-blue-dark, #082A63);
+}
+
+.subs-pager-item.is-active .subs-pager-link {
+    background: var(--lp-blue, #0D3B85);
+    color: var(--lp-gold, #F4B41A);
+    border-radius: 0.55rem;
+    box-shadow: inset 0 -3px 0 var(--lp-gold, #F4B41A);
+    cursor: default;
+}
+
+.subs-pager-item.is-disabled .subs-pager-link {
+    color: #94a3b8;
+    cursor: default;
+    pointer-events: none;
+}
+
+.subs-pager-item.is-gap .subs-pager-link {
+    min-width: 1.4rem;
+    padding: 0;
+}
+
+.subs-pager-link:focus-visible {
+    outline: 2px solid var(--lp-gold, #F4B41A);
+    outline-offset: 1px;
+}
+
+[data-bs-theme="dark"] .subs-pager-list {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+[data-bs-theme="dark"] .subs-pager-link {
+    color: #cfe1f0;
+}
+
+[data-bs-theme="dark"] .subs-pager-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+[data-bs-theme="dark"] .subs-pager-item.is-active .subs-pager-link {
+    background: #1d4f9e;
+    color: #F4B41A;
+}
+
+@media (max-width: 575.98px) {
+    .subs-pager-link {
+        min-width: 2rem;
+        height: 2rem;
+        padding: 0 0.55rem;
+    }
+}
