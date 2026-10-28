@@ -6,6 +6,16 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Dashboard{% endblock %}</title>
 
+    <script>
+        // Sidebar is an icon-only rail on desktop; hovering expands it
+        // (see script at the bottom). Set pre-paint to avoid a flash.
+        (function () {
+            if (window.innerWidth >= 992) {
+                document.documentElement.classList.add('dash-sidebar-collapsed');
+            }
+        })();
+    </script>
+
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48.png') }}">
@@ -435,16 +445,36 @@
         });
     })();
 
+    // Icon-only sidebar rail (desktop). Hover expands it to show labels;
+    // it returns to icons only after the pointer has been away for 60s.
     (function () {
-        // Icon-only nav links lose their visible label, so fall back to
-        // the browser's native title tooltip using that same text
-        // rather than leaving unlabeled icons once collapsed.
-        document.querySelectorAll('.dash-nav-link').forEach(function (link) {
-            if (link.hasAttribute('title')) return;
-            const span = link.querySelector('span');
-            if (span && span.textContent.trim()) {
-                link.setAttribute('title', span.textContent.trim());
-            }
+        const sidebar = document.getElementById('dashSidebar');
+        if (!sidebar) return;
+        const root = document.documentElement;
+        const COLLAPSE_DELAY_MS = 60000;
+        let timer = null;
+
+        function isDesktop() { return window.innerWidth >= 992; }
+
+        function open() {
+            clearTimeout(timer);
+            if (isDesktop()) root.classList.add('dash-sidebar-open');
+        }
+
+        function scheduleClose() {
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                root.classList.remove('dash-sidebar-open');
+            }, COLLAPSE_DELAY_MS);
+        }
+
+        sidebar.addEventListener('mouseenter', open);
+        sidebar.addEventListener('mouseleave', scheduleClose);
+        sidebar.addEventListener('focusin', open);
+
+        window.addEventListener('resize', function () {
+            root.classList.toggle('dash-sidebar-collapsed', isDesktop());
+            if (!isDesktop()) root.classList.remove('dash-sidebar-open');
         });
     })();
 

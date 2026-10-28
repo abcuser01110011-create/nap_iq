@@ -223,22 +223,22 @@ html.dash-sidebar-collapsed .dash-shell {
     --napiq-sidebar-width: 76px;
 }
 
-.dash-sidebar-collapsed .dash-sidebar-brand {
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-brand {
     padding: 1.15rem 0.5rem;
 }
 
-.dash-sidebar-collapsed .dash-sidebar-brand a {
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-brand a {
     justify-content: center;
 }
 
-.dash-sidebar-collapsed .dash-brand-text,
-.dash-sidebar-collapsed .dash-nav-link span,
-.dash-sidebar-collapsed .dash-badge-count,
-.dash-sidebar-collapsed .dash-soon-badge {
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-brand-text,
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-nav-link span,
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-badge-count,
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
     display: none;
 }
 
-.dash-sidebar-collapsed .dash-nav-link {
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-nav-link {
     justify-content: center;
     gap: 0;
     padding: 0.6rem;
@@ -2279,10 +2279,20 @@ html.dash-sidebar-collapsed .dash-shell {
     color: #fff;
 }
 
-html.dash-sidebar-collapsed .dash-sidebar-actions {
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-actions {
     flex-direction: column;
 }
 
-html.dash-sidebar-collapsed .dash-logout-btn span {
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-logout-btn span {
     display: none;
+}
+
+
+/* Hover-expanded sidebar: overlays the page (main content keeps its
+   76px margin, so nothing reflows) and shows labels. */
+@media (min-width: 992px) {
+    html.dash-sidebar-open .dash-sidebar {
+        width: 260px;
+        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+    }
 }
