@@ -2218,3 +2218,75 @@ html.dash-sidebar-collapsed .dash-shell {
     border-radius: 10px;
     border: 1px solid var(--napiq-border);
 }
+
+
+/* ---------------------------------------------------------------- */
+/* SIDEBAR BOTTOM ACTIONS: red Logout + Profile icon                  */
+/* ---------------------------------------------------------------- */
+
+.dash-sidebar-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0 0.25rem 0.25rem;
+}
+
+.dash-logout-form {
+    flex: 1;
+    margin: 0;
+}
+
+.dash-logout-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: #dc2626;
+    color: #fff;
+    font-weight: 600;
+    transition: background 0.15s ease;
+}
+
+.dash-logout-btn:hover,
+.dash-logout-btn:focus-visible {
+    background: #b91c1c;
+    color: #fff;
+}
+
+.dash-profile-btn {
+    flex: 0 0 auto;
+    width: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1.25rem;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+
+.dash-profile-btn:hover,
+.dash-profile-btn.active {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+/* Narrow icon rail: stack the two buttons vertically. */
+html.dash-sidebar-collapsed .dash-sidebar-actions {
+    flex-direction: column;
+}
+
+html.dash-sidebar-collapsed .dash-logout-btn span {
+    display: none;
+}
+
+html.dash-sidebar-collapsed .dash-profile-btn {
+    width: auto;
+    padding: 0.5rem 0;
+}

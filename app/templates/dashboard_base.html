@@ -6,31 +6,6 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Dashboard{% endblock %}</title>
 
-    {# Sidebar-collapsed state, applied synchronously before first paint.
-       Without this, the collapsed/icon-only state -- read from
-       localStorage and applied by the <script> block at the bottom of
-       this page -- doesn't take effect until every script on the page
-       has finished loading, so navigating to a new page always flashed
-       the full-width sidebar first and only snapped to icon-only a
-       moment later. Setting the class here, in a tiny blocking inline
-       script that runs while the parser is still in <head>, means the
-       very first frame the browser paints already reflects it -- same
-       fix pattern already used for initial map view in napmap.js. Kept
-       in sync by hand with the STORAGE_KEY / class name the toggle
-       script below uses. #}
-    <script>
-        (function () {
-            try {
-                if (window.innerWidth >= 992 && window.localStorage.getItem('napiq-sidebar-collapsed') === '1') {
-                    document.documentElement.classList.add('dash-sidebar-collapsed');
-                }
-            } catch (e) {
-                // localStorage unavailable (privacy mode, etc.) -- fall back
-                // to the default expanded sidebar, same as before this fix.
-            }
-        })();
-    </script>
-
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48.png') }}">
@@ -246,37 +221,27 @@
                     </a>
                 </li>
                 {% endif %}
-                <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('profile.') else '' }}"
-                       href="{{ url_for('profile.index') }}">
-                        <i class="bi bi-person-circle"></i><span>Profile</span>
-                    </a>
-                </li>
-                <li>
-                    <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout" id="logoutForm">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="button" class="dash-nav-link w-100 text-start border-0 bg-transparent"
-                                data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
-                            <i class="bi bi-box-arrow-right"></i><span>Logout</span>
-                        </button>
-                    </form>
-                </li>
             </ul>
 
             <div class="dash-nav-divider dash-nav-divider-push"></div>
 
-            {# Collapse/expand the whole sidebar down to just the icon
-               rail -- desktop-only (hidden below the same breakpoint the
-               mobile slide-out toggle takes over at, see dashboard.css).
-               State persists across pages via localStorage; see the
-               script at the bottom of this file for the toggle logic. #}
-            <ul class="dash-nav-list dash-sidebar-collapse-list">
-                <li>
-                    <button type="button" class="dash-nav-link w-100 text-start border-0 bg-transparent" id="dashSidebarCollapseToggle">
-                        <i class="bi bi-chevron-double-left"></i><span>Collapse</span>
+            {# Bottom action row: red Logout button (opens the confirm modal)
+               with the Profile icon beside it. Replaces the old
+               Collapse button. #}
+            <div class="dash-sidebar-actions">
+                <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout" id="logoutForm" class="dash-logout-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="button" class="dash-logout-btn" title="Logout"
+                            data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
+                        <i class="bi bi-box-arrow-right"></i><span>Logout</span>
                     </button>
-                </li>
-            </ul>
+                </form>
+                <a href="{{ url_for('profile.index') }}"
+                   class="dash-profile-btn {{ 'active' if request.endpoint and request.endpoint.startswith('profile.') else '' }}"
+                   title="Profile" aria-label="Profile">
+                    <i class="bi bi-person-circle"></i>
+                </a>
+            </div>
         </nav>
     </aside>
 
@@ -405,13 +370,13 @@
                     <i class="bi bi-bell"></i>
                 </button>
                 {% endif %}
-                <div class="dash-user">
+                <a class="dash-user text-decoration-none" href="{{ url_for('profile.index') }}" title="Profile">
                     <span class="dash-user-avatar"><i class="bi bi-person-fill"></i></span>
                     <span class="dash-user-info d-none d-lg-flex">
                         <span class="dash-user-name">{{ current_user.full_name if current_user else 'Guest' }}</span>
                         <span class="dash-user-role">{{ current_user.role|replace('_', ' ')|title if current_user else '' }}</span>
                     </span>
-                </div>
+                </a>
             </div>
         </header>
 
@@ -470,61 +435,7 @@
         });
     })();
 
-    // Sidebar collapse-to-icons (desktop only -- the mobile slide-out
-    // toggle above handles narrow widths). Persisted per-browser via
-    // localStorage so it survives navigating to a different page. The
-    // class itself now lives on <html>, not .dash-shell, so the inline
-    // <head> script above can apply it before .dash-shell even exists
-    // in the DOM yet (see that script's comment) -- this block just
-    // keeps the toggle button's icon/label in sync with it afterward.
     (function () {
-        const collapseToggle = document.getElementById('dashSidebarCollapseToggle');
-        if (!collapseToggle) return;
-
-        const STORAGE_KEY = 'napiq-sidebar-collapsed';
-        const icon = collapseToggle.querySelector('i');
-        const label = collapseToggle.querySelector('span');
-
-        function applyCollapsed(collapsed) {
-            document.documentElement.classList.toggle('dash-sidebar-collapsed', collapsed);
-            if (icon) icon.className = collapsed ? 'bi bi-chevron-double-right' : 'bi bi-chevron-double-left';
-            if (label) label.textContent = collapsed ? 'Expand' : 'Collapse';
-            collapseToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-        }
-
-        // Only restore the collapsed state on desktop widths -- on a
-        // narrow screen the sidebar is already off-canvas by default
-        // (see dashboard.css's mobile breakpoint), so forcing icon-only
-        // mode there too would just be confusing once it slides open.
-        // (Re-applies what the <head> script above already set pre-paint
-        // -- this is what keeps it correct on resize/no-JS-cache edge
-        // cases, and is what actually updates the icon/label text.)
-        applyCollapsed(window.localStorage.getItem(STORAGE_KEY) === '1' && window.innerWidth >= 992);
-
-        collapseToggle.addEventListener('click', function () {
-            const collapsed = !document.documentElement.classList.contains('dash-sidebar-collapsed');
-            applyCollapsed(collapsed);
-            window.localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
-
-            // GeoMap (naps/map.html): Leaflet measures #napMap's size
-            // once, when the map is created, and never re-measures on
-            // its own. Collapsing/expanding the sidebar changes that
-            // container's width (via the CSS transition on .dash-main/
-            // .dash-sidebar below), so without this the map kept its
-            // old, narrower canvas and left a blank strip down the
-            // right-hand side until the next manual browser resize.
-            // window.NapIQMap is only set on the GeoMap page (see
-            // napmap.js) and undefined everywhere else, so this is a
-            // harmless no-op on every other page. The 220ms delay lets
-            // the 0.2s sidebar transition finish first so Leaflet
-            // measures the *final* width, not a mid-transition one.
-            if (window.NapIQMap) {
-                setTimeout(function () {
-                    window.NapIQMap.invalidateSize();
-                }, 220);
-            }
-        });
-
         // Icon-only nav links lose their visible label, so fall back to
         // the browser's native title tooltip using that same text
         // rather than leaving unlabeled icons once collapsed.
