@@ -673,6 +673,7 @@
    file itself (same "let Jinja resolve the static path" reasoning as every
    <script src="{{ url_for('static', ...) }}"> tag on this page). #}
 <script>window.NAP_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
+<script src="{{ url_for('static', filename='js/cable-path-geometry.js') }}?v={{ asset_version('js/cable-path-geometry.js') }}"></script>
 <script src="{{ url_for('static', filename='js/napmap.js') }}?v={{ asset_version('js/napmap.js') }}"></script>
 {# "+ Tickets" quick-create dropdown/modal -- self-contained, loads
    after napmap.js only so it can piggyback on the Add NAP button's

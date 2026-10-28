@@ -105,6 +105,7 @@ from app.routes.service_requests import _sync_subscriber_nap
 from app.routes.api_v1.technician import (
     _assignment_nap, _nap_occupied_ports, _validate_port_number, _subscriber_installed_port_number,
     MAX_CABLE_PATH_POINTS,
+    promote_cable_path_to_subscriber,
 )
 
 # Mirrors app/routes/api_v1/technician.py's ALLOWED_PHOTO_EXTENSIONS exactly
@@ -500,6 +501,7 @@ def record_cable_path(assignment_id):
         cleaned_points.append({"latitude": lat, "longitude": lng})
 
     assignment.cable_path_points = json.dumps(cleaned_points)
+    promote_cable_path_to_subscriber(assignment)
     db.session.commit()
 
     return {"point_count": len(cleaned_points)}, 200

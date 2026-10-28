@@ -958,6 +958,32 @@ def pin_assignment_location(assignment_id):
 MAX_CABLE_PATH_POINTS = 5000
 
 
+def promote_cable_path_to_subscriber(assignment):
+    """If this installation's subscriber already exists and is linked to
+    a NAP, copy the freshly-recorded trail straight into their CablePath
+    row so the admin GeoMap shows the walked route right away, instead of
+    a straight dashed line until complete_assignment() eventually runs.
+
+    A brand-new walk-in subscriber doesn't exist yet at this stage; that
+    case is still covered by complete_assignment()'s promotion block.
+    Safe to call repeatedly (a Retake just overwrites the same row).
+    Does not commit -- the caller already does.
+    """
+    service_request = assignment.service_request
+    if service_request is None or not service_request.subscriber_id or not assignment.cable_path_points:
+        return
+    subscriber = db.session.get(Subscriber, service_request.subscriber_id)
+    if subscriber is None or subscriber.nap_id is None:
+        return
+    path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
+    if path is None:
+        path = CablePath(subscriber_id=subscriber.id)
+        db.session.add(path)
+    path.nap_id = subscriber.nap_id
+    path.source_assignment_id = assignment.id
+    path.points = assignment.cable_path_points
+
+
 @api_v1_technician_bp.route("/assignments/<int:assignment_id>/cable-path", methods=["POST"])
 @jwt_role_required("technician")
 def record_cable_path(assignment_id):
@@ -1021,6 +1047,7 @@ def record_cable_path(assignment_id):
         cleaned_points.append({"latitude": lat, "longitude": lng})
 
     assignment.cable_path_points = json.dumps(cleaned_points)
+    promote_cable_path_to_subscriber(assignment)
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200

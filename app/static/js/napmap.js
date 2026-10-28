@@ -158,6 +158,13 @@
     // noticeably jittery on real devices.
     const CABLE_PATH_SIMPLIFY_TOLERANCE_METERS = 0.75;
 
+    // Display tuning used by buildRecordedLatLngs() (needs
+    // cable-path-geometry.js). 1.25 m removes GPS jitter/loops; the
+    // Chaikin passes then round the surviving corners. Raise the
+    // tolerance for a calmer line, lower it for a more literal one.
+    const CABLE_PATH_DISPLAY_TOLERANCE_METERS = 1.25;
+    const CABLE_PATH_SMOOTH_ITERATIONS = 3;
+
     // Color used for a subscriber↔NAP connection line when that
     // subscriber has no currently-open reported issue -- reads as
     // "healthy" at a glance, same green as an Active NAP.
@@ -1459,11 +1466,8 @@
                         ? issueSubscriber.cable_path
                         : null;
                 const latlngs = recordedPath
-                    ? snapCablePathEndpoints(
-                          simplifyCablePath(
-                              recordedPath.map((p) => [p.latitude, p.longitude]),
-                              CABLE_PATH_SIMPLIFY_TOLERANCE_METERS
-                          ),
+                    ? buildRecordedLatLngs(
+                          recordedPath,
                           L.latLng(issue.latitude, issue.longitude),
                           L.latLng(nap.latitude, nap.longitude)
                       )
@@ -2050,6 +2054,34 @@
         return latlngs;
     }
 
+    /**
+     * Turns a stored technician GPS trail into the [lat, lng] list the
+     * GeoMap actually draws: light de-jitter -> snap the two ends onto
+     * the NAP / subscriber markers -> round the corners (Chaikin) so the
+     * line reads as the natural curved route that was walked instead of
+     * an angular zig-zag. Smoothing runs AFTER the snap so the exact
+     * endpoints are kept (smooth() never moves the first/last point).
+     * Falls back to the old RDP-only behaviour if cable-path-geometry.js
+     * didn't load.
+     */
+    function buildRecordedLatLngs(recordedPath, subscriberLatLng, napLatLng) {
+        const raw = recordedPath.map((p) => [p.latitude, p.longitude]);
+        const geo = window.CablePathGeometry;
+        if (!geo) {
+            return snapCablePathEndpoints(
+                simplifyCablePath(raw, CABLE_PATH_SIMPLIFY_TOLERANCE_METERS),
+                subscriberLatLng,
+                napLatLng
+            );
+        }
+        const snapped = snapCablePathEndpoints(
+            geo.simplify(raw, CABLE_PATH_DISPLAY_TOLERANCE_METERS),
+            subscriberLatLng,
+            napLatLng
+        );
+        return geo.smooth(snapped, CABLE_PATH_SMOOTH_ITERATIONS);
+    }
+
     /** Small helper for snapCablePathEndpoints()'s no-breadcrumb-in-range
      * fallback: returns 0 or latlngs.length-1, whichever literal end of
      * the trail sits closer to `anchor`. */
@@ -2149,11 +2181,8 @@
                     ? subscriber.cable_path
                     : null;
                 const latlngs = recordedPath
-                    ? snapCablePathEndpoints(
-                          simplifyCablePath(
-                              recordedPath.map((p) => [p.latitude, p.longitude]),
-                              CABLE_PATH_SIMPLIFY_TOLERANCE_METERS
-                          ),
+                    ? buildRecordedLatLngs(
+                          recordedPath,
                           L.latLng(subscriber.latitude, subscriber.longitude),
                           L.latLng(nap.latitude, nap.longitude)
                       )
@@ -2165,6 +2194,9 @@
                     color: getSubscriberConnectionColor(subscriber.id),
                     weight: recordedPath ? 3 : 2.5,
                     opacity: 0.85,
+                    smoothFactor: recordedPath ? 0.3 : 1.0,
+                    lineJoin: "round",
+                    lineCap: "round",
                     dashArray: recordedPath ? null : "4,4",
                     // Only the recorded-path line needs to be
                     // hoverable -- the straight-line guess has nothing

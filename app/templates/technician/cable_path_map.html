@@ -161,6 +161,7 @@
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cable-path-geometry.js') }}?v={{ asset_version('js/cable-path-geometry.js') }}"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var mapEl = document.getElementById("cablePathMap");
@@ -282,9 +283,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     var recordedLine = null;
     if (existingPoints.length >= 2) {
-        var existingLatLngs = simplifyCablePath(existingPoints.map(function (p) {
+        var existingLatLngs = (window.CablePathGeometry
+            ? window.CablePathGeometry.simplify
+            : simplifyCablePath)(existingPoints.map(function (p) {
             return [p.latitude, p.longitude];
-        }), CABLE_PATH_SIMPLIFY_TOLERANCE_METERS);
+        }), window.CablePathGeometry ? 1.25 : CABLE_PATH_SIMPLIFY_TOLERANCE_METERS);
         // Raw GPS fixes almost never land exactly on the NAP or the
         // pinned subscriber location, which left the drawn line
         // visibly short of (or drifting past) those icons. Snap the
@@ -298,7 +301,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if (hasPin) {
             recordedDisplayLatLngs.push([pinLat, pinLng]);
         }
-        recordedLine = L.polyline(recordedDisplayLatLngs, { color: "#198754", weight: 4 }).addTo(map);
+        if (window.CablePathGeometry) {
+            // Same rounding the admin GeoMap applies, so both sides match.
+            recordedDisplayLatLngs = window.CablePathGeometry.smooth(recordedDisplayLatLngs, 3);
+        }
+        recordedLine = L.polyline(recordedDisplayLatLngs, {
+            color: "#198754", weight: 4, smoothFactor: 0.3, lineJoin: "round", lineCap: "round"
+        }).addTo(map);
         existingLatLngs.forEach(function (ll) {
             boundsPoints.push(ll);
         });
@@ -412,6 +421,7 @@ document.addEventListener("DOMContentLoaded", function () {
         : null;
 
     var watchId = null;
+    var gpsFilter = null;      // Kalman + outlier filter, fresh per recording
     var pathPoints = [];       // real accepted GPS fixes {latitude, longitude}
     var lastFix = null;        // last accepted fix {lat, lng}
     var walkedM = 0;
@@ -515,12 +525,16 @@ document.addEventListener("DOMContentLoaded", function () {
         // Stabilize the drawn line so pauses/GPS wobble don't render
         // as little loops; the head marker below still tracks the
         // true (unsimplified) displayPos.
-        latLngs = simplifyCablePath(latLngs, CABLE_PATH_SIMPLIFY_TOLERANCE_METERS);
+        latLngs = window.CablePathGeometry
+            ? window.CablePathGeometry.toDisplayPath(latLngs, { toleranceMeters: 1.0, iterations: 2 })
+            : simplifyCablePath(latLngs, CABLE_PATH_SIMPLIFY_TOLERANCE_METERS);
 
         if (liveLine) {
             liveLine.setLatLngs(latLngs);
         } else {
-            liveLine = L.polyline(latLngs, { color: "#fd7e14", weight: 4 }).addTo(map);
+            liveLine = L.polyline(latLngs, {
+                color: "#fd7e14", weight: 4, smoothFactor: 0.3, lineJoin: "round", lineCap: "round"
+            }).addTo(map);
         }
 
         // Faint dashed guide from the head of the line to the NAP: the
@@ -741,8 +755,18 @@ document.addEventListener("DOMContentLoaded", function () {
         ) {
             return;
         }
-        var cur = { lat: position.coords.latitude, lng: position.coords.longitude };
         var acc = typeof position.coords.accuracy === "number" ? position.coords.accuracy : 0;
+        // Clean the raw fix: reject impossible jumps and blend by the
+        // fix's own accuracy (see cable-path-geometry.js). The filtered
+        // position is what gets drawn AND saved.
+        var cur;
+        if (window.CablePathGeometry) {
+            if (!gpsFilter) gpsFilter = window.CablePathGeometry.createGpsFilter();
+            cur = gpsFilter.accept(position);
+            if (!cur) return;
+        } else {
+            cur = { lat: position.coords.latitude, lng: position.coords.longitude };
+        }
 
         if (!lastFix) {
             // The line always starts on a marker, never on a raw GPS
@@ -787,6 +811,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function resetRecordingState() {
         stopAnimTimer();
+        gpsFilter = null;
         pathPoints = [];
         lastFix = null;
         walkedM = 0;
