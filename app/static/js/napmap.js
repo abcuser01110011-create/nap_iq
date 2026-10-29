@@ -2210,6 +2210,16 @@
                     });
                 }
                 subscriberConnectionLayer.addLayer(line);
+
+                // No technician-recorded path for this subscriber: the
+                // dashed straight line above is only a placeholder. Ask
+                // a walking-route service for a path along the real
+                // streets between the NAP and the subscriber and swap it
+                // in, so the cable looks like a run that follows the road
+                // (like a recorded one) instead of a straight guess.
+                if (!recordedPath) {
+                    upgradeToEstimatedRoute(subscriber, nap, line, subscriberConnectionLayer);
+                }
                 // Two subscribers sharing (or very close to) the same
                 // NAP can end up with nearly-coincident lines. Without
                 // this, whichever subscriber happens to be later in
@@ -2229,6 +2239,113 @@
         });
 
         updateResultCount();
+    }
+
+
+    // ------------------------------------------------------------------
+    // Estimated cable routes (for subscribers with no recorded path)
+    // ------------------------------------------------------------------
+    // A walking route NAP -> subscriber along real streets, fetched from
+    // the public OSRM "foot" service and cached in localStorage so each
+    // pair is only ever requested once per browser. Requests are queued
+    // a few at a time to stay polite to the public server. If the
+    // service can't be reached, the dashed straight line stays.
+    const EST_ROUTE_CACHE_KEY = "napiq:estCableRoutes:v1";
+    const EST_ROUTE_ENDPOINTS = [
+        "https://routing.openstreetmap.de/routed-foot/route/v1/foot/",
+    ];
+    const EST_ROUTE_CONCURRENCY = 3;
+    const estRouteMemory = {};
+    const estRouteWaiting = [];
+    let estRouteActive = 0;
+    let estRouteCacheLoaded = false;
+
+    function loadEstRouteCache() {
+        if (estRouteCacheLoaded) return;
+        estRouteCacheLoaded = true;
+        try {
+            const raw = window.localStorage.getItem(EST_ROUTE_CACHE_KEY);
+            if (raw) Object.assign(estRouteMemory, JSON.parse(raw));
+        } catch (e) { /* storage unavailable: memory-only cache */ }
+    }
+
+    function saveEstRouteCache() {
+        try {
+            window.localStorage.setItem(EST_ROUTE_CACHE_KEY, JSON.stringify(estRouteMemory));
+        } catch (e) { /* quota/privacy mode: ignore */ }
+    }
+
+    function estRouteKey(nap, sub) {
+        return [nap.latitude, nap.longitude, sub.latitude, sub.longitude]
+            .map(function (n) { return Number(n).toFixed(5); }).join(",");
+    }
+
+    function fetchEstRoute(nap, sub) {
+        const coords = nap.longitude + "," + nap.latitude + ";" + sub.longitude + "," + sub.latitude;
+        const url = EST_ROUTE_ENDPOINTS[0] + coords + "?overview=full&geometries=geojson";
+        return fetch(url).then(function (res) {
+            if (!res.ok) throw new Error("route HTTP " + res.status);
+            return res.json();
+        }).then(function (data) {
+            const route = data && data.routes && data.routes[0];
+            const pts = route && route.geometry && route.geometry.coordinates;
+            if (!pts || pts.length < 2) throw new Error("no route");
+            // GeoJSON is [lng, lat]; Leaflet wants [lat, lng].
+            return pts.map(function (c) { return [c[1], c[0]]; });
+        });
+    }
+
+    function pumpEstRouteQueue() {
+        while (estRouteActive < EST_ROUTE_CONCURRENCY && estRouteWaiting.length) {
+            const job = estRouteWaiting.shift();
+            estRouteActive += 1;
+            fetchEstRoute(job.nap, job.sub).then(function (pts) {
+                estRouteMemory[job.key] = pts;
+                saveEstRouteCache();
+                job.resolve(pts);
+            }).catch(function () {
+                job.resolve(null);
+            }).then(function () {
+                estRouteActive -= 1;
+                pumpEstRouteQueue();
+            });
+        }
+    }
+
+    function getEstimatedRoute(nap, sub) {
+        loadEstRouteCache();
+        const key = estRouteKey(nap, sub);
+        if (estRouteMemory[key]) return Promise.resolve(estRouteMemory[key]);
+        return new Promise(function (resolve) {
+            estRouteWaiting.push({ key: key, nap: nap, sub: sub, resolve: resolve });
+            pumpEstRouteQueue();
+        });
+    }
+
+    function upgradeToEstimatedRoute(subscriber, nap, placeholderLine, layer) {
+        if (subscriber.latitude == null || subscriber.longitude == null) return;
+        getEstimatedRoute(nap, subscriber).then(function (route) {
+            // The map may have been re-rendered (filters, toggles) while
+            // we waited; only touch the line if it is still on the map.
+            if (!route || !layer.hasLayer(placeholderLine)) return;
+            // Join the street route to the exact NAP and house positions.
+            const latlngs = [[nap.latitude, nap.longitude]]
+                .concat(route)
+                .concat([[subscriber.latitude, subscriber.longitude]]);
+            layer.removeLayer(placeholderLine);
+            const line = L.polyline(latlngs, {
+                color: getSubscriberConnectionColor(subscriber.id),
+                weight: 3,
+                opacity: 0.85,
+                smoothFactor: 0.3,
+                lineJoin: "round",
+                lineCap: "round",
+                interactive: true,
+            });
+            line.bindTooltip("Cable route (" + latlngs.length + " points)", { sticky: true });
+            layer.addLayer(line);
+            line.bringToFront();
+        });
     }
 
     /** Small circular marker for subscribers — visually distinct from
