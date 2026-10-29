@@ -515,9 +515,27 @@
             wrap.classList.toggle('open', open);
             toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         }
+        // Hover opens the menu; leaving closes it (short delay so the pointer
+        // can travel to the menu / panel). A click keeps it open as well, for
+        // touch screens where there is no hover.
+        var closeTimer = null;
+        function lockedOrPreviewing() {
+            var cl = document.documentElement.classList;
+            return cl.contains('dash-account-hover') || cl.contains('dash-account-pinned');
+        }
+        wrap.addEventListener('mouseenter', function () {
+            clearTimeout(closeTimer);
+            setOpen(true);
+        });
+        wrap.addEventListener('mouseleave', function () {
+            clearTimeout(closeTimer);
+            closeTimer = setTimeout(function () {
+                if (!lockedOrPreviewing()) setOpen(false);
+            }, 250);
+        });
         toggle.addEventListener('click', function (e) {
             e.stopPropagation();
-            setOpen(menu.hidden);
+            setOpen(true);
         });
         menu.addEventListener('click', function (e) {
             if (e.target.closest('[data-account-tab]')) return; // Profile/Settings lock the menu open
@@ -616,6 +634,24 @@
             if (frame.getAttribute('src') !== 'about:blank') loads++;
         });
         document.getElementById('accountPanelClose').addEventListener('click', hide);
+
+        // While locked, a click anywhere outside the profile menu and the
+        // details card closes both -- and is swallowed, so it doesn't also
+        // activate whatever was underneath (a table row, a link, ...).
+        var menuWrap = document.getElementById('dashProfileMenu');
+        document.addEventListener('click', function (e) {
+            if (!pinned) return;
+            var t = e.target;
+            if (panel.contains(t) || (menuWrap && menuWrap.contains(t)) || (dd && dd.contains(t))) return;
+            if (t.closest && t.closest('.modal, .modal-backdrop')) return; // e.g. the logout confirmation
+            e.preventDefault();
+            e.stopPropagation();
+            hide();
+        }, true);
+        // Choosing Log out dismisses the panel first.
+        document.querySelectorAll('.dash-profile-dropdown-logout').forEach(function (b) {
+            b.addEventListener('click', function () { if (pinned) hide(); });
+        });
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && !panel.hidden) hide();
         });
