@@ -1,5 +1,9 @@
 {% extends "dashboard_base.html" %}
 {% block title %}NAP Management{% endblock %}
+{% block body_class %}naps-fit{% endblock %}
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/naps-fit.css') }}" rel="stylesheet">
+{% endblock %}
 {% block page_title %}Network Access Points{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ naps|length }} record{{ '' if naps|length == 1 else 's' }} shown</p>{% endblock %}
 
@@ -49,7 +53,7 @@
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="napTableBody">
                 {% for nap in naps %}
                 <tr class="disp-row disp-row-clickable nap-row" data-detail-url="{{ url_for('naps.view_nap', nap_id=nap.id, partial=1) }}" style="cursor: pointer;">
                     <td>
@@ -114,6 +118,14 @@
     </div>
 </div>
 
+{# Pagination lives OUTSIDE the table card, directly under it
+   (same pill pager as the Subscribers list). #}
+<div class="subs-pager" id="napPager" hidden>
+    <nav aria-label="NAP pages">
+        <ul class="subs-pager-list" id="napPagerList"></ul>
+    </nav>
+</div>
+
 <!-- Shared confirmation modal for Deactivate / Activate -->
 <div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -152,13 +164,115 @@
 </div>
 
 <script>
+    // Client-side pagination (10 per page) over the rows already loaded,
+    // same behavior as the Subscribers list. Pager is hidden when there
+    // is only one page.
+    (function () {
+        var body = document.getElementById('napTableBody');
+        var pager = document.getElementById('napPager');
+        var pagerList = document.getElementById('napPagerList');
+        if (!body || !pager || !pagerList) return;
+
+        var rows = Array.prototype.slice.call(body.querySelectorAll('tr.nap-row'));
+        var PAGE_SIZE = 10;
+        var page = 1;
+
+        function pageItem(label, target, opts) {
+            opts = opts || {};
+            var li = document.createElement('li');
+            li.className = 'subs-pager-item' + (opts.active ? ' is-active' : '') + (opts.disabled ? ' is-disabled' : '') + (opts.gap ? ' is-gap' : '') + (opts.nav ? ' is-nav' : '');
+            var a = document.createElement('a');
+            a.className = 'subs-pager-link';
+            a.href = '#';
+            a.innerHTML = label;
+            if (opts.aria) a.setAttribute('aria-label', opts.aria);
+            if (opts.active) a.setAttribute('aria-current', 'page');
+            if (opts.disabled) { a.setAttribute('aria-disabled', 'true'); a.tabIndex = -1; }
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (opts.disabled || opts.active) return;
+                page = target;
+                render();
+            });
+            li.appendChild(a);
+            return li;
+        }
+
+        function render() {
+            var total = rows.length;
+            var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            if (page > pages) page = pages;
+            var start = (page - 1) * PAGE_SIZE;
+            var end = Math.min(start + PAGE_SIZE, total);
+
+            rows.forEach(function (row, i) {
+                row.classList.toggle('d-none', i < start || i >= end);
+            });
+
+            pager.hidden = total <= PAGE_SIZE;
+            if (total <= PAGE_SIZE) return;
+
+            pagerList.innerHTML = '';
+            pagerList.appendChild(pageItem('prev', page - 1, { disabled: page === 1, nav: true, aria: 'Previous page' }));
+
+            // Fixed-size window: always 7 slots once there are more than
+            // 7 pages, so the pill never changes width.
+            var slots = [];
+            if (pages <= 7) {
+                for (var i = 1; i <= pages; i++) slots.push(i);
+            } else if (page <= 4) {
+                slots = [1, 2, 3, 4, 5, 'gap', pages];
+            } else if (page >= pages - 3) {
+                slots = [1, 'gap', pages - 4, pages - 3, pages - 2, pages - 1, pages];
+            } else {
+                slots = [1, 'gap', page - 1, page, page + 1, 'gap', pages];
+            }
+            slots.forEach(function (n, idx) {
+                if (n === 'gap') {
+                    var prevN = slots[idx - 1], nextN = slots[idx + 1];
+                    pagerList.appendChild(pageItem('&hellip;', Math.round((prevN + nextN) / 2), { gap: true }));
+                } else {
+                    pagerList.appendChild(pageItem(String(n), n, { active: n === page }));
+                }
+            });
+
+            pagerList.appendChild(pageItem('next', page + 1, { disabled: page === pages, nav: true, aria: 'Next page' }));
+        }
+
+        render();
+    })();
+</script>
+
+<script>
+    // Fit-to-screen: size the 10 rows so they exactly fill the table card
+    // (no empty space under the last row). Runs on load and on resize.
+    (function () {
+        var table = document.querySelector('.disp-table');
+        var wrap = table && table.closest('.table-responsive');
+        if (!table || !wrap) return;
+        var ROWS = 10;
+        function fit() {
+            var thead = table.querySelector('thead');
+            var avail = wrap.clientHeight - (thead ? thead.offsetHeight : 0) - 1;
+            var h = Math.max(40, avail / ROWS);
+            table.style.setProperty('--subs-row-h', h + 'px');
+        }
+        fit();
+        window.addEventListener('resize', fit);
+        if (window.ResizeObserver) new ResizeObserver(fit).observe(wrap);
+        window.addEventListener('load', fit);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    })();
+</script>
+
+<script>
     // NAP details popup: same behavior as the Subscribers list -- clicking
     // a row opens a modal immediately and fills it from a background fetch
     // (cached, prefetched on hover). No page navigation.
     (function () {
         var modalEl = document.getElementById('napDetailModal');
         var bodyEl = document.getElementById('napDetailBody');
-        var tbody = document.querySelector('.disp-table tbody');
+        var tbody = document.getElementById("napTableBody");
         if (!modalEl || !bodyEl || !tbody) return;
 
         var cache = {};

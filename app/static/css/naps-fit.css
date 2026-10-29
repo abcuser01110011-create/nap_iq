@@ -1,0 +1,163 @@
+/* ---------------------------------------------------------------- */
+/* NAP MANAGEMENT LIST - "fit to screen" compact layout                 */
+/* Loaded only by app/templates/naps/list.html and scoped to  */
+/* body.naps-fit, so no other page is affected.                      */
+/*                                                                   */
+/* Goal: topbar + filter bar + 10 table rows + pager all fit inside  */
+/* the browser window with no vertical page scrolling. Row height    */
+/* shrinks automatically on shorter screens.                         */
+/* ---------------------------------------------------------------- */
+
+/* Desktop / laptop only. Phones & small tablets keep normal scrolling. */
+@media (min-width: 768px) and (min-height: 520px) {
+
+    /* Lock the page to exactly one screen */
+    body.naps-fit .dash-shell {
+        height: 100vh;
+        min-height: 0;
+    }
+
+    body.naps-fit .dash-main {
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Slimmer topbar */
+    body.naps-fit .dash-topbar {
+        min-height: 54px;
+        padding: 0.35rem 1.25rem;
+        flex-shrink: 0;
+    }
+
+    body.naps-fit .dash-topbar-title h1 {
+        font-size: 1.05rem;
+    }
+
+    /* Content area becomes a column that fills the remaining height */
+    body.naps-fit .dash-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0.75rem 1.25rem;
+    }
+
+    body.naps-fit .dash-content > .flash-stack {
+        flex-shrink: 0;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* ---- Filter bar (search + status pills) ---- */
+    body.naps-fit .subs-filterbar {
+        flex-shrink: 0;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+    }
+
+    body.naps-fit .subs-search-form {
+        padding: 0.4rem 1rem;
+    }
+
+    body.naps-fit .subs-search-form input {
+        font-size: 0.82rem;
+    }
+
+    body.naps-fit .subs-pill-group {
+        padding: 0.2rem;
+    }
+
+    body.naps-fit .subs-pill {
+        padding: 0.3rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    body.naps-fit .subs-filterbar .btn {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.7rem;
+    }
+
+    /* ---- Table card fills the rest of the screen ---- */
+    body.naps-fit .disp-table-card {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-radius: 0.75rem;
+    }
+
+    /* Safety net: if the window is extremely short, scroll inside the
+       card instead of scrolling the whole page. */
+    body.naps-fit .disp-table-card .table-responsive {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    body.naps-fit .disp-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 0.55rem 1rem;
+        font-size: 0.65rem;
+        background: var(--napiq-surface);
+    }
+
+    /* Each of the 10 rows is stretched to fill the table card. */
+    /* --subs-row-h is set by a small script in list.html so the 10 rows
+       exactly fill the table card; 48px is just the no-JS fallback. */
+    body.naps-fit .disp-table tbody tr.nap-row {
+        height: var(--subs-row-h, 48px);
+    }
+
+    body.naps-fit .disp-table tbody td {
+        padding: 0.3rem 1rem;
+    }
+
+    body.naps-fit .disp-primary-link {
+        font-size: 0.82rem;
+        line-height: 1.2;
+    }
+
+    body.naps-fit .disp-subtext {
+        font-size: 0.7rem;
+        line-height: 1.2;
+        margin-top: 0;
+    }
+
+    body.naps-fit .disp-table tbody td:not(:first-child) {
+        font-size: 0.82rem;
+    }
+
+    body.naps-fit .disp-badge {
+        font-size: 0.68rem;
+        padding: 0.2rem 0.6rem;
+    }
+
+    body.naps-fit .subs-edit-btn {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+    }
+
+    body.naps-fit .subs-chevron {
+        font-size: 0.75rem;
+    }
+
+    /* ---- Pager: outside the table card, centered right below it ---- */
+    body.naps-fit .subs-pager {
+        flex-shrink: 0;
+        border-top: none;
+        padding: 0.6rem 0 0;
+    }
+
+    body.naps-fit .subs-pager-list {
+        padding: 0.2rem;
+        --pager-w: 1.85rem;
+        --pager-h: 1.85rem;
+        --pager-nav-w: 3.2rem;
+    }
+
+    body.naps-fit .subs-pager-link {
+        font-size: 0.8rem;
+    }
+}
