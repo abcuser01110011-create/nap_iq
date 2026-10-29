@@ -158,6 +158,12 @@ def view_technician(technician_id):
         a for a in technician.assignments
         if a.status in ("assigned", "accepted", "in_progress")
     ]
+    # The Technician list opens this same detail view in a popup (fetched
+    # in the background) -- it asks for just the contents via ?partial=1.
+    if request.args.get("partial"):
+        return render_template(
+            "technicians/_detail_body.html", technician=technician, open_assignments=open_assignments
+        )
     return render_template(
         "technicians/view.html", technician=technician, open_assignments=open_assignments
     )

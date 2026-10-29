@@ -58,12 +58,11 @@
                     <th>Mobile Login</th>
                     <th>Status</th>
                     <th>Resolved Issues</th>
-                    <th class="text-end">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="techTableBody">
                 {% for technician in technicians %}
-                <tr class="disp-row">
+                <tr class="disp-row disp-row-clickable" data-detail-url="{{ url_for('technicians.view_technician', technician_id=technician.id, partial=1) }}" style="cursor: pointer;">
                     <td><span class="disp-primary-link">{{ technician.full_name }}</span></td>
                     <td class="disp-subtext">
                         {{ 'Field Assistant' if technician.personnel_type == 'field_assistant' else 'Technician' }}
@@ -87,22 +86,10 @@
                         </span>
                     </td>
                     <td>{{ technician.resolved_issues_count }}</td>
-                    <td class="text-end">
-                        <div class="subs-row-actions">
-                            <a href="{{ url_for('technicians.view_technician', technician_id=technician.id) }}"
-                               class="subs-edit-btn" title="View">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}"
-                               class="subs-edit-btn" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                        </div>
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="disp-empty">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-person-badge display-6 d-block mb-2"></i>
                         No personnel found{% if search_term or status_filter %} matching your filters{% endif %}.
                     </td>
@@ -112,4 +99,89 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<div class="modal fade" id="techDetailModal" tabindex="-1" aria-label="Technician details" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <span class="text-muted small">Technician details</span>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 pb-4" id="techDetailBody"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Technician details popup: same behavior as the Subscribers list --
+    // clicking a row opens a modal immediately and fills it from a
+    // background fetch (cached, prefetched on hover). No page navigation.
+    (function () {
+        var modalEl = document.getElementById('techDetailModal');
+        var bodyEl = document.getElementById('techDetailBody');
+        var tbody = document.getElementById('techTableBody');
+        if (!modalEl || !bodyEl || !tbody) return;
+
+        var cache = {};
+        var pending = {};
+        var current = null;
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+        var ERROR = '<div class="text-center text-muted py-5">Could not load details. Please try again.</div>';
+
+        function load(url) {
+            if (cache[url]) return Promise.resolve(cache[url]);
+            if (pending[url]) return pending[url];
+            pending[url] = fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.text();
+                })
+                .then(function (html) {
+                    cache[url] = html;
+                    delete pending[url];
+                    return html;
+                })
+                .catch(function (err) {
+                    delete pending[url];
+                    throw err;
+                });
+            return pending[url];
+        }
+
+        function rowUrl(target) {
+            var row = target.closest && target.closest('tr[data-detail-url]');
+            return row ? row.getAttribute('data-detail-url') : null;
+        }
+
+        tbody.addEventListener('mouseover', function (e) {
+            var url = rowUrl(e.target);
+            if (url) load(url).catch(function () {});
+        });
+
+        tbody.addEventListener('click', function (e) {
+            if (e.target.closest('a, button')) return;
+            var url = rowUrl(e.target);
+            if (!url) return;
+            current = url;
+            bodyEl.innerHTML = cache[url] || SPINNER;
+            modal.show();
+            if (!cache[url]) {
+                load(url).then(function (html) {
+                    if (current === url) bodyEl.innerHTML = html;
+                }).catch(function () {
+                    if (current === url) bodyEl.innerHTML = ERROR;
+                });
+            }
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            current = null;
+            bodyEl.innerHTML = '';
+        });
+    })();
+</script>
 {% endblock %}
