@@ -1,4 +1,5 @@
-<div class="d-flex justify-content-between align-items-start mb-4">
+<div class="nap-detail">
+<div class="d-flex justify-content-between align-items-start mb-3">
     <div>
         <div class="text-muted small">{{ nap.nap_code }}</div>
         <h3 class="mb-0">{{ nap.name }}</h3>
@@ -14,45 +15,65 @@
     </span>
 </div>
 
-<dl class="row mb-0">
-    <dt class="col-sm-4 text-muted fw-normal">Address</dt>
-    <dd class="col-sm-8">{{ nap.address or "—" }}</dd>
+<style>
+    /* Compact layout so the whole NAP fits in the popup without scrolling. */
+    .nap-detail .nap-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem 1.25rem; margin: 0; }
+    .nap-detail .nap-facts dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .nap-detail .nap-facts dd { margin: 0; font-size: 0.9rem; }
+    .nap-detail .nap-ports { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.5rem; }
+    .nap-detail .nap-ports.is-single { grid-template-columns: 1fr; }
+    .nap-detail .nap-ports table { font-size: 0.78rem; margin: 0; }
+    .nap-detail .nap-ports th { font-size: 0.66rem; text-transform: uppercase; white-space: nowrap; }
+    .nap-detail .nap-ports th, .nap-detail .nap-ports td { padding: 0.2rem 0.4rem; }
+    .nap-detail .nap-ports .badge { font-size: 0.66rem; font-weight: 600; }
+    .nap-detail h3 { font-size: 1.35rem; }
+    @media (max-width: 767.98px) {
+        .nap-detail .nap-facts { grid-template-columns: 1fr 1fr; }
+        .nap-detail .nap-ports { grid-template-columns: 1fr; }
+    }
+</style>
 
-    <dt class="col-sm-4 text-muted fw-normal">Total Ports</dt>
-    <dd class="col-sm-8">{{ nap.total_ports }}</dd>
-
-    <dt class="col-sm-4 text-muted fw-normal">Used Ports</dt>
-    <dd class="col-sm-8">{{ used_ports }}</dd>
-
-    <dt class="col-sm-4 text-muted fw-normal">Available Ports</dt>
-    <dd class="col-sm-8">
-        <span class="badge {{ 'text-bg-success' if available_ports > 0 else 'text-bg-secondary' }}">
-            {{ available_ports }}
-        </span>
-    </dd>
-
-    <dt class="col-sm-4 text-muted fw-normal">Created</dt>
-    <dd class="col-sm-8">{{ nap.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
-
-    <dt class="col-sm-4 text-muted fw-normal">Last Updated</dt>
-    <dd class="col-sm-8">{{ nap.updated_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
+<dl class="nap-facts">
+    <div><dt class="text-muted fw-normal">Address</dt><dd>{{ nap.address or "—" }}</dd></div>
+    <div><dt class="text-muted fw-normal">Total Ports</dt><dd>{{ nap.total_ports }}</dd></div>
+    <div><dt class="text-muted fw-normal">Used Ports</dt><dd>{{ used_ports }}</dd></div>
+    <div>
+        <dt class="text-muted fw-normal">Available Ports</dt>
+        <dd>
+            <span class="badge {{ 'text-bg-success' if available_ports > 0 else 'text-bg-secondary' }}">{{ available_ports }}</span>
+        </dd>
+    </div>
+    <div><dt class="text-muted fw-normal">Created</dt><dd>{{ nap.created_at.strftime('%b %d, %Y %I:%M %p') }}</dd></div>
+    <div><dt class="text-muted fw-normal">Last Updated</dt><dd>{{ nap.updated_at.strftime('%b %d, %Y %I:%M %p') }}</dd></div>
 </dl>
 
-<hr class="my-4">
+<hr class="my-3">
 
-<h6 class="text-muted mb-3">Ports</h6>
-<div class="table-responsive mb-4">
-    <table class="table table-sm align-middle mb-0">
+<h6 class="text-muted mb-2">Ports</h6>
+{% set sub_status_classes = {
+    'active': 'text-bg-success',
+    'inactive': 'text-bg-secondary',
+    'disconnected': 'text-bg-danger',
+    'pending_review': 'text-bg-warning'
+} %}
+{# Ports are split into two side-by-side columns (1..half | half+1..total)
+   so a 16-port NAP doesn't need a tall scrolling popup. #}
+{% set half = ((nap.total_ports + 1) // 2) if nap.total_ports > 8 else nap.total_ports %}
+{% set groups = [range(1, half + 1)] %}
+{% if nap.total_ports > half %}{% set _ = groups.append(range(half + 1, nap.total_ports + 1)) %}{% endif %}
+<div class="nap-ports mb-3 {{ 'is-single' if groups|length == 1 else '' }}">
+    {% for group in groups %}
+    <table class="table table-sm align-middle">
         <thead>
             <tr>
-                <th style="width: 12%;">Port Number</th>
+                <th style="width: 14%;">Port</th>
                 <th>Customer</th>
                 <th>Plan</th>
                 <th>Status</th>
             </tr>
         </thead>
         <tbody>
-            {% for port_num in range(1, nap.total_ports + 1) %}
+            {% for port_num in group %}
                 {% set sub = port_assignments.get(port_num) %}
                 <tr>
                     <td>{{ port_num }}</td>
@@ -66,12 +87,6 @@
                         </td>
                         <td>{{ sub.plan_type or "—" }}</td>
                         <td>
-                            {% set sub_status_classes = {
-                                'active': 'text-bg-success',
-                                'inactive': 'text-bg-secondary',
-                                'disconnected': 'text-bg-danger',
-                                'pending_review': 'text-bg-warning'
-                            } %}
                             <span class="badge {{ sub_status_classes.get(sub.status, 'text-bg-secondary') }}">
                                 {{ sub.status|replace('_', ' ')|capitalize }}
                             </span>
@@ -85,6 +100,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {% endfor %}
 </div>
 
 <div class="d-flex justify-content-end gap-2">
@@ -114,4 +130,5 @@
             </button>
         </form>
     {% endif %}
+</div>
 </div>
