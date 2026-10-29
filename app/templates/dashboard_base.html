@@ -7,20 +7,16 @@
     <title>{% block title %}Dashboard{% endblock %}</title>
 
     <script>
-        // Sidebar is an icon-only rail on desktop; hovering expands it
-        // (see script at the bottom). Set pre-paint to avoid a flash.
+        // Sidebar is expanded by default on desktop. The hamburger button
+        // collapses it to an icon-only rail; the choice is remembered.
+        // Set pre-paint to avoid a flash.
         (function () {
             // Loaded inside the Account modal's iframe: hide the shell chrome.
             try { if (window.self !== window.top) document.documentElement.classList.add('dash-embedded'); } catch (e) { document.documentElement.classList.add('dash-embedded'); }
             if (window.innerWidth >= 992) {
-                document.documentElement.classList.add('dash-sidebar-collapsed');
-                // The previous page was left by clicking a sidebar link, so the
-                // pointer is still over the sidebar: start expanded (no
-                // collapse/expand flicker). Closed again on the first mouse
-                // move that lands outside it (see the sidebar hover script).
                 try {
-                    if (sessionStorage.getItem('dashSidebarKeepOpen') === '1') {
-                        document.documentElement.classList.add('dash-sidebar-open');
+                    if (localStorage.getItem('dashSidebarCollapsed') === '1') {
+                        document.documentElement.classList.add('dash-sidebar-collapsed');
                     }
                 } catch (e) {}
             }
@@ -465,11 +461,15 @@
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
 <script>
-    // Sidebar toggle for mobile/tablet widths.
+    // Hamburger: on desktop collapses/expands the sidebar (remembered); on
+    // mobile/tablet widths opens/closes the slide-in drawer.
     (function () {
         const sidebar = document.getElementById('dashSidebar');
         const toggle = document.getElementById('dashSidebarToggle');
         const backdrop = document.getElementById('dashSidebarBackdrop');
+        const root = document.documentElement;
+
+        function isDesktop() { return window.innerWidth >= 992; }
 
         function closeSidebar() {
             sidebar.classList.remove('dash-sidebar-open');
@@ -477,10 +477,30 @@
         }
 
         if (toggle) toggle.addEventListener('click', function () {
+            if (isDesktop()) {
+                var collapsed = root.classList.toggle('dash-sidebar-collapsed');
+                try { localStorage.setItem('dashSidebarCollapsed', collapsed ? '1' : '0'); } catch (err) {}
+                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                return;
+            }
             sidebar.classList.toggle('dash-sidebar-open');
             backdrop.classList.toggle('dash-sidebar-backdrop-visible');
         });
+        if (toggle) toggle.setAttribute('aria-expanded', root.classList.contains('dash-sidebar-collapsed') ? 'false' : 'true');
         backdrop.addEventListener('click', closeSidebar);
+
+        // Crossing the desktop breakpoint: desktop uses the saved choice,
+        // smaller screens always use the full-width drawer.
+        window.addEventListener('resize', function () {
+            if (isDesktop()) {
+                closeSidebar();
+                var saved = false;
+                try { saved = localStorage.getItem('dashSidebarCollapsed') === '1'; } catch (err) {}
+                root.classList.toggle('dash-sidebar-collapsed', saved);
+            } else {
+                root.classList.remove('dash-sidebar-collapsed');
+            }
+        });
 
         // Enable Bootstrap tooltips (used on disabled "coming soon" links).
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
@@ -488,70 +508,19 @@
         });
     })();
 
-    // Icon-only sidebar rail (desktop). Hover expands it to show labels;
-    // it returns to icons only as soon as the pointer leaves.
+    // The page content reflows when the sidebar collapses/expands; tell
+    // anything that measures its container (Leaflet map, charts) once the
+    // width transition has finished.
     (function () {
-        const sidebar = document.getElementById('dashSidebar');
-        if (!sidebar) return;
-        const root = document.documentElement;
-
-        function isDesktop() { return window.innerWidth >= 992; }
-
-        // The page content reflows while the sidebar expands/collapses; tell
-        // anything that measures its container (Leaflet map, charts) once the
-        // width transition has finished.
         var reflowTimer = null;
-        function notifyReflow() {
+        new MutationObserver(function () {
             clearTimeout(reflowTimer);
             reflowTimer = setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 230);
-        }
-        new MutationObserver(notifyReflow).observe(root, { attributes: true, attributeFilter: ['class'] });
-
-        function open() {
-            if (isDesktop()) root.classList.add('dash-sidebar-open');
-        }
-
-        function close() {
-            if (root.classList.contains('dash-account-hover') || root.classList.contains('dash-account-pinned')) return;
-            root.classList.remove('dash-sidebar-open');
-        }
-
-        sidebar.addEventListener('mouseenter', open);
-        sidebar.addEventListener('mouseleave', close);
-
-        // Keep the sidebar expanded across page loads while the pointer
-        // stays on it: remember that a sidebar link was clicked, and on the
-        // next page re-open if the pointer is (or may still be) over it.
-        sidebar.addEventListener('click', function (e) {
-            if (e.target.closest('a[href]')) {
-                try { sessionStorage.setItem('dashSidebarKeepOpen', '1'); } catch (err) {}
-            }
-        });
-        (function () {
-            var keep = false;
-            try {
-                keep = sessionStorage.getItem('dashSidebarKeepOpen') === '1';
-                sessionStorage.removeItem('dashSidebarKeepOpen');
-            } catch (err) {}
-            if (isDesktop() && (keep || sidebar.matches(':hover'))) open();
-            if (keep) {
-                // Browsers don't fire mouseenter/leave until the pointer moves;
-                // the first move tells us whether it is still on the sidebar.
-                document.addEventListener('mousemove', function onFirstMove(e) {
-                    document.removeEventListener('mousemove', onFirstMove);
-                    if (!sidebar.contains(e.target)) close();
-                });
-            }
-        })();
-
-        window.addEventListener('resize', function () {
-            root.classList.toggle('dash-sidebar-collapsed', isDesktop());
-            if (!isDesktop()) root.classList.remove('dash-sidebar-open');
-        });
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     })();
 
     // Sidebar profile dropdown: toggles on click, closes on outside click,
-    // Escape, picking an item, or when the hover-expanded sidebar collapses.
+    // Escape, or picking an item.
     (function () {
         var toggle = document.getElementById('dashProfileToggle');
         var menu = document.getElementById('dashProfileDropdown');

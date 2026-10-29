@@ -305,7 +305,9 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 }
 
 .dash-sidebar-toggle {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: none;
     background: transparent;
     font-size: 1.4rem;
@@ -2396,20 +2398,8 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-chevron {
     color: #ff8787;
 }
 
-/* Hover-expanded sidebar: shows labels and pushes the page (it used to overlay it;
-   see below). */
-@media (min-width: 992px) {
-    html.dash-sidebar-open .dash-sidebar {
-        width: 260px;
-    }
-
-    /* Expanded sidebar PUSHES the page instead of overlaying it: the
-       width variable also drives .dash-main's margin-left, so the content
-       area shrinks to fit and nothing is covered. */
-    html.dash-sidebar-collapsed.dash-sidebar-open .dash-shell {
-        --napiq-sidebar-width: 260px;
-    }
-}
+/* Sidebar: expanded by default; html.dash-sidebar-collapsed (toggled by the
+   hamburger) shrinks it to the icon-only rail defined above. */
 
 
 /* ---------------------------------------------------------------- */
