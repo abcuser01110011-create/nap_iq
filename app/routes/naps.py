@@ -485,7 +485,30 @@ def quick_add_nap():
     return jsonify({"status": "error", "errors": form.errors}), 400
 
 
-def _nap_port_assignments(nap):
+def _recorded_ports(subscriber_ids):
+    """{subscriber_id: newest technician-recorded port_number} for the given
+    subscribers, in ONE query (so a caller handling many NAPs can batch it
+    instead of paying a database round trip per NAP)."""
+    recorded_ports = {}
+    if subscriber_ids:
+        rows = (
+            db.session.query(ServiceRequest.subscriber_id, Assignment.port_number)
+            .join(Assignment, Assignment.service_request_id == ServiceRequest.id)
+            .filter(
+                ServiceRequest.subscriber_id.in_(subscriber_ids),
+                Assignment.port_number.isnot(None),
+            )
+            .order_by(Assignment.assigned_at.desc())
+            .all()
+        )
+        # rows are newest-assignment-first; setdefault so each
+        # subscriber keeps only their most recently recorded port.
+        for subscriber_id, port_number in rows:
+            recorded_ports.setdefault(subscriber_id, port_number)
+    return recorded_ports
+
+
+def _nap_port_assignments(nap, recorded_ports=None):
     """Maps port_number -> Subscriber for this NAP's occupied slots,
     using each subscriber's actual technician-recorded port_number
     (the value entered on the mobile Job Detail screen and saved to
@@ -509,23 +532,8 @@ def _nap_port_assignments(nap):
     occupied_subs = [s for s in nap.subscribers if s.status != "disconnected"]
     occupied_subs.sort(key=lambda s: s.id)
 
-    subscriber_ids = [s.id for s in occupied_subs]
-    recorded_ports = {}
-    if subscriber_ids:
-        rows = (
-            db.session.query(ServiceRequest.subscriber_id, Assignment.port_number)
-            .join(Assignment, Assignment.service_request_id == ServiceRequest.id)
-            .filter(
-                ServiceRequest.subscriber_id.in_(subscriber_ids),
-                Assignment.port_number.isnot(None),
-            )
-            .order_by(Assignment.assigned_at.desc())
-            .all()
-        )
-        # rows are newest-assignment-first; setdefault so each
-        # subscriber keeps only their most recently recorded port.
-        for subscriber_id, port_number in rows:
-            recorded_ports.setdefault(subscriber_id, port_number)
+    if recorded_ports is None:
+        recorded_ports = _recorded_ports([s.id for s in occupied_subs])
 
     assignments = {}
     unplaced = []

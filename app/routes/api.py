@@ -44,13 +44,13 @@ service-request-scoped one.
 import json
 
 from flask import Blueprint, jsonify, g, abort, request
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.auth import role_required
 from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, CablePath
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
-from app.routes.naps import _nap_port_assignments
+from app.routes.naps import _nap_port_assignments, _recorded_ports
 from app.recommendation import (
     OPEN_ASSIGNMENT_STATUSES as _REC_OPEN_ASSIGNMENT_STATUSES,
     _availability_score,
@@ -103,12 +103,22 @@ def naps_json():
     place at all (disconnected, or otherwise no longer occupying a
     physical slot) — the panel shows "Not connected" for those.
     """
-    naps = Nap.query.order_by(Nap.name.asc()).all()
+    # Speed: load every NAP's subscribers in one extra query and every
+    # recorded port in one more, instead of a lazy query per NAP (the
+    # database is a network hop away, so each query costs real time).
+    naps = (
+        Nap.query.options(selectinload(Nap.subscribers))
+        .order_by(Nap.name.asc())
+        .all()
+    )
+    recorded_ports = _recorded_ports(
+        [s.id for nap in naps for s in nap.subscribers if s.status != "disconnected"]
+    )
 
     def _connected_lines(nap):
         port_by_subscriber_id = {
             subscriber.id: port
-            for port, subscriber in _nap_port_assignments(nap).items()
+            for port, subscriber in _nap_port_assignments(nap, recorded_ports).items()
         }
         lines = []
         for subscriber in nap.subscribers:
@@ -189,7 +199,9 @@ def issues_json():
     ORM relationships) so the popup doesn't need a second request per
     marker.
     """
-    query = TechnicalIssue.query
+    query = TechnicalIssue.query.options(
+        joinedload(TechnicalIssue.subscriber), joinedload(TechnicalIssue.nap)
+    )
 
     if g.user.role == "technician":
         profile = Technician.query.filter_by(user_id=g.user.id).first()
@@ -304,7 +316,9 @@ def subscribers_json():
     line when they're present, falling back to the old straight line
     otherwise.
     """
-    query = Subscriber.query.filter_by(status="active")
+    # joinedload: fetch each subscriber's cable path in the same query
+    # rather than one extra query per subscriber.
+    query = Subscriber.query.options(joinedload(Subscriber.cable_path)).filter_by(status="active")
 
     if g.user.role == "technician":
         profile = Technician.query.filter_by(user_id=g.user.id).first()
