@@ -220,37 +220,46 @@
                 {% endif %}
             </ul>
 
-            <div class="dash-nav-divider"></div>
-
-            <ul class="dash-nav-list">
-                {% if current_user and current_user.role != 'user' %}
-                <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('settings.') else '' }}"
-                       href="{{ url_for('settings.index') }}">
-                        <i class="bi bi-gear"></i><span>Settings</span>
-                    </a>
-                </li>
-                {% endif %}
-            </ul>
-
             <div class="dash-nav-divider dash-nav-divider-push"></div>
 
-            {# Bottom action row: red Logout button (opens the confirm modal)
-               with the Profile icon beside it. Replaces the old
-               Collapse button. #}
+            {# Bottom profile card with a dropdown (opens upward). Holds
+               Profile, Settings (non-customer roles only) and Logout.
+               Replaces the old red Logout button, the Profile button and
+               the Settings nav link. #}
             <div class="dash-sidebar-actions">
                 <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout" id="logoutForm" class="dash-logout-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="button" class="dash-logout-btn" title="Logout"
-                            data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
-                        <i class="bi bi-box-arrow-right"></i><span>Logout</span>
-                    </button>
                 </form>
-                <a href="{{ url_for('profile.index') }}"
-                   class="dash-profile-btn {{ 'active' if request.endpoint and request.endpoint.startswith('profile.') else '' }}"
-                   title="Profile" aria-label="Profile">
-                    <i class="bi bi-person-circle"></i><span>Profile</span>
-                </a>
+
+                <div class="dash-profile-menu" id="dashProfileMenu">
+                    <div class="dash-profile-dropdown" id="dashProfileDropdown" role="menu" hidden>
+                        {% if current_user and current_user.email %}
+                        <div class="dash-profile-dropdown-email">{{ current_user.email }}</div>
+                        {% endif %}
+                        <a href="{{ url_for('profile.index') }}" class="dash-profile-dropdown-item" role="menuitem">
+                            <i class="bi bi-person-circle"></i><span>Profile</span>
+                        </a>
+                        {% if current_user and current_user.role != 'user' %}
+                        <a href="{{ url_for('settings.index') }}" class="dash-profile-dropdown-item" role="menuitem">
+                            <i class="bi bi-gear"></i><span>Settings</span>
+                        </a>
+                        {% endif %}
+                        <div class="dash-profile-dropdown-sep"></div>
+                        <button type="button" class="dash-profile-dropdown-item dash-profile-dropdown-logout" role="menuitem"
+                                data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
+                            <i class="bi bi-box-arrow-right"></i><span>Log out</span>
+                        </button>
+                    </div>
+
+                    <button type="button"
+                            class="dash-profile-btn {{ 'active' if request.endpoint and (request.endpoint.startswith('profile.') or request.endpoint.startswith('settings.')) else '' }}"
+                            id="dashProfileToggle" title="Account menu" aria-label="Account menu"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="dashProfileDropdown">
+                        <span class="dash-profile-avatar">{{ (current_user.full_name or current_user.username)[:1]|upper if current_user else 'G' }}</span>
+                        <span class="dash-profile-name">{{ (current_user.full_name or current_user.username) if current_user else 'Guest' }}</span>
+                        <i class="bi bi-chevron-down dash-profile-chevron"></i>
+                    </button>
+                </div>
             </div>
         </nav>
     </aside>
@@ -469,6 +478,34 @@
             root.classList.toggle('dash-sidebar-collapsed', isDesktop());
             if (!isDesktop()) root.classList.remove('dash-sidebar-open');
         });
+    })();
+
+    // Sidebar profile dropdown: toggles on click, closes on outside click,
+    // Escape, picking an item, or when the hover-expanded sidebar collapses.
+    (function () {
+        var toggle = document.getElementById('dashProfileToggle');
+        var menu = document.getElementById('dashProfileDropdown');
+        var wrap = document.getElementById('dashProfileMenu');
+        if (!toggle || !menu || !wrap) return;
+
+        function setOpen(open) {
+            menu.hidden = !open;
+            wrap.classList.toggle('open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            setOpen(menu.hidden);
+        });
+        menu.addEventListener('click', function () { setOpen(false); });
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) setOpen(false);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') setOpen(false);
+        });
+        var sidebar = document.getElementById('dashSidebar') || document.querySelector('.dash-sidebar');
+        if (sidebar) sidebar.addEventListener('mouseleave', function () { setOpen(false); });
     })();
 
     // Logout confirmation: the "Log out" button inside #logoutConfirmModal

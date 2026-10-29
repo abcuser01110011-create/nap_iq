@@ -2237,7 +2237,7 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 
 
 /* ---------------------------------------------------------------- */
-/* SIDEBAR BOTTOM ACTIONS: plain red Logout + Profile                 */
+/* SIDEBAR BOTTOM: profile card with dropdown (Profile/Settings/Logout) */
 /* ---------------------------------------------------------------- */
 
 .dash-sidebar-actions {
@@ -2251,61 +2251,147 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
     margin: 0;
 }
 
-.dash-logout-btn,
+.dash-profile-menu {
+    position: relative;
+}
+
 .dash-profile-btn {
     width: 100%;
     display: flex;
     align-items: center;
     gap: 0.7rem;
-    padding: 0.6rem 0.75rem 0.6rem 1rem;
+    padding: 0.55rem 0.75rem 0.55rem 0.6rem;
     border: 0;
     border-radius: 0.5rem;
     background: transparent;
+    color: #cfe1f0;
     font-size: 0.9rem;
     font-weight: 500;
     text-align: left;
-    text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;
 }
 
-.dash-logout-btn i,
-.dash-profile-btn i {
-    font-size: 1.05rem;
-    width: 1.2rem;
-    text-align: center;
-    flex-shrink: 0;
-}
-
-.dash-logout-btn {
-    color: #ff6b6b;
-    font-weight: 600;
-}
-
-.dash-logout-btn:hover,
-.dash-logout-btn:focus-visible {
-    background: rgba(255, 107, 107, 0.12);
-    color: #ff8787;
-}
-
-.dash-profile-btn {
-    color: #cfe1f0;
-}
-
 .dash-profile-btn:hover,
-.dash-profile-btn.active {
+.dash-profile-btn.active,
+.dash-profile-menu.open .dash-profile-btn {
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
 }
 
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-logout-btn span,
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-btn span {
+.dash-profile-avatar {
+    width: 1.7rem;
+    height: 1.7rem;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.dash-profile-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-profile-chevron {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.dash-profile-menu.open .dash-profile-chevron {
+    transform: rotate(180deg);
+}
+
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-name,
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-chevron {
     opacity: 0;
 }
 
-.dash-logout-btn span,
-.dash-profile-btn span {
-    transition: opacity 0.15s ease;
+.dash-profile-name,
+.dash-profile-chevron {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Dropdown opens upward, inside the sidebar so overflow clipping is fine */
+.dash-profile-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 0.4rem);
+    padding: 0.4rem;
+    border-radius: 0.75rem;
+    background: #1b2a41;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    z-index: 20;
+}
+
+.dash-profile-dropdown[hidden] {
+    display: none;
+}
+
+.dash-profile-dropdown-email {
+    padding: 0.45rem 0.7rem 0.55rem;
+    font-size: 0.78rem;
+    color: #9fb3c8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dash-profile-dropdown-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.55rem 0.7rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #e6eef7;
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.dash-profile-dropdown-item i {
+    width: 1.2rem;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.dash-profile-dropdown-item:hover,
+.dash-profile-dropdown-item:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.dash-profile-dropdown-sep {
+    height: 1px;
+    margin: 0.3rem 0.2rem;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.dash-profile-dropdown-logout {
+    color: #ff6b6b;
+}
+
+.dash-profile-dropdown-logout:hover,
+.dash-profile-dropdown-logout:focus-visible {
+    background: rgba(255, 107, 107, 0.12);
+    color: #ff8787;
 }
 
 /* Hover-expanded sidebar: overlays the page (main content keeps its
