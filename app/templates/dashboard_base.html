@@ -297,34 +297,33 @@
         </div>
     </div>
 
-    <!-- Account modal: Profile / Settings shown as a popup. The existing
-         /profile/ and /settings/ pages are loaded into the iframe (they hide
-         their own sidebar/topbar via html.dash-embedded), so every form,
-         route and permission check keeps working unchanged. -->
-    <div class="modal fade" id="accountModal" tabindex="-1" aria-labelledby="accountModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-md-down">
-            <div class="modal-content account-modal">
-                <div class="account-modal-header">
-                    <h5 class="account-modal-title" id="accountModalLabel">Account</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="account-modal-body">
-                    <nav class="account-modal-nav" aria-label="Account sections">
-                        <div class="account-modal-nav-label">Account</div>
-                        <button type="button" class="account-modal-tab" data-account-tab="profile" data-src="{{ url_for('profile.index') }}">
-                            <i class="bi bi-person"></i><span>Profile</span>
-                        </button>
-                        {% if current_user and current_user.role != 'user' %}
-                        <div class="account-modal-nav-label">Preferences</div>
-                        <button type="button" class="account-modal-tab" data-account-tab="settings" data-src="{{ url_for('settings.index') }}">
-                            <i class="bi bi-gear"></i><span>Settings</span>
-                        </button>
-                        {% endif %}
-                    </nav>
-                    <div class="account-modal-content">
-                        <iframe id="accountFrame" title="Account" src="about:blank"></iframe>
-                    </div>
-                </div>
+    <!-- Account panel: Profile / Settings details. Hovering the dropdown's
+         Profile/Settings items previews it; clicking one "locks" it open
+         (stays until closed with the X or Esc). The existing /profile/ and
+         /settings/ pages are loaded into the iframe (they hide their own
+         sidebar/topbar via html.dash-embedded), so every form, route and
+         permission check keeps working unchanged. -->
+    <div class="account-panel" id="accountPanel" role="dialog" aria-labelledby="accountPanelLabel" hidden>
+        <div class="account-modal-header">
+            <h5 class="account-modal-title" id="accountPanelLabel">Account</h5>
+            <span class="account-panel-pin" id="accountPanelPin" title="Pinned open" hidden><i class="bi bi-pin-angle-fill"></i></span>
+            <button type="button" class="btn-close ms-auto" id="accountPanelClose" aria-label="Close"></button>
+        </div>
+        <div class="account-modal-body">
+            <nav class="account-modal-nav" aria-label="Account sections">
+                <div class="account-modal-nav-label">Account</div>
+                <button type="button" class="account-modal-tab" data-account-tab="profile" data-src="{{ url_for('profile.index') }}">
+                    <i class="bi bi-person"></i><span>Profile</span>
+                </button>
+                {% if current_user and current_user.role != 'user' %}
+                <div class="account-modal-nav-label">Preferences</div>
+                <button type="button" class="account-modal-tab" data-account-tab="settings" data-src="{{ url_for('settings.index') }}">
+                    <i class="bi bi-gear"></i><span>Settings</span>
+                </button>
+                {% endif %}
+            </nav>
+            <div class="account-modal-content">
+                <iframe id="accountFrame" title="Account" src="about:blank"></iframe>
             </div>
         </div>
     </div>
@@ -502,6 +501,7 @@
         }
 
         function close() {
+            if (root.classList.contains('dash-account-hover')) return;
             root.classList.remove('dash-sidebar-open');
         }
 
@@ -539,17 +539,25 @@
             if (e.key === 'Escape') setOpen(false);
         });
         var sidebar = document.getElementById('dashSidebar') || document.querySelector('.dash-sidebar');
-        if (sidebar) sidebar.addEventListener('mouseleave', function () { setOpen(false); });
+        if (sidebar) sidebar.addEventListener('mouseleave', function () {
+            if (document.documentElement.classList.contains('dash-account-hover')) return;
+            setOpen(false);
+        });
+        document.addEventListener('dash:closeprofilemenu', function () { setOpen(false); });
     })();
 
-    // Account modal (Profile / Settings popup).
+    // Account panel (Profile / Settings): hover previews, click locks open.
     (function () {
-        var modalEl = document.getElementById('accountModal');
+        var panel = document.getElementById('accountPanel');
         var frame = document.getElementById('accountFrame');
-        if (!modalEl || !frame || document.documentElement.classList.contains('dash-embedded')) return;
-        var tabs = modalEl.querySelectorAll('.account-modal-tab');
-        var title = document.getElementById('accountModalLabel');
-        var loads = 0;
+        var sidebar = document.getElementById('dashSidebar');
+        if (!panel || !frame || !sidebar || document.documentElement.classList.contains('dash-embedded')) return;
+        var root = document.documentElement;
+        var tabs = panel.querySelectorAll('.account-modal-tab');
+        var title = document.getElementById('accountPanelLabel');
+        var pinIcon = document.getElementById('accountPanelPin');
+        var items = document.querySelectorAll('.dash-profile-dropdown-item[data-account-tab]');
+        var current = null, pinned = false, timer = null, loads = 0;
 
         function show(name) {
             var found = null;
@@ -560,27 +568,74 @@
             });
             if (!found) return false;
             title.textContent = found.textContent.trim();
-            loads = 0;
-            frame.src = found.getAttribute('data-src');
+            if (current !== name) {
+                current = name;
+                loads = 0;
+                frame.src = found.getAttribute('data-src');
+            }
+            panel.hidden = false;
+            if (!pinned) root.classList.add('dash-account-hover');
             return true;
         }
+        function hide() {
+            clearTimeout(timer);
+            var changed = pinned && loads > 1; // something was saved inside the panel
+            panel.hidden = true;
+            pinned = false;
+            pinIcon.hidden = true;
+            current = null;
+            frame.src = 'about:blank';
+            root.classList.remove('dash-account-hover');
+            if (!sidebar.matches(':hover')) {
+                root.classList.remove('dash-sidebar-open');
+                document.dispatchEvent(new Event('dash:closeprofilemenu'));
+            }
+            if (changed) window.location.reload(); // refresh name/theme in the shell
+        }
+        function lock() {
+            pinned = true;
+            pinIcon.hidden = false;
+            root.classList.remove('dash-account-hover');
+        }
+        function scheduleHide() {
+            if (pinned) return;
+            clearTimeout(timer);
+            timer = setTimeout(hide, 250);
+        }
+        function cancelHide() { clearTimeout(timer); }
+
+        items.forEach(function (a) {
+            var name = a.getAttribute('data-account-tab');
+            a.addEventListener('mouseenter', function () { cancelHide(); show(name); });
+            a.addEventListener('mouseleave', scheduleHide);
+            a.addEventListener('click', function (e) {
+                if (!show(name)) return; // fall back to a normal link
+                e.preventDefault();
+                lock();
+            });
+        });
+        // Moving between the dropdown rows and the panel keeps it open.
+        var dd = document.getElementById('dashProfileDropdown');
+        if (dd) {
+            dd.addEventListener('mouseenter', cancelHide);
+            dd.addEventListener('mouseleave', scheduleHide);
+        }
+        panel.addEventListener('mouseenter', cancelHide);
+        panel.addEventListener('mouseleave', scheduleHide);
+
         tabs.forEach(function (t) {
-            t.addEventListener('click', function () { show(t.getAttribute('data-account-tab')); });
+            t.addEventListener('click', function () { show(t.getAttribute('data-account-tab')); lock(); });
         });
         frame.addEventListener('load', function () {
             if (frame.getAttribute('src') !== 'about:blank') loads++;
         });
-        document.querySelectorAll('.dash-profile-dropdown-item[data-account-tab]').forEach(function (a) {
-            a.addEventListener('click', function (e) {
-                if (!show(a.getAttribute('data-account-tab'))) return; // fall back to normal link
-                e.preventDefault();
-                bootstrap.Modal.getOrCreateInstance(modalEl).show();
-            });
+        document.getElementById('accountPanelClose').addEventListener('click', hide);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !panel.hidden) hide();
         });
-        modalEl.addEventListener('hidden.bs.modal', function () {
-            var changed = loads > 1; // something was saved inside the popup
-            frame.src = 'about:blank';
-            if (changed) window.location.reload(); // refresh name/theme in the shell
+        // Hovering the Logout row (or leaving the menu entirely) dismisses an un-pinned preview.
+        document.querySelectorAll('.dash-profile-dropdown-item:not([data-account-tab])').forEach(function (b) {
+            b.addEventListener('mouseenter', function () { if (!pinned) hide(); });
         });
     })();
 

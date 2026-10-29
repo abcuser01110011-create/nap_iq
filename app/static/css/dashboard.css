@@ -2506,10 +2506,31 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-chevron {
 /* ACCOUNT MODAL (Profile / Settings popup)                           */
 /* ---------------------------------------------------------------- */
 
-.account-modal {
-    height: min(80vh, 720px);
+.account-panel {
+    position: fixed;
+    left: 276px;
+    bottom: 24px;
+    width: min(900px, calc(100vw - 300px));
+    height: min(78vh, 680px);
+    display: flex;
+    flex-direction: column;
     border-radius: 0.9rem;
     overflow: hidden;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+    z-index: 1090;
+}
+
+.account-panel[hidden] {
+    display: none;
+}
+
+.account-panel-pin {
+    margin-left: 0.6rem;
+    color: var(--bs-secondary-color);
+    font-size: 0.9rem;
 }
 
 .account-modal-header {
@@ -2586,11 +2607,17 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-chevron {
     background: transparent;
 }
 
-@media (max-width: 767.98px) {
-    .account-modal {
-        height: 100%;
+@media (max-width: 991.98px) {
+    .account-panel {
+        inset: 0;
+        left: 0;
+        width: auto;
+        height: auto;
         border-radius: 0;
     }
+}
+
+@media (max-width: 767.98px) {
     .account-modal-body {
         flex-direction: column;
     }
@@ -2632,4 +2659,12 @@ html.dash-embedded .dash-content {
 html.dash-embedded .dash-content .row > .col-lg-7 {
     flex: 0 0 100%;
     max-width: 100%;
+}
+
+/* No focus ring around the sidebar profile card (hover/open state already highlights it) */
+.dash-profile-btn:focus,
+.dash-profile-btn:focus-visible,
+.dash-profile-btn:active {
+    outline: none;
+    box-shadow: none;
 }
