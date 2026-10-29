@@ -256,10 +256,7 @@
                             id="dashProfileToggle" title="Account menu" aria-label="Account menu"
                             aria-haspopup="true" aria-expanded="false" aria-controls="dashProfileDropdown">
                         <span class="dash-profile-avatar">{{ (current_user.full_name or current_user.username)[:1]|upper if current_user else 'G' }}</span>
-                        <span class="dash-profile-info">
-                            <span class="dash-profile-name">{{ (current_user.full_name or current_user.username) if current_user else 'Guest' }}</span>
-                            <span class="dash-profile-role">{{ current_user.role|replace('_', ' ')|title if current_user else '' }}</span>
-                        </span>
+                        <span class="dash-profile-name">{{ (current_user.full_name or current_user.username) if current_user else 'Guest' }}</span>
                         <i class="bi bi-chevron-down dash-profile-chevron"></i>
                     </button>
                 </div>
@@ -471,7 +468,6 @@
         }
 
         function close() {
-            if (root.classList.contains('dash-profile-popup-open')) return;
             root.classList.remove('dash-sidebar-open');
         }
 
@@ -484,33 +480,15 @@
         });
     })();
 
-    // Sidebar profile popup: a floating menu (moved to <body> so the
-    // sidebar's overflow clipping can't hide it) that opens beside the
-    // sidebar. The sidebar stays expanded while it is open.
+    // Sidebar profile dropdown: toggles on click, closes on outside click,
+    // Escape, picking an item, or when the hover-expanded sidebar collapses.
     (function () {
         var toggle = document.getElementById('dashProfileToggle');
         var menu = document.getElementById('dashProfileDropdown');
         var wrap = document.getElementById('dashProfileMenu');
-        var sidebar = document.getElementById('dashSidebar');
-        if (!toggle || !menu || !wrap || !sidebar) return;
-        var root = document.documentElement;
-        document.body.appendChild(menu);
+        if (!toggle || !menu || !wrap) return;
 
-        function place() {
-            var t = toggle.getBoundingClientRect();
-            var sb = sidebar.getBoundingClientRect();
-            menu.style.left = (sb.right + 10) + 'px';
-            menu.style.bottom = Math.max(12, window.innerHeight - t.bottom) + 'px';
-        }
         function setOpen(open) {
-            if (open) {
-                if (window.innerWidth >= 992) root.classList.add('dash-sidebar-open');
-                root.classList.add('dash-profile-popup-open');
-                place();
-            } else {
-                root.classList.remove('dash-profile-popup-open');
-                if (!sidebar.matches(':hover')) root.classList.remove('dash-sidebar-open');
-            }
             menu.hidden = !open;
             wrap.classList.toggle('open', open);
             toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -521,12 +499,13 @@
         });
         menu.addEventListener('click', function () { setOpen(false); });
         document.addEventListener('click', function (e) {
-            if (!menu.hidden && !menu.contains(e.target) && !wrap.contains(e.target)) setOpen(false);
+            if (!wrap.contains(e.target)) setOpen(false);
         });
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') setOpen(false);
         });
-        window.addEventListener('resize', function () { if (!menu.hidden) place(); });
+        var sidebar = document.getElementById('dashSidebar') || document.querySelector('.dash-sidebar');
+        if (sidebar) sidebar.addEventListener('mouseleave', function () { setOpen(false); });
     })();
 
     // Logout confirmation: the "Log out" button inside #logoutConfirmModal

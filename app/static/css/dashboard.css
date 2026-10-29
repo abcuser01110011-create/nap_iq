@@ -2260,9 +2260,7 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
     display: flex;
     align-items: center;
     gap: 0.7rem;
-    /* Same 1rem left inset as .dash-nav-link so the avatar sits on the
-       same vertical axis as the nav icons above it. */
-    padding: 0.55rem 0.75rem 0.55rem 1rem;
+    padding: 0.55rem 0.75rem 0.55rem 0.6rem;
     border: 0;
     border-radius: 0.5rem;
     background: transparent;
@@ -2285,7 +2283,6 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 .dash-profile-avatar {
     width: 1.7rem;
     height: 1.7rem;
-    margin: 0 -0.25rem; /* 1.7rem avatar centered in the 1.2rem icon slot */
     flex-shrink: 0;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.18);
@@ -2297,63 +2294,45 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
     font-weight: 600;
 }
 
-.dash-profile-info {
+.dash-profile-name {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    line-height: 1.2;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    transition: opacity 0.15s ease;
-}
-
-.dash-profile-name {
-    font-weight: 600;
-    font-size: 0.88rem;
-    color: #fff;
-}
-
-.dash-profile-role {
-    font-size: 0.74rem;
-    font-weight: 500;
-    color: #9fb3c8;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dash-profile-chevron {
     font-size: 0.75rem;
     flex-shrink: 0;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: transform 0.15s ease;
 }
 
 .dash-profile-menu.open .dash-profile-chevron {
-    transform: rotate(-90deg);
+    transform: rotate(180deg);
 }
 
-/* Collapsed rail: just the avatar, centered */
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-btn {
-    gap: 0;
-}
-
-html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-info,
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-name,
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-chevron {
-    flex: 0 0 0;
-    width: 0;
-    overflow: hidden;
     opacity: 0;
 }
 
-/* Floating popup (JS appends it to <body> and sets left/bottom) */
+.dash-profile-name,
+.dash-profile-chevron {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Dropdown opens upward, inside the sidebar so overflow clipping is fine */
 .dash-profile-dropdown {
-    position: fixed;
-    min-width: 230px;
-    max-width: calc(100vw - 24px);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 0.4rem);
     padding: 0.4rem;
     border-radius: 0.75rem;
     background: #1b2a41;
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-    z-index: 1100;
+    z-index: 20;
 }
 
 .dash-profile-dropdown[hidden] {
