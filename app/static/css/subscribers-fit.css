@@ -1,0 +1,166 @@
+/* ---------------------------------------------------------------- */
+/* SUBSCRIBERS LIST - "fit to screen" compact layout                 */
+/* Loaded only by app/templates/subscribers/list.html and scoped to  */
+/* body.subs-fit, so no other page is affected.                      */
+/*                                                                   */
+/* Goal: topbar + filter bar + 10 table rows + pager all fit inside  */
+/* the browser window with no vertical page scrolling. Row height    */
+/* shrinks automatically on shorter screens.                         */
+/* ---------------------------------------------------------------- */
+
+/* Desktop / laptop only. Phones & small tablets keep normal scrolling. */
+@media (min-width: 768px) and (min-height: 520px) {
+
+    /* Lock the page to exactly one screen */
+    body.subs-fit .dash-shell {
+        height: 100vh;
+        min-height: 0;
+    }
+
+    body.subs-fit .dash-main {
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Slimmer topbar */
+    body.subs-fit .dash-topbar {
+        min-height: 54px;
+        padding: 0.35rem 1.25rem;
+        flex-shrink: 0;
+    }
+
+    body.subs-fit .dash-topbar-title h1 {
+        font-size: 1.05rem;
+    }
+
+    /* Content area becomes a column that fills the remaining height */
+    body.subs-fit .dash-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0.75rem 1.25rem;
+    }
+
+    body.subs-fit .dash-content > .flash-stack {
+        flex-shrink: 0;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* ---- Filter bar (search + Installation Request + status pills) ---- */
+    body.subs-fit .subs-filterbar {
+        flex-shrink: 0;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+    }
+
+    body.subs-fit .subs-search-form {
+        padding: 0.4rem 1rem;
+    }
+
+    body.subs-fit .subs-search-form input {
+        font-size: 0.82rem;
+    }
+
+    body.subs-fit .subs-pill-group {
+        padding: 0.2rem;
+    }
+
+    body.subs-fit .subs-pill {
+        padding: 0.3rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    body.subs-fit .subs-filterbar .btn {
+        font-size: 0.75rem;
+        padding: 0.35rem 0.7rem;
+    }
+
+    /* ---- Table card fills the rest of the screen ---- */
+    body.subs-fit .subs-table-card {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-radius: 0.75rem;
+    }
+
+    /* Safety net: if the window is extremely short, scroll inside the
+       card instead of scrolling the whole page. */
+    body.subs-fit .subs-table-card .table-responsive {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    body.subs-fit .subs-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 0.55rem 1rem;
+        font-size: 0.65rem;
+        background: var(--napiq-surface);
+    }
+
+    /* Each of the 10 rows is sized from the viewport height:
+       (100vh - ~220px of page chrome) / 10, kept between 42px and 54px. */
+    body.subs-fit .subs-table tbody tr.subs-row {
+        height: clamp(42px, calc((100vh - 220px) / 10), 54px);
+    }
+
+    body.subs-fit .subs-table tbody td {
+        padding: 0.3rem 1rem;
+    }
+
+    body.subs-fit .subs-name {
+        font-size: 0.82rem;
+        line-height: 1.2;
+    }
+
+    body.subs-fit .subs-subtext {
+        font-size: 0.7rem;
+        line-height: 1.2;
+        margin-top: 0;
+    }
+
+    body.subs-fit .subs-table tbody td:not(:first-child) {
+        font-size: 0.82rem;
+    }
+
+    body.subs-fit .subs-code-pill {
+        font-size: 0.68rem;
+        padding: 0.15rem 0.5rem;
+    }
+
+    body.subs-fit .subs-status-pill {
+        font-size: 0.68rem;
+        padding: 0.2rem 0.6rem;
+    }
+
+    body.subs-fit .subs-edit-btn {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+    }
+
+    body.subs-fit .subs-chevron {
+        font-size: 0.75rem;
+    }
+
+    /* ---- Pager pinned to the bottom of the card ---- */
+    body.subs-fit .subs-pager {
+        flex-shrink: 0;
+        padding: 0.45rem 1rem;
+    }
+
+    body.subs-fit .subs-pager-list {
+        padding: 0.2rem;
+    }
+
+    body.subs-fit .subs-pager-link {
+        min-width: 1.85rem;
+        height: 1.85rem;
+        padding: 0 0.65rem;
+        font-size: 0.8rem;
+    }
+}

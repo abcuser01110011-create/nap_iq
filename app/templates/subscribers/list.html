@@ -1,5 +1,9 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Subscribers{% endblock %}
+{% block body_class %}subs-fit{% endblock %}
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/subscribers-fit.css') }}" rel="stylesheet">
+{% endblock %}
 {% block page_title %}Subscribers{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0" id="subsRecordCount">{{ subscribers|length }} record{{ '' if subscribers|length == 1 else 's' }}</p>{% endblock %}
 
