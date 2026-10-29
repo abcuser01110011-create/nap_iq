@@ -104,11 +104,48 @@
     font-size: 1.05rem;
 }
 
-.dash-brand-sub {
-    font-size: 0.7rem;
-    color: #9fc1de;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+/* Hamburger that collapses/expands the sidebar (desktop). Sits at the right
+   of the brand row; in the collapsed rail the brand row stacks so the
+   button is above the logo/icon column. */
+.dash-sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.dash-sidebar-hamburger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 38px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 1.4rem;
+    border-radius: 0.5rem;
+    padding: 0;
+    cursor: pointer;
+}
+
+.dash-sidebar-hamburger:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+html.dash-sidebar-collapsed .dash-sidebar-brand {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.6rem;
+}
+
+@media (max-width: 991.98px) {
+    /* On small screens the topbar hamburger opens the drawer instead. */
+    .dash-sidebar-hamburger {
+        display: none;
+    }
 }
 
 .dash-nav {
@@ -305,9 +342,7 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 }
 
 .dash-sidebar-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: none;
     border: none;
     background: transparent;
     font-size: 1.4rem;

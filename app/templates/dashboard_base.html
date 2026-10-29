@@ -77,9 +77,12 @@
                 </span>
                 <span class="dash-brand-text">
                     <span class="dash-brand-name">PG Networks</span>
-                    <span class="dash-brand-sub">ISP Operations</span>
                 </span>
             </a>
+            <button type="button" class="dash-sidebar-hamburger" id="dashSidebarHamburger"
+                    aria-label="Collapse or expand sidebar" title="Collapse / expand sidebar">
+                <i class="bi bi-list"></i>
+            </button>
         </div>
 
         {#
@@ -465,7 +468,7 @@
     // mobile/tablet widths opens/closes the slide-in drawer.
     (function () {
         const sidebar = document.getElementById('dashSidebar');
-        const toggle = document.getElementById('dashSidebarToggle');
+        const toggles = document.querySelectorAll('.dash-sidebar-toggle, .dash-sidebar-hamburger');
         const backdrop = document.getElementById('dashSidebarBackdrop');
         const root = document.documentElement;
 
@@ -476,17 +479,24 @@
             backdrop.classList.remove('dash-sidebar-backdrop-visible');
         }
 
-        if (toggle) toggle.addEventListener('click', function () {
-            if (isDesktop()) {
-                var collapsed = root.classList.toggle('dash-sidebar-collapsed');
-                try { localStorage.setItem('dashSidebarCollapsed', collapsed ? '1' : '0'); } catch (err) {}
-                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-                return;
-            }
-            sidebar.classList.toggle('dash-sidebar-open');
-            backdrop.classList.toggle('dash-sidebar-backdrop-visible');
+        function syncAria() {
+            var expanded = !root.classList.contains('dash-sidebar-collapsed');
+            toggles.forEach(function (t) { t.setAttribute('aria-expanded', expanded ? 'true' : 'false'); });
+        }
+
+        toggles.forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                if (isDesktop()) {
+                    var collapsed = root.classList.toggle('dash-sidebar-collapsed');
+                    try { localStorage.setItem('dashSidebarCollapsed', collapsed ? '1' : '0'); } catch (err) {}
+                    syncAria();
+                    return;
+                }
+                sidebar.classList.toggle('dash-sidebar-open');
+                backdrop.classList.toggle('dash-sidebar-backdrop-visible');
+            });
         });
-        if (toggle) toggle.setAttribute('aria-expanded', root.classList.contains('dash-sidebar-collapsed') ? 'false' : 'true');
+        syncAria();
         backdrop.addEventListener('click', closeSidebar);
 
         // Crossing the desktop breakpoint: desktop uses the saved choice,
@@ -500,6 +510,7 @@
             } else {
                 root.classList.remove('dash-sidebar-collapsed');
             }
+            syncAria();
         });
 
         // Enable Bootstrap tooltips (used on disabled "coming soon" links).

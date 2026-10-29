@@ -148,7 +148,8 @@ html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-icon { background: t
 /* the mono logo was forced to white for the dark rail: show it in its own navy */
 html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-logo { filter: none; }
 html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-name { color: #061747; }
-html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-sub { color: #64748B; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-sidebar-hamburger { color: #061747; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-sidebar-hamburger:hover { background: rgba(22, 132, 255, .1); }
 
 html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link { color: #334155; }
 html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link i { color: #475569; }
