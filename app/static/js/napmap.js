@@ -12,6 +12,8 @@
     // Default view: Sta. Cruz, Laguna town center.
     const DEFAULT_CENTER = [14.2810, 121.4150];
     const DEFAULT_ZOOM = 14;
+    // Opening zoom when no NAP has open issues (centered on a NAP, street level).
+    const NO_ISSUE_FOCUS_ZOOM = 17;
 
     const STATUS_COLORS = {
         active: "#198754",
@@ -499,7 +501,15 @@
             : NaN;
         const hasServerFocus = Number.isFinite(initialFocusLat) && Number.isFinite(initialFocusLng);
         const initialCenter = hasServerFocus ? [initialFocusLat, initialFocusLng] : DEFAULT_CENTER;
-        const initialZoom = hasServerFocus ? NAP_FOCUS_ZOOM : DEFAULT_ZOOM;
+        // A real focus NAP (open issues) gets the close-up zoom; the "no
+        // issues yet" fallback (coordinates only, no NAP id) opens at a
+        // slightly wider street-level view instead of the whole city.
+        const hasFocusNapId = mapElForInitialView
+            ? !!mapElForInitialView.getAttribute("data-focus-nap-id")
+            : false;
+        const initialZoom = hasServerFocus
+            ? (hasFocusNapId ? NAP_FOCUS_ZOOM : NO_ISSUE_FOCUS_ZOOM)
+            : DEFAULT_ZOOM;
 
         map = L.map("napMap").setView(initialCenter, initialZoom);
 

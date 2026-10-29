@@ -377,6 +377,21 @@ def geomap():
             else:
                 focus_nap_id = None
 
+        # No open issues anywhere -> nothing "critical" to land on, but
+        # opening zoomed out over the whole city is too far away to be
+        # useful. Fall back to simply centering on the first NAP that has
+        # coordinates. Only lat/lng are passed (focus_nap_id stays None),
+        # so napmap.js zooms there without opening any NAP detail panel.
+        if focus_nap_lat is None or focus_nap_lng is None:
+            fallback_nap = (
+                Nap.query.filter(Nap.latitude.isnot(None), Nap.longitude.isnot(None))
+                .order_by(Nap.id.asc())
+                .first()
+            )
+            if fallback_nap is not None:
+                focus_nap_lat = fallback_nap.latitude
+                focus_nap_lng = fallback_nap.longitude
+
     return render_template(
         "naps/map.html",
         focus_issue_id=issue_id,
