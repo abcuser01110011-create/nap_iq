@@ -687,11 +687,10 @@ class RecordPaymentForm(FlaskForm):
 
 class ProfileForm(FlaskForm):
     """Lets any signed-in account edit its own contact details.
-    Deliberately excludes username and role — self-service editing of
-    either would let an account escalate/rename itself, so both stay
-    Administrator-only via Manage Users (Phase 8). Mirrors UserForm's
-    uniqueness-check pattern for email, but has no username field to
-    check at all.
+    Username is self-editable (login sessions key on user_id, so renaming
+    is safe). Role is deliberately excluded — self-service role editing
+    would let an account escalate itself, so it stays Administrator-only
+    via Manage Users (Phase 8). Mirrors UserForm's uniqueness checks.
 
     The route sets `form.user_id = g.user.id` right after
     instantiating so `validate_email` can exclude the signed-in
@@ -700,6 +699,13 @@ class ProfileForm(FlaskForm):
 
     user_id = None  # set manually by the route; not a real form field
 
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(message="Username is required."),
+            Length(min=3, max=50, message="Username must be between 3 and 50 characters."),
+        ],
+    )
     full_name = StringField(
         "Full Name",
         validators=[
@@ -720,6 +726,14 @@ class ProfileForm(FlaskForm):
         validators=[Optional(), phone_11_digits],
         render_kw=PHONE_RENDER_KW,
     )
+
+    def validate_username(self, field):
+        """Unique (case-insensitive), excluding the signed-in account."""
+        query = User.query.filter(func.lower(User.username) == field.data.strip().lower())
+        if self.user_id is not None:
+            query = query.filter(User.id != self.user_id)
+        if query.first() is not None:
+            raise ValidationError("This username is already taken. Choose a different one.")
 
     def validate_email(self, field):
         """Same uniqueness rule as UserForm.validate_email, scoped to

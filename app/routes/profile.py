@@ -54,8 +54,8 @@ def index():
 @profile_bp.route("/edit", methods=["GET", "POST"])
 @login_required
 def edit_profile():
-    """Lets the signed-in account edit its own full name, email, and
-    phone number. Username and role are not editable here — see
+    """Lets the signed-in account edit its own username, full name,
+    email, and phone number. Role is not editable here — see
     ProfileForm's docstring for why."""
     user = g.user
     form = ProfileForm(obj=user)
@@ -64,6 +64,7 @@ def edit_profile():
         form.phone_number.data = _display_phone(user)
 
     if form.validate_on_submit():
+        user.username = form.username.data.strip()
         user.full_name = form.full_name.data.strip()
         user.email = (form.email.data or "").strip() or None
         user.phone_number = (form.phone_number.data or "").strip() or None

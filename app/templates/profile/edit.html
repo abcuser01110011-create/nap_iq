@@ -19,8 +19,10 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Username</label>
-                            <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
-                            <div class="form-text">Contact an administrator to change your username.</div>
+                            {{ form.username(class="form-control" ~ (" is-invalid" if form.username.errors else ""), autocomplete="username") }}
+                            {% for error in form.username.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Role</label>
