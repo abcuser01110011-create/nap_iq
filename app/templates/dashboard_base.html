@@ -497,6 +497,16 @@
 
         function isDesktop() { return window.innerWidth >= 992; }
 
+        // The page content reflows while the sidebar expands/collapses; tell
+        // anything that measures its container (Leaflet map, charts) once the
+        // width transition has finished.
+        var reflowTimer = null;
+        function notifyReflow() {
+            clearTimeout(reflowTimer);
+            reflowTimer = setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 230);
+        }
+        new MutationObserver(notifyReflow).observe(root, { attributes: true, attributeFilter: ['class'] });
+
         function open() {
             if (isDesktop()) root.classList.add('dash-sidebar-open');
         }

@@ -2394,12 +2394,18 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-chevron {
     color: #ff8787;
 }
 
-/* Hover-expanded sidebar: overlays the page (main content keeps its
-   76px margin, so nothing reflows) and shows labels. */
+/* Hover-expanded sidebar: shows labels and pushes the page (it used to overlay it;
+   see below). */
 @media (min-width: 992px) {
     html.dash-sidebar-open .dash-sidebar {
         width: 260px;
-        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Expanded sidebar PUSHES the page instead of overlaying it: the
+       width variable also drives .dash-main's margin-left, so the content
+       area shrinks to fit and nothing is covered. */
+    html.dash-sidebar-collapsed.dash-sidebar-open .dash-shell {
+        --napiq-sidebar-width: 260px;
     }
 }
 
