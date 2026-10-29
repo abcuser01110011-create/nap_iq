@@ -2260,7 +2260,9 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
     display: flex;
     align-items: center;
     gap: 0.7rem;
-    padding: 0.55rem 0.75rem 0.55rem 0.6rem;
+    /* Same 1rem left inset as .dash-nav-link so the avatar sits on the
+       same vertical axis as the nav icons above it. */
+    padding: 0.55rem 0.75rem 0.55rem 1rem;
     border: 0;
     border-radius: 0.5rem;
     background: transparent;
@@ -2283,6 +2285,7 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 .dash-profile-avatar {
     width: 1.7rem;
     height: 1.7rem;
+    margin: 0 -0.25rem; /* 1.7rem avatar centered in the 1.2rem icon slot */
     flex-shrink: 0;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.18);
@@ -2329,10 +2332,7 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 
 /* Collapsed rail: just the avatar, centered */
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-btn {
-    justify-content: center;
     gap: 0;
-    padding-left: 0;
-    padding-right: 0;
 }
 
 html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-profile-info,
