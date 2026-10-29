@@ -2250,7 +2250,7 @@
     // pair is only ever requested once per browser. Requests are queued
     // a few at a time to stay polite to the public server. If the
     // service can't be reached, the dashed straight line stays.
-    const EST_ROUTE_CACHE_KEY = "napiq:estCableRoutes:v1";
+    const EST_ROUTE_CACHE_KEY = "napiq:estCableRoutes:v2";
     // Tried in order for every request; the public servers are shared and
     // sometimes busy, so a failure on one just moves on to the next.
     const EST_ROUTE_ENDPOINTS = [
@@ -2341,14 +2341,46 @@
         return pts;
     }
 
+    function pathLengthMeters(pts) {
+        let total = 0;
+        for (let i = 1; i < pts.length; i += 1) {
+            total += L.latLng(pts[i - 1]).distanceTo(L.latLng(pts[i]));
+        }
+        return total;
+    }
+
+    /** A street route is only believable when it actually starts/ends
+     * near the NAP and the house and isn't a huge detour. If the NAP or
+     * subscriber sits far from any mapped road (marsh, fields, a
+     * mis-placed pin), the routing server snaps to a distant street and
+     * the "route" becomes a long line across the map -- reject those. */
+    function isBelievableRoute(route, nap, sub) {
+        const napLL = L.latLng(nap.latitude, nap.longitude);
+        const subLL = L.latLng(sub.latitude, sub.longitude);
+        const first = L.latLng(route[0]);
+        const last = L.latLng(route[route.length - 1]);
+        const straight = napLL.distanceTo(subLL);
+        const snapOk = napLL.distanceTo(first) <= 120 && subLL.distanceTo(last) <= 120;
+        const lengthOk = pathLengthMeters(route) <= straight * 2.5 + 100;
+        return snapOk && lengthOk;
+    }
+
     function pumpEstRouteQueue() {
         while (estRouteActive < EST_ROUTE_CONCURRENCY && estRouteWaiting.length) {
             const job = estRouteWaiting.shift();
             estRouteActive += 1;
             fetchEstRoute(job.nap, job.sub).then(function (pts) {
-                estRouteMemory[job.key] = pts;
-                saveEstRouteCache();
-                job.resolve(pts);
+                if (isBelievableRoute(pts, job.nap, job.sub)) {
+                    estRouteMemory[job.key] = pts;
+                    saveEstRouteCache();
+                    job.resolve(pts);
+                } else {
+                    // Remember "no usable street route here" so it isn't
+                    // requested again; draw the generated path instead.
+                    estRouteMemory[job.key] = 0;
+                    saveEstRouteCache();
+                    job.resolve(syntheticCableRoute(job.nap, job.sub, job.seed));
+                }
             }).catch(function () {
                 job.resolve(syntheticCableRoute(job.nap, job.sub, job.seed));
             }).then(function () {
@@ -2362,6 +2394,9 @@
         loadEstRouteCache();
         const key = estRouteKey(nap, sub);
         if (estRouteMemory[key]) return Promise.resolve(estRouteMemory[key]);
+        if (estRouteMemory[key] === 0) {
+            return Promise.resolve(syntheticCableRoute(nap, sub, parseInt(sub.id, 10) || 0));
+        }
         return new Promise(function (resolve) {
             estRouteWaiting.push({
                 key: key, nap: nap, sub: sub, resolve: resolve,
