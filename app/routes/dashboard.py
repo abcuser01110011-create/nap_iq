@@ -45,10 +45,10 @@ NAP_STATUS_ORDER = ["active", "full", "maintenance", "inactive"]
 # Fixed colors for each NAP status, shared by the status-distribution
 # bars and legend on the dashboard's NAP Status Summary panel.
 NAP_STATUS_COLORS = {
-    "active": "#22c55e",
-    "full": "#f59e0b",
-    "maintenance": "#f87171",
-    "inactive": "#9aa2ad",
+    "active": "#16A34A",
+    "full": "#F59E0B",
+    "maintenance": "#EF4444",
+    "inactive": "#94A3B8",
 }
 
 # TechnicalIssue.status values that count as still "open" for the
@@ -79,11 +79,11 @@ ISSUE_STATUS_LABELS = {
     "closed": "Closed",
 }
 ISSUE_STATUS_COLORS = {
-    "pending": "#94a3b8",
-    "assigned": "#38bdf8",
-    "in_progress": "#8b5cf6",
-    "resolved": "#22c55e",
-    "closed": "#6b7280",
+    "pending": "#94A3B8",
+    "assigned": "#1684FF",
+    "in_progress": "#8B5CF6",
+    "resolved": "#16A34A",
+    "closed": "#94A3B8",
 }
 
 # Fixed display order + labels/colors for the "Open issues by
@@ -101,10 +101,10 @@ ISSUE_PRIORITY_LABELS = {
     "low": "Low",
 }
 ISSUE_PRIORITY_COLORS = {
-    "critical": "#dc3545",
-    "high": "#fd7e14",
-    "medium": "#ffc107",
-    "low": "#22c55e",
+    "critical": "#EF4444",
+    "high": "#F59E0B",
+    "medium": "#FFC928",
+    "low": "#16A34A",
 }
 
 

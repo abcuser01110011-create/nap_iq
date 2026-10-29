@@ -43,7 +43,7 @@
     </div>
 
     <div class="dash-greeting-body">
-        <h2 class="dash-greeting-title"><span id="dashGreetingWord">Welcome</span>, {{ first_name }}</h2>
+        <h2 class="dash-greeting-title"><span id="dashGreetingWord">Welcome</span>, <span class="dash-greeting-name">{{ first_name }}</span></h2>
         <p class="dash-greeting-sub">
             {% if unread_notifications_count %}
                 You've got {{ unread_notifications_count }} update{{ '' if unread_notifications_count == 1 else 's' }} waiting in your notifications.
@@ -53,6 +53,7 @@
         </p>
         <p class="dash-greeting-meta">Live operations overview for PG Networks</p>
     </div>
+    <div class="dash-greeting-art" aria-hidden="true"><i class="bi bi-broadcast-pin"></i></div>
 </section>
 
 <script>
@@ -84,7 +85,7 @@
 <div class="row g-3 mb-3">
     <div class="col-6 col-lg">
         <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('naps.list_naps') }}">
-            <span class="dash-stat-icon stat-icon-purple"><i class="bi bi-hdd-network"></i></span>
+            <span class="dash-stat-icon stat-icon-royal"><i class="bi bi-hdd-network"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ total_naps }}</span>
                 <span class="dash-stat-label">Total NAPs</span>
@@ -111,7 +112,7 @@
     </div>
     <div class="col-6 col-lg">
         <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('issues.list_issues') }}">
-            <span class="dash-stat-icon stat-icon-red"><i class="bi bi-ticket-detailed-fill"></i></span>
+            <span class="dash-stat-icon stat-icon-orange"><i class="bi bi-ticket-detailed-fill"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ open_tickets }}</span>
                 <span class="dash-stat-label">Open Tickets</span>
@@ -129,7 +130,7 @@
     </div>
     <div class="col-6 col-lg">
         <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('service_requests.list_requests', status='pending') }}">
-            <span class="dash-stat-icon stat-icon-orange"><i class="bi bi-clipboard-check-fill"></i></span>
+            <span class="dash-stat-icon stat-icon-gold"><i class="bi bi-clipboard-check-fill"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ pending_service_requests }}</span>
                 <span class="dash-stat-label">Pending Service Requests</span>

@@ -9,17 +9,17 @@
    ===================================================================== */
 
 html:not([data-bs-theme="dark"]) {
-    --lp-blue: #0D3B85; --lp-blue-dark: #082A63; --lp-navy: #081225;
-    --lp-gold: #F4B41A; --lp-sky: #4C7FD1; --lp-ink: #0F172A;
-    --lp-muted: #64748B; --lp-alt: #F1F5F9; --lp-line: #E2E8F0;
+    --lp-blue: #1046B8; --lp-blue-dark: #061747; --lp-navy: #061747;
+    --lp-gold: #FFC928; --lp-sky: #1684FF; --lp-ink: #0F172A;
+    --lp-muted: #64748B; --lp-alt: #F3F7FF; --lp-line: #DCE6F8;
 
     --napiq-primary: var(--lp-blue);
     --napiq-primary-dark: var(--lp-blue-dark);
     --napiq-bg: var(--lp-alt);
     --napiq-border: var(--lp-line);
     --napiq-text-muted: var(--lp-muted);
-    --bs-link-color: #0D3B85;
-    --bs-link-hover-color: #082A63;
+    --bs-link-color: #1684FF;
+    --bs-link-hover-color: #1046B8;
 }
 html:not([data-bs-theme="dark"]) body.dash-body {
     background-color: var(--lp-alt);
@@ -29,12 +29,12 @@ html:not([data-bs-theme="dark"]) body.dash-body {
 
 /* Sidebar: landing hero gradient, gold active marker */
 html:not([data-bs-theme="dark"]) .dash-sidebar {
-    background: linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%);
+    background: linear-gradient(175deg, #061747 0%, #0A2A86 58%, #0B3BB0 100%);
 }
 html:not([data-bs-theme="dark"]) .dash-nav-link { color: #CBD5E1; }
 html:not([data-bs-theme="dark"]) .dash-nav-link:hover { background: rgba(255, 255, 255, .1); color: #fff; }
 html:not([data-bs-theme="dark"]) .dash-nav-link.active {
-    background: rgba(255, 255, 255, .14); color: #fff;
+    background: linear-gradient(90deg, #1046B8 0%, #1684FF 100%); color: #fff;
     box-shadow: inset 3px 0 0 var(--lp-gold);
 }
 html:not([data-bs-theme="dark"]) .dash-nav-link.active i { color: var(--lp-gold); }
@@ -52,7 +52,7 @@ html:not([data-bs-theme="dark"]) .dash-body .table thead th { color: var(--lp-bl
 html:not([data-bs-theme="dark"]) .dash-body .btn-primary {
     background-color: var(--lp-blue); border-color: var(--lp-blue);
     border-radius: 999px; font-weight: 600;
-    box-shadow: 0 8px 18px -10px rgba(13, 59, 133, .6);
+    box-shadow: 0 8px 18px -10px rgba(16, 70, 184, .6);
 }
 html:not([data-bs-theme="dark"]) .dash-body .btn-primary:hover,
 html:not([data-bs-theme="dark"]) .dash-body .btn-primary:focus {
@@ -72,7 +72,7 @@ html:not([data-bs-theme="dark"]) .dash-body .btn-sm { font-size: .82rem; }
 /* Form focus + pagination + tabs in the same blue */
 html:not([data-bs-theme="dark"]) .dash-body .form-control:focus,
 html:not([data-bs-theme="dark"]) .dash-body .form-select:focus {
-    border-color: var(--lp-sky); box-shadow: 0 0 0 .2rem rgba(76, 127, 209, .25);
+    border-color: var(--lp-sky); box-shadow: 0 0 0 .2rem rgba(22, 132, 255, .25);
 }
 html:not([data-bs-theme="dark"]) .dash-body .page-item.active .page-link {
     background-color: var(--lp-blue); border-color: var(--lp-blue); color: #fff;
@@ -84,3 +84,32 @@ html:not([data-bs-theme="dark"]) .dash-body .nav-pills .nav-link.active { backgr
 html:not([data-bs-theme="dark"]) .dash-body .text-primary { color: var(--lp-blue) !important; }
 html:not([data-bs-theme="dark"]) .dash-body .bg-primary { background-color: var(--lp-blue) !important; }
 html:not([data-bs-theme="dark"]) .dash-body .border-primary { border-color: var(--lp-blue) !important; }
+
+
+/* ---------------------------------------------------------------- */
+/* PG Networks brand palette (both light & dark): sidebar finishing   */
+/* Deep Navy #061747 / Royal Blue #1046B8 / PG Gold #FFC928 /         */
+/* Electric Blue #1684FF / Ice Blue #F3F7FF / white cards             */
+/* ---------------------------------------------------------------- */
+body.dash-body .dash-sidebar {
+    background: linear-gradient(175deg, #061747 0%, #0A2A86 58%, #0B3BB0 100%);
+    overflow: hidden;
+}
+/* gold + blue swoosh in the bottom corner of the sidebar */
+body.dash-body .dash-sidebar::after {
+    content: "";
+    position: absolute;
+    left: -30%;
+    right: -30%;
+    bottom: -40px;
+    height: 170px;
+    background:
+        linear-gradient(8deg, transparent 46%, rgba(255, 201, 40, .85) 47%, rgba(255, 201, 40, .85) 50%, transparent 51%),
+        radial-gradient(120% 100% at 20% 100%, rgba(22, 132, 255, .35), transparent 60%);
+    pointer-events: none;
+    opacity: .9;
+}
+body.dash-body .dash-sidebar > * { position: relative; z-index: 1; }
+body.dash-body .dash-nav-link.active { background: linear-gradient(90deg, #1046B8 0%, #1684FF 100%); box-shadow: inset 3px 0 0 #FFC928; }
+body.dash-body .dash-nav-link.active i { color: #FFC928; }
+body.dash-body .dash-badge-count.text-bg-danger { background-color: #EF4444 !important; }

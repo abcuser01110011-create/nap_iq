@@ -1766,11 +1766,13 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
     color: #fff;
 }
 
-.stat-icon-purple { background: #8b5cf6; }
-.stat-icon-blue   { background: #0ea5e9; }
-.stat-icon-green  { background: #22c55e; }
-.stat-icon-red    { background: #f87171; }
-.stat-icon-orange { background: #f59e0b; }
+.stat-icon-purple { background: linear-gradient(135deg, #A78BFA, #8B5CF6); }
+.stat-icon-blue   { background: linear-gradient(135deg, #38A3FF, #1684FF); }
+.stat-icon-royal  { background: linear-gradient(135deg, #1684FF, #1046B8); }
+.stat-icon-green  { background: linear-gradient(135deg, #22C55E, #16A34A); }
+.stat-icon-red    { background: linear-gradient(135deg, #F87171, #EF4444); }
+.stat-icon-orange { background: linear-gradient(135deg, #FBBF24, #F59E0B); }
+.stat-icon-gold   { background: linear-gradient(135deg, #FFD65A, #FFC928); color: #061747; }
 
 .dash-stat-body {
     display: flex;
@@ -2817,4 +2819,191 @@ html.dash-embedded .dash-content .row > .col-lg-7 {
     .dash-greeting-search {
         width: 100%;
     }
+}
+
+
+/* ---------------------------------------------------------------- */
+/* PG NETWORKS BRAND THEME: tagline, navy hero card, navy stat cards  */
+/* ---------------------------------------------------------------- */
+
+.dash-sidebar-tagline {
+    padding: 0.5rem 1.4rem 1rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #dbe7ff;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+}
+
+.dash-sidebar-tagline span {
+    display: block;
+    width: 22px;
+    height: 3px;
+    margin-top: 0.5rem;
+    border-radius: 2px;
+    background: #FFC928;
+}
+
+html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-sidebar-tagline {
+    opacity: 0;
+}
+
+/* Hero greeting card */
+.dash-greeting {
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+    background:
+        radial-gradient(60% 120% at 85% 0%, rgba(22, 132, 255, 0.45), transparent 60%),
+        linear-gradient(120deg, #061747 0%, #0A2A86 55%, #1046B8 100%);
+    border: 1px solid rgba(22, 132, 255, 0.35);
+    box-shadow: 0 14px 34px -18px rgba(6, 23, 71, 0.7);
+}
+
+/* gold diagonal accent */
+.dash-greeting::before {
+    content: "";
+    position: absolute;
+    top: -40%;
+    right: 6%;
+    width: 14px;
+    height: 220%;
+    background: linear-gradient(180deg, #FFC928, rgba(255, 201, 40, 0.15));
+    transform: rotate(38deg);
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+.dash-greeting > * {
+    position: relative;
+    z-index: 1;
+}
+
+.dash-greeting-clock,
+.dash-greeting-title {
+    color: #fff;
+}
+
+.dash-greeting-dot {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.dash-greeting-time {
+    color: #fff;
+}
+
+.dash-greeting-name {
+    color: #FFC928;
+}
+
+.dash-greeting-sub {
+    color: #fff;
+}
+
+.dash-greeting-meta {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.dash-greeting-art {
+    position: absolute !important;
+    right: 3.5%;
+    bottom: -6px;
+    font-size: 5.5rem;
+    line-height: 1;
+    color: rgba(22, 132, 255, 0.55);
+    pointer-events: none;
+}
+
+.dash-greeting-search {
+    background: rgba(6, 23, 71, 0.45);
+    border: 1px solid #1684FF;
+    color: #fff;
+}
+
+.dash-greeting-search i,
+.dash-greeting-search input::placeholder {
+    color: #fff;
+    opacity: 0.85;
+}
+
+.dash-greeting-search kbd {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+.dash-greeting .dash-icon-btn,
+.dash-greeting .napiq-theme-toggle {
+    background: rgba(6, 23, 71, 0.45);
+    border: 1px solid rgba(22, 132, 255, 0.6);
+    color: #fff;
+}
+
+.dash-greeting .dash-user-name {
+    color: #fff;
+}
+
+.dash-greeting .dash-user-role {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.dash-greeting .dash-user-avatar {
+    background: #1684FF;
+}
+
+.dash-greeting .dash-sidebar-toggle {
+    color: #fff;
+}
+
+/* Stat cards: navy gradient tiles */
+.dash-body .dash-stat-card {
+    position: relative;
+    background: linear-gradient(135deg, #061747 0%, #0A2A86 100%);
+    border: 1px solid rgba(22, 132, 255, 0.35);
+    border-radius: 0.9rem;
+    color: #fff;
+    padding: 1rem 2.4rem 1rem 1rem;
+    box-shadow: 0 10px 24px -16px rgba(6, 23, 71, 0.8);
+}
+
+.dash-body .dash-stat-card::after {
+    content: "\F285"; /* bootstrap-icons: chevron-right */
+    font-family: "bootstrap-icons";
+    position: absolute;
+    right: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+}
+
+.dash-body .dash-stat-card .dash-stat-value {
+    color: #fff;
+}
+
+.dash-body .dash-stat-card .dash-stat-label {
+    color: #cfe0ff;
+    font-weight: 600;
+}
+
+.dash-body .dash-stat-card-link:hover,
+.dash-body .dash-stat-card-link:focus-visible {
+    background: linear-gradient(135deg, #0A2A86 0%, #1046B8 100%);
+    border-color: #FFC928;
+    color: #fff;
+}
+
+/* Panels: white cards, navy titles, status accents */
+html:not([data-bs-theme="dark"]) .summary-panel-header h5,
+html:not([data-bs-theme="dark"]) .dash-panel-header h5 {
+    color: #061747;
+}
+
+html:not([data-bs-theme="dark"]) .summary-panel-header h5 i {
+    color: #1046B8;
+}
+
+.port-util-fill {
+    background: linear-gradient(90deg, #061747, #1684FF);
 }
