@@ -157,12 +157,12 @@
 
     body.subs-fit .subs-pager-list {
         padding: 0.2rem;
+        --pager-w: 1.85rem;
+        --pager-h: 1.85rem;
+        --pager-nav-w: 3.2rem;
     }
 
     body.subs-fit .subs-pager-link {
-        min-width: 1.85rem;
-        height: 1.85rem;
-        padding: 0 0.65rem;
         font-size: 0.8rem;
     }
 }

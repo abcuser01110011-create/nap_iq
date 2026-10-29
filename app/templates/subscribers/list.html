@@ -270,7 +270,7 @@
         function pageItem(label, target, opts) {
             opts = opts || {};
             var li = document.createElement('li');
-            li.className = 'subs-pager-item' + (opts.active ? ' is-active' : '') + (opts.disabled ? ' is-disabled' : '') + (opts.gap ? ' is-gap' : '');
+            li.className = 'subs-pager-item' + (opts.active ? ' is-active' : '') + (opts.disabled ? ' is-disabled' : '') + (opts.gap ? ' is-gap' : '') + (opts.nav ? ' is-nav' : '');
             var a = document.createElement('a');
             a.className = 'subs-pager-link';
             a.href = '#';
@@ -307,21 +307,32 @@
             if (total <= PAGE_SIZE) return;
 
             pagerList.innerHTML = '';
-            pagerList.appendChild(pageItem('prev', page - 1, { disabled: page === 1, aria: 'Previous page' }));
+            pagerList.appendChild(pageItem('prev', page - 1, { disabled: page === 1, nav: true, aria: 'Previous page' }));
 
-            // Compact window: first, last, current +/- 1, with ellipses.
-            var shown = {};
-            [1, pages, page - 1, page, page + 1].forEach(function (n) {
-                if (n >= 1 && n <= pages) shown[n] = true;
-            });
-            var last = 0;
-            Object.keys(shown).map(Number).sort(function (x, y) { return x - y; }).forEach(function (n) {
-                if (n - last > 1) pagerList.appendChild(pageItem('&hellip;', n, { disabled: true, gap: true }));
-                pagerList.appendChild(pageItem(String(n), n, { active: n === page }));
-                last = n;
+            // Fixed-size window: always the same number of slots (7) once
+            // there are more than 7 pages, so the pill never changes width.
+            //   1 2 3 4 5 ... N   |   1 ... 4 5 6 ... N   |   1 ... N-4 .. N
+            var slots = [];
+            if (pages <= 7) {
+                for (var i = 1; i <= pages; i++) slots.push(i);
+            } else if (page <= 4) {
+                slots = [1, 2, 3, 4, 5, 'gap', pages];
+            } else if (page >= pages - 3) {
+                slots = [1, 'gap', pages - 4, pages - 3, pages - 2, pages - 1, pages];
+            } else {
+                slots = [1, 'gap', page - 1, page, page + 1, 'gap', pages];
+            }
+            slots.forEach(function (n, idx) {
+                if (n === 'gap') {
+                    // Gap jumps to the page in the middle of the hidden range.
+                    var prevN = slots[idx - 1], nextN = slots[idx + 1];
+                    pagerList.appendChild(pageItem('&hellip;', Math.round((prevN + nextN) / 2), { gap: true }));
+                } else {
+                    pagerList.appendChild(pageItem(String(n), n, { active: n === page }));
+                }
             });
 
-            pagerList.appendChild(pageItem('next', page + 1, { disabled: page === pages, aria: 'Next page' }));
+            pagerList.appendChild(pageItem('next', page + 1, { disabled: page === pages, nav: true, aria: 'Next page' }));
         }
 
         function applyFilter() {
