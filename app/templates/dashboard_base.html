@@ -10,6 +10,8 @@
         // Sidebar is an icon-only rail on desktop; hovering expands it
         // (see script at the bottom). Set pre-paint to avoid a flash.
         (function () {
+            // Loaded inside the Account modal's iframe: hide the shell chrome.
+            try { if (window.self !== window.top) document.documentElement.classList.add('dash-embedded'); } catch (e) { document.documentElement.classList.add('dash-embedded'); }
             if (window.innerWidth >= 992) {
                 document.documentElement.classList.add('dash-sidebar-collapsed');
             }
@@ -236,11 +238,11 @@
                         {% if current_user and current_user.email %}
                         <div class="dash-profile-dropdown-email">{{ current_user.email }}</div>
                         {% endif %}
-                        <a href="{{ url_for('profile.index') }}" class="dash-profile-dropdown-item" role="menuitem">
+                        <a href="{{ url_for('profile.index') }}" class="dash-profile-dropdown-item" role="menuitem" data-account-tab="profile">
                             <i class="bi bi-person-circle"></i><span>Profile</span>
                         </a>
                         {% if current_user and current_user.role != 'user' %}
-                        <a href="{{ url_for('settings.index') }}" class="dash-profile-dropdown-item" role="menuitem">
+                        <a href="{{ url_for('settings.index') }}" class="dash-profile-dropdown-item" role="menuitem" data-account-tab="settings">
                             <i class="bi bi-gear"></i><span>Settings</span>
                         </a>
                         {% endif %}
@@ -290,6 +292,38 @@
                     <button type="button" class="btn btn-danger" id="logoutConfirmBtn">
                         <i class="bi bi-box-arrow-right me-1"></i>Log out
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account modal: Profile / Settings shown as a popup. The existing
+         /profile/ and /settings/ pages are loaded into the iframe (they hide
+         their own sidebar/topbar via html.dash-embedded), so every form,
+         route and permission check keeps working unchanged. -->
+    <div class="modal fade" id="accountModal" tabindex="-1" aria-labelledby="accountModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-md-down">
+            <div class="modal-content account-modal">
+                <div class="account-modal-header">
+                    <h5 class="account-modal-title" id="accountModalLabel">Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="account-modal-body">
+                    <nav class="account-modal-nav" aria-label="Account sections">
+                        <div class="account-modal-nav-label">Account</div>
+                        <button type="button" class="account-modal-tab" data-account-tab="profile" data-src="{{ url_for('profile.index') }}">
+                            <i class="bi bi-person"></i><span>Profile</span>
+                        </button>
+                        {% if current_user and current_user.role != 'user' %}
+                        <div class="account-modal-nav-label">Preferences</div>
+                        <button type="button" class="account-modal-tab" data-account-tab="settings" data-src="{{ url_for('settings.index') }}">
+                            <i class="bi bi-gear"></i><span>Settings</span>
+                        </button>
+                        {% endif %}
+                    </nav>
+                    <div class="account-modal-content">
+                        <iframe id="accountFrame" title="Account" src="about:blank"></iframe>
+                    </div>
                 </div>
             </div>
         </div>
@@ -506,6 +540,48 @@
         });
         var sidebar = document.getElementById('dashSidebar') || document.querySelector('.dash-sidebar');
         if (sidebar) sidebar.addEventListener('mouseleave', function () { setOpen(false); });
+    })();
+
+    // Account modal (Profile / Settings popup).
+    (function () {
+        var modalEl = document.getElementById('accountModal');
+        var frame = document.getElementById('accountFrame');
+        if (!modalEl || !frame || document.documentElement.classList.contains('dash-embedded')) return;
+        var tabs = modalEl.querySelectorAll('.account-modal-tab');
+        var title = document.getElementById('accountModalLabel');
+        var loads = 0;
+
+        function show(name) {
+            var found = null;
+            tabs.forEach(function (t) {
+                var on = t.getAttribute('data-account-tab') === name;
+                t.classList.toggle('active', on);
+                if (on) found = t;
+            });
+            if (!found) return false;
+            title.textContent = found.textContent.trim();
+            loads = 0;
+            frame.src = found.getAttribute('data-src');
+            return true;
+        }
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function () { show(t.getAttribute('data-account-tab')); });
+        });
+        frame.addEventListener('load', function () {
+            if (frame.getAttribute('src') !== 'about:blank') loads++;
+        });
+        document.querySelectorAll('.dash-profile-dropdown-item[data-account-tab]').forEach(function (a) {
+            a.addEventListener('click', function (e) {
+                if (!show(a.getAttribute('data-account-tab'))) return; // fall back to normal link
+                e.preventDefault();
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            });
+        });
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            var changed = loads > 1; // something was saved inside the popup
+            frame.src = 'about:blank';
+            if (changed) window.location.reload(); // refresh name/theme in the shell
+        });
     })();
 
     // Logout confirmation: the "Log out" button inside #logoutConfirmModal
