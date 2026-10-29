@@ -328,6 +328,7 @@
     <!-- ============================ MAIN AREA ============================ -->
     <div class="dash-main">
 
+        {% block topbar %}
         <header class="dash-topbar">
             <button type="button" class="dash-sidebar-toggle" id="dashSidebarToggle" aria-label="Toggle navigation">
                 <i class="bi bi-list"></i>
@@ -341,6 +342,7 @@
             {% block topbar_search %}{% endblock %}
 
             <div class="dash-topbar-actions">
+                {% block topbar_actions %}
                 {# Dark Mode toggle — a per-account preference (users.theme_preference),
                    visible to every signed-in role next to the notification bell.
                    Handled entirely by static/js/theme.js, which posts to
@@ -426,8 +428,10 @@
                         <span class="dash-user-role">{{ current_user.role|replace('_', ' ')|title if current_user else '' }}</span>
                     </span>
                 </a>
+                {% endblock %}
             </div>
         </header>
+        {% endblock %}
 
         <main class="dash-content">
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -472,7 +476,7 @@
             backdrop.classList.remove('dash-sidebar-backdrop-visible');
         }
 
-        toggle.addEventListener('click', function () {
+        if (toggle) toggle.addEventListener('click', function () {
             sidebar.classList.toggle('dash-sidebar-open');
             backdrop.classList.toggle('dash-sidebar-backdrop-visible');
         });

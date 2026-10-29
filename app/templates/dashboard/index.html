@@ -9,7 +9,74 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 {% endblock %}
 
+{# The standard top bar is replaced by the greeting card below, which carries
+   the date/time, search, theme toggle and notifications itself. #}
+{% block topbar %}{% endblock %}
+
 {% block content %}
+
+{# ------------------------------------------------------------------ #}
+{# GREETING CARD                                                        #}
+{# ------------------------------------------------------------------ #}
+{% set first_name = (current_user.full_name or current_user.username).split(' ')[0] if current_user else 'there' %}
+<section class="dash-greeting" aria-label="Welcome">
+    <div class="dash-greeting-top">
+        <div class="dash-greeting-clock">
+            <button type="button" class="dash-sidebar-toggle" id="dashSidebarToggle" aria-label="Toggle navigation">
+                <i class="bi bi-list"></i>
+            </button>
+            <span id="dashGreetingDate">&nbsp;</span>
+            <span class="dash-greeting-dot">&middot;</span>
+            <span id="dashGreetingTime" class="dash-greeting-time">&nbsp;</span>
+        </div>
+
+        <div class="dash-greeting-tools">
+            <form class="dash-greeting-search" method="get" action="{{ url_for('subscribers.list_subscribers') }}" role="search">
+                <i class="bi bi-search"></i>
+                <input type="search" name="q" id="dashGreetingSearch" placeholder="Search subscribers..." autocomplete="off" aria-label="Search subscribers">
+                <kbd>Ctrl K</kbd>
+            </form>
+            <div class="dash-topbar-actions">
+                {{ self.topbar_actions() }}
+            </div>
+        </div>
+    </div>
+
+    <div class="dash-greeting-body">
+        <h2 class="dash-greeting-title"><span id="dashGreetingWord">Welcome</span>, {{ first_name }}</h2>
+        <p class="dash-greeting-sub">
+            {% if unread_notifications_count %}
+                You've got {{ unread_notifications_count }} update{{ '' if unread_notifications_count == 1 else 's' }} waiting in your notifications.
+            {% else %}
+                You're all caught up &mdash; no new notifications.
+            {% endif %}
+        </p>
+        <p class="dash-greeting-meta">Live operations overview for PG Networks</p>
+    </div>
+</section>
+
+<script>
+(function () {
+    var dateEl = document.getElementById('dashGreetingDate');
+    var timeEl = document.getElementById('dashGreetingTime');
+    var wordEl = document.getElementById('dashGreetingWord');
+    function tick() {
+        var now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+        var h = now.getHours();
+        wordEl.textContent = h < 12 ? 'Good morning' : (h < 18 ? 'Good afternoon' : 'Good evening');
+    }
+    tick();
+    setInterval(tick, 1000);
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            document.getElementById('dashGreetingSearch').focus();
+        }
+    });
+})();
+</script>
 
 {# ------------------------------------------------------------------ #}
 {# ROW: TOP STAT CARDS                                                  #}

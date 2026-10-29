@@ -2674,3 +2674,141 @@ html.dash-embedded .dash-content .row > .col-lg-7 {
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
 }
+
+
+/* ---------------------------------------------------------------- */
+/* ADMIN DASHBOARD GREETING CARD (replaces the top bar on that page)  */
+/* ---------------------------------------------------------------- */
+
+.dash-greeting {
+    background: linear-gradient(135deg, #f5f3ff 0%, #eef4ff 60%, #f8fbff 100%);
+    border: 1px solid var(--napiq-border);
+    border-radius: 1.25rem;
+    padding: 1.4rem 1.75rem 1.6rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 6px 24px rgba(31, 41, 55, 0.06);
+}
+
+.dash-greeting-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.dash-greeting-clock {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #374151;
+}
+
+.dash-greeting-clock .dash-sidebar-toggle {
+    margin-right: 0.25rem;
+}
+
+.dash-greeting-dot {
+    color: #9ca3af;
+}
+
+.dash-greeting-time {
+    color: var(--napiq-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.dash-greeting-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.dash-greeting-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 320px;
+    max-width: 100%;
+    padding: 0.5rem 0.8rem;
+    border-radius: 0.75rem;
+    background: var(--napiq-surface);
+    border: 1px solid var(--napiq-border);
+    margin: 0;
+}
+
+.dash-greeting-search i {
+    color: var(--napiq-text-muted);
+}
+
+.dash-greeting-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 0.88rem;
+    color: inherit;
+}
+
+.dash-greeting-search kbd {
+    font-size: 0.68rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.35rem;
+    background: var(--napiq-bg);
+    color: var(--napiq-text-muted);
+    border: 1px solid var(--napiq-border);
+    box-shadow: none;
+}
+
+.dash-greeting-body {
+    margin-top: 1.1rem;
+}
+
+.dash-greeting-title {
+    margin: 0 0 0.35rem;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.dash-greeting-sub {
+    margin: 0 0 0.35rem;
+    color: var(--napiq-text-muted);
+}
+
+.dash-greeting-meta {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--napiq-text-muted);
+}
+
+[data-bs-theme="dark"] .dash-greeting {
+    background: linear-gradient(135deg, #1b1f33 0%, #17233a 60%, #162033 100%);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+[data-bs-theme="dark"] .dash-greeting-clock {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .dash-greeting-search {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 575.98px) {
+    .dash-greeting {
+        padding: 1rem;
+    }
+    .dash-greeting-title {
+        font-size: 1.5rem;
+    }
+    .dash-greeting-search {
+        width: 100%;
+    }
+}
