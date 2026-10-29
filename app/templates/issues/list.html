@@ -53,7 +53,7 @@
             {% if pending_requests %}
                 {% for req in pending_requests %}
                     <li>
-                        <a class="dropdown-item" href="{{ url_for('issues.view_issue', issue_id=req.id) }}">
+                        <a class="dropdown-item ticket-open" href="{{ url_for('issues.view_issue', issue_id=req.id) }}" data-detail-url="{{ url_for('issues.view_issue', issue_id=req.id, partial=1) }}">
                             <span class="fw-semibold">{{ req.subscriber_name }}</span>
                             <span class="text-muted small d-block">{{ req.issue_type }} &middot; {{ req.issue_code }}</span>
                         </a>
@@ -116,9 +116,9 @@
             </thead>
             <tbody id="issuesTableBody">
                 {% for ticket in tickets %}
-                <tr class="disp-row disp-row-clickable" data-search="{{ ticket.search_blob }}" onclick="window.location='{{ ticket.detail_url }}';">
+                <tr class="disp-row disp-row-clickable" data-search="{{ ticket.search_blob }}" data-detail-url="{{ ticket.detail_url }}?partial=1" style="cursor: pointer;">
                     <td>
-                        <a href="{{ ticket.detail_url }}" class="disp-primary-link">
+                        <a href="{{ ticket.detail_url }}" class="disp-primary-link ticket-open">
                             {{ ticket.code }}
                         </a>
                     </td>
@@ -148,7 +148,7 @@
                     <td class="text-end">
                         <div class="subs-row-actions">
                             <a href="{{ ticket.detail_url }}"
-                               class="subs-edit-btn" title="View" onclick="event.stopPropagation();">
+                               class="subs-edit-btn ticket-open" title="View">
                                 <i class="bi bi-eye"></i>
                             </a>
                             <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
@@ -181,6 +181,104 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<div class="modal fade" id="ticketDetailModal" tabindex="-1" aria-label="Ticket details" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <span class="text-muted small">Ticket details</span>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 pb-4" id="ticketDetailBody"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Ticket details popup: same behavior as the Subscribers list --
+    // clicking a row opens a modal immediately and fills it from a
+    // background fetch (cached, prefetched on hover). No page navigation.
+    (function () {
+        var modalEl = document.getElementById('ticketDetailModal');
+        var bodyEl = document.getElementById('ticketDetailBody');
+        var tbody = document.getElementById('issuesTableBody');
+        if (!modalEl || !bodyEl || !tbody) return;
+
+        var cache = {};
+        var pending = {};
+        var current = null;
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+        var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+        var ERROR = '<div class="text-center text-muted py-5">Could not load ticket details. Please try again.</div>';
+
+        function load(url) {
+            if (cache[url]) return Promise.resolve(cache[url]);
+            if (pending[url]) return pending[url];
+            pending[url] = fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.text();
+                })
+                .then(function (html) {
+                    cache[url] = html;
+                    delete pending[url];
+                    return html;
+                })
+                .catch(function (err) {
+                    delete pending[url];
+                    throw err;
+                });
+            return pending[url];
+        }
+
+        function rowUrl(target) {
+            var el = target.closest && target.closest('[data-detail-url]');
+            return el ? el.getAttribute('data-detail-url') : null;
+        }
+
+        function openTicket(url) {
+            current = url;
+            bodyEl.innerHTML = cache[url] || SPINNER;
+            modal.show();
+            if (!cache[url]) {
+                load(url).then(function (html) {
+                    if (current === url) bodyEl.innerHTML = html;
+                }).catch(function () {
+                    if (current === url) bodyEl.innerHTML = ERROR;
+                });
+            }
+        }
+
+        tbody.addEventListener('mouseover', function (e) {
+            var url = rowUrl(e.target);
+            if (url) load(url).catch(function () {});
+        });
+
+        // Table rows, the code link and the eye button all open the popup.
+        tbody.addEventListener('click', function (e) {
+            var control = e.target.closest('a, button');
+            if (control && !control.classList.contains('ticket-open')) return;
+            var url = rowUrl(e.target);
+            if (!url) return;
+            e.preventDefault();
+            openTicket(url);
+        });
+
+        // "Requests" dropdown entries open the same popup.
+        document.querySelectorAll('a.ticket-open[data-detail-url]').forEach(function (a) {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                openTicket(a.getAttribute('data-detail-url'));
+            });
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            current = null;
+            bodyEl.innerHTML = '';
+        });
+    })();
+</script>
+
 <script>
     // Instant client-side filtering as the admin types — same pattern
     // as subscribers/list.html: filters the rows already on the page

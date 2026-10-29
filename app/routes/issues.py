@@ -971,6 +971,18 @@ def view_issue(issue_id):
         # Backs the "Create Ticket" button's "+ Tickets" modal.
         subscriber_plan_types = _subscriber_plan_types()
 
+    # The Tickets list opens this same detail view in a popup (fetched in
+    # the background) -- it asks for just the card contents via ?partial=1.
+    if request.args.get("partial"):
+        return render_template(
+            "issues/_detail_body.html",
+            issue=issue,
+            assignment=assignment,
+            technicians=technicians,
+            assignment_history=assignment_history,
+            subscriber_plan_types=subscriber_plan_types,
+        )
+
     return render_template(
         "issues/view.html",
         issue=issue,
@@ -1062,6 +1074,17 @@ def view_service_order(request_id):
 
     request_type = service_request.request_type or ""
     type_label = "NAP Installation" if request_type == "add_nap" else request_type.replace("_", " ").title()
+
+    if request.args.get("partial"):
+        return render_template(
+            "issues/_service_order_body.html",
+            service_request=service_request,
+            type_label=type_label,
+            assignment=current_assignment,
+            technicians=technicians,
+            assignment_history=assignment_history,
+            dispatchable=service_request.status in _DISPATCHABLE_REQUEST_STATUSES,
+        )
 
     return render_template(
         "issues/view_service_order.html",

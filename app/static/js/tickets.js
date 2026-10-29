@@ -1179,14 +1179,29 @@
         if (!modalEl || typeof bootstrap === "undefined") return;
         modalInstance = new bootstrap.Modal(modalEl);
 
-        document.querySelectorAll(".ticket-type-option").forEach((item) => {
-            item.addEventListener("click", (event) => {
-                event.preventDefault();
-                const category = item.getAttribute("data-category");
-                const typeValue = item.getAttribute("data-type-value");
-                const typeLabel = item.getAttribute("data-type-label");
-                openTicketForm(category, typeValue, typeLabel, readPresetSubscriber(item), readPresetDescription(item));
-            });
+        // Delegated so ticket-type-option elements injected later (e.g. the
+        // "Create Ticket" button inside the Tickets list's detail popup)
+        // work too.
+        document.addEventListener("click", (event) => {
+            const item = event.target.closest && event.target.closest(".ticket-type-option");
+            if (!item) return;
+            event.preventDefault();
+            const category = item.getAttribute("data-category");
+            const typeValue = item.getAttribute("data-type-value");
+            const typeLabel = item.getAttribute("data-type-label");
+            const preset = readPresetSubscriber(item);
+            const presetDesc = readPresetDescription(item);
+            // Opened from inside another popup: close that one first.
+            const parentModal = item.closest(".modal");
+            if (parentModal) {
+                const inst = bootstrap.Modal.getInstance(parentModal);
+                if (inst) {
+                    inst.hide();
+                    setTimeout(() => openTicketForm(category, typeValue, typeLabel, preset, presetDesc), 350);
+                    return;
+                }
+            }
+            openTicketForm(category, typeValue, typeLabel, preset, presetDesc);
         });
 
         document.getElementById("ticketForm").addEventListener("submit", handleSubmit);
