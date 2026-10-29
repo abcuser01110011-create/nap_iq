@@ -102,10 +102,11 @@
         background: var(--napiq-surface);
     }
 
-    /* Each of the 10 rows is sized from the viewport height:
-       (100vh - ~220px of page chrome) / 10, kept between 42px and 54px. */
+    /* Each of the 10 rows is stretched to fill the table card. */
+    /* --subs-row-h is set by a small script in list.html so the 10 rows
+       exactly fill the table card; 48px is just the no-JS fallback. */
     body.subs-fit .subs-table tbody tr.subs-row {
-        height: clamp(42px, calc((100vh - 220px) / 10), 54px);
+        height: var(--subs-row-h, 48px);
     }
 
     body.subs-fit .subs-table tbody td {
@@ -147,10 +148,11 @@
         font-size: 0.75rem;
     }
 
-    /* ---- Pager pinned to the bottom of the card ---- */
+    /* ---- Pager: outside the table card, centered right below it ---- */
     body.subs-fit .subs-pager {
         flex-shrink: 0;
-        padding: 0.45rem 1rem;
+        border-top: none;
+        padding: 0.6rem 0 0;
     }
 
     body.subs-fit .subs-pager-list {

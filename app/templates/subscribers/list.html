@@ -144,11 +144,13 @@
             </tbody>
         </table>
     </div>
-    <div class="subs-pager" id="subsPager" hidden>
-        <nav aria-label="Subscribers pages">
-            <ul class="subs-pager-list" id="subsPagerList"></ul>
-        </nav>
-    </div>
+</div>
+
+{# Pagination lives OUTSIDE the table card, directly under it. #}
+<div class="subs-pager" id="subsPager" hidden>
+    <nav aria-label="Subscribers pages">
+        <ul class="subs-pager-list" id="subsPagerList"></ul>
+    </nav>
 </div>
 {% endblock %}
 
@@ -345,6 +347,28 @@
         // No-JS / slow-typist fallback: Enter still submits a real
         // server-side search (?q=...), which also covers subscribers
         // outside the currently loaded status subset.
+    })();
+</script>
+
+<script>
+    // Fit-to-screen: size the 10 rows so they exactly fill the table card
+    // (no empty space under the last row). Runs on load and on resize.
+    (function () {
+        var table = document.querySelector('.subs-table');
+        var wrap = table && table.closest('.table-responsive');
+        if (!table || !wrap) return;
+        var ROWS = 10;
+        function fit() {
+            var thead = table.querySelector('thead');
+            var avail = wrap.clientHeight - (thead ? thead.offsetHeight : 0) - 1;
+            var h = Math.max(40, avail / ROWS);
+            table.style.setProperty('--subs-row-h', h + 'px');
+        }
+        fit();
+        window.addEventListener('resize', fit);
+        if (window.ResizeObserver) new ResizeObserver(fit).observe(wrap); // pager show/hide, sidebar collapse
+        window.addEventListener('load', fit);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
     })();
 </script>
 {% endblock %}
