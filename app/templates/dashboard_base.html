@@ -310,18 +310,6 @@
             <button type="button" class="btn-close ms-auto" id="accountPanelClose" aria-label="Close"></button>
         </div>
         <div class="account-modal-body">
-            <nav class="account-modal-nav" aria-label="Account sections">
-                <div class="account-modal-nav-label">Account</div>
-                <button type="button" class="account-modal-tab" data-account-tab="profile" data-src="{{ url_for('profile.index') }}">
-                    <i class="bi bi-person"></i><span>Profile</span>
-                </button>
-                {% if current_user and current_user.role != 'user' %}
-                <div class="account-modal-nav-label">Preferences</div>
-                <button type="button" class="account-modal-tab" data-account-tab="settings" data-src="{{ url_for('settings.index') }}">
-                    <i class="bi bi-gear"></i><span>Settings</span>
-                </button>
-                {% endif %}
-            </nav>
             <div class="account-modal-content">
                 <iframe id="accountFrame" title="Account" src="about:blank"></iframe>
             </div>
@@ -501,7 +489,7 @@
         }
 
         function close() {
-            if (root.classList.contains('dash-account-hover')) return;
+            if (root.classList.contains('dash-account-hover') || root.classList.contains('dash-account-pinned')) return;
             root.classList.remove('dash-sidebar-open');
         }
 
@@ -531,63 +519,64 @@
             e.stopPropagation();
             setOpen(menu.hidden);
         });
-        menu.addEventListener('click', function () { setOpen(false); });
+        menu.addEventListener('click', function (e) {
+            if (e.target.closest('[data-account-tab]')) return; // Profile/Settings lock the menu open
+            setOpen(false);
+        });
         document.addEventListener('click', function (e) {
+            if (document.documentElement.classList.contains('dash-account-pinned')) return;
             if (!wrap.contains(e.target)) setOpen(false);
         });
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'Escape' && !document.documentElement.classList.contains('dash-account-pinned')) setOpen(false);
         });
         var sidebar = document.getElementById('dashSidebar') || document.querySelector('.dash-sidebar');
         if (sidebar) sidebar.addEventListener('mouseleave', function () {
-            if (document.documentElement.classList.contains('dash-account-hover')) return;
+            var cl = document.documentElement.classList;
+            if (cl.contains('dash-account-hover') || cl.contains('dash-account-pinned')) return;
             setOpen(false);
         });
         document.addEventListener('dash:closeprofilemenu', function () { setOpen(false); });
     })();
 
-    // Account panel (Profile / Settings): hover previews, click locks open.
+    // Account panel (Profile / Settings): hover previews, click locks the
+    // panel AND the dropdown open until the X / Esc is used.
     (function () {
         var panel = document.getElementById('accountPanel');
         var frame = document.getElementById('accountFrame');
         var sidebar = document.getElementById('dashSidebar');
         if (!panel || !frame || !sidebar || document.documentElement.classList.contains('dash-embedded')) return;
         var root = document.documentElement;
-        var tabs = panel.querySelectorAll('.account-modal-tab');
         var title = document.getElementById('accountPanelLabel');
         var pinIcon = document.getElementById('accountPanelPin');
         var items = document.querySelectorAll('.dash-profile-dropdown-item[data-account-tab]');
         var current = null, pinned = false, timer = null, loads = 0;
 
-        function show(name) {
-            var found = null;
-            tabs.forEach(function (t) {
-                var on = t.getAttribute('data-account-tab') === name;
-                t.classList.toggle('active', on);
-                if (on) found = t;
-            });
-            if (!found) return false;
-            title.textContent = found.textContent.trim();
+        function show(item) {
+            var name = item.getAttribute('data-account-tab');
+            items.forEach(function (i) { i.classList.toggle('is-active', i === item); });
+            title.textContent = item.textContent.trim();
             if (current !== name) {
                 current = name;
                 loads = 0;
-                frame.src = found.getAttribute('data-src');
+                frame.src = item.getAttribute('href');
             }
             panel.hidden = false;
             if (!pinned) root.classList.add('dash-account-hover');
-            return true;
         }
         function hide() {
             clearTimeout(timer);
+            var wasPinned = pinned;
             var changed = pinned && loads > 1; // something was saved inside the panel
             panel.hidden = true;
             pinned = false;
             pinIcon.hidden = true;
             current = null;
             frame.src = 'about:blank';
-            root.classList.remove('dash-account-hover');
-            if (!sidebar.matches(':hover')) {
-                root.classList.remove('dash-sidebar-open');
+            items.forEach(function (i) { i.classList.remove('is-active'); });
+            root.classList.remove('dash-account-hover', 'dash-account-pinned');
+            if (wasPinned || !sidebar.matches(':hover')) {
+                if (!sidebar.matches(':hover')) root.classList.remove('dash-sidebar-open');
                 document.dispatchEvent(new Event('dash:closeprofilemenu'));
             }
             if (changed) window.location.reload(); // refresh name/theme in the shell
@@ -596,6 +585,7 @@
             pinned = true;
             pinIcon.hidden = false;
             root.classList.remove('dash-account-hover');
+            root.classList.add('dash-account-pinned'); // keeps dropdown + sidebar open
         }
         function scheduleHide() {
             if (pinned) return;
@@ -605,12 +595,11 @@
         function cancelHide() { clearTimeout(timer); }
 
         items.forEach(function (a) {
-            var name = a.getAttribute('data-account-tab');
-            a.addEventListener('mouseenter', function () { cancelHide(); show(name); });
+            a.addEventListener('mouseenter', function () { if (!pinned) { cancelHide(); show(a); } });
             a.addEventListener('mouseleave', scheduleHide);
             a.addEventListener('click', function (e) {
-                if (!show(name)) return; // fall back to a normal link
                 e.preventDefault();
+                show(a);
                 lock();
             });
         });
@@ -623,9 +612,6 @@
         panel.addEventListener('mouseenter', cancelHide);
         panel.addEventListener('mouseleave', scheduleHide);
 
-        tabs.forEach(function (t) {
-            t.addEventListener('click', function () { show(t.getAttribute('data-account-tab')); lock(); });
-        });
         frame.addEventListener('load', function () {
             if (frame.getAttribute('src') !== 'about:blank') loads++;
         });
@@ -633,7 +619,7 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && !panel.hidden) hide();
         });
-        // Hovering the Logout row (or leaving the menu entirely) dismisses an un-pinned preview.
+        // Hovering the Logout row dismisses an un-pinned preview.
         document.querySelectorAll('.dash-profile-dropdown-item:not([data-account-tab])').forEach(function (b) {
             b.addEventListener('mouseenter', function () { if (!pinned) hide(); });
         });

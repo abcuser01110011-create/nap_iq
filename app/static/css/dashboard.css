@@ -2668,3 +2668,9 @@ html.dash-embedded .dash-content .row > .col-lg-7 {
     outline: none;
     box-shadow: none;
 }
+
+/* Dropdown row whose panel is showing / locked */
+.dash-profile-dropdown-item.is-active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
