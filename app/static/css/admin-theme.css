@@ -113,3 +113,157 @@ body.dash-body .dash-sidebar > * { position: relative; z-index: 1; }
 body.dash-body .dash-nav-link.active { background: linear-gradient(90deg, #1046B8 0%, #1684FF 100%); box-shadow: inset 3px 0 0 #FFC928; }
 body.dash-body .dash-nav-link.active i { color: #FFC928; }
 body.dash-body .dash-badge-count.text-bg-danger { background-color: #EF4444 !important; }
+
+
+/* ===================================================================== */
+/* LIGHT "PG Networks" DASHBOARD SKIN (colors only)                       */
+/* White sidebar + white hero/cards, royal-blue active pill, gold accents.*/
+/* Every rule is scoped to light mode, so the dark-mode toggle is intact. */
+/* Palette: Navy #061747 / Royal #1046B8 / Electric #1684FF /             */
+/*          Gold #FFC928 / Ice #F3F7FF / Line #DCE6F8                     */
+/* ===================================================================== */
+
+html:not([data-bs-theme="dark"]) body.dash-body {
+    background:
+        radial-gradient(900px 420px at 100% 0%, rgba(22, 132, 255, .06), transparent 60%),
+        #F4F8FF;
+}
+
+/* ---- Sidebar: white / ice-blue ---- */
+html:not([data-bs-theme="dark"]) body.dash-body .dash-sidebar {
+    background: linear-gradient(180deg, #FFFFFF 0%, #F4F8FF 100%);
+    color: #334155;
+    border-right: 1px solid #E3ECFA;
+    box-shadow: 6px 0 24px -20px rgba(6, 23, 71, .35);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-sidebar::after {
+    background:
+        linear-gradient(8deg, transparent 46%, rgba(255, 201, 40, .95) 47%, rgba(255, 201, 40, .95) 50%, transparent 51%),
+        radial-gradient(120% 100% at 20% 100%, rgba(16, 70, 184, .85), rgba(22, 132, 255, .45) 45%, transparent 70%);
+    opacity: 1;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-sidebar-brand { border-bottom-color: #E3ECFA; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-icon { background: transparent; }
+/* the mono logo was forced to white for the dark rail: show it in its own navy */
+html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-logo { filter: none; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-name { color: #061747; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-brand-sub { color: #64748B; }
+
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link { color: #334155; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link i { color: #475569; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link:hover {
+    background: #EAF1FF; color: #1046B8;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link:hover i { color: #1046B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link.active {
+    background: linear-gradient(90deg, #1046B8 0%, #1684FF 100%);
+    color: #fff;
+    box-shadow: 0 10px 20px -12px rgba(16, 70, 184, .75);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link.active i { color: #fff; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link-disabled,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-link-disabled:hover { color: #94A3B8; background: transparent; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-soon-badge { background: #EAF1FF; color: #1046B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-nav-divider { background: #E3ECFA; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-sidebar-tagline { color: #1046B8; }
+
+/* profile button + dropdown in the sidebar */
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-btn { color: #334155; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-btn:hover,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-btn.active,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-menu.open .dash-profile-btn {
+    background: #EAF1FF; color: #1046B8;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-avatar { background: #DCE8FF; color: #1046B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown {
+    background: #FFFFFF; border-color: #DCE6F8;
+    box-shadow: 0 14px 30px -12px rgba(6, 23, 71, .3);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-email { color: #64748B; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-item { color: #334155; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-item:hover,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-item:focus-visible { background: #EAF1FF; color: #1046B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-sep { background: #E3ECFA; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-logout { color: #DC2626; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-logout:hover,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-profile-dropdown-logout:focus-visible { background: rgba(220, 38, 38, .08); color: #B91C1C; }
+
+/* ---- Greeting hero: white card, blue haze, gold swoosh ---- */
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting {
+    color: #061747;
+    background:
+        radial-gradient(55% 140% at 100% 0%, rgba(22, 132, 255, .14), transparent 65%),
+        linear-gradient(120deg, #FFFFFF 0%, #F7FAFF 60%, #EAF2FF 100%);
+    border: 1px solid #E3ECFA;
+    box-shadow: 0 14px 34px -22px rgba(6, 23, 71, .35);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting::before {
+    background: linear-gradient(180deg, #FFC928, rgba(255, 201, 40, .2));
+    opacity: .9;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-clock,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-time { color: #334155; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-dot { color: #94A3B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-title { color: #061747; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-name { color: #1684FF; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-sub { color: #475569; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-meta { color: #1046B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-art { color: rgba(22, 132, 255, .16); }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting .dash-sidebar-toggle { color: #1046B8; }
+
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-search {
+    background: #FFFFFF; border: 1px solid #DCE6F8; color: #0F172A;
+    box-shadow: 0 6px 16px -12px rgba(6, 23, 71, .4);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-search i,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-search input::placeholder { color: #64748B; opacity: 1; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-search input { color: #0F172A; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting-search kbd {
+    background: transparent; border-color: transparent; color: #64748B;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting .dash-icon-btn,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting .napiq-theme-toggle {
+    background: #FFFFFF; border: 1px solid #DCE6F8; color: #1046B8;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting .dash-user-name { color: #061747; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting .dash-user-role { color: #64748B; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-greeting .dash-user-avatar { background: #1046B8; color: #fff; }
+
+/* ---- Stat cards: white tiles, colored icon squares ---- */
+html:not([data-bs-theme="dark"]) body.dash-body .dash-stat-card {
+    background: #FFFFFF;
+    border: 1px solid #E3ECFA;
+    color: #061747;
+    box-shadow: 0 10px 24px -20px rgba(6, 23, 71, .5);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .dash-stat-card::after { color: #94A3B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-stat-card .dash-stat-value { color: #061747; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-stat-card .dash-stat-label { color: #64748B; font-weight: 500; }
+html:not([data-bs-theme="dark"]) body.dash-body .dash-stat-card-link:hover,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-stat-card-link:focus-visible {
+    background: #F8FBFF; border-color: #1684FF; color: #061747;
+}
+html:not([data-bs-theme="dark"]) body.dash-body .stat-icon-royal  { background: linear-gradient(135deg, #1684FF, #1046B8); color: #fff; }
+html:not([data-bs-theme="dark"]) body.dash-body .stat-icon-blue   { background: linear-gradient(135deg, #38A3FF, #1684FF); color: #fff; }
+html:not([data-bs-theme="dark"]) body.dash-body .stat-icon-green  { background: linear-gradient(135deg, #22C55E, #16A34A); color: #fff; }
+html:not([data-bs-theme="dark"]) body.dash-body .stat-icon-orange { background: linear-gradient(135deg, #FFC928, #F5A800); color: #fff; }
+html:not([data-bs-theme="dark"]) body.dash-body .stat-icon-purple { background: linear-gradient(135deg, #A78BFA, #8B5CF6); color: #fff; }
+html:not([data-bs-theme="dark"]) body.dash-body .stat-icon-gold   { background: linear-gradient(135deg, #FFD65A, #FFC928); color: #fff; }
+
+/* ---- Panels ---- */
+html:not([data-bs-theme="dark"]) body.dash-body .summary-panel,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-panel {
+    background: #FFFFFF; border-color: #E3ECFA;
+    box-shadow: 0 12px 28px -24px rgba(6, 23, 71, .45);
+}
+html:not([data-bs-theme="dark"]) body.dash-body .summary-panel-header h5,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-panel-header h5 { color: #061747; }
+html:not([data-bs-theme="dark"]) body.dash-body .summary-panel-header h5 i,
+html:not([data-bs-theme="dark"]) body.dash-body .dash-panel-header h5 i { color: #1046B8 !important; }
+html:not([data-bs-theme="dark"]) body.dash-body .summary-total-badge { color: #64748B; }
+html:not([data-bs-theme="dark"]) body.dash-body .summary-track,
+html:not([data-bs-theme="dark"]) body.dash-body .port-util-track { background: #E8EEF9; }
+html:not([data-bs-theme="dark"]) body.dash-body .port-util-fill { background: linear-gradient(90deg, #1046B8, #1684FF); }
+html:not([data-bs-theme="dark"]) body.dash-body .workload-progress-fill { background: linear-gradient(90deg, #1046B8, #1684FF); }
+html:not([data-bs-theme="dark"]) body.dash-body .bg-icon-primary { background: #1046B8; }
+html:not([data-bs-theme="dark"]) body.dash-body .bg-icon-success { background: #16A34A; }
