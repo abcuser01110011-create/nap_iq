@@ -6,6 +6,8 @@ from routes/models makes validation rules easy to find, reuse (the same
 NapForm powers both the Add and Edit pages), and unit-test later.
 """
 
+import re
+
 from flask_wtf import FlaskForm
 from sqlalchemy import func
 from wtforms import (
@@ -524,7 +526,7 @@ class ResetPasswordForm(FlaskForm):
         "New Password",
         validators=[
             DataRequired(message="Password is required."),
-            Length(min=8, message="Password must be at least 8 characters."),
+            validate_password_complexity,
         ],
     )
     confirm_password = PasswordField(
@@ -729,6 +731,34 @@ class ProfileForm(FlaskForm):
             query = query.filter(User.id != self.user_id)
         if query.first() is not None:
             raise ValidationError("This email address is already in use by another account.")
+
+
+PASSWORD_REQUIREMENTS = (
+    "At least 8 characters",
+    "At least one uppercase letter (A-Z)",
+    "At least one lowercase letter (a-z)",
+    "At least one number (0-9)",
+    "At least one special character (e.g. !@#$%^&*)",
+)
+
+
+def validate_password_complexity(form, field):
+    """Server-side twin of static/js/password-complexity.js. Keep the two
+    rule sets in sync."""
+    value = field.data or ""
+    problems = []
+    if len(value) < 8:
+        problems.append("at least 8 characters")
+    if not re.search(r"[A-Z]", value):
+        problems.append("an uppercase letter")
+    if not re.search(r"[a-z]", value):
+        problems.append("a lowercase letter")
+    if not re.search(r"\d", value):
+        problems.append("a number")
+    if not re.search(r"[^A-Za-z0-9]", value):
+        problems.append("a special character")
+    if problems:
+        raise ValidationError("Password must contain " + ", ".join(problems) + ".")
 
 
 class ChangePasswordForm(FlaskForm):
