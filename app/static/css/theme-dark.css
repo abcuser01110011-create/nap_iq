@@ -18,21 +18,25 @@
      2. Patch the small number of app classes that hardcode a color
         instead of using one of those tokens.
 
-   Palette matches the reference GeoMap screenshot: near-black navy
-   page background, dark slate-navy panels, violet/purple accent for
-   primary actions, CARTO dark map tiles (swapped in napmap.js).
+   Palette: neutral near-black charcoal page + panels (Classroom-style
+   dark UI), with the PG Networks logo colors layered on top -- royal /
+   sky blue for primary actions and gold for active markers and key
+   highlights -- so dark mode reads as the same brand as light mode.
+   Light mode is NOT touched by anything in this file.
    ===================================================================== */
 
 [data-bs-theme="dark"] {
     /* style.css tokens */
-    --napiq-primary: #8b5cf6;
-    --napiq-primary-dark: #7c3aed;
+    --napiq-primary: #1684FF;
+    --napiq-primary-dark: #1046B8;
+    --napiq-gold: #FFC928;
+    --napiq-surface-hover: rgba(22, 132, 255, 0.10);
 
     /* dashboard.css tokens */
-    --napiq-surface: #141b2d;
-    --napiq-bg: #0a0e1a;
+    --napiq-surface: #15171d;
+    --napiq-bg: #0b0c10;
     --napiq-border: rgba(255, 255, 255, 0.08);
-    --napiq-text-muted: #93a0b8;
+    --napiq-text-muted: #9aa3b5;
 
     --napiq-success: #22c55e;
     --napiq-warning: #f59e0b;
@@ -48,11 +52,11 @@
 
 [data-bs-theme="dark"] body {
     background-color: var(--napiq-bg);
-    color: #e6e9f2;
+    color: #e8eaf0;
 }
 
 [data-bs-theme="dark"] .app-navbar {
-    background-color: #0d1220 !important;
+    background-color: #0e1015 !important;
     border-bottom: 1px solid var(--napiq-border);
 }
 
@@ -61,7 +65,7 @@
 /* ---------------------------------------------------------------- */
 
 [data-bs-theme="dark"] .dash-sidebar {
-    background: linear-gradient(180deg, #12182b 0%, #090d18 100%);
+    background: linear-gradient(180deg, #13151b 0%, #0b0c10 100%);
 }
 
 [data-bs-theme="dark"] .dash-sidebar-brand {
@@ -69,27 +73,27 @@
 }
 
 [data-bs-theme="dark"] .dash-brand-sub {
-    color: #8b93ab;
+    color: #9aa3b5;
 }
 
 [data-bs-theme="dark"] .dash-nav-link {
-    color: #a7afc4;
+    color: #aab2c3;
 }
 
 [data-bs-theme="dark"] .dash-nav-link:hover {
-    background: rgba(139, 92, 246, 0.14);
+    background: rgba(22, 132, 255, 0.14);
     color: #fff;
 }
 
 [data-bs-theme="dark"] .dash-nav-link.active {
-    background: rgba(139, 92, 246, 0.22);
+    background: linear-gradient(90deg, #1046B8 0%, #1684FF 100%);
     color: #fff;
-    box-shadow: inset 3px 0 0 var(--napiq-primary);
+    box-shadow: inset 3px 0 0 #FFC928;
 }
 
 [data-bs-theme="dark"] .dash-nav-link-disabled,
 [data-bs-theme="dark"] .dash-nav-link-disabled:hover {
-    color: #5b647a;
+    color: #5a6071;
 }
 
 [data-bs-theme="dark"] .dash-soon-badge {
@@ -126,7 +130,7 @@
 }
 
 [data-bs-theme="dark"] .notif-dropdown {
-    background: #1c2536;
+    background: #1c2029;
     border-color: rgba(255, 255, 255, 0.08);
 }
 
@@ -169,12 +173,12 @@
 }
 
 [data-bs-theme="dark"] .dash-skeleton {
-    background: linear-gradient(90deg, #1b2338 25%, #232c47 37%, #1b2338 63%);
+    background: linear-gradient(90deg, #1b1e26 25%, #252933 37%, #1b1e26 63%);
     background-size: 400% 100%;
 }
 
 [data-bs-theme="dark"] .dash-empty i {
-    color: #3c445c;
+    color: #3a3f4d;
 }
 
 [data-bs-theme="dark"] .table thead th {
@@ -186,7 +190,7 @@
 /* ---------------------------------------------------------------- */
 
 [data-bs-theme="dark"] .subs-search-form:focus-within {
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.22);
+    box-shadow: 0 0 0 3px rgba(22, 132, 255, 0.22);
 }
 
 [data-bs-theme="dark"] .subs-pill:hover {
@@ -198,7 +202,7 @@
 }
 
 [data-bs-theme="dark"] .subs-code-pill {
-    background: rgba(139, 92, 246, 0.12);
+    background: rgba(22, 132, 255, 0.12);
 }
 
 /* ---------------------------------------------------------------- */
@@ -210,14 +214,14 @@
 }
 
 [data-bs-theme="dark"] .disp-nav-link:hover {
-    color: #a78bfa;
+    color: #5aa9ff;
 }
 
 [data-bs-theme="dark"] .disp-badge-medium,
 [data-bs-theme="dark"] .disp-badge-in_progress,
 [data-bs-theme="dark"] .disp-badge-scheduled {
-    background: rgba(139, 92, 246, 0.18);
-    color: #a78bfa;
+    background: rgba(22, 132, 255, 0.18);
+    color: #5aa9ff;
 }
 
 /* Professional-polish card elevation (dashboard.css) needs a darker,
@@ -252,7 +256,7 @@
 }
 
 [data-bs-theme="dark"] .nap-search-dropdown .list-group-item:hover {
-    background-color: #1c2438;
+    background-color: #1d212b;
 }
 
 /* Ticket form's Customer + Barangay autocomplete dropdowns
@@ -261,7 +265,7 @@
    light-mode background with light text on top of it -- effectively
    invisible. Same treatment as .nap-search-dropdown above. */
 [data-bs-theme="dark"] .ticket-subscriber-dropdown .list-group-item:hover {
-    background-color: #1c2438;
+    background-color: #1d212b;
 }
 
 [data-bs-theme="dark"] .issue-popup .issue-popup-code,
@@ -269,18 +273,18 @@
 [data-bs-theme="dark"] .issue-popup dt,
 [data-bs-theme="dark"] .nap-popup dt,
 [data-bs-theme="dark"] .subscriber-popup-address {
-    color: #93a0b8;
+    color: #9aa3b5;
 }
 
 /* #ticketDetailsModal ("View Ticket") -- same treatment as the
    issue/NAP popups above. */
 [data-bs-theme="dark"] #ticketDetailsModal dt {
-    color: #93a0b8;
+    color: #9aa3b5;
 }
 
 [data-bs-theme="dark"] .nav-card > .card > .card-header {
-    background: linear-gradient(180deg, #171f33 0%, #121a2b 100%) !important;
-    border-bottom-color: rgba(139, 92, 246, 0.25);
+    background: linear-gradient(180deg, #1a1d26 0%, #14171e 100%) !important;
+    border-bottom-color: rgba(22, 132, 255, 0.25);
 }
 
 /* Same !important-leak as the .nav-card fix above, but for the plain
@@ -293,8 +297,8 @@
    icon/label and a jarring seam. Scoped to .dash-content so it only
    touches cards inside the main dashboard area, not e.g. auth pages. */
 [data-bs-theme="dark"] .dash-content .card-header.bg-white {
-    background: linear-gradient(180deg, #171f33 0%, #121a2b 100%) !important;
-    border-bottom-color: rgba(139, 92, 246, 0.25) !important;
+    background: linear-gradient(180deg, #1a1d26 0%, #14171e 100%) !important;
+    border-bottom-color: rgba(22, 132, 255, 0.25) !important;
     color: var(--bs-body-color);
 }
 
@@ -311,16 +315,16 @@
 }
 
 [data-bs-theme="dark"] .nav-card .bg-light {
-    background-color: #1c2438 !important;
+    background-color: #1d212b !important;
     border-color: var(--napiq-border) !important;
 }
 
 [data-bs-theme="dark"] .nav-card-route-status {
-    background-color: #171f33 !important;
+    background-color: #181b24 !important;
 }
 
 [data-bs-theme="dark"] .nav-card .progress {
-    background-color: #1c2438;
+    background-color: #1d212b;
 }
 
 /* Leaflet's own default popup/controls ship hardcoded white/black,
@@ -329,7 +333,7 @@
 [data-bs-theme="dark"] .leaflet-popup-content-wrapper,
 [data-bs-theme="dark"] .leaflet-popup-tip {
     background: var(--napiq-surface);
-    color: #e6e9f2;
+    color: #e8eaf0;
 }
 
 [data-bs-theme="dark"] .leaflet-popup-content-wrapper a {
@@ -343,16 +347,16 @@
 }
 
 [data-bs-theme="dark"] .leaflet-bar a:hover {
-    background: #1c2438;
+    background: #1d212b;
 }
 
 [data-bs-theme="dark"] .leaflet-control-attribution {
-    background: rgba(10, 15, 28, 0.75);
-    color: #93a0b8;
+    background: rgba(11, 12, 16, 0.78);
+    color: #9aa3b5;
 }
 
 [data-bs-theme="dark"] .leaflet-control-attribution a {
-    color: #c3b8fb;
+    color: #9cc9ff;
 }
 
 /* =====================================================================
@@ -401,4 +405,217 @@
    default dark glyph just fine. */
 [data-bs-theme="dark"] .flash-stack .btn-close {
     filter: invert(1) grayscale(1) brightness(200%);
+}
+
+
+/* =====================================================================
+   BRAND LAYER (blue + gold) -- added in the charcoal/blue/gold retheme
+   ---------------------------------------------------------------------
+   Everything below is scoped to [data-bs-theme="dark"], so light mode
+   keeps its existing look exactly as it was.
+   ===================================================================== */
+
+/* Bootstrap 5.3 dark variables -> charcoal surfaces + brand blue.
+   Cards, modals, tables, dropdowns and form controls all read these. */
+[data-bs-theme="dark"] {
+    --bs-body-bg: #0b0c10;
+    --bs-body-bg-rgb: 11, 12, 16;
+    --bs-body-color: #e8eaf0;
+    --bs-secondary-bg: #15171d;
+    --bs-secondary-bg-rgb: 21, 23, 29;
+    --bs-tertiary-bg: #1b1e26;
+    --bs-tertiary-bg-rgb: 27, 30, 38;
+    --bs-border-color: rgba(255, 255, 255, 0.09);
+    --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
+    --bs-emphasis-color: #f4f6fb;
+    --bs-secondary-color: #9aa3b5;
+    --bs-link-color: #4da3ff;
+    --bs-link-hover-color: #FFC928;
+    --bs-link-color-rgb: 77, 163, 255;
+    --bs-link-hover-color-rgb: 255, 201, 40;
+    --bs-primary: #1684FF;
+    --bs-primary-rgb: 22, 132, 255;
+    --bs-focus-ring-color: rgba(22, 132, 255, 0.30);
+}
+
+/* Primary buttons: bright blue like the reference "Join a Class"
+   button, gold focus ring so it ties back to the logo. */
+[data-bs-theme="dark"] .btn-primary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #1684FF;
+    --bs-btn-border-color: #1684FF;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #3d9bff;
+    --bs-btn-hover-border-color: #3d9bff;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #1046B8;
+    --bs-btn-active-border-color: #1046B8;
+    --bs-btn-focus-shadow-rgb: 255, 201, 40;
+    --bs-btn-disabled-bg: #1684FF;
+    --bs-btn-disabled-border-color: #1684FF;
+}
+
+[data-bs-theme="dark"] .btn-outline-primary {
+    --bs-btn-color: #4da3ff;
+    --bs-btn-border-color: rgba(22, 132, 255, 0.6);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #1684FF;
+    --bs-btn-hover-border-color: #1684FF;
+    --bs-btn-active-bg: #1046B8;
+    --bs-btn-active-border-color: #1046B8;
+}
+
+[data-bs-theme="dark"] .text-primary { color: #4da3ff !important; }
+[data-bs-theme="dark"] .bg-primary { background-color: #1684FF !important; }
+[data-bs-theme="dark"] .border-primary { border-color: #1684FF !important; }
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    border-color: #1684FF;
+    box-shadow: 0 0 0 0.2rem rgba(22, 132, 255, 0.25);
+}
+
+[data-bs-theme="dark"] .form-check-input:checked {
+    background-color: #1684FF;
+    border-color: #1684FF;
+}
+
+[data-bs-theme="dark"] .page-item.active .page-link,
+[data-bs-theme="dark"] .nav-pills .nav-link.active {
+    background-color: #1684FF;
+    border-color: #1684FF;
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    color: #FFC928;
+    border-bottom-color: #FFC928;
+}
+
+/* Sidebar: gold icon on the active item (same as light mode) and a
+   gold tagline accent bar. */
+[data-bs-theme="dark"] .dash-nav-link.active i {
+    color: #FFC928;
+}
+
+[data-bs-theme="dark"] .dash-nav-link:hover i {
+    color: #4da3ff;
+}
+
+[data-bs-theme="dark"] .dash-sidebar-tagline {
+    color: #aecbff;
+}
+
+/* Hero greeting card: charcoal with a soft blue glow and the gold
+   diagonal stripe, instead of the always-navy brand card. */
+[data-bs-theme="dark"] .dash-greeting {
+    background:
+        radial-gradient(55% 130% at 88% 0%, rgba(22, 132, 255, 0.30), transparent 62%),
+        radial-gradient(40% 90% at 0% 100%, rgba(255, 201, 40, 0.07), transparent 65%),
+        linear-gradient(125deg, #1a1c27 0%, #14161e 55%, #101218 100%);
+    border: 1px solid rgba(22, 132, 255, 0.25);
+    box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.8);
+}
+
+[data-bs-theme="dark"] .dash-greeting::before {
+    opacity: 0.55;
+}
+
+[data-bs-theme="dark"] .dash-greeting-search {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-bs-theme="dark"] .dash-greeting-search:focus-within {
+    border-color: #1684FF;
+}
+
+[data-bs-theme="dark"] .dash-greeting .dash-icon-btn,
+[data-bs-theme="dark"] .dash-greeting .napiq-theme-toggle {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-bs-theme="dark"] .dash-greeting .dash-icon-btn:hover,
+[data-bs-theme="dark"] .dash-greeting .napiq-theme-toggle:hover {
+    border-color: #FFC928;
+}
+
+[data-bs-theme="dark"] .dash-greeting-art {
+    color: rgba(22, 132, 255, 0.40);
+}
+
+/* Stat cards: charcoal tiles with a thin blue edge, gold on hover. */
+[data-bs-theme="dark"] .dash-body .dash-stat-card {
+    background: linear-gradient(135deg, #1a1d26 0%, #13161d 100%);
+    border: 1px solid rgba(22, 132, 255, 0.28);
+    box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.85);
+}
+
+[data-bs-theme="dark"] .dash-body .dash-stat-card .dash-stat-label {
+    color: #9fb6dc;
+}
+
+[data-bs-theme="dark"] .dash-body .dash-stat-card-link:hover,
+[data-bs-theme="dark"] .dash-body .dash-stat-card-link:focus-visible {
+    background: linear-gradient(135deg, #1d2230 0%, #161a24 100%);
+    border-color: #FFC928;
+}
+
+/* Panel headings: icons pick up the sky blue. */
+[data-bs-theme="dark"] .summary-panel-header h5 i,
+[data-bs-theme="dark"] .dash-panel-header h5 i {
+    color: #4da3ff;
+}
+
+[data-bs-theme="dark"] .table thead th {
+    color: #9fb6dc;
+}
+
+/* Network-status panel (dashboard.css .nap-status-panel is a fixed
+   dark card in both themes; here it only gets the dark-mode palette). */
+[data-bs-theme="dark"] .nap-status-panel {
+    --nsp-bg: #101218;
+    --nsp-surface: #15171d;
+    --nsp-text-muted: #9aa3b5;
+    --nsp-accent: #1684FF;
+}
+
+/* Pagination active state keeps its gold label on a deeper blue. */
+[data-bs-theme="dark"] .subs-pager-item.is-active .subs-pager-link {
+    background: #1046B8;
+    color: #FFC928;
+}
+
+/* Port utilisation bars + progress bars: blue-to-gold like the logo. */
+[data-bs-theme="dark"] .port-util-fill {
+    background: linear-gradient(90deg, #1046B8, #1684FF);
+}
+
+[data-bs-theme="dark"] .progress-bar {
+    background-color: #1684FF;
+}
+
+/* Scrollbars: slim charcoal track, blue thumb on hover. */
+[data-bs-theme="dark"] {
+    scrollbar-color: #2a2e3a #0b0c10;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-track {
+    background: #0b0c10;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #2a2e3a;
+    border-radius: 8px;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #1684FF;
+}
+
+/* Text selection */
+[data-bs-theme="dark"] ::selection {
+    background: rgba(22, 132, 255, 0.45);
+    color: #fff;
 }
