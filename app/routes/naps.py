@@ -593,6 +593,18 @@ def view_nap(nap_id):
     used_ports, available_ports = slot_usage(nap)
     port_assignments = _nap_port_assignments(nap)
 
+    # The NAP Management list opens this same detail view in a popup
+    # (fetched in the background) -- it asks for just the card
+    # contents via ?partial=1, same as the Subscribers list.
+    if request.args.get("partial"):
+        return render_template(
+            "naps/_detail_body.html",
+            nap=nap,
+            used_ports=used_ports,
+            available_ports=available_ports,
+            port_assignments=port_assignments,
+        )
+
     return render_template(
         "naps/view.html",
         nap=nap,
