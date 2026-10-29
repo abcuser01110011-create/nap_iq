@@ -526,7 +526,7 @@ class ResetPasswordForm(FlaskForm):
         "New Password",
         validators=[
             DataRequired(message="Password is required."),
-            validate_password_complexity,
+            Length(min=8, message="Password must be at least 8 characters."),
         ],
     )
     confirm_password = PasswordField(
@@ -789,7 +789,7 @@ class ChangePasswordForm(FlaskForm):
         "New Password",
         validators=[
             DataRequired(message="Password is required."),
-            Length(min=8, message="Password must be at least 8 characters."),
+            validate_password_complexity,
         ],
     )
     confirm_password = PasswordField(
