@@ -237,8 +237,6 @@
                Profile, Settings (non-customer roles only) and Logout.
                Replaces the old red Logout button, the Profile button and
                the Settings nav link. #}
-            <div class="dash-sidebar-tagline" aria-hidden="true">Better Connection<br>Brighter Future<span></span></div>
-
             <div class="dash-sidebar-actions">
                 <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout" id="logoutForm" class="dash-logout-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
