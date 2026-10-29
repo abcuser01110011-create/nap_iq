@@ -65,9 +65,20 @@
                             {% for assignment in open_assignments %}
                             <tr>
                                 <td>
+                                    {# An assignment belongs to either a technical issue (TN)
+                                       or a service order (SO); service-order assignments have
+                                       no technical_issue_id, which used to crash this page. #}
+                                    {% if assignment.technical_issue_id %}
                                     <a href="{{ url_for('issues.view_issue', issue_id=assignment.technical_issue_id) }}">
-                                        {{ assignment.technical_issue.issue_code or ('#' ~ assignment.technical_issue_id) }}
+                                        {{ assignment.technical_issue.issue_code if assignment.technical_issue and assignment.technical_issue.issue_code else ('#' ~ assignment.technical_issue_id) }}
                                     </a>
+                                    {% elif assignment.service_request_id %}
+                                    <a href="{{ url_for('issues.view_service_order', request_id=assignment.service_request_id) }}">
+                                        SO-{{ '%04d'|format(assignment.service_request_id) }}
+                                    </a>
+                                    {% else %}
+                                    —
+                                    {% endif %}
                                 </td>
                                 <td><span class="badge text-bg-info">{{ assignment.status|replace('_',' ')|capitalize }}</span></td>
                                 <td>{{ assignment.assigned_at.strftime('%Y-%m-%d') }}</td>
