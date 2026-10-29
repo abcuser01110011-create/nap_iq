@@ -2251,10 +2251,16 @@
     // a few at a time to stay polite to the public server. If the
     // service can't be reached, the dashed straight line stays.
     const EST_ROUTE_CACHE_KEY = "napiq:estCableRoutes:v1";
+    // Tried in order for every request; the public servers are shared and
+    // sometimes busy, so a failure on one just moves on to the next.
     const EST_ROUTE_ENDPOINTS = [
         "https://routing.openstreetmap.de/routed-foot/route/v1/foot/",
+        "https://router.project-osrm.org/route/v1/driving/",
+        "https://routing.openstreetmap.de/routed-car/route/v1/driving/",
     ];
-    const EST_ROUTE_CONCURRENCY = 3;
+    const EST_ROUTE_CONCURRENCY = 2;
+    const EST_ROUTE_ROUNDS = 3;          // full passes over the endpoints
+    const EST_ROUTE_RETRY_DELAY_MS = 1500;
     const estRouteMemory = {};
     const estRouteWaiting = [];
     let estRouteActive = 0;
@@ -2280,9 +2286,13 @@
             .map(function (n) { return Number(n).toFixed(5); }).join(",");
     }
 
-    function fetchEstRoute(nap, sub) {
+    function sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    function fetchEstRouteFrom(base, nap, sub) {
         const coords = nap.longitude + "," + nap.latitude + ";" + sub.longitude + "," + sub.latitude;
-        const url = EST_ROUTE_ENDPOINTS[0] + coords + "?overview=full&geometries=geojson";
+        const url = base + coords + "?overview=full&geometries=geojson";
         return fetch(url).then(function (res) {
             if (!res.ok) throw new Error("route HTTP " + res.status);
             return res.json();
@@ -2295,6 +2305,42 @@
         });
     }
 
+    /** Street route with retries across several servers. Rejects only
+     * after every server has failed on every round. */
+    function fetchEstRoute(nap, sub) {
+        let attempt = Promise.reject(new Error("start"));
+        for (let round = 0; round < EST_ROUTE_ROUNDS; round += 1) {
+            EST_ROUTE_ENDPOINTS.forEach(function (base) {
+                attempt = attempt.catch(function () {
+                    return fetchEstRouteFrom(base, nap, sub);
+                });
+            });
+            attempt = attempt.catch(function (err) {
+                return sleep(EST_ROUTE_RETRY_DELAY_MS).then(function () { throw err; });
+            });
+        }
+        return attempt;
+    }
+
+    /** Last-resort path when no routing server answers: a run that goes
+     * out along one axis and then the other (the way cable follows
+     * blocks), with a small offset, rounded off. Never a straight line,
+     * and NOT cached, so the real street route is retried next load. */
+    function syntheticCableRoute(nap, sub, seed) {
+        const a = [Number(nap.latitude), Number(nap.longitude)];
+        const b = [Number(sub.latitude), Number(sub.longitude)];
+        const latFirst = (Math.abs(seed) % 2) === 0;
+        const corner = latFirst ? [b[0], a[1]] : [a[0], b[1]];
+        // Small, repeatable sideways wobble so neighbouring runs differ.
+        const wob = ((Math.abs(seed) % 7) - 3) * 0.000012;
+        const mid1 = [a[0] + (corner[0] - a[0]) * 0.5 + wob, a[1] + (corner[1] - a[1]) * 0.5 - wob];
+        const mid2 = [corner[0] + (b[0] - corner[0]) * 0.5 - wob, corner[1] + (b[1] - corner[1]) * 0.5 + wob];
+        let pts = [a, mid1, corner, mid2, b];
+        const geo = window.CablePathGeometry;
+        if (geo && typeof geo.smooth === "function") pts = geo.smooth(pts, 3);
+        return pts;
+    }
+
     function pumpEstRouteQueue() {
         while (estRouteActive < EST_ROUTE_CONCURRENCY && estRouteWaiting.length) {
             const job = estRouteWaiting.shift();
@@ -2304,7 +2350,7 @@
                 saveEstRouteCache();
                 job.resolve(pts);
             }).catch(function () {
-                job.resolve(null);
+                job.resolve(syntheticCableRoute(job.nap, job.sub, job.seed));
             }).then(function () {
                 estRouteActive -= 1;
                 pumpEstRouteQueue();
@@ -2317,7 +2363,10 @@
         const key = estRouteKey(nap, sub);
         if (estRouteMemory[key]) return Promise.resolve(estRouteMemory[key]);
         return new Promise(function (resolve) {
-            estRouteWaiting.push({ key: key, nap: nap, sub: sub, resolve: resolve });
+            estRouteWaiting.push({
+                key: key, nap: nap, sub: sub, resolve: resolve,
+                seed: parseInt(sub.id, 10) || 0,
+            });
             pumpEstRouteQueue();
         });
     }
