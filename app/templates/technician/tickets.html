@@ -25,6 +25,11 @@
     .tech-tickets-title i { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 1.2rem; color: #fff; background: linear-gradient(135deg, #1684FF, #1046B8); box-shadow: 0 6px 14px -6px rgba(16,70,184,.6); }
     .tech-tickets-history { font-size: .75rem; color: #6b7280 !important; text-decoration: none; white-space: nowrap; }
     .tech-tickets-history:hover { color: #374151 !important; text-decoration: underline; }
+    .tech-tickets-card .tech-ticket-title { font-size: 1.05rem; font-weight: 700; margin: .1rem 0 .7rem; }
+    .tech-tickets-card .tech-ticket-row { display: flex; align-items: flex-start; gap: .6rem; font-size: .88rem; margin-top: .55rem; }
+    .tech-tickets-card .tech-ticket-row i { font-size: 1rem; line-height: 1.25; opacity: .8; }
+    .tech-tickets-card .tech-ticket-footer { display: flex; justify-content: flex-end; margin-top: .9rem; padding-top: .7rem; border-top: 1px solid var(--napiq-border); }
+    .tech-tickets-card .tech-ticket-viewbtn { font-size: .72rem; font-weight: 700; color: #4C7FD1; background: rgba(76,127,209,.14); border-radius: 999px; padding: .25rem .7rem; }
     html[data-bs-theme="dark"] .tech-tickets-title { color: #fff; }
     html[data-bs-theme="dark"] .tech-tickets-history { color: #9ca3af !important; }
 </style>
@@ -60,13 +65,17 @@
                         {{ job.status_label }}
                     </span>
                 </div>
-                <div class="tech-ticket-type">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;text-transform:none;white-space:nowrap;">(Affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
-                <div class="tech-ticket-location">{{ job.address }}</div>
-                {% if job.priority %}
-                <div class="tech-ticket-priority tech-ticket-priority-{{ job.priority }}">
-                    Priority: {{ job.priority_label }}
-                </div>
+                <div class="tech-ticket-title">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;font-size:.8rem;white-space:nowrap;">(Affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
+                {% if job.subscriber_name %}
+                <div class="tech-ticket-row"><i class="bi bi-person"></i><span>{{ job.subscriber_label }}: {{ job.subscriber_name.split(' — ')[-1] }}</span></div>
                 {% endif %}
+                <div class="tech-ticket-row"><i class="bi bi-geo-alt"></i><span>{{ job.address }}</span></div>
+                {% if job.nap %}
+                <div class="tech-ticket-row"><i class="bi bi-diagram-3"></i><span>{{ job.nap.nap_code }}{% if job.port_number %} · Port {{ job.port_number }}{% endif %}</span></div>
+                {% endif %}
+                <div class="tech-ticket-footer">
+                    <span class="tech-ticket-viewbtn">View Details &rarr;</span>
+                </div>
             </a>
             {% endfor %}
         </div>
