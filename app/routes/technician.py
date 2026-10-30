@@ -208,6 +208,23 @@ def index():
 
     jobs = [_serialize_job(a) for a in assignments]
 
+    # Team card on the dashboard: the technician's team name + the team's
+    # shared status (same rule as the Technician tab's status badge). A
+    # technician who isn't on a team yet shows their own status instead.
+    team_info = None
+    if profile is not None:
+        try:
+            from app.routes.technicians import team_status
+            team = profile.teams[0] if profile.teams else None
+            if team is not None:
+                team_info = {"name": team.name, "status": team_status(team), "members": len(team.members)}
+            else:
+                team_info = {"name": None, "status": profile.effective_status, "members": 0}
+        except Exception:
+            # Teams tables missing (database/add_teams.sql not run yet): hide the card.
+            db.session.rollback()
+            team_info = None
+
     # Ticket overview card: counts over this technician's own assignments
     # (cancelled ones are left out of the completion rate).
     stats = {"open": 0, "in_progress": 0, "completed": 0, "rate": 0}
@@ -229,6 +246,7 @@ def index():
         profile=profile,
         jobs=jobs,
         stats=stats,
+        team_info=team_info,
         notes_form=ResolutionNotesForm(),
     )
 
