@@ -280,6 +280,28 @@
     {# Technician / field assistant on phones and small tablets: the hamburger
        drawer is hidden (technician-theme.css) and this bottom bar replaces it. #}
     {% if current_user and current_user.role in ('technician', 'field_assistant') %}
+    <style>
+        /* Technician bottom navigation (phones / small devices). Inline so it
+           always applies, independent of cached stylesheets. */
+        .tech-bottomnav { display: none; }
+        @media (max-width: 991.98px) {
+            .dash-sidebar, .dash-sidebar-backdrop, .dash-sidebar-toggle { display: none !important; }
+            .dash-main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+            .tech-bottomnav {
+                display: flex !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
+                background: #0b1e45; border-top: 1px solid rgba(255,255,255,.12);
+                padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 16px rgba(0,0,0,.25);
+            }
+            .tech-bottomnav .tech-bottomnav-item {
+                flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+                padding: 6px 4px; color: rgba(255,255,255,.65); text-decoration: none; font-size: .7rem; font-weight: 600;
+            }
+            .tech-bottomnav .tech-bottomnav-item i { font-size: 1.35rem; line-height: 1; }
+            .tech-bottomnav .tech-bottomnav-item:hover { color: #fff; }
+            .tech-bottomnav .tech-bottomnav-item.active, .tech-bottomnav .tech-bottomnav-item.active:hover { color: #F4B41A; }
+        }
+        html.dash-embedded .tech-bottomnav { display: none !important; }
+    </style>
     <nav class="tech-bottomnav" aria-label="Primary">
         <a href="{{ url_for('technician.index') }}"
            class="tech-bottomnav-item {{ 'active' if request.endpoint in ['technician.index', 'technician.ticket_detail'] else '' }}">
