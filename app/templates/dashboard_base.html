@@ -277,6 +277,25 @@
     <!-- Backdrop used only on mobile when the sidebar is toggled open -->
     <div class="dash-sidebar-backdrop" id="dashSidebarBackdrop"></div>
 
+    {# Technician / field assistant on phones and small tablets: the hamburger
+       drawer is hidden (technician-theme.css) and this bottom bar replaces it. #}
+    {% if current_user and current_user.role in ('technician', 'field_assistant') %}
+    <nav class="tech-bottomnav" aria-label="Primary">
+        <a href="{{ url_for('technician.index') }}"
+           class="tech-bottomnav-item {{ 'active' if request.endpoint in ['technician.index', 'technician.ticket_detail'] else '' }}">
+            <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('technician.history') }}"
+           class="tech-bottomnav-item {{ 'active' if request.endpoint == 'technician.history' else '' }}">
+            <i class="bi bi-ticket-perforated"></i><span>Tickets</span>
+        </a>
+        <a href="{{ url_for('profile.index') }}"
+           class="tech-bottomnav-item {{ 'active' if request.endpoint and request.endpoint.startswith('profile.') else '' }}">
+            <i class="bi bi-person-circle"></i><span>Profile</span>
+        </a>
+    </nav>
+    {% endif %}
+
     <!-- Logout confirmation modal. Triggered instead of submitting
          #logoutForm directly (the Logout button is now type="button"
          with data-bs-toggle/target pointing here); the real submit is
