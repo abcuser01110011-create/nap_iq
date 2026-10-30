@@ -108,12 +108,23 @@
 
 {% if use_flip %}
 <style>
-    .tf-card { position: relative; display: grid; transition-property: transform, height; transition-duration: .6s, .45s; transform-style: preserve-3d; margin-bottom: 1rem; }
-    .tf-actions { padding: .9rem 1rem; display: flex; justify-content: center; border-top: 1px solid var(--napiq-border, #dee2e6); }
+    .tf-card { position: relative; display: grid; transition: transform .6s cubic-bezier(.4,.2,.2,1); transform-style: preserve-3d; margin-bottom: 1rem; }
+    .tf-front { display: flex; flex-direction: column; position: relative; }
+    /* Buttons stay pinned to the bottom of the card; both faces share one height. */
+    .tf-actions { margin-top: auto; padding: .9rem 1rem; display: flex; justify-content: center; border-top: 1px solid var(--napiq-border, #dee2e6); }
     .tf-actions > div { justify-content: center; }
-    .tf-front > .alert { margin: .75rem 1rem 0; }
+    /* Warnings / errors on the completion side float over the card (no background,
+       no layout shift) just above the buttons, then fade out by themselves. */
+    .tf-front .alert { position: absolute; left: 1rem; right: 1rem; bottom: 5rem; z-index: 5; margin: 0 !important; padding: 0 !important;
+                       background: transparent !important; border: 0 !important; box-shadow: none !important; justify-content: center; text-align: center;
+                       font-weight: 600; color: var(--bs-body-color, #212529) !important; pointer-events: none;
+                       text-shadow: 0 0 6px var(--napiq-surface, #fff), 0 0 3px var(--napiq-surface, #fff);
+                       opacity: 0; transition: opacity .4s ease; }
+    .tf-front .alert.tf-toast-show { opacity: 1; }
+    .tf-front .alert.alert-danger, .tf-front .alert.tf-toast-error { color: #ef4444 !important; }
+    #tfToggleBtn { min-width: 11rem; }
     .tf-card.is-flipped { transform: rotateY(180deg); }
-    .tf-face { grid-area: 1 / 1; align-self: start; min-width: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    .tf-face { grid-area: 1 / 1; min-width: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
                background: var(--napiq-surface, #fff); border: 1px solid var(--napiq-border, #dee2e6); border-radius: .9rem; overflow: hidden; }
     .tf-back { transform: rotateY(180deg); visibility: hidden; transition: visibility 0s .3s; }
     .tf-card.is-flipped .tf-back { visibility: visible; }
@@ -450,17 +461,38 @@
     var back = document.getElementById('tfBack');
     if (!card || !btn) return;
     var front = document.getElementById('tfFront');
-    // Card height follows whichever face is showing (no blank space under the shorter one).
-    function sync() { card.style.height = (card.classList.contains('is-flipped') ? back : front).offsetHeight + 'px'; }
-    sync();
-    if (window.ResizeObserver) { var ro = new ResizeObserver(sync); ro.observe(front); ro.observe(back); }
-    window.addEventListener('resize', sync);
+
+    // Alerts on the completion side: show briefly, then fade out on their own.
+    var TOAST_MS = 4000;
+    function watch(el) {
+        var timer = null;
+        function check() {
+            var txt = (el.textContent || '').trim();
+            if (!txt || el.classList.contains('d-none')) { el.classList.remove('tf-toast-show'); return; }
+            el.classList.toggle('tf-toast-error', /denied|could not|unable|not supported|unavailable|failed|error/i.test(txt));
+            el.classList.add('tf-toast-show');
+            clearTimeout(timer);
+            timer = setTimeout(function () { el.classList.remove('tf-toast-show'); }, TOAST_MS);
+        }
+        var busy = false, lastHidden = el.classList.contains('d-none');
+        new MutationObserver(function (recs) {
+            // Ignore the observer firing for our own tf-* class changes.
+            var hidden = el.classList.contains('d-none');
+            var contentChanged = recs.some(function (r) { return r.type !== 'attributes'; });
+            if (!contentChanged && hidden === lastHidden) return;
+            lastHidden = hidden;
+            if (busy) return; busy = true;
+            setTimeout(function () { busy = false; check(); }, 0);
+        }).observe(el, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        check();
+    }
+    front.querySelectorAll('.alert').forEach(watch);
+
     btn.addEventListener('click', function () {
         var flipped = card.classList.toggle('is-flipped');
         btn.setAttribute('aria-pressed', flipped ? 'true' : 'false');
         back.setAttribute('aria-hidden', flipped ? 'false' : 'true');
         label.textContent = flipped ? 'Back to Tasks' : 'Ticket Details';
-        sync();
     });
 })();
 </script>
