@@ -461,7 +461,7 @@ def report_issue():
         elif assignment is not None:
             flash(
                 f"Your issue '{issue.issue_code}' was reported and assigned to "
-                f"{assignment.technician.full_name}.",
+                f"{(assignment.technician.teams[0].name if assignment.technician.teams else assignment.technician.full_name)}.",
                 "success",
             )
         else:

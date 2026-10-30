@@ -537,7 +537,8 @@ def auto_assign_recommended_technician(issue):
     technician chosen by `choose_technician_for_issue()` (same NAP ->
     that NAP's technician; different NAP -> a technician with no open
     job; everyone busy -> the nearest one), so it lands on that
-    technician's job list without an Administrator assigning it.
+    technician's job list without an Administrator assigning it. When
+    that technician is on a team, the whole team gets the job (see below).
 
     Creates the same kind of `assignments` row a manual dispatch does
     (see app/routes/dispatch.py's `assign()`), with `dispatch_score`
@@ -548,18 +549,43 @@ def auto_assign_recommended_technician(issue):
     Callers must have already committed the issue (so it has an id);
     this function commits the new assignment and status change itself.
     """
-    technician = choose_technician_for_issue(issue)
-    if technician is None:
+    # Teams: use the same dispatch rule as always, but hand the job to the
+    # whole team of the best-ranked technician who is on one -- every member
+    # gets their own Assignment, so it shows in each member's account. If no
+    # ranked technician belongs to a team, fall back to the single top pick.
+    rows = get_recommendations(issue)
+    if not rows:
         return None
 
-    assignment = Assignment(
-        technical_issue_id=issue.id,
-        technician_id=technician.id,
-        status="assigned",
-    )
+    team = None
+    for row in rows:
+        teams = getattr(row["technician"], "teams", None) or []
+        if teams:
+            team = sorted(teams, key=lambda t: t.id)[0]
+            break
+
+    if team is not None and team.members:
+        recipients = sorted(
+            team.members,
+            key=lambda m: (m.id != team.leader_id, m.full_name.lower(), m.id),
+        )
+    else:
+        recipients = [rows[0]["technician"]]
+
+    assignments = []
+    for member in recipients:
+        a = Assignment(
+            technical_issue_id=issue.id,
+            technician_id=member.id,
+            status="assigned",
+        )
+        db.session.add(a)
+        assignments.append(a)
     issue.status = "assigned"
-    db.session.add(assignment)
     notify_issue_status_change(issue)
     db.session.commit()
 
-    return assignment
+    # First assignment (the team leader's, when there is one) is returned so
+    # existing callers keep working; the team name is on its technician's
+    # `.teams`.
+    return assignments[0]
