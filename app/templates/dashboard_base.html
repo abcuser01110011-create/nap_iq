@@ -48,7 +48,8 @@
     {% if current_user and current_user.role == 'user' %}
     <link href="{{ url_for('static', filename='css/customer-theme.css') }}" rel="stylesheet">
     {% endif %}
-    {% if current_user and current_user.role in ('administrator', 'payment_collector', 'technician', 'field_assistant') %}
+    {# 'user' (subscriber) now shares the same light/dark PG Networks skin as the technician dashboard. #}
+    {% if current_user and current_user.role in ('administrator', 'payment_collector', 'technician', 'field_assistant', 'user') %}
     <link href="{{ url_for('static', filename='css/admin-theme.css') }}" rel="stylesheet">
     {% endif %}
     {% block extra_head %}{% endblock %}

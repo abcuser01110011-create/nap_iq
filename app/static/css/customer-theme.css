@@ -1,114 +1,26 @@
 /* =====================================================================
-   NAP-IQ Customer Web Theme
+   NAP-IQ Customer (subscriber) Web Theme
    ---------------------------------------------------------------------
-   Only loaded for the "user" (Customer/Subscriber) role (see
-   dashboard_base.html, which links this file and adds the
-   "dash-theme-customer" class to <body> only for that role, on
-   customer/*.html pages). Re-skins the shared dashboard shell's accent
-   color to the same palette the Customer mobile app uses
-   (mobile/apps/app/src/theme/customer.ts), so a subscriber sees one
-   consistent brand color whether they're on their phone or on the
-   website — same idea as technician-theme.css does for the Technician
-   role/app.
+   Loaded only for the "user" (Customer/Subscriber) role (see
+   dashboard_base.html). Subscribers now share the exact same PG
+   Networks skin as the technician dashboard -- that skin lives in
+   admin-theme.css (white sidebar, ice-blue page, royal-blue accents in
+   light mode; navy/charcoal in dark mode) and is linked for this role
+   too. Because of that, this file no longer forces a light look or
+   hides the light/dark toggle: the subscriber's own mode preference
+   (users.theme_preference) is respected on every customer page.
 
-   Unlike technician-theme.css, this is NOT a light-to-dark re-skin —
-   the shared dashboard shell is already light by default (same
-   background as the mobile app's `colors.bg`), so this file only needs
-   to re-point the primary accent (and a couple of supporting tokens)
-   at the mobile app's blue, then force that light look regardless of
-   the user's personal dark-mode toggle — the Customer mobile app has
-   no dark mode, so the web portal shouldn't drift from it either.
-
-   This file is a pure re-skin: it doesn't change any layout/spacing
-   rules (those live in dashboard.css and stay shared with every other
-   role), only colors. It's loaded after dashboard.css and
-   theme-dark.css, and (like technician-theme.css) sets these
-   --napiq-* tokens directly on <body> via the .dash-theme-customer
-   class, which wins over the inherited [data-bs-theme="dark"] values
-   set on <html> regardless of toggle state, since a directly-matched
-   declaration on an element always beats an inherited one.
+   What is left here are the customer-only components:
+     - account / payment typography (.napiq-account-*)
+     - the home greeting card extras (.cust-greeting, .napiq-acct-*)
+     - the "Amount To Pay" card (.napiq-pay-*)
+     - accents for the installation-progress tracker
+   Everything is colour-only (plus the greeting layout) and is written
+   against theme-aware tokens so it works in both modes.
    ===================================================================== */
 
-.dash-theme-customer {
-    /* Re-point the app's shared design tokens (style.css / dashboard.css)
-       at the same values theme/customer.ts uses on mobile, so every
-       component already built on var(--napiq-*) re-themes for free. */
-    --napiq-primary: #1849d6;
-    --napiq-primary-dark: #123aae;
-    --napiq-surface: #ffffff;
-    --napiq-bg: #f4f6fa;
-    --napiq-border: #e4e7ec;
-    --napiq-text-muted: #667085;
-
-    --napiq-success: #12b76a;
-    --napiq-warning: #f79009;
-    --napiq-danger: #d92d20;
-    --napiq-info: #1849d6;
-
-    color-scheme: light;
-}
-
-/* Force the light look regardless of the account's personal dark-mode
-   toggle (same reasoning as .dash-theme-tech forcing navy) — the
-   Customer mobile app only has this one theme, so the web portal
-   shouldn't offer a second look that the app can't match. */
-.dash-theme-customer.dash-body {
-    background-color: var(--napiq-bg);
-    color: #101828;
-}
-
-/* Nothing to toggle under a theme that's always light — hide the
-   control rather than leave one that visibly does nothing. */
-.dash-theme-customer #darkModeToggle {
-    display: none;
-}
-
 /* ---------------------------------------------------------------- */
-/* CARDS / TEXT -- explicit overrides for the handful of rules that   */
-/* theme-dark.css could otherwise still win on specificity for.       */
-/* ---------------------------------------------------------------- */
-
-.dash-theme-customer .card {
-    background-color: var(--napiq-surface);
-    border-color: var(--napiq-border);
-    color: #101828;
-}
-
-.dash-theme-customer .card-header.bg-white {
-    background-color: var(--napiq-surface) !important;
-    border-bottom-color: var(--napiq-border);
-    color: #101828;
-}
-
-.dash-theme-customer .text-muted {
-    color: var(--napiq-text-muted) !important;
-}
-
-.dash-theme-customer .form-control,
-.dash-theme-customer .form-control:focus {
-    background-color: var(--napiq-surface);
-    border-color: var(--napiq-border);
-    color: #101828;
-}
-
-.dash-theme-customer .modal-content {
-    background-color: var(--napiq-surface);
-    color: #101828;
-}
-
-.dash-theme-customer .modal-header,
-.dash-theme-customer .modal-footer {
-    border-color: var(--napiq-border);
-}
-
-/* ---------------------------------------------------------------- */
-/* CUSTOMER HOME "Account" / "Last payment" cards -- ported from the  */
-/* Customer mobile app's HomeScreen card styling (mobile/apps/app/    */
-/* src/screens/customer/HomeScreen.tsx: styles.card / .cardLabel /    */
-/* .cardValue / .row / .rowLabel / .rowValue) so the web portal home  */
-/* page reads the same way as the app's. Only used on customer/       */
-/* index.html; the shared .card rules above still apply for spacing/  */
-/* border/background, this just adds the label/value typography.     */
+/* ACCOUNT / LAST PAYMENT cards (label + value typography)            */
 /* ---------------------------------------------------------------- */
 
 .napiq-account-label {
@@ -122,7 +34,7 @@
 .napiq-account-code {
     font-size: 1.15rem;
     font-weight: 700;
-    color: #101828;
+    color: var(--bs-body-color);
     margin-top: 0.25rem;
     margin-bottom: 0.75rem;
 }
@@ -147,7 +59,7 @@
 .napiq-account-row-value {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #101828;
+    color: var(--bs-body-color);
     margin-top: 0.1rem;
     text-transform: capitalize;
     overflow: hidden;
@@ -164,138 +76,231 @@
     border: 1px solid #fda29b;
     background: #fef3f2;
 }
+html[data-bs-theme="dark"] .napiq-due-date--due,
+html[data-bs-theme="dark"] .napiq-account-code.napiq-due-date--due {
+    color: #fda29b;
+}
+html[data-bs-theme="dark"] .napiq-due-card--due {
+    border-color: rgba(253, 162, 155, 0.45);
+    background: rgba(217, 45, 32, 0.14);
+}
 
 /* ---------------------------------------------------------------- */
-/* CUSTOMER HOME: greeting + account-number pill + "Amount To Pay"   */
-/* card (customer/index.html).                                       */
+/* HOME GREETING CARD (customer/index.html)                           */
+/* Same .dash-greeting hero the technician / admin dashboards use --  */
+/* its colours come from admin-theme.css. This block only adds the    */
+/* layout bits that are specific to the subscriber version.           */
 /* ---------------------------------------------------------------- */
-.dash-theme-customer {
-    --napiq-teal: #00756f;
+
+/* The notification dropdown opens from inside the card, so the card must
+   not clip it (dashboard.css gives .dash-greeting overflow:hidden). */
+.dash-greeting.cust-greeting {
+    overflow: visible;
+    z-index: 3;
 }
-.napiq-acct-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
-.napiq-acct-hi { flex: 1 0 100%; font-size: 1.05rem; font-weight: 700; color: #101828; }
+.dash-greeting.cust-greeting .dash-greeting-art {
+    bottom: 0;
+}
+
+.cust-greeting-left {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+}
+.cust-greeting-left .dash-sidebar-toggle {
+    flex: 0 0 auto;
+}
+
+/* Account number pill + plan/status, inside the card body */
+.cust-acct {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    width: 100%;
+    max-width: 26rem;
+    margin-top: 0.9rem;
+}
+
 .napiq-acct-pill {
-    display: inline-flex; align-items: center; gap: .6rem;
-    padding: .55rem 1.1rem; border: 1.5px solid var(--napiq-teal); border-radius: 999px;
-    color: var(--napiq-teal); font-size: 1.15rem; font-weight: 600; letter-spacing: .02em;
-    background: var(--napiq-surface, #fff); max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.6rem;
+    max-width: 100%;
+    padding: 0.5rem 1.1rem;
+    border: 1.5px solid var(--napiq-primary);
+    border-radius: 999px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
-.napiq-acct-pill-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.napiq-acct-pill-chevron { font-size: .9rem; }
-.napiq-acct-meta { flex: 1 0 100%; display: flex; justify-content: space-between; align-items: center; gap: .75rem; font-size: .75rem; color: #101828; text-transform: uppercase; }
-.napiq-acct-status { display: inline-flex; align-items: center; gap: .4rem; text-transform: none; font-size: .85rem; color: var(--napiq-text-muted); }
-.napiq-acct-dot { width: 10px; height: 10px; border-radius: 50%; background: #12b76a; box-shadow: 0 0 0 3px rgba(18,183,106,.25); }
-.napiq-acct-dot--off { background: #98a2b3; box-shadow: 0 0 0 3px rgba(152,162,179,.25); }
+.napiq-acct-pill-code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.napiq-acct-pill-chevron {
+    font-size: 0.9rem;
+}
+html:not([data-bs-theme="dark"]) .napiq-acct-pill {
+    background: #FFFFFF;
+    color: #1046B8;
+    box-shadow: 0 6px 16px -12px rgba(6, 23, 71, 0.4);
+}
+html[data-bs-theme="dark"] .napiq-acct-pill {
+    background: rgba(6, 23, 71, 0.45);
+    border-color: rgba(22, 132, 255, 0.6);
+    color: #FFFFFF;
+}
+
+.napiq-acct-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.napiq-acct-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+html:not([data-bs-theme="dark"]) .napiq-acct-plan { color: #1046B8; }
+html:not([data-bs-theme="dark"]) .napiq-acct-status { color: #475569; }
+html[data-bs-theme="dark"] .napiq-acct-plan,
+html[data-bs-theme="dark"] .napiq-acct-status { color: rgba(255, 255, 255, 0.78); }
+
+.napiq-acct-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #12b76a;
+    box-shadow: 0 0 0 3px rgba(18, 183, 106, 0.25);
+}
+.napiq-acct-dot--off {
+    background: #98a2b3;
+    box-shadow: 0 0 0 3px rgba(152, 162, 179, 0.25);
+}
+
+/* Phones / small screens: date stacked over the time on the left, a smaller
+   light/dark toggle (and the bell) on the same row at the right. Same
+   treatment as the technician greeting card. */
+@media (max-width: 991.98px) {
+    .cust-greeting .dash-greeting-top { flex-wrap: nowrap; gap: 0.5rem; }
+    .cust-greeting .dash-greeting-clock { flex-direction: column; align-items: flex-start; gap: 2px; font-size: 0.72rem; }
+    .cust-greeting .dash-greeting-clock .dash-greeting-dot { display: none; }
+    .cust-greeting .dash-greeting-tools { flex-wrap: nowrap; gap: 0; flex: 0 0 auto; }
+    .cust-greeting .dash-topbar-actions { display: flex; align-items: center; gap: 0.4rem; }
+    .cust-greeting .napiq-theme-toggle { width: 44px; height: 28px; border-radius: 14px; }
+    .cust-greeting .napiq-theme-toggle .napiq-theme-toggle__icon { font-size: 0.9rem; }
+}
+@media (max-width: 575.98px) {
+    /* the decorative wifi icon would sit under the status text on phones */
+    .cust-greeting .dash-greeting-art { display: none; }
+    .cust-acct { max-width: none; }
+}
+
+/* ---------------------------------------------------------------- */
+/* HOME: "Amount To Pay" card                                         */
+/* Same tile treatment as the technician stat cards: white + blue     */
+/* line in light mode, navy glass in dark mode.                       */
+/* ---------------------------------------------------------------- */
 
 .napiq-pay-card {
-    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    padding: 1rem 1.1rem; background: var(--napiq-surface, #fff);
-    border-radius: .75rem; box-shadow: 0 2px 8px rgba(16,24,40,.12);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    background: var(--napiq-surface, #fff);
+    border: 1px solid var(--napiq-border);
+    border-radius: 14px;
+    color: var(--bs-body-color);
+    box-shadow: 0 10px 24px -20px rgba(6, 23, 71, 0.5);
 }
-.napiq-pay-label { display: block; font-size: .8rem; color: var(--napiq-text-muted); }
-.napiq-pay-amount { font-size: 1.5rem; font-weight: 500; color: #101828; margin: .2rem 0 .5rem; }
-.napiq-pay-peso { color: var(--napiq-teal); font-weight: 700; margin-right: .35rem; }
-.napiq-pay-due { font-size: .72rem; color: #101828; }
+html[data-bs-theme="dark"] .napiq-pay-card {
+    background: linear-gradient(135deg, #1a1d26 0%, #13161d 100%);
+    border-color: rgba(22, 132, 255, 0.3);
+    box-shadow: 0 12px 26px -18px rgba(0, 0, 0, 0.9);
+}
+
+.napiq-pay-label { display: block; font-size: 0.8rem; color: var(--napiq-text-muted); }
+.napiq-pay-amount { font-size: 1.5rem; font-weight: 500; color: var(--bs-body-color); margin: 0.2rem 0 0.5rem; }
+.napiq-pay-peso { color: var(--napiq-primary); font-weight: 700; margin-right: 0.35rem; }
+.napiq-pay-due { font-size: 0.72rem; color: var(--bs-body-color); }
+
 .napiq-pay-btn {
-    border: 0; border-radius: .5rem; background: var(--napiq-teal); color: #fff;
-    font-size: .8rem; font-weight: 600; letter-spacing: .05em;
-    padding: 1rem 1.6rem; min-width: 8.5rem; cursor: pointer;
+    border: 0;
+    border-radius: 999px;
+    background: var(--napiq-primary);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 1rem 1.6rem;
+    min-width: 8.5rem;
+    cursor: pointer;
+    box-shadow: 0 8px 18px -10px rgba(16, 70, 184, 0.6);
+    transition: background-color 0.15s ease, transform 0.15s ease;
 }
-.napiq-pay-btn:hover, .napiq-pay-btn:focus-visible { filter: brightness(1.12); }
-.napiq-pay-btn:disabled { background: #98a2b3; cursor: not-allowed; opacity: .7; filter: none; transform: none; }
+.napiq-pay-btn:hover,
+.napiq-pay-btn:focus-visible { background: var(--napiq-primary-dark); transform: translateY(-1px); }
 .napiq-pay-btn:active { transform: translateY(1px); }
-.napiq-pay-card--due { border: 1px solid #fda29b; background: #fef3f2; }
+.napiq-pay-btn:disabled {
+    background: #94A3B8;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+
+/* Due today / overdue: the whole card turns red */
+.napiq-pay-card.napiq-pay-card--due { border-color: #fda29b; background: #fef3f2; }
 .napiq-pay-card--due .napiq-pay-amount,
 .napiq-pay-card--due .napiq-pay-due { color: #d92d20; }
+html[data-bs-theme="dark"] .napiq-pay-card.napiq-pay-card--due {
+    background: rgba(217, 45, 32, 0.14);
+    border-color: rgba(253, 162, 155, 0.45);
+}
+html[data-bs-theme="dark"] .napiq-pay-card--due .napiq-pay-amount,
+html[data-bs-theme="dark"] .napiq-pay-card--due .napiq-pay-due { color: #fda29b; }
+
 @media (max-width: 400px) {
-    .napiq-pay-btn { padding: .9rem 1rem; min-width: 7rem; }
+    .napiq-pay-btn { padding: 0.9rem 1rem; min-width: 7rem; }
 }
 
-/* ================================================================= */
-/* LANDING-PAGE PALETTE (matches static/css/landing.css)             */
-/* Royal blue #0D3B85 / deep blue #082A63 / navy #081225 / gold      */
-/* #F4B41A / sky #4C7FD1, slate neutrals, pill buttons. Loaded last  */
-/* so it overrides the older blue/teal accents above.                */
-/* ================================================================= */
-.dash-theme-customer {
-    --lp-blue: #0D3B85; --lp-blue-dark: #082A63; --lp-navy: #081225;
-    --lp-gold: #F4B41A; --lp-sky: #4C7FD1; --lp-ink: #0F172A;
-    --lp-muted: #64748B; --lp-alt: #F1F5F9; --lp-line: #E2E8F0;
+/* ---------------------------------------------------------------- */
+/* HOME: installation / issue progress accents                        */
+/* --napiq-primary is royal blue in light mode and electric blue in   */
+/* dark mode (admin-theme.css), so these follow the mode for free.    */
+/* ---------------------------------------------------------------- */
 
-    --napiq-primary: var(--lp-blue);
-    --napiq-primary-dark: var(--lp-blue-dark);
-    --napiq-bg: var(--lp-alt);
-    --napiq-border: var(--lp-line);
-    --napiq-text-muted: var(--lp-muted);
-    --napiq-info: var(--lp-blue);
-    --napiq-teal: var(--lp-blue);
-    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-}
-.dash-theme-customer.dash-body { color: var(--lp-ink); }
-
-/* Sidebar: same royal-blue -> navy gradient as the landing hero, gold active marker */
-.dash-theme-customer .dash-sidebar {
-    background: linear-gradient(160deg, #0D3B85 0%, #0A2F6B 55%, #081225 100%);
-}
-.dash-theme-customer .dash-nav-link { color: #CBD5E1; }
-.dash-theme-customer .dash-nav-link:hover { background: rgba(255, 255, 255, .1); color: #fff; }
-.dash-theme-customer .dash-nav-link.active {
-    background: rgba(255, 255, 255, .14); color: #fff;
-    box-shadow: inset 3px 0 0 var(--lp-gold);
-}
-.dash-theme-customer .dash-nav-link.active i { color: var(--lp-gold); }
-
-/* Top bar */
-.dash-theme-customer .dash-topbar { border-bottom: 1px solid var(--lp-line); }
-.dash-theme-customer .dash-topbar-title h1 { color: var(--lp-ink); }
-
-/* Cards */
-.dash-theme-customer .card,
-.dash-theme-customer .napiq-pay-card {
-    border-color: var(--lp-line); border-radius: 14px;
-    box-shadow: 0 12px 28px -22px rgba(15, 27, 61, .5);
-}
-
-/* Home: greeting, account pill, plan/status */
-.dash-theme-customer .napiq-acct-hi { color: var(--lp-ink); font-weight: 800; }
-.dash-theme-customer .napiq-acct-pill { border-color: var(--lp-blue); color: var(--lp-blue); }
-.dash-theme-customer .napiq-acct-plan { color: var(--lp-ink); font-weight: 600; }
-
-/* Home: Amount To Pay */
-.dash-theme-customer .napiq-pay-peso { color: var(--lp-blue); }
-.dash-theme-customer .napiq-pay-btn {
-    background: var(--lp-blue); border-radius: 999px; font-weight: 700;
-    box-shadow: 0 8px 18px -8px rgba(13, 59, 133, .6);
-}
-.dash-theme-customer .napiq-pay-btn:hover,
-.dash-theme-customer .napiq-pay-btn:focus-visible { background: var(--lp-blue-dark); filter: none; transform: translateY(-1px); }
-.dash-theme-customer .napiq-pay-btn:disabled {
-    background: #94A3B8; box-shadow: none; transform: none; cursor: not-allowed; opacity: .75;
-}
-
-/* Home: installation progress */
 .dash-theme-customer .ip-step.done:not(:first-child)::before,
-.dash-theme-customer .ip-step.current:not(:first-child)::before { background: var(--lp-blue); }
-.dash-theme-customer .ip-step.done .ip-dot { background: var(--lp-blue); border-color: var(--lp-blue); color: #fff; }
+.dash-theme-customer .ip-step.current:not(:first-child)::before { background: var(--napiq-primary); }
+.dash-theme-customer .ip-step.done .ip-dot { background: var(--napiq-primary); border-color: var(--napiq-primary); color: #fff; }
 .dash-theme-customer .ip-step.current .ip-dot {
-    border-color: var(--lp-gold); color: var(--lp-blue); box-shadow: 0 0 0 4px rgba(244, 180, 26, .3);
+    border-color: #FFC928;
+    color: var(--napiq-primary);
+    box-shadow: 0 0 0 4px rgba(255, 201, 40, 0.3);
 }
-.dash-theme-customer .ip-step.selected .ip-label { color: var(--lp-blue); }
+.dash-theme-customer .ip-step.selected .ip-label { color: var(--napiq-primary); }
 .dash-theme-customer .ip-home-item .ip-step:focus-visible,
-.dash-theme-customer .app-prog-steps .ip-step:focus-visible { outline-color: var(--lp-gold); }
-.dash-theme-customer .app-prog-badge { background: var(--lp-muted); }
-.dash-theme-customer .app-prog-badge--approved,
-.dash-theme-customer .app-prog-badge--assigned { background: var(--lp-sky); color: #fff; }
-.dash-theme-customer .app-prog-badge--arriving { background: var(--lp-blue); color: #fff; }
-.dash-theme-customer .app-prog-note { background: var(--lp-alt); border-left-color: var(--lp-gold); }
-.dash-theme-customer .app-prog-call,
-.dash-theme-customer .ip-d-value a { color: var(--lp-blue); }
+.dash-theme-customer .app-prog-steps .ip-step:focus-visible { outline-color: #FFC928; }
 
-/* Buttons / links elsewhere in customer pages */
-.dash-theme-customer .btn-primary {
-    background: var(--lp-blue); border-color: var(--lp-blue); border-radius: 999px; font-weight: 600;
-}
-.dash-theme-customer .btn-primary:hover,
-.dash-theme-customer .btn-primary:focus { background: var(--lp-blue-dark); border-color: var(--lp-blue-dark); }
-.dash-theme-customer .btn-outline-primary { color: var(--lp-blue); border-color: var(--lp-blue); border-radius: 999px; }
-.dash-theme-customer .btn-outline-primary:hover { background: var(--lp-blue); border-color: var(--lp-blue); color: #fff; }
+.dash-theme-customer .app-prog-badge { background: #64748B; }
+.dash-theme-customer .app-prog-badge--approved,
+.dash-theme-customer .app-prog-badge--assigned { background: #1684FF; color: #fff; }
+.dash-theme-customer .app-prog-badge--arriving { background: #1046B8; color: #fff; }
+.dash-theme-customer .app-prog-note { border-left-color: #FFC928; }
+.dash-theme-customer .app-prog-note--completed { border-left-color: #198754; }
+.dash-theme-customer .app-prog-note--rejected { border-left-color: #dc3545; }
+.dash-theme-customer .app-prog-call,
+.dash-theme-customer .ip-d-value a { color: var(--napiq-primary); }
