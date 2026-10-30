@@ -52,6 +52,7 @@
     {% if current_user and current_user.role in ('administrator', 'payment_collector', 'technician', 'field_assistant', 'user') %}
     <link href="{{ url_for('static', filename='css/admin-theme.css') }}" rel="stylesheet">
     {% endif %}
+    <link href="{{ url_for('static', filename='css/mobile-bottomnav.css') }}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
 {#
@@ -278,55 +279,125 @@
     <!-- Backdrop used only on mobile when the sidebar is toggled open -->
     <div class="dash-sidebar-backdrop" id="dashSidebarBackdrop"></div>
 
-    {# Technician / field assistant on phones and small tablets: the hamburger
-       drawer is hidden (technician-theme.css) and this bottom bar replaces it. #}
-    {% if current_user and current_user.role in ('technician', 'field_assistant') %}
-    <style>
-        /* Technician bottom navigation (phones / small devices). Inline so it
-           always applies, independent of cached stylesheets. */
-        .tech-bottomnav { display: none; }
-        @media (max-width: 991.98px) {
-            .dash-sidebar, .dash-sidebar-backdrop, .dash-sidebar-toggle { display: none !important; }
-            .dash-main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-            .tech-bottomnav {
-                display: flex !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
-                background: #FFFFFF; border-top: 1px solid #DCE6F8;
-                padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 18px -10px rgba(6,23,71,.35);
-            }
-            .tech-bottomnav .tech-bottomnav-item {
-                flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
-                padding: 6px 4px; color: #64748B; text-decoration: none; font-size: .7rem; font-weight: 600;
-            }
-            .tech-bottomnav .tech-bottomnav-item i { font-size: 1.35rem; line-height: 1; }
-            .tech-bottomnav .tech-bottomnav-item:hover { color: #1046B8; }
-            .tech-bottomnav .tech-bottomnav-disabled, .tech-bottomnav .tech-bottomnav-disabled:hover { opacity: .45; pointer-events: none; cursor: default; }
-            .tech-bottomnav .tech-bottomnav-item.active, .tech-bottomnav .tech-bottomnav-item.active:hover { color: #1046B8; }
-            html[data-bs-theme="dark"] .tech-bottomnav { background: #061747; border-top-color: rgba(255,255,255,.12); }
-            html[data-bs-theme="dark"] .tech-bottomnav .tech-bottomnav-item { color: rgba(255,255,255,.65); }
-            html[data-bs-theme="dark"] .tech-bottomnav .tech-bottomnav-item.active { color: #FFC928; }
-        }
-        html.dash-embedded .tech-bottomnav { display: none !important; }
-    </style>
-    <nav class="tech-bottomnav" aria-label="Primary">
-        <a href="{{ url_for('technician.index') }}"
-           class="tech-bottomnav-item {{ 'active' if request.endpoint == 'technician.index' else '' }}">
-            <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+    {# ================= MOBILE BOTTOM NAVIGATION (all roles) =================
+       Phones / small screens only (< 992px, see static/css/mobile-bottomnav.css):
+       the top bar and the slide-out sidebar are hidden and this bottom tab bar
+       replaces them. Same role gating as the sidebar above. Items flagged
+       "bar" sit in the tab bar; the rest, plus notifications, dark mode,
+       settings and log out, live in the "More" sheet. #}
+    {% if current_user %}
+    {% set _role = current_user.role %}
+    {% set _ep = request.endpoint or '' %}
+    {% set mbn = [] %}
+    {% if _role != 'payment_collector' %}
+        {% set _ = mbn.append({'href': url_for(role_home_endpoint), 'icon': 'bi-speedometer2', 'label': 'Dashboard', 'bar': true,
+            'active': _ep == role_home_endpoint,
+            'badge': (sidebar_badges.get('technician_dashboard') if _role == 'field_assistant' else 0)}) %}
+    {% endif %}
+    {% if _role in ('administrator', 'field_assistant') %}
+        {% set _ = mbn.append({'href': url_for('naps.geomap'), 'icon': 'bi-geo-alt', 'label': 'GeoMap', 'bar': _role == 'field_assistant', 'active': _ep == 'naps.geomap'}) %}
+        {% set _ = mbn.append({'href': url_for('naps.list_naps'), 'icon': 'bi-hdd-network', 'label': 'NAPs', 'bar': false, 'active': _ep in ['naps.list_naps', 'naps.view_nap', 'naps.add_nap']}) %}
+    {% endif %}
+    {% if _role == 'administrator' %}
+        {% set _ = mbn.append({'href': url_for('issues.list_issues'), 'icon': 'bi-ticket-perforated', 'label': 'Tickets', 'bar': true, 'active': _ep.startswith('issues.'), 'badge': sidebar_badges.get('issues')}) %}
+        {% set _ = mbn.append({'href': url_for('subscribers.list_subscribers'), 'icon': 'bi-person-vcard', 'label': 'Subscribers', 'bar': true, 'active': _ep.startswith('subscribers.'), 'badge': sidebar_badges.get('subscribers')}) %}
+        {% set _ = mbn.append({'href': url_for('payments.list_payments'), 'icon': 'bi-cash-coin', 'label': 'Payments', 'bar': true, 'active': _ep.startswith('payments.'), 'badge': sidebar_badges.get('payments')}) %}
+        {% set _ = mbn.append({'href': url_for('technicians.list_technicians'), 'icon': 'bi-person-badge', 'label': 'Technician', 'bar': false, 'active': _ep.startswith('technicians.')}) %}
+        {% set _ = mbn.append({'href': url_for('collectors.list_collectors'), 'icon': 'bi-wallet2', 'label': 'Collector', 'bar': false, 'active': _ep.startswith('collectors.')}) %}
+        {% set _ = mbn.append({'href': url_for('reports.index'), 'icon': 'bi-bar-chart-line', 'label': 'Reports', 'bar': false, 'active': _ep.startswith('reports.')}) %}
+    {% elif _role in ('technician', 'field_assistant') %}
+        {% set _ = mbn.append({'href': url_for('technician.tickets'), 'icon': 'bi-ticket-perforated', 'label': 'Tickets', 'bar': true, 'active': _ep in ['technician.tickets', 'technician.history', 'technician.ticket_detail']}) %}
+    {% elif _role == 'payment_collector' %}
+        {% set _ = mbn.append({'href': url_for('collector.index'), 'icon': 'bi-cash-coin', 'label': 'Collections', 'bar': true, 'active': _ep.startswith('collector.')}) %}
+    {% elif _role == 'user' %}
+        {% set _ = mbn.append({'href': url_for('customer.my_payments'), 'icon': 'bi-cash-coin', 'label': 'Payments', 'bar': true, 'active': _ep == 'customer.my_payments', 'badge': sidebar_badges.get('customer_payments')}) %}
+    {% endif %}
+    {% if _role in ('administrator', 'user') %}
+        {% set _ = mbn.append({'href': url_for('notifications.index'), 'icon': 'bi-bell', 'label': 'Alerts', 'bar': _role == 'user', 'active': _ep.startswith('notifications.'), 'badge': unread_notifications_count}) %}
+    {% endif %}
+    {% set _ = mbn.append({'href': url_for('profile.index'), 'icon': 'bi-person-circle', 'label': 'Profile', 'bar': _role != 'administrator',
+        'active': _ep.startswith('profile.') or _ep.startswith('settings.')}) %}
+    {% set mbn_bar = mbn|selectattr('bar')|list %}
+    {% set mbn_more = mbn|rejectattr('bar')|list %}
+    {% set mbn_more_active = (mbn_more|selectattr('active')|list|length) > 0 %}
+
+    <nav class="mbn" aria-label="Primary">
+        {% for it in mbn_bar %}
+        <a href="{{ it.href }}" class="mbn-item {{ 'active' if it.active else '' }}">
+            <i class="bi {{ it.icon }}"></i><span class="mbn-label">{{ it.label }}</span>
+            {% if it.badge %}<span class="mbn-badge">{{ it.badge if it.badge < 100 else '99+' }}</span>{% endif %}
         </a>
-        <a href="{{ url_for('technician.tickets') }}"
-           class="tech-bottomnav-item {{ 'active' if request.endpoint in ['technician.tickets', 'technician.history', 'technician.ticket_detail'] else '' }}">
-            <i class="bi bi-ticket-perforated"></i><span>Tickets</span>
-        </a>
-        {# Notifications: technician accounts have no notifications feature yet,
-           so this is shown (same spot the top bell used to be) but inactive. #}
-        <a href="#" class="tech-bottomnav-item tech-bottomnav-disabled" aria-disabled="true" tabindex="-1"
-           title="Notifications aren't available for your account yet">
-            <i class="bi bi-bell"></i><span>Alerts</span>
-        </a>
-        <a href="{{ url_for('profile.index') }}"
-           class="tech-bottomnav-item {{ 'active' if request.endpoint and request.endpoint.startswith('profile.') else '' }}">
-            <i class="bi bi-person-circle"></i><span>Profile</span>
-        </a>
+        {% endfor %}
+        <button type="button" class="mbn-item {{ 'active' if mbn_more_active else '' }}" id="mbnMoreBtn"
+                aria-haspopup="true" aria-expanded="false" aria-controls="mbnSheet">
+            <i class="bi bi-grid"></i><span class="mbn-label">More</span>
+            {% if unread_notifications_count and _role in ('administrator', 'user') and not mbn_bar|selectattr('label', 'equalto', 'Alerts')|list %}<span class="mbn-dot"></span>{% endif %}
+        </button>
     </nav>
+
+    <div class="mbn-backdrop" id="mbnBackdrop"></div>
+    <div class="mbn-sheet" id="mbnSheet" role="dialog" aria-label="More">
+        <div class="mbn-sheet-grip"></div>
+        <div class="mbn-user">
+            <span class="mbn-user-avatar">{{ (current_user.full_name or current_user.username)[:1]|upper }}</span>
+            <div>
+                <div class="mbn-user-name">{{ current_user.full_name or current_user.username }}</div>
+                <div class="mbn-user-role">{{ current_user.role|replace('_', ' ')|title }}</div>
+            </div>
+        </div>
+
+        {% if mbn_more %}
+        <div class="mbn-grid">
+            {% for it in mbn_more %}
+            <a href="{{ it.href }}" class="mbn-tile {{ 'active' if it.active else '' }}">
+                <i class="bi {{ it.icon }}"></i><span>{{ it.label }}</span>
+                {% if it.badge %}<span class="mbn-badge">{{ it.badge if it.badge < 100 else '99+' }}</span>{% endif %}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="mbn-list">
+            <div class="mbn-row">
+                <i class="bi bi-moon-stars"></i><span>Dark mode</span>
+                <button type="button" class="napiq-theme-toggle flex-shrink-0" data-theme-toggle-btn
+                        aria-pressed="{{ 'true' if current_user.theme_preference == 'dark' else 'false' }}"
+                        aria-label="Toggle dark mode">
+                    <i class="bi bi-moon-stars-fill napiq-theme-toggle__icon napiq-theme-toggle__icon--moon" aria-hidden="true"></i>
+                    <i class="bi bi-sun-fill napiq-theme-toggle__icon napiq-theme-toggle__icon--sun" aria-hidden="true"></i>
+                </button>
+            </div>
+            {% if _role != 'user' %}
+            <a href="{{ url_for('settings.index') }}" class="mbn-row">
+                <i class="bi bi-gear"></i><span>Settings</span>
+            </a>
+            {% endif %}
+            <button type="button" class="mbn-row mbn-row-danger" data-mbn-close
+                    data-bs-toggle="modal" data-bs-target="#logoutConfirmModal">
+                <i class="bi bi-box-arrow-right"></i><span>Log out</span>
+            </button>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var btn = document.getElementById('mbnMoreBtn');
+            var sheet = document.getElementById('mbnSheet');
+            var back = document.getElementById('mbnBackdrop');
+            if (!btn || !sheet || !back) return;
+            function setOpen(open) {
+                sheet.classList.toggle('is-open', open);
+                back.classList.toggle('is-open', open);
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+            btn.addEventListener('click', function () { setOpen(!sheet.classList.contains('is-open')); });
+            back.addEventListener('click', function () { setOpen(false); });
+            sheet.addEventListener('click', function (e) {
+                if (e.target.closest('a[href], [data-mbn-close]')) setOpen(false);
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+            window.addEventListener('resize', function () { if (window.innerWidth >= 992) setOpen(false); });
+        })();
+    </script>
     {% endif %}
 
     <!-- Logout confirmation modal. Triggered instead of submitting
