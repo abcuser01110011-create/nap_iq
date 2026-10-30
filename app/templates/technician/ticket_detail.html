@@ -248,7 +248,7 @@
         <h2 class="h6 text-uppercase text-muted mb-2"><span class="td-chip"><i class="bi bi-camera"></i></span>Completion Photo</h2>
 
         {% if job.assignment.photo_filename %}
-            <img src="{{ job.assignment.photo_filename }}" alt="Completion photo" class="tech-photo-preview mb-3">
+            <img src="{{ job.assignment.photo_filename }}" alt="Completion photo" class="tech-photo-preview mb-3" id="photoCurrentImg">
         {% else %}
             <p class="small text-muted mb-3">
                 {{ "No photo added yet — required before this assignment can be marked complete."
@@ -268,10 +268,10 @@
 
             <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-outline-primary btn-sm" id="photoTakeBtn">
-                    <i class="bi bi-camera me-1"></i>Take Photo
+                    <i class="bi bi-camera me-1"></i>{{ "Retake Photo" if job.assignment.photo_filename else "Take Photo" }}
                 </button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="photoUploadBtn">
-                    <i class="bi bi-image me-1"></i>Upload Image
+                    <i class="bi bi-image me-1"></i>{{ "Replace Image" if job.assignment.photo_filename else "Upload Image" }}
                 </button>
             </div>
 
@@ -293,6 +293,7 @@
             var img = document.getElementById('photoPendingImg');
             var nameEl = document.getElementById('photoPendingName');
             var objectUrl = null;
+            var current = document.getElementById('photoCurrentImg');   // the already-saved photo, if any
 
             function pick(useCamera) {
                 if (useCamera) input.setAttribute('capture', 'environment');
@@ -305,6 +306,7 @@
                 if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
                 img.removeAttribute('src');
                 pending.classList.add('d-none');
+                if (current) current.classList.remove('d-none');   // back to the saved photo
             }
 
             document.getElementById('photoTakeBtn').addEventListener('click', function () { pick(true); });
@@ -317,10 +319,11 @@
                 if (objectUrl) URL.revokeObjectURL(objectUrl);
                 objectUrl = URL.createObjectURL(f);
                 img.style.display = '';
-                img.onerror = function () { img.style.display = 'none'; };   // e.g. HEIC can't preview
+                img.onerror = function () { img.style.display = 'none'; if (current) current.classList.remove('d-none'); };   // e.g. HEIC can't preview
                 img.src = objectUrl;
                 nameEl.textContent = f.name;
                 pending.classList.remove('d-none');
+                if (current) current.classList.add('d-none');      // only ONE image on screen: the new one replaces the saved one
             });
         })();
         </script>
