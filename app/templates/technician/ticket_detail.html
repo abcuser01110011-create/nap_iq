@@ -3,6 +3,9 @@
 {% block page_title %}{{ job.ticket_code }}{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ job.type_label }}{% if job.consolidated %} · Consolidated ({{ job.consolidated.total }} locations){% endif %}</p>{% endblock %}
 
+{# No top header on this page (same as Tickets / Ticket History). #}
+{% block topbar %}{% endblock %}
+
 {% block content %}
 {% set assignment_status_classes = {
     'assigned': 'text-bg-secondary',
