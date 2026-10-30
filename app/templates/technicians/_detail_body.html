@@ -1,92 +1,187 @@
-{# The popup has no page title, so show the name here; the full page already has it in its title bar. #}
-{% if request.args.get('partial') %}
-<h3 class="mb-3">{{ technician.full_name }}</h3>
-{% endif %}
-<div class="row g-3">
-    <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white"><i class="bi bi-person-badge me-1"></i>Profile</div>
-            <div class="card-body">
-                <dl class="row mb-0 small">
-                    <dt class="col-sm-4 text-muted fw-normal">Type</dt>
-                    <dd class="col-sm-8">
-                        {{ 'Field Assistant' if technician.personnel_type == 'field_assistant' else 'Technician' }}
-                    </dd>
+{# Technician details card -- used by the popup on the Technician list
+   (?partial=1) and by the full /technicians/<id> page. #}
+{% set is_fa = technician.personnel_type == 'field_assistant' %}
+{% set st = technician.effective_status %}
+{% set st_cls = {'available': 'is-available', 'busy': 'is-busy', 'offline': 'is-offline'}.get(st, 'is-offline') %}
 
-                    <dt class="col-sm-4 text-muted fw-normal">Contact</dt>
-                    <dd class="col-sm-8">{{ technician.contact_number or "—" }}</dd>
+<style>
+    .tech-pop {
+        --tp-blue: #1046B8; --tp-gold: #F4B41A;
+        --tp-card: var(--bs-tertiary-bg); --tp-line: var(--bs-border-color);
+        position: relative; padding: 0.25rem 0 0;
+    }
+    /* soft corner swooshes, like the design */
+    .tech-pop::before {
+        content: ""; position: absolute; inset: -1.5rem -1.5rem auto auto; width: 55%; height: 150px; z-index: 0; pointer-events: none;
+        background: radial-gradient(120% 100% at 100% 0, rgba(244,180,26,.22) 0, rgba(244,180,26,0) 55%),
+                    radial-gradient(100% 90% at 70% 0, rgba(16,70,184,.14) 0, rgba(16,70,184,0) 60%);
+    }
+    .tech-pop::after {
+        content: ""; position: absolute; left: -1.5rem; bottom: -1.5rem; width: 150px; height: 70px; z-index: 0; pointer-events: none;
+        background: linear-gradient(35deg, var(--tp-blue) 0 38%, transparent 38.5%),
+                    linear-gradient(35deg, transparent 0 45%, rgba(244,180,26,.55) 45.5% 52%, transparent 52.5%);
+        border-bottom-left-radius: .4rem;
+    }
+    .tech-pop > * { position: relative; z-index: 1; }
 
-                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
-                    <dd class="col-sm-8">
-                        {% set tech_status_classes = {'available': 'text-bg-success', 'busy': 'text-bg-warning', 'offline': 'text-bg-secondary'} %}
-                        <span class="badge {{ tech_status_classes.get(technician.effective_status, 'text-bg-secondary') }}">
-                            {{ technician.effective_status|capitalize }}
-                        </span>
-                    </dd>
+    .tech-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+    .tech-head-avatar {
+        width: 64px; height: 64px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center;
+        background: var(--bs-body-bg); border: 2px solid var(--tp-gold); box-shadow: 0 2px 8px rgba(0,0,0,.15);
+        color: var(--tp-blue); font-size: 1.9rem;
+    }
+    .tech-eyebrow { display: flex; align-items: center; gap: .6rem; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
+    .tech-eyebrow::after { content: ""; width: 56px; height: 2px; background: var(--tp-gold); border-radius: 2px; }
+    .tech-name { margin: .1rem 0 0; font-size: 1.6rem; font-weight: 800; line-height: 1.15; }
+    .tech-role { color: var(--bs-secondary-color); font-size: .95rem; }
 
-                    <dt class="col-sm-4 text-muted fw-normal">Resolved Issues</dt>
-                    <dd class="col-sm-8">{{ technician.resolved_issues_count }}</dd>
+    .tech-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 1.1rem; }
+    @media (max-width: 767.98px) { .tech-grid { grid-template-columns: 1fr; } }
+    .tech-card { background: var(--tp-card); border: 1px solid var(--tp-line); border-radius: .9rem; padding: 1.25rem; }
 
-                    <dt class="col-sm-4 text-muted fw-normal">Mobile Login</dt>
-                    <dd class="col-sm-8">
-                        {% if technician.user %}
-                            <span class="badge text-bg-light border">{{ technician.user.username }}</span>
-                        {% else %}
-                            <span class="text-muted">Not set up</span>
-                        {% endif %}
-                    </dd>
-                </dl>
-            </div>
+    .tech-profile-top { display: flex; align-items: center; gap: 1.1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--tp-line); margin-bottom: .9rem; }
+    .tech-avatar { position: relative; width: 104px; height: 104px; flex: 0 0 auto; }
+    .tech-avatar-face {
+        width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; font-size: 3.6rem; color: #fff;
+        background: linear-gradient(160deg, #3b82f6, var(--tp-blue)); border: 3px solid var(--tp-gold);
+        box-shadow: 0 3px 10px rgba(0,0,0,.2); overflow: hidden;
+    }
+    .tech-dot { position: absolute; right: 6px; bottom: 6px; width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--tp-card); background: #9aa4b2; }
+    .tech-dot.is-available { background: #22c55e; } .tech-dot.is-busy { background: #f59e0b; } .tech-dot.is-offline { background: #9aa4b2; }
+
+    .tech-pill { display: inline-flex; align-items: center; gap: .4rem; padding: .25rem .75rem; border-radius: 999px; font-weight: 700; font-size: .85rem; }
+    .tech-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .tech-pill.is-available { background: rgba(34,197,94,.18); color: #16a34a; }
+    .tech-pill.is-busy { background: rgba(244,180,26,.28); color: #b45309; }
+    .tech-pill.is-offline { background: rgba(148,163,184,.25); color: var(--bs-secondary-color); }
+    [data-bs-theme="dark"] .tech-pill.is-available { color: #4ade80; }
+    [data-bs-theme="dark"] .tech-pill.is-busy { color: #fbbf24; }
+
+    .tech-quick { display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
+    .tech-quick-row { display: flex; align-items: center; gap: .6rem; font-size: 1rem; }
+    .tech-quick-row i, .tech-fact i { color: var(--bs-secondary-color); font-size: 1.1rem; width: 1.3rem; text-align: center; }
+    .tech-chip { background: rgba(16,70,184,.12); color: var(--tp-blue); border-radius: .5rem; padding: .15rem .6rem; font-weight: 600; font-size: .85rem; }
+    [data-bs-theme="dark"] .tech-chip { background: rgba(96,165,250,.16); color: #93c5fd; }
+
+    .tech-facts { display: flex; flex-direction: column; gap: .75rem; margin: 0; }
+    .tech-fact { display: flex; align-items: center; gap: .6rem; font-size: .95rem; }
+    .tech-fact .k { width: 9rem; color: var(--bs-secondary-color); }
+    .tech-fact .v { font-weight: 500; }
+
+    .tech-assign-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+    .tech-assign-title { display: flex; align-items: center; gap: .6rem; font-size: 1.2rem; font-weight: 800; }
+    .tech-assign-title i { font-size: 1.5rem; }
+    .tech-count { font-weight: 500; color: var(--bs-secondary-color); font-size: 1rem; }
+    .tech-viewall { border: 1px solid var(--tp-line); border-radius: 999px; padding: .3rem .9rem; font-weight: 600; font-size: .9rem; color: var(--tp-blue); text-decoration: none; background: var(--bs-body-bg); }
+    [data-bs-theme="dark"] .tech-viewall { color: #93c5fd; }
+    .tech-viewall:hover { border-color: var(--tp-blue); }
+
+    .tech-table { width: 100%; border: 1px solid var(--tp-line); border-radius: .7rem; overflow: hidden; border-collapse: separate; border-spacing: 0; background: var(--bs-body-bg); }
+    .tech-table th { background: rgba(16,70,184,.08); text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; color: var(--bs-secondary-color); padding: .65rem .9rem; font-weight: 700; }
+    .tech-table td { padding: .75rem .9rem; vertical-align: middle; border-top: 1px solid var(--tp-line); }
+    .tech-table tbody tr:first-child td { border-top: 0; }
+    .tech-table .code { font-weight: 700; }
+    .tech-table .sub { font-size: .8rem; color: var(--bs-secondary-color); }
+    .tech-astatus { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: .5rem; font-weight: 600; font-size: .82rem; background: rgba(20,184,166,.18); color: #0f766e; }
+    .tech-astatus::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+    [data-bs-theme="dark"] .tech-astatus { color: #5eead4; }
+    .tech-empty { padding: 2.5rem 1rem; text-align: center; color: var(--bs-secondary-color); }
+
+    .tech-foot { display: flex; justify-content: flex-end; margin-top: 1.1rem; padding-top: .9rem; border-top: 1px solid var(--tp-line); }
+    .tech-edit { display: inline-flex; align-items: center; gap: .5rem; padding: .55rem 1.6rem; border-radius: 999px; font-weight: 700; color: #fff; text-decoration: none;
+        background: linear-gradient(180deg, #1d5fd8, var(--tp-blue)); box-shadow: 0 0 0 2px rgba(244,180,26,.7), 0 4px 10px rgba(16,70,184,.35); }
+    .tech-edit:hover { color: #fff; filter: brightness(1.08); }
+</style>
+
+<div class="tech-pop">
+    <div class="tech-head">
+        <div class="tech-head-avatar"><i class="bi bi-person-badge-fill"></i></div>
+        <div>
+            <div class="tech-eyebrow">{{ 'Field Assistant' if is_fa else 'Technician' }} Details</div>
+            <h3 class="tech-name">{{ technician.full_name }}</h3>
+            <div class="tech-role">{{ 'Field Assistant' if is_fa else 'Field Technician' }}</div>
         </div>
     </div>
 
-    <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white">
-                <i class="bi bi-clipboard-check me-1"></i>Open Assignments
-                <span class="text-muted small">({{ open_assignments|length }})</span>
-            </div>
-            <div class="card-body p-0">
-                {% if open_assignments %}
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0 align-middle">
-                        <thead><tr><th>Issue</th><th>Status</th><th>Assigned</th></tr></thead>
-                        <tbody>
-                            {% for assignment in open_assignments %}
-                            <tr>
-                                <td>
-                                    {# An assignment belongs to either a technical issue (TN)
-                                       or a service order (SO); service-order assignments have
-                                       no technical_issue_id, which used to crash this page. #}
-                                    {% if assignment.technical_issue_id %}
-                                    <a href="{{ url_for('issues.view_issue', issue_id=assignment.technical_issue_id) }}">
-                                        {{ assignment.technical_issue.issue_code if assignment.technical_issue and assignment.technical_issue.issue_code else ('#' ~ assignment.technical_issue_id) }}
-                                    </a>
-                                    {% elif assignment.service_request_id %}
-                                    <a href="{{ url_for('issues.view_service_order', request_id=assignment.service_request_id) }}">
-                                        SO-{{ '%04d'|format(assignment.service_request_id) }}
-                                    </a>
-                                    {% else %}
-                                    —
-                                    {% endif %}
-                                </td>
-                                <td><span class="badge text-bg-info">{{ assignment.status|replace('_',' ')|capitalize }}</span></td>
-                                <td>{{ assignment.assigned_at.strftime('%Y-%m-%d') }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <div class="tech-grid">
+        <div class="tech-card">
+            <div class="tech-profile-top">
+                <div class="tech-avatar">
+                    <div class="tech-avatar-face"><i class="bi bi-person-fill"></i></div>
+                    <span class="tech-dot {{ st_cls }}"></span>
                 </div>
-                {% else %}
-                <div class="p-4 text-center text-muted">No open assignments right now.</div>
-                {% endif %}
+                <div class="tech-quick">
+                    <div><span class="tech-pill {{ st_cls }}">{{ st|capitalize }}</span></div>
+                    <div class="tech-quick-row"><i class="bi bi-telephone"></i>{{ technician.contact_number or "—" }}</div>
+                    <div class="tech-quick-row">
+                        <i class="bi bi-phone"></i>
+                        <span class="text-muted">Mobile Login</span>
+                        {% if technician.user %}<span class="tech-chip">{{ technician.user.username }}</span>{% else %}<span class="text-muted">Not set up</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tech-facts">
+                <div class="tech-fact"><i class="bi bi-person"></i><span class="k">Name</span><span class="v">{{ technician.full_name }}</span></div>
+                <div class="tech-fact"><i class="bi bi-person-lines-fill"></i><span class="k">Contact Number</span><span class="v">{{ technician.contact_number or "—" }}</span></div>
+                <div class="tech-fact"><i class="bi bi-activity"></i><span class="k">Status</span><span class="tech-pill {{ st_cls }}">{{ st|capitalize }}</span></div>
+                <div class="tech-fact"><i class="bi bi-check-circle"></i><span class="k">Resolved Issues</span><span class="v">{{ technician.resolved_issues_count }}</span></div>
+                <div class="tech-fact">
+                    <i class="bi bi-phone"></i><span class="k">Mobile Login</span>
+                    {% if technician.user %}<span class="tech-chip">{{ technician.user.username }}</span>{% else %}<span class="text-muted">Not set up</span>{% endif %}
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
-<div class="d-flex justify-content-end mt-3">
-    <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}" class="btn btn-outline-primary">
-        <i class="bi bi-pencil me-1"></i>Edit
-    </a>
+        <div class="tech-card">
+            <div class="tech-assign-head">
+                <div class="tech-assign-title">
+                    <i class="bi bi-clipboard-check"></i>Open Assignments
+                    <span class="tech-count">({{ open_assignments|length }})</span>
+                </div>
+                <a href="{{ url_for('issues.list_issues') }}" class="tech-viewall">View All <i class="bi bi-chevron-right small"></i></a>
+            </div>
+
+            {% if open_assignments %}
+            <table class="tech-table">
+                <thead><tr><th>Issue</th><th>Status</th><th>Assigned</th><th></th></tr></thead>
+                <tbody>
+                    {% for assignment in open_assignments %}
+                    {# An assignment belongs to either a technical issue (TN) or a
+                       service order (SO); SO assignments have no technical_issue_id. #}
+                    {% if assignment.technical_issue_id %}
+                        {% set a_url = url_for('issues.view_issue', issue_id=assignment.technical_issue_id) %}
+                        {% set a_code = assignment.technical_issue.issue_code if assignment.technical_issue and assignment.technical_issue.issue_code else ('#' ~ assignment.technical_issue_id) %}
+                        {% set a_type = assignment.technical_issue.issue_type if assignment.technical_issue else '' %}
+                    {% elif assignment.service_request_id %}
+                        {% set a_url = url_for('issues.view_service_order', request_id=assignment.service_request_id) %}
+                        {% set a_code = 'SO-' ~ '%04d'|format(assignment.service_request_id) %}
+                        {% set rt = (assignment.service_request.request_type if assignment.service_request else '') or '' %}
+                        {% set a_type = 'NAP Installation' if rt == 'add_nap' else rt|replace('_', ' ')|title %}
+                    {% else %}
+                        {% set a_url = '' %}{% set a_code = '—' %}{% set a_type = '' %}
+                    {% endif %}
+                    <tr>
+                        <td>
+                            {% if a_url %}<a class="code" href="{{ a_url }}">{{ a_code }}</a>{% else %}<span class="code">{{ a_code }}</span>{% endif %}
+                            {% if a_type %}<div class="sub">{{ a_type }}</div>{% endif %}
+                        </td>
+                        <td><span class="tech-astatus">{{ assignment.status|replace('_',' ')|capitalize }}</span></td>
+                        <td><i class="bi bi-calendar3 me-1 text-muted"></i>{{ assignment.assigned_at.strftime('%Y-%m-%d') }}</td>
+                        <td class="text-end text-muted">{% if a_url %}<a href="{{ a_url }}" class="text-muted"><i class="bi bi-chevron-right"></i></a>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="tech-empty"><i class="bi bi-inbox d-block fs-2 mb-2"></i>No open assignments right now.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tech-foot">
+        <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}" class="tech-edit">
+            <i class="bi bi-pencil"></i>Edit
+        </a>
+    </div>
 </div>

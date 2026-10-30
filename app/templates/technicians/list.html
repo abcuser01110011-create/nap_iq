@@ -102,14 +102,16 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<style>
+    /* Popup chrome: no header bar -- the card has its own header; just a close button. */
+    #techDetailModal .modal-content { position: relative; overflow: hidden; border-radius: 1rem; }
+    #techDetailModal .tech-close { position: absolute; top: 1rem; right: 1.25rem; z-index: 5; }
+</style>
 <div class="modal fade" id="techDetailModal" tabindex="-1" aria-label="Technician details" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <span class="text-muted small">Technician details</span>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body px-4 pb-4" id="techDetailBody"></div>
+            <button type="button" class="btn-close tech-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-body px-4 py-4" id="techDetailBody"></div>
         </div>
     </div>
 </div>
