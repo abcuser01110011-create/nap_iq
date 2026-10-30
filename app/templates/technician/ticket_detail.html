@@ -257,73 +257,38 @@
         {% endif %}
 
         {% if job.can_edit %}
-        {# Two ways to add the photo: take one with the camera, or pick an
-           existing image. Both feed the same single file input; "Take Photo"
-           just sets capture="environment" (opens the rear camera on phones;
-           desktop browsers ignore it and open the normal file picker). #}
+        {# ONE button, same as Pin Location / NAP & Port. On phones the file picker
+           offers "Take photo", "Photo library" and "Files", so there is no need for
+           separate camera / upload buttons. The photo uploads as soon as it is
+           chosen -- no extra "Replace Photo" / "Cancel" step. #}
         <form method="post" enctype="multipart/form-data" id="completionPhotoForm"
               action="{{ url_for('technician.upload_photo', assignment_id=job.assignment.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="file" name="photo" id="completionPhotoInput" accept="image/*,.heic" class="d-none">
 
-            <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-outline-primary btn-sm" id="photoTakeBtn">
-                    <i class="bi bi-camera me-1"></i>{{ "Retake Photo" if job.assignment.photo_filename else "Take Photo" }}
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="photoUploadBtn">
-                    <i class="bi bi-image me-1"></i>{{ "Replace Image" if job.assignment.photo_filename else "Upload Image" }}
-                </button>
-            </div>
-
-            <div id="photoPending" class="mt-3 d-none">
-                <img id="photoPendingImg" alt="Selected photo preview" class="tech-photo-preview mb-2">
-                <div class="small text-muted mb-2" id="photoPendingName"></div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-check2 me-1"></i>{{ "Replace Photo" if job.assignment.photo_filename else "Save Photo" }}
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="photoCancelBtn">Cancel</button>
-                </div>
-            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="photoPickBtn">
+                <i class="bi bi-camera me-1"></i>{{ "Replace Photo" if job.assignment.photo_filename else "Add Photo" }}
+            </button>
         </form>
         <script>
         (function () {
+            var form = document.getElementById('completionPhotoForm');
             var input = document.getElementById('completionPhotoInput');
-            var pending = document.getElementById('photoPending');
-            var img = document.getElementById('photoPendingImg');
-            var nameEl = document.getElementById('photoPendingName');
-            var objectUrl = null;
+            var btn = document.getElementById('photoPickBtn');
             var current = document.getElementById('photoCurrentImg');   // the already-saved photo, if any
 
-            function pick(useCamera) {
-                if (useCamera) input.setAttribute('capture', 'environment');
-                else input.removeAttribute('capture');
-                input.value = '';
-                input.click();
-            }
-            function clearPending() {
-                input.value = '';
-                if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-                img.removeAttribute('src');
-                pending.classList.add('d-none');
-                if (current) current.classList.remove('d-none');   // back to the saved photo
-            }
-
-            document.getElementById('photoTakeBtn').addEventListener('click', function () { pick(true); });
-            document.getElementById('photoUploadBtn').addEventListener('click', function () { pick(false); });
-            document.getElementById('photoCancelBtn').addEventListener('click', clearPending);
+            btn.addEventListener('click', function () { input.value = ''; input.click(); });
 
             input.addEventListener('change', function () {
                 var f = input.files && input.files[0];
-                if (!f) { clearPending(); return; }
-                if (objectUrl) URL.revokeObjectURL(objectUrl);
-                objectUrl = URL.createObjectURL(f);
-                img.style.display = '';
-                img.onerror = function () { img.style.display = 'none'; if (current) current.classList.remove('d-none'); };   // e.g. HEIC can't preview
-                img.src = objectUrl;
-                nameEl.textContent = f.name;
-                pending.classList.remove('d-none');
-                if (current) current.classList.add('d-none');      // only ONE image on screen: the new one replaces the saved one
+                if (!f) return;
+                // Show the new image right away while it uploads.
+                if (current && f.type && f.type.indexOf('image/') === 0 && f.type !== 'image/heic') {
+                    current.src = URL.createObjectURL(f);
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Uploading\u2026';
+                form.submit();
             });
         })();
         </script>
