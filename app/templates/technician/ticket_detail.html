@@ -108,20 +108,22 @@
 
 {% if use_flip %}
 <style>
-    .tf-card { position: relative; display: grid; transition: transform .6s cubic-bezier(.4,.2,.2,1); transform-style: preserve-3d; margin-bottom: 1rem; }
+    .tf-card { position: relative; display: grid; transition: transform .6s cubic-bezier(.4,.2,.2,1); transform-style: preserve-3d; }
     .tf-front { display: flex; flex-direction: column; position: relative; }
     /* Buttons stay pinned to the bottom of the card; both faces share one height. */
     .tf-actions { margin-top: auto; padding: .9rem 1rem; display: flex; justify-content: center; border-top: 1px solid var(--napiq-border, #dee2e6); }
     .tf-actions > div { justify-content: center; }
-    /* Warnings / errors on the completion side float over the card (no background,
-       no layout shift) just above the buttons, then fade out by themselves. */
-    .tf-front .alert { position: absolute; left: 1rem; right: 1rem; bottom: 5rem; z-index: 5; margin: 0 !important; padding: 0 !important;
-                       background: transparent !important; border: 0 !important; box-shadow: none !important; justify-content: center; text-align: center;
-                       font-weight: 600; color: var(--bs-body-color, #212529) !important; pointer-events: none;
-                       text-shadow: 0 0 6px var(--napiq-surface, #fff), 0 0 3px var(--napiq-surface, #fff);
+    /* Warnings / errors from the completion side float in the gap between the card
+       and the Ticket Details button (no background, no layout shift), then fade out. */
+    .tf-front .alert { display: none !important; }
+    .tf-toast-zone { position: relative; height: 3rem; }
+    .tf-toast-zone .alert { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 5; margin: 0 !important; padding: 0 !important;
+                       background: transparent !important; border: 0 !important; box-shadow: none !important; display: flex; justify-content: center; text-align: center;
+                       font-size: .85rem; font-weight: 600; line-height: 1.25; color: var(--bs-body-color, #212529) !important; pointer-events: none;
                        opacity: 0; transition: opacity .4s ease; }
-    .tf-front .alert.tf-toast-show { opacity: 1; }
-    .tf-front .alert.alert-danger, .tf-front .alert.tf-toast-error { color: #ef4444 !important; }
+    .tf-toast-zone .alert.d-none { display: none !important; }
+    .tf-toast-zone .alert.tf-toast-show { opacity: 1; }
+    .tf-toast-zone .alert.alert-danger, .tf-toast-zone .alert.tf-toast-error { color: #ef4444 !important; }
     #tfToggleBtn { min-width: 11rem; }
     .tf-card.is-flipped { transform: rotateY(180deg); }
     .tf-face { grid-area: 1 / 1; min-width: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
@@ -448,7 +450,8 @@
 {% endif %}
 
 {% if use_flip %}
-<div class="d-flex justify-content-center mt-3">
+<div class="tf-toast-zone" id="tfToastZone" aria-live="polite"></div>
+<div class="d-flex justify-content-center">
     <button type="button" class="btn btn-outline-secondary" id="tfToggleBtn" aria-controls="tfCard" aria-pressed="false">
         <i class="bi bi-info-circle me-1"></i><span id="tfToggleLabel">Ticket Details</span>
     </button>
@@ -486,7 +489,8 @@
         }).observe(el, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         check();
     }
-    front.querySelectorAll('.alert').forEach(watch);
+    var zone = document.getElementById('tfToastZone');
+    front.querySelectorAll('.alert').forEach(function (el) { zone.appendChild(el); watch(el); });
 
     btn.addEventListener('click', function () {
         var flipped = card.classList.toggle('is-flipped');
