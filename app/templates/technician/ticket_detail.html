@@ -36,61 +36,111 @@
 
 {# Consolidated tickets list every subscriber in the card below instead. #}
 {% set ticket_details_card %}
-<div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted mb-3">Ticket Details</h2>
-        <dl class="row mb-0 small">
-            <dt class="col-sm-3">Type</dt>
-            <dd class="col-sm-9">{{ job.type_label }}</dd>
-
-            {% if job.subscriber_name %}
-            <dt class="col-sm-3">{{ job.subscriber_label }}</dt>
-            <dd class="col-sm-9">{{ job.subscriber_name }}</dd>
-            {% endif %}
-
-            <dt class="col-sm-3">Location</dt>
-            <dd class="col-sm-9">{{ job.address }}</dd>
-
-            {% if job.plan_label %}
-            <dt class="col-sm-3">Plan</dt>
-            <dd class="col-sm-9">{{ job.plan_label }}</dd>
-            {% endif %}
-
-            {% if job.contact_number %}
-            <dt class="col-sm-3">Contact</dt>
-            <dd class="col-sm-9">{{ job.contact_number }}</dd>
-            {% endif %}
-
-            {% if job.port_number and not job.is_new_installation %}
-            <dt class="col-sm-3">Port Number</dt>
-            <dd class="col-sm-9">Port {{ job.port_number }}</dd>
-            {% endif %}
-
-            {% if job.nap_label and not job.is_new_installation %}
-            <dt class="col-sm-3">NAP</dt>
-            <dd class="col-sm-9">{{ job.nap_label }}</dd>
-            {% endif %}
-
-            {% if job.priority %}
-            <dt class="col-sm-3">Priority</dt>
-            <dd class="col-sm-9 text-capitalize">{{ job.priority_label }}</dd>
-            {% endif %}
-
-            {% if job.description %}
-            <dt class="col-sm-3">Description</dt>
-            <dd class="col-sm-9"><div class="tech-desc-box">{{ job.description }}</div></dd>
-            {% endif %}
-
-            <dt class="col-sm-3">Assigned</dt>
-            <dd class="col-sm-9">{{ job.assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</dd>
-        </dl>
-
+<style>
+    .td-card { --td-navy: #061747; --td-royal: #1046B8; --td-gold: #FFC928; --td-ink: #061747; --td-label: #4A5C8C; --td-line: #E3EBF9; --td-chip: #E8EEFC; --td-body: #FFFFFF;
+               display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 1.1rem; background: var(--td-body);
+               box-shadow: 0 18px 40px -26px rgba(6, 23, 71, .6); margin-bottom: 1.5rem; }
+    html[data-bs-theme="dark"] .td-card { --td-ink: #F1F5FF; --td-label: #8FA2D4; --td-line: rgba(255,255,255,.08); --td-chip: rgba(22,132,255,.16); --td-body: #11141c; }
+    .td-head { position: relative; display: flex; align-items: center; gap: .9rem; padding: 1.1rem 1.1rem 1.5rem; color: #fff; overflow: hidden;
+               background: linear-gradient(120deg, #0A2A86 0%, #0F3FB0 60%, #1046B8 100%); }
+    .td-head::before, .td-head::after { content: ""; position: absolute; right: -40px; top: -60px; width: 190px; height: 190px; border-radius: 50%; border: 1px solid rgba(255,255,255,.08); }
+    .td-head::after { right: -70px; top: -85px; width: 250px; height: 250px; }
+    .td-head-icon { font-size: 2rem; line-height: 1; color: var(--td-gold); transform: rotate(-35deg); flex: 0 0 auto; }
+    .td-head-sep { width: 1px; align-self: stretch; background: rgba(255,255,255,.28); margin: .15rem 0; flex: 0 0 auto; }
+    .td-head-text { min-width: 0; flex: 1 1 auto; position: relative; z-index: 1; }
+    .td-title { margin: 0; font-size: 1.05rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: #fff; }
+    .td-sub { margin: .15rem 0 0; font-size: .74rem; color: rgba(255,255,255,.75); }
+    .td-logo { width: 46px; height: 46px; border-radius: 12px; object-fit: cover; flex: 0 0 auto; position: relative; z-index: 1; box-shadow: 0 6px 14px -6px rgba(0,0,0,.5); }
+    .td-body { position: relative; margin-top: -.9rem; border-radius: 1.1rem 1.1rem 0 0; background: var(--td-body); padding: .35rem 1.1rem .5rem; flex: 1 1 auto; }
+    .td-row { display: flex; align-items: center; gap: .9rem; padding: .8rem 0; border-bottom: 1px solid var(--td-line); }
+    .td-row:last-of-type { border-bottom: 0; }
+    .td-chip { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--td-chip); color: var(--td-royal); font-size: 1.15rem; }
+    html[data-bs-theme="dark"] .td-chip { color: #6FB0FF; }
+    .td-text { min-width: 0; }
+    .td-label { display: block; font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--td-label); }
+    .td-value { display: block; font-size: 1.02rem; font-weight: 700; color: var(--td-ink); overflow-wrap: anywhere; }
+    .td-value.is-desc { font-weight: 600; white-space: pre-line; }
+    .td-maps { display: inline-block; margin: .4rem 0 .5rem; font-size: .82rem; font-weight: 600; color: var(--td-royal); }
+    html[data-bs-theme="dark"] .td-maps { color: #6FB0FF; }
+    .td-foot { position: relative; height: 46px; margin-top: auto; background: linear-gradient(120deg, #0A2A86 0%, #061747 100%); flex: 0 0 auto; }
+    .td-foot::before { content: ""; position: absolute; left: 0; top: -2px; width: 68%; height: 24px; background: var(--td-body); border-bottom-right-radius: 40px; border-bottom: 3px solid var(--td-gold); }
+    .td-dots { position: absolute; right: 1.1rem; bottom: 12px; display: flex; gap: .4rem; }
+    .td-dots i { display: block; width: 26px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.28); }
+    .td-dots i:first-child { background: var(--td-gold); }
+</style>
+<section class="td-card" aria-label="Ticket details">
+    <header class="td-head">
+        <i class="bi bi-ticket-perforated td-head-icon" aria-hidden="true"></i>
+        <span class="td-head-sep" aria-hidden="true"></span>
+        <div class="td-head-text">
+            <h2 class="td-title">Ticket Details</h2>
+            <p class="td-sub">View and manage ticket information</p>
+        </div>
+        <img class="td-logo" src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="PG Networks">
+    </header>
+    <div class="td-body">
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-gear"></i></span>
+            <div class="td-text"><span class="td-label">Type</span><span class="td-value">{{ job.type_label }}</span></div>
+        </div>
+        {% if job.subscriber_name %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-person"></i></span>
+            <div class="td-text"><span class="td-label">{{ job.subscriber_label }}</span><span class="td-value">{{ job.subscriber_name.split(' — ')[-1] }}</span></div>
+        </div>
+        {% endif %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-geo-alt"></i></span>
+            <div class="td-text"><span class="td-label">Location</span><span class="td-value">{{ job.address }}</span></div>
+        </div>
+        {% if job.plan_label %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-speedometer2"></i></span>
+            <div class="td-text"><span class="td-label">Plan</span><span class="td-value">{{ job.plan_label }}</span></div>
+        </div>
+        {% endif %}
+        {% if job.contact_number %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-telephone"></i></span>
+            <div class="td-text"><span class="td-label">Contact</span><span class="td-value">{{ job.contact_number }}</span></div>
+        </div>
+        {% endif %}
+        {% if job.nap_label and not job.is_new_installation %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-diagram-3"></i></span>
+            <div class="td-text"><span class="td-label">NAP</span><span class="td-value">{{ job.nap_label }}</span></div>
+        </div>
+        {% endif %}
+        {% if job.port_number and not job.is_new_installation %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-ethernet"></i></span>
+            <div class="td-text"><span class="td-label">Port Number</span><span class="td-value">Port {{ job.port_number }}</span></div>
+        </div>
+        {% endif %}
+        {% if job.priority %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-flag"></i></span>
+            <div class="td-text"><span class="td-label">Priority</span><span class="td-value text-capitalize">{{ job.priority_label }}</span></div>
+        </div>
+        {% endif %}
+        {% if job.description %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-file-earmark-text"></i></span>
+            <div class="td-text"><span class="td-label">Description</span><span class="td-value is-desc">{{ job.description }}</span></div>
+        </div>
+        {% endif %}
+        <div class="td-row">
+            <span class="td-chip"><i class="bi bi-calendar3"></i></span>
+            <div class="td-text"><span class="td-label">Assigned</span><span class="td-value">{{ job.assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+        </div>
         {% if job.lat is not none and job.lng is not none and job.assignment.status != 'assigned' %}
-        <a class="tm-map-link mt-3" target="_blank" rel="noopener"
-           href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}">Open in Maps</a>
+        <a class="td-maps" target="_blank" rel="noopener" href="https://maps.google.com/?q={{ job.lat }},{{ job.lng }}">Open in Maps</a>
         {% endif %}
     </div>
-</div>
+    <footer class="td-foot" aria-hidden="true">
+        <span class="td-dots"><i></i><i></i><i></i></span>
+    </footer>
+</section>
 {% endset %}
 {% if not job.consolidated and (not job.is_new_installation or show_step1) and not use_flip %}
 {{ ticket_details_card }}
@@ -131,7 +181,8 @@
     .tf-card.is-flipped { transform: rotateY(180deg); }
     .tf-face { grid-area: 1 / 1; min-width: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
                background: var(--napiq-surface, #fff); border: 1px solid var(--napiq-border, #dee2e6); border-radius: .9rem; overflow: hidden; }
-    .tf-back { transform: rotateY(180deg); visibility: hidden; transition: visibility 0s .3s; }
+    .tf-back { transform: rotateY(180deg); visibility: hidden; transition: visibility 0s .3s; display: flex; flex-direction: column; background: transparent; border: 0; }
+    .tf-back > .td-card { margin-bottom: 0; flex: 1 1 auto; }
     .tf-card.is-flipped .tf-back { visibility: visible; }
     .tf-card.is-flipped .tf-front { visibility: hidden; transition: visibility 0s .3s; }
     .tf-front > .card, .tf-back > .card { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; margin: 0 !important; }
