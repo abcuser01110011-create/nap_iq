@@ -2,6 +2,10 @@
 {% block title %}My Profile{% endblock %}
 {% block page_title %}My Profile{% endblock %}
 
+{# Technicians get no top header here (same as the Tickets / Ticket History
+   pages); every other role keeps the normal header. #}
+{% block topbar %}{% if current_user.role != 'technician' %}{{ super() }}{% endif %}{% endblock %}
+
 {% block content %}
 
 <div class="row justify-content-center">
