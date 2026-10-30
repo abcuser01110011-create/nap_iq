@@ -317,8 +317,10 @@
     {% endif %}
     {% set _ = mbn.append({'href': url_for('profile.index'), 'icon': 'bi-person-circle', 'label': 'Profile', 'bar': _role != 'administrator',
         'active': _ep.startswith('profile.') or _ep.startswith('settings.')}) %}
-    {% set mbn_bar = mbn|selectattr('bar')|list %}
-    {% set mbn_more = mbn|rejectattr('bar')|list %}
+    {# "More" exists for administrators only; every other role shows all of its items in the bar. #}
+    {% set mbn_has_more = _role == 'administrator' %}
+    {% set mbn_bar = (mbn|selectattr('bar')|list) if mbn_has_more else mbn %}
+    {% set mbn_more = (mbn|rejectattr('bar')|list) if mbn_has_more else [] %}
     {% set mbn_more_active = (mbn_more|selectattr('active')|list|length) > 0 %}
 
     <nav class="mbn" aria-label="Primary">
@@ -328,13 +330,16 @@
             {% if it.badge %}<span class="mbn-badge">{{ it.badge if it.badge < 100 else '99+' }}</span>{% endif %}
         </a>
         {% endfor %}
+        {% if mbn_has_more %}
         <button type="button" class="mbn-item {{ 'active' if mbn_more_active else '' }}" id="mbnMoreBtn"
                 aria-haspopup="true" aria-expanded="false" aria-controls="mbnSheet">
             <i class="bi bi-grid"></i><span class="mbn-label">More</span>
             {% if unread_notifications_count and _role in ('administrator', 'user') and not mbn_bar|selectattr('label', 'equalto', 'Alerts')|list %}<span class="mbn-dot"></span>{% endif %}
         </button>
+        {% endif %}
     </nav>
 
+    {% if mbn_has_more %}
     <div class="mbn-backdrop" id="mbnBackdrop"></div>
     <div class="mbn-sheet" id="mbnSheet" role="dialog" aria-label="More">
         <div class="mbn-sheet-grip"></div>
@@ -398,6 +403,7 @@
             window.addEventListener('resize', function () { if (window.innerWidth >= 992) setOpen(false); });
         })();
     </script>
+    {% endif %}
     {% endif %}
 
     <!-- Logout confirmation modal. Triggered instead of submitting
