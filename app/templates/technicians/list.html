@@ -115,16 +115,16 @@
             <div class="modal-body px-4 py-4" id="techDetailBody"></div>
         </div>
     </div>
+</div>
 
-    {# Edit popup: a second, portrait popup stacked ON TOP of the details popup
-       (details stay open underneath). It lives inside the details modal's
-       element so Bootstrap's focus handling lets you type in it. #}
-    <div class="modal fade" id="techEditModal" tabindex="-1" aria-label="Edit technician" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 420px;">
-            <div class="modal-content" style="border-radius: 1rem;">
-                <button type="button" class="btn-close tech-close" data-bs-dismiss="modal" aria-label="Close" style="position:absolute; top:1rem; right:1rem; z-index:5;"></button>
-                <div class="modal-body px-4 py-4" id="techEditBody"></div>
-            </div>
+{# Edit popup: a second, portrait popup stacked ON TOP of the details popup
+   (details stay open underneath). A sibling of the details modal so its
+   z-index really sits above the details popup. #}
+<div class="modal fade" id="techEditModal" tabindex="-1" aria-label="Edit technician" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 420px;">
+        <div class="modal-content" style="border-radius: 1rem;">
+            <button type="button" class="btn-close tech-close" data-bs-dismiss="modal" aria-label="Close" style="position:absolute; top:1rem; right:1rem; z-index:5;"></button>
+            <div class="modal-body px-4 py-4" id="techEditBody"></div>
         </div>
     </div>
 </div>
@@ -142,7 +142,9 @@
         var cache = {};
         var pending = {};
         var current = null;
-        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        // focus:false -> the details popup doesn't trap focus, so you can type in
+        // the edit popup stacked above it (which has its own focus handling).
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
 
         var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
         var ERROR = '<div class="text-center text-muted py-5">Could not load details. Please try again.</div>';
