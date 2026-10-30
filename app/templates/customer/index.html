@@ -11,7 +11,68 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-application-progress.css') }}">
 {% endblock %}
 
+{# The standard top bar is replaced by the greeting card below (same card the
+   administrator and technician dashboards use), which carries the date/time
+   and the theme toggle. #}
+{% block topbar %}{% endblock %}
+
 {% block content %}
+{% set first_name = (current_user.full_name or current_user.username).split(' ')[0] if current_user else 'there' %}
+<style>
+    /* Phones / small screens: date stacked over the time on the left, a smaller
+       light/dark toggle on the same row at the right; the bell lives in the
+       bottom navigation (Alerts). */
+    @media (max-width: 991.98px) {
+        .cust-greeting .dash-greeting-top { flex-wrap: nowrap; gap: .5rem; }
+        .cust-greeting .dash-greeting-clock { flex-direction: column; align-items: flex-start; gap: 2px; font-size: .72rem; }
+        .cust-greeting .dash-greeting-clock .dash-greeting-dot { display: none; }
+        .cust-greeting .dash-greeting-tools { flex-wrap: nowrap; gap: 0; flex: 0 0 auto; }
+        .cust-greeting .dash-topbar-actions .dash-icon-btn { display: none !important; }
+        .cust-greeting .napiq-theme-toggle { width: 44px; height: 28px; border-radius: 14px; }
+        .cust-greeting .napiq-theme-toggle .napiq-theme-toggle__icon { font-size: .9rem; }
+    }
+</style>
+<section class="dash-greeting cust-greeting" aria-label="Welcome">
+    <div class="dash-greeting-top">
+        <div class="dash-greeting-clock">
+            <button type="button" class="dash-sidebar-toggle" id="dashSidebarToggle" aria-label="Toggle navigation">
+                <i class="bi bi-list"></i>
+            </button>
+            <span id="dashGreetingDate">&nbsp;</span>
+            <span class="dash-greeting-dot">&middot;</span>
+            <span id="dashGreetingTime" class="dash-greeting-time">&nbsp;</span>
+        </div>
+
+        <div class="dash-greeting-tools">
+            <div class="dash-topbar-actions">
+                {{ self.topbar_actions() }}
+            </div>
+        </div>
+    </div>
+
+    <div class="dash-greeting-body">
+        <h2 class="dash-greeting-title"><span id="dashGreetingWord">Welcome</span>, <span class="dash-greeting-name">{{ first_name }}</span></h2>
+    </div>
+    <div class="dash-greeting-art" aria-hidden="true"><i class="bi bi-broadcast-pin"></i></div>
+</section>
+
+<script>
+(function () {
+    var dateEl = document.getElementById('dashGreetingDate');
+    var timeEl = document.getElementById('dashGreetingTime');
+    var wordEl = document.getElementById('dashGreetingWord');
+    function tick() {
+        var now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+        var h = now.getHours();
+        wordEl.textContent = h < 12 ? 'Good morning' : (h < 18 ? 'Good afternoon' : 'Good evening');
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>
+
 {% if subscriber is none %}
 <div class="card shadow-sm napiq-account-card">
     <div class="card-body">
