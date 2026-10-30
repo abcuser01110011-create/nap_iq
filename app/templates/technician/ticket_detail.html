@@ -17,6 +17,10 @@
    always behaves as "Step 2" (i.e. shows everything, same as before). #}
 {% set show_step1 = job.is_new_installation and job.can_start %}
 {% set show_step2 = (not job.is_new_installation) or (not job.can_start) %}
+{# Flip card: the work cards (photo / pin / NAP & port / cable path) are merged
+   into ONE card; "Ticket Details" (below Mark Complete) flips it over to show
+   the ticket details on the back. Not used for consolidated tickets. #}
+{% set use_flip = show_step2 and not job.consolidated and (job.show_photo_card or job.is_installation) %}
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <a href="{{ url_for('technician.tickets') }}" class="small text-decoration-none">
@@ -28,7 +32,7 @@
 </div>
 
 {# Consolidated tickets list every subscriber in the card below instead. #}
-{% if not job.consolidated and (not job.is_new_installation or show_step1) %}
+{% set ticket_details_card %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-3">Ticket Details</h2>
@@ -84,6 +88,9 @@
         {% endif %}
     </div>
 </div>
+{% endset %}
+{% if not job.consolidated and (not job.is_new_installation or show_step1) and not use_flip %}
+{{ ticket_details_card }}
 {% endif %}
 
 {# Ticket consolidation: every affected location, with map + per-stop navigation #}
@@ -99,6 +106,22 @@
 </div>
 {% endif %}
 
+{% if use_flip %}
+<style>
+    .tf-card { position: relative; display: grid; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.4,.2,.2,1); margin-bottom: 1rem; }
+    .tf-card.is-flipped { transform: rotateY(180deg); }
+    .tf-face { grid-area: 1 / 1; min-width: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+               background: var(--napiq-surface, #fff); border: 1px solid var(--napiq-border, #dee2e6); border-radius: .9rem; overflow: hidden; }
+    .tf-back { transform: rotateY(180deg); visibility: hidden; transition: visibility 0s .3s; }
+    .tf-card.is-flipped .tf-back { visibility: visible; }
+    .tf-card.is-flipped .tf-front { visibility: hidden; transition: visibility 0s .3s; }
+    .tf-front > .card, .tf-back > .card { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; margin: 0 !important; }
+    .tf-front > .card + .card { border-top: 1px solid var(--napiq-border, #dee2e6) !important; }
+    @media (prefers-reduced-motion: reduce) { .tf-card { transition: none; } }
+</style>
+<div class="tf-card" id="tfCard">
+<div class="tf-face tf-front" id="tfFront">
+{% endif %}
 {# Consolidated tickets collect one proof photo per location instead (see the
    "Consolidated ticket" card above), so the single completion-photo card is hidden. #}
 {% if job.show_photo_card and not job.consolidated and (not job.is_new_installation or show_step2) %}
@@ -269,9 +292,10 @@
     </div>
 </div>
 
-{% if job.nap and job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none
-      and (job.can_edit or job.is_closed or job.cable_path_point_count > 0)
-      and (not job.is_new_installation or show_step2) %}
+{% endif %}{# end NAP & Port (new installation) #}
+
+{% if job.is_new_installation and show_step2 and job.nap and job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none
+      and (job.can_edit or job.is_closed or job.cable_path_point_count > 0) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2">Cable Path (Optional)</h2>
@@ -296,6 +320,15 @@
 </div>
 {% endif %}
 
+{% if use_flip %}
+</div>{# /tf-front #}
+<div class="tf-face tf-back" id="tfBack" aria-hidden="true">
+    {{ ticket_details_card }}
+</div>
+</div>{# /tf-card #}
+{% endif %}
+
+{% if job.is_new_installation and show_step2 %}
 <!-- Nearby-NAPs picker -- populated via JS from GET nearby-naps
      (data-nearby-action on findNapsBtn above), each row's "Link"
      button POSTs to link-nap (data-link-action) then reloads the page
@@ -395,6 +428,29 @@
         {% endif %}
     {% endif %}
 </div>
+
+{% if use_flip %}
+<div class="d-flex justify-content-center mt-3">
+    <button type="button" class="btn btn-outline-secondary" id="tfToggleBtn" aria-controls="tfCard" aria-pressed="false">
+        <i class="bi bi-info-circle me-1"></i><span id="tfToggleLabel">Ticket Details</span>
+    </button>
+</div>
+<script>
+(function () {
+    var card = document.getElementById('tfCard');
+    var btn = document.getElementById('tfToggleBtn');
+    var label = document.getElementById('tfToggleLabel');
+    var back = document.getElementById('tfBack');
+    if (!card || !btn) return;
+    btn.addEventListener('click', function () {
+        var flipped = card.classList.toggle('is-flipped');
+        btn.setAttribute('aria-pressed', flipped ? 'true' : 'false');
+        back.setAttribute('aria-hidden', flipped ? 'false' : 'true');
+        label.textContent = flipped ? 'Back to Tasks' : 'Ticket Details';
+    });
+})();
+</script>
+{% endif %}
 
 <!-- Shared modal for both "Save Notes" and "Mark Complete" — the form's
      action/button label/wording swap based on which button opened it,
