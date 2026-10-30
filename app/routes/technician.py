@@ -233,6 +233,31 @@ def index():
     )
 
 
+@technician_bp.route("/tickets")
+@role_required("technician")
+def tickets():
+    """The technician's Tickets tab: the open (assigned / accepted /
+    in-progress) ticket cards that used to sit on the dashboard."""
+    profile = Technician.query.filter_by(user_id=g.user.id).first()
+
+    assignments = []
+    if profile is not None:
+        assignments = (
+            Assignment.query.filter(
+                Assignment.technician_id == profile.id,
+                Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
+            )
+            .order_by(Assignment.assigned_at.desc())
+            .all()
+        )
+
+    return render_template(
+        "technician/tickets.html",
+        profile=profile,
+        jobs=[_serialize_job(a) for a in assignments],
+    )
+
+
 @technician_bp.route("/history")
 @role_required("technician")
 def history():

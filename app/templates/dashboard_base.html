@@ -195,7 +195,7 @@
                    "View all notifications" link straight to notifications.index,
                    a second sidebar entry to the exact same page would just be a
                    redundant path to the same place, not a new capability. #}
-                {% elif current_user and current_user.role == 'field_assistant' %}
+                {% elif current_user and current_user.role in ('technician', 'field_assistant') %}
                 {# Phase 15: the disabled "Assigned Issues" placeholder that used to
                    sit here has been removed rather than turned into a real link —
                    the "Dashboard" item above already points at technician.index,
@@ -203,9 +203,9 @@
                    there). A second sidebar entry to the exact same URL would just
                    be a confusing duplicate rather than a new page. #}
                 <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint == 'technician.history' else '' }}"
-                       href="{{ url_for('technician.history') }}">
-                        <i class="bi bi-clock-history"></i><span>Assignment History</span>
+                    <a class="dash-nav-link {{ 'active' if request.endpoint in ['technician.tickets', 'technician.history', 'technician.ticket_detail'] else '' }}"
+                       href="{{ url_for('technician.tickets') }}">
+                        <i class="bi bi-ticket-perforated"></i><span>Tickets</span>
                     </a>
                 </li>
                 {% elif current_user and current_user.role == 'payment_collector' %}
@@ -308,11 +308,11 @@
     </style>
     <nav class="tech-bottomnav" aria-label="Primary">
         <a href="{{ url_for('technician.index') }}"
-           class="tech-bottomnav-item {{ 'active' if request.endpoint in ['technician.index', 'technician.ticket_detail'] else '' }}">
+           class="tech-bottomnav-item {{ 'active' if request.endpoint == 'technician.index' else '' }}">
             <i class="bi bi-speedometer2"></i><span>Dashboard</span>
         </a>
-        <a href="{{ url_for('technician.history') }}"
-           class="tech-bottomnav-item {{ 'active' if request.endpoint == 'technician.history' else '' }}">
+        <a href="{{ url_for('technician.tickets') }}"
+           class="tech-bottomnav-item {{ 'active' if request.endpoint in ['technician.tickets', 'technician.history', 'technician.ticket_detail'] else '' }}">
             <i class="bi bi-ticket-perforated"></i><span>Tickets</span>
         </a>
         {# Notifications: technician accounts have no notifications feature yet,
