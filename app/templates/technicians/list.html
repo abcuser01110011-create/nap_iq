@@ -65,6 +65,92 @@
     {% endif %}
 </div>
 
+{# Team cards: sit directly above the technician table. #}
+{% if not show_deactivated %}
+<style>
+    .team-strip-head { display: flex; align-items: center; gap: .6rem; margin: 0 0 .6rem; }
+    .team-strip-title { font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: var(--bs-secondary-color); display: flex; align-items: center; gap: .6rem; }
+    .team-strip-title::after { content: ""; width: 40px; height: 2px; background: #F4B41A; border-radius: 2px; }
+    .team-strip-count { font-size: .75rem; color: var(--bs-secondary-color); }
+    .team-strip { display: flex; gap: .85rem; overflow-x: auto; padding: .15rem .15rem .75rem; margin-bottom: .75rem; scroll-snap-type: x proximity; }
+    .team-card { flex: 0 0 280px; scroll-snap-align: start; background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); border-radius: .9rem;
+        padding: .95rem 1rem; position: relative; overflow: hidden; }
+    .team-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #1d5fd8, #1046B8); }
+    .team-card-top { display: flex; align-items: center; gap: .7rem; }
+    .team-card-icon { width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; color: #fff; font-size: 1.05rem;
+        background: linear-gradient(160deg, #3b82f6, #1046B8); border: 2px solid #F4B41A; }
+    .team-card-name { font-weight: 800; font-size: 1rem; line-height: 1.15; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-card-desc { font-size: .75rem; color: var(--bs-secondary-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .1rem; }
+    .team-card-lead { display: flex; align-items: center; gap: .4rem; font-size: .8rem; margin: .7rem 0 .55rem; color: var(--bs-secondary-color); }
+    .team-card-lead i { color: #F4B41A; }
+    .team-card-lead strong { color: var(--bs-body-color); font-weight: 600; }
+    .team-avatars { display: flex; align-items: center; }
+    .team-avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: .68rem; font-weight: 700; color: #fff;
+        background: #5b6b86; border: 2px solid var(--bs-tertiary-bg); margin-left: -8px; position: relative; }
+    .team-avatar:first-child { margin-left: 0; }
+    .team-avatar.is-available { background: #16a34a; } .team-avatar.is-busy { background: #d97706; } .team-avatar.is-offline { background: #64748b; }
+    .team-avatar.is-leader { box-shadow: 0 0 0 2px #F4B41A; z-index: 1; }
+    .team-avatar.is-more { background: var(--bs-secondary-bg); color: var(--bs-body-color); }
+    .team-card-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .7rem; padding-top: .6rem; border-top: 1px solid var(--bs-border-color); font-size: .75rem; color: var(--bs-secondary-color); }
+    .team-chip { display: inline-flex; align-items: center; gap: .3rem; }
+    .team-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #9aa4b2; }
+    .team-chip.is-available::before { background: #22c55e; } .team-chip.is-busy::before { background: #f59e0b; }
+    .team-empty { display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; margin-bottom: .9rem; border: 1px dashed var(--bs-border-color); border-radius: .9rem; color: var(--bs-secondary-color); font-size: .85rem; }
+</style>
+
+<div class="team-strip-head">
+    <div class="team-strip-title">Teams</div>
+    <span class="team-strip-count">{{ teams|length }} team{{ '' if teams|length == 1 else 's' }}</span>
+</div>
+
+{% if teams %}
+<div class="team-strip" aria-label="Teams">
+    {% for team in teams %}
+    {% set members = team.members|sort(attribute='full_name') %}
+    {% set avail = members|selectattr('effective_status', 'equalto', 'available')|list|length %}
+    {% set busy = members|selectattr('effective_status', 'equalto', 'busy')|list|length %}
+    <div class="team-card" title="{{ team.name }}">
+        <div class="team-card-top">
+            <div class="team-card-icon"><i class="bi bi-people-fill"></i></div>
+            <div class="min-w-0" style="min-width:0;">
+                <h6 class="team-card-name">{{ team.name }}</h6>
+                <div class="team-card-desc">{{ team.description or 'No description' }}</div>
+            </div>
+        </div>
+
+        <div class="team-card-lead">
+            <i class="bi bi-star-fill"></i>
+            {% if team.leader %}Leader: <strong>{{ team.leader.full_name }}</strong>{% else %}No team leader{% endif %}
+        </div>
+
+        <div class="team-avatars">
+            {% for m in members[:5] %}
+            <span class="team-avatar is-{{ m.effective_status }}{{ ' is-leader' if team.leader_id == m.id else '' }}"
+                  title="{{ m.full_name }}{{ ' (leader)' if team.leader_id == m.id else '' }}">{{ (m.full_name.split()|map('first')|list)[:2]|join|upper }}</span>
+            {% endfor %}
+            {% if members|length > 5 %}
+            <span class="team-avatar is-more" title="{{ members[5:]|map(attribute='full_name')|join(', ') }}">+{{ members|length - 5 }}</span>
+            {% endif %}
+        </div>
+
+        <div class="team-card-foot">
+            <span><strong>{{ members|length }}</strong> member{{ '' if members|length == 1 else 's' }}</span>
+            <span class="d-flex gap-2">
+                <span class="team-chip is-available">{{ avail }} available</span>
+                <span class="team-chip is-busy">{{ busy }} busy</span>
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="team-empty">
+    <i class="bi bi-people fs-4"></i>
+    <span>No teams yet. Use <strong>Create Team</strong> to group technicians together.</span>
+</div>
+{% endif %}
+{% endif %}
+
 <div class="disp-table-card">
     <div class="table-responsive">
         <table class="table disp-table align-middle mb-0">

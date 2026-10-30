@@ -95,12 +95,23 @@ def list_technicians():
         if (t.user is not None and t.user.status != "active") == show_deactivated
     ]
 
+    # Team cards above the table. Wrapped so the page still loads if the
+    # teams tables haven't been created yet (database/add_teams.sql).
+    teams = []
+    if not show_deactivated:
+        try:
+            teams = TechnicianTeam.query.order_by(TechnicianTeam.name.asc()).all()
+        except Exception:
+            db.session.rollback()
+            teams = []
+
     return render_template(
         "technicians/list.html",
         technicians=technicians,
         search_term=search_term,
         status_filter=status_filter,
         show_deactivated=show_deactivated,
+        teams=teams,
     )
 
 
