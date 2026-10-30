@@ -67,7 +67,10 @@
                 </div>
                 <div class="tech-ticket-title">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;font-size:.8rem;white-space:nowrap;">(Affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
                 {% if job.subscriber_name %}
-                <div class="tech-ticket-row"><i class="bi bi-person"></i><span>{{ job.subscriber_label }}: {{ job.subscriber_name.split(' — ')[-1] }}</span></div>
+                <div class="tech-ticket-row"><i class="bi bi-person"></i><span>{{ job.subscriber_name.split(' — ')[-1] }}</span></div>
+                {% endif %}
+                {% if job.contact_number %}
+                <div class="tech-ticket-row"><i class="bi bi-telephone"></i><span>{{ job.contact_number }}</span></div>
                 {% endif %}
                 <div class="tech-ticket-row"><i class="bi bi-geo-alt"></i><span>{{ job.address }}</span></div>
                 {% if job.nap %}
