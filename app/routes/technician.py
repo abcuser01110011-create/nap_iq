@@ -208,10 +208,27 @@ def index():
 
     jobs = [_serialize_job(a) for a in assignments]
 
+    # Ticket overview card: counts over this technician's own assignments
+    # (cancelled ones are left out of the completion rate).
+    stats = {"open": 0, "in_progress": 0, "completed": 0, "rate": 0}
+    if profile is not None:
+        counts = dict(
+            db.session.query(Assignment.status, db.func.count(Assignment.id))
+            .filter(Assignment.technician_id == profile.id)
+            .group_by(Assignment.status)
+            .all()
+        )
+        stats["open"] = counts.get("assigned", 0) + counts.get("accepted", 0)
+        stats["in_progress"] = counts.get("in_progress", 0)
+        stats["completed"] = counts.get("completed", 0)
+        total = stats["open"] + stats["in_progress"] + stats["completed"]
+        stats["rate"] = round(stats["completed"] * 100 / total) if total else 0
+
     return render_template(
         "technician/index.html",
         profile=profile,
         jobs=jobs,
+        stats=stats,
         notes_form=ResolutionNotesForm(),
     )
 
