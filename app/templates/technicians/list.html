@@ -1,7 +1,7 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Technician{% endblock %}
 {% block page_title %}Technician{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">{{ technicians|length }} profile{{ '' if technicians|length == 1 else 's' }} shown</p>{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ technicians|length }} {{ 'deactivated ' if show_deactivated else '' }}profile{{ '' if technicians|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
@@ -13,6 +13,7 @@
 <div class="subs-table-card mb-3">
     <div class="p-3">
         <form method="get" action="{{ url_for('technicians.list_technicians') }}" class="row g-2 align-items-end">
+            {% if show_deactivated %}<input type="hidden" name="account" value="deactivated">{% endif %}
             <div class="col-sm-7 col-md-8">
                 <label class="form-label small text-muted mb-1">Search</label>
                 <div class="subs-search-form mb-0">
@@ -40,11 +41,24 @@
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
                 {% if search_term or status_filter %}
-                    <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-link text-decoration-none">Clear</a>
+                    <a href="{{ url_for('technicians.list_technicians', account='deactivated' if show_deactivated else None) }}" class="btn btn-link text-decoration-none">Clear</a>
                 {% endif %}
             </div>
         </form>
     </div>
+</div>
+
+{# Outside (underneath) the search card. #}
+<div class="mb-3">
+    {% if show_deactivated %}
+    <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+        <i class="bi bi-arrow-left me-1"></i>Back to active accounts
+    </a>
+    {% else %}
+    <a href="{{ url_for('technicians.list_technicians', account='deactivated') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+        <i class="bi bi-person-x me-1"></i>View deactivated accounts
+    </a>
+    {% endif %}
 </div>
 
 <div class="disp-table-card">
@@ -91,7 +105,7 @@
                 <tr>
                     <td colspan="6" class="disp-empty">
                         <i class="bi bi-person-badge display-6 d-block mb-2"></i>
-                        No personnel found{% if search_term or status_filter %} matching your filters{% endif %}.
+                        {{ 'No deactivated accounts' if show_deactivated else 'No personnel found' }}{% if search_term or status_filter %} matching your filters{% endif %}.
                     </td>
                 </tr>
                 {% endfor %}

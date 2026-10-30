@@ -86,11 +86,21 @@ def list_technicians():
     if status_filter:
         technicians = [t for t in technicians if t.effective_status == status_filter]
 
+    # Accounts whose mobile login was deactivated are hidden from the main
+    # list and shown only via "View deactivated accounts" (?account=deactivated).
+    # Profiles with no login at all count as active.
+    show_deactivated = request.args.get("account", "").strip() == "deactivated"
+    technicians = [
+        t for t in technicians
+        if (t.user is not None and t.user.status != "active") == show_deactivated
+    ]
+
     return render_template(
         "technicians/list.html",
         technicians=technicians,
         search_term=search_term,
         status_filter=status_filter,
+        show_deactivated=show_deactivated,
     )
 
 

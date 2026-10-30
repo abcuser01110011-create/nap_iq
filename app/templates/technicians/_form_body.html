@@ -20,9 +20,11 @@
     .tech-edit-pop .form-label { font-size: .8rem; font-weight: 600; color: var(--bs-secondary-color); margin-bottom: .25rem; }
     .tech-edit-pop .form-control, .tech-edit-pop .form-select { border-radius: .6rem; padding: .55rem .8rem; }
     .tech-edit-pop hr { margin: 1.1rem 0 !important; }
-    .tech-edit-pop .tep-actions { display: flex; flex-direction: column-reverse; gap: .6rem; }
-    .tech-edit-pop .tep-actions .btn { width: 100%; border-radius: 999px; padding: .6rem 1rem; font-weight: 700; }
-    .tech-edit-pop .tep-actions .btn-primary { background: linear-gradient(180deg, #1d5fd8, #1046B8); border-color: #1046B8; box-shadow: 0 0 0 2px rgba(244,180,26,.6); }
+    /* Cancel | Save Changes as one split bar: Cancel on the left, Save on the right. */
+    .tech-edit-pop .tep-actions { display: flex; flex-direction: row; gap: 0; }
+    .tech-edit-pop .tep-actions .btn { flex: 1 1 0; width: auto; padding: .6rem 1rem; font-weight: 700; }
+    .tech-edit-pop .tep-actions .btn-outline-secondary { border-radius: 999px 0 0 999px; border-right-width: 0; }
+    .tech-edit-pop .tep-actions .btn-primary { border-radius: 0 999px 999px 0; background: linear-gradient(180deg, #1d5fd8, #1046B8); border-color: #1046B8; box-shadow: 0 0 0 2px rgba(244,180,26,.6); }
 </style>
 <div class="tech-edit-pop">
 <div class="tep-head">
