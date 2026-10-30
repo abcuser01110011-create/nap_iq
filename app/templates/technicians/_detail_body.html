@@ -8,7 +8,7 @@
     .tech-pop {
         --tp-blue: #1046B8; --tp-gold: #F4B41A;
         --tp-card: var(--bs-tertiary-bg); --tp-line: var(--bs-border-color);
-        position: relative; padding: 1.6rem 0 0;
+        position: relative; padding: .35rem 0 0;
     }
     /* soft corner swooshes, like the design */
     .tech-pop::before {
@@ -24,6 +24,8 @@
     }
     .tech-pop > * { position: relative; z-index: 1; }
 
+    .tech-eyebrow { display: flex; align-items: center; gap: .6rem; margin: 0 0 .9rem; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
+    .tech-eyebrow::after { content: ""; width: 56px; height: 2px; background: var(--tp-gold); border-radius: 2px; }
     .tech-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 1.1rem; }
     @media (max-width: 767.98px) { .tech-grid { grid-template-columns: 1fr; } }
     .tech-card { background: var(--tp-card); border: 1px solid var(--tp-line); border-radius: .9rem; padding: 1.25rem; }
@@ -86,6 +88,8 @@
 </style>
 
 <div class="tech-pop">
+    <div class="tech-eyebrow">{{ 'Field Assistant' if is_fa else 'Technician' }} Details</div>
+
     <div class="tech-grid">
         <div class="tech-card">
             <div class="tech-profile-top">

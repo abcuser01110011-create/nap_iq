@@ -6,7 +6,31 @@
 {% set show_credentials_fields = not has_existing_login %}
 {% set show_type_and_status = mode == 'edit' %}
 {% set in_popup = request.args.get('partial') %}
-{% if in_popup %}<h4 class="mb-3 pe-5">{{ 'Edit ' ~ noun if mode == 'edit' else 'Add ' ~ noun }}</h4>{% endif %}
+{% if in_popup %}
+<style>
+    /* Portrait edit popup: one column, stacked fields, full-width buttons. */
+    .tech-edit-pop .tep-head { display: flex; align-items: center; gap: .85rem; padding-bottom: 1rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--bs-border-color); }
+    .tech-edit-pop .tep-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; color: #fff; flex: 0 0 auto;
+        background: linear-gradient(160deg, #3b82f6, #1046B8); border: 2px solid #F4B41A; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    .tech-edit-pop .tep-eyebrow { font-size: .65rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
+    .tech-edit-pop .tep-title { margin: 0; font-size: 1.3rem; font-weight: 800; line-height: 1.15; }
+    .tech-edit-pop .row > [class*="col-"] { flex: 0 0 100%; max-width: 100%; }
+    .tech-edit-pop .form-label { font-size: .8rem; font-weight: 600; color: var(--bs-secondary-color); margin-bottom: .25rem; }
+    .tech-edit-pop .form-control, .tech-edit-pop .form-select { border-radius: .6rem; padding: .55rem .8rem; }
+    .tech-edit-pop hr { margin: 1.1rem 0 !important; }
+    .tech-edit-pop .tep-actions { display: flex; flex-direction: column-reverse; gap: .6rem; }
+    .tech-edit-pop .tep-actions .btn { width: 100%; border-radius: 999px; padding: .6rem 1rem; font-weight: 700; }
+    .tech-edit-pop .tep-actions .btn-primary { background: linear-gradient(180deg, #1d5fd8, #1046B8); border-color: #1046B8; box-shadow: 0 0 0 2px rgba(244,180,26,.6); }
+</style>
+<div class="tech-edit-pop">
+<div class="tep-head">
+    <div class="tep-icon"><i class="bi bi-pencil-square"></i></div>
+    <div>
+        <div class="tep-eyebrow">{{ noun }}</div>
+        <h4 class="tep-title">{{ 'Edit Profile' if mode == 'edit' else 'Add ' ~ noun }}</h4>
+    </div>
+</div>
+{% endif %}
 <form method="post" novalidate id="techEditForm"{% if in_popup and technician %} action="{{ url_for('technicians.edit_technician', technician_id=technician.id, partial=1) }}"{% endif %}>
     {{ form.hidden_tag() }}
 
@@ -93,7 +117,7 @@
 
     <hr class="my-4">
 
-    <div class="d-flex justify-content-end gap-2">
+    <div class="{{ 'tep-actions' if in_popup else 'd-flex justify-content-end gap-2' }}">
         <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-outline-secondary"{% if in_popup %} data-tech-cancel{% endif %}>Cancel</a>
         <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg me-1"></i>
@@ -101,3 +125,4 @@
         </button>
     </div>
 </form>
+{% if in_popup %}</div>{% endif %}

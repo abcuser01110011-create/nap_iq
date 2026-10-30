@@ -105,6 +105,7 @@
 <style>
     /* Popup chrome: no header bar -- the card has its own header; just a close button. */
     #techDetailModal .modal-content { position: relative; overflow: hidden; border-radius: 1rem; }
+    #techEditModal { z-index: 1065; }
     #techDetailModal .tech-close { position: absolute; top: 1rem; right: 1.25rem; z-index: 5; }
 </style>
 <div class="modal fade" id="techDetailModal" tabindex="-1" aria-label="Technician details" aria-hidden="true">
@@ -112,6 +113,18 @@
         <div class="modal-content">
             <button type="button" class="btn-close tech-close" data-bs-dismiss="modal" aria-label="Close"></button>
             <div class="modal-body px-4 py-4" id="techDetailBody"></div>
+        </div>
+    </div>
+
+    {# Edit popup: a second, portrait popup stacked ON TOP of the details popup
+       (details stay open underneath). It lives inside the details modal's
+       element so Bootstrap's focus handling lets you type in it. #}
+    <div class="modal fade" id="techEditModal" tabindex="-1" aria-label="Edit technician" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 420px;">
+            <div class="modal-content" style="border-radius: 1rem;">
+                <button type="button" class="btn-close tech-close" data-bs-dismiss="modal" aria-label="Close" style="position:absolute; top:1rem; right:1rem; z-index:5;"></button>
+                <div class="modal-body px-4 py-4" id="techEditBody"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -180,30 +193,51 @@
             }
         });
 
-        // Edit inside the popup: swap the details for the edit form.
-        var detailUrl = null;
+        // Edit: opens a second popup stacked over the details popup.
+        var editEl = document.getElementById('techEditModal');
+        var editBody = document.getElementById('techEditBody');
+        var editModal = bootstrap.Modal.getOrCreateInstance(editEl);
+
+        // Escape closes only the top (edit) popup, not both.
+        editEl.addEventListener('keydown', function (e) { if (e.key === 'Escape') e.stopPropagation(); });
+
+        // Make the second popup's backdrop sit above the details popup.
+        editEl.addEventListener('show.bs.modal', function () {
+            setTimeout(function () {
+                var backs = document.querySelectorAll('.modal-backdrop');
+                if (backs.length) backs[backs.length - 1].style.zIndex = '1060';
+            }, 0);
+        });
+        editEl.addEventListener('hidden.bs.modal', function (e) {
+            e.stopPropagation();
+            editBody.innerHTML = '';
+            // Details popup is still open: keep the page behind it locked.
+            document.body.classList.add('modal-open');
+            document.body.style.overflow = 'hidden';
+        });
+
         bodyEl.addEventListener('click', function (e) {
             var edit = e.target.closest('a.tech-edit[data-edit-url]');
-            if (edit) {
-                e.preventDefault();
-                detailUrl = current;
-                bodyEl.innerHTML = SPINNER;
-                fetch(edit.getAttribute('data-edit-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                    .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
-                    .then(function (html) { bodyEl.innerHTML = html; })
-                    .catch(function () { bodyEl.innerHTML = ERROR; });
-                return;
-            }
+            if (!edit) return;
+            e.preventDefault();
+            editBody.innerHTML = SPINNER;
+            editModal.show();
+            fetch(edit.getAttribute('data-edit-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
+                .then(function (html) { editBody.innerHTML = html; })
+                .catch(function () { editBody.innerHTML = ERROR; });
+        });
+
+        editBody.addEventListener('click', function (e) {
             if (e.target.closest('[data-tech-cancel]')) {
                 e.preventDefault();
-                if (detailUrl && cache[detailUrl]) bodyEl.innerHTML = cache[detailUrl];
-                else modal.hide();
+                editModal.hide();
             }
         });
 
         // Save from the popup: post in the background; on success reload the
         // list (the flash message shows there), on errors show the form again.
-        bodyEl.addEventListener('submit', function (e) {
+        editBody.addEventListener('submit', function (e) {
             var form = e.target.closest('form#techEditForm');
             if (!form) return;
             e.preventDefault();
@@ -216,15 +250,16 @@
                         window.location.reload();
                         return null;
                     }
-                    return res.text().then(function (html) { bodyEl.innerHTML = html; });
+                    return res.text().then(function (html) { editBody.innerHTML = html; });
                 })
                 .catch(function () {
                     if (btn) btn.disabled = false;
-                    bodyEl.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger py-2">Could not save. Please try again.</div>');
+                    editBody.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger py-2">Could not save. Please try again.</div>');
                 });
         });
 
-        modalEl.addEventListener('hidden.bs.modal', function () {
+        modalEl.addEventListener('hidden.bs.modal', function (e) {
+            if (e.target !== modalEl) return; // ignore the nested edit popup's event
             current = null;
             bodyEl.innerHTML = '';
         });
