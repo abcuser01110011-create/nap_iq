@@ -65,8 +65,8 @@
                 <div class="td-fact"><i class="bi bi-star-fill td-star"></i><span class="k">Team Leader</span>
                     <span class="v">{{ team.leader.full_name if team.leader else 'None' }}</span></div>
                 <div class="td-fact"><i class="bi bi-people"></i><span class="k">Members</span><span class="v">{{ members|length }}</span></div>
-                <div class="td-fact"><i class="bi bi-activity"></i><span class="k">Availability</span>
-                    <span class="v">{{ avail }} available &middot; {{ busy }} busy{% if offline %} &middot; {{ offline }} offline{% endif %}</span></div>
+                <div class="td-fact"><i class="bi bi-activity"></i><span class="k">Team Status</span>
+                    <span class="v">{{ team_status|capitalize }}</span></div>
                 <div class="td-fact"><i class="bi bi-calendar3"></i><span class="k">Created</span><span class="v">{{ team.created_at.strftime('%b %d, %Y') }}</span></div>
                 <div class="td-fact"><i class="bi bi-clock-history"></i><span class="k">Last Updated</span><span class="v">{{ team.updated_at.strftime('%b %d, %Y %I:%M %p') }}</span></div>
             </div>
@@ -79,12 +79,11 @@
             <div class="td-list">
                 {% for m in members %}
                 <div class="td-member">
-                    <span class="td-avatar is-{{ m.effective_status }}{{ ' is-leader' if team.leader_id == m.id else '' }}">{{ (m.full_name.split()|map('first')|list)[:2]|join|upper }}</span>
+                    <span class="td-avatar is-{{ team_status }}{{ ' is-leader' if team.leader_id == m.id else '' }}">{{ (m.full_name.split()|map('first')|list)[:2]|join|upper }}</span>
                     <div style="min-width:0; flex:1;">
                         <div class="td-mname">{{ m.full_name }}{% if team.leader_id == m.id %}<i class="bi bi-star-fill td-crown" title="Team leader"></i>{% endif %}</div>
                         <div class="td-msub">{{ 'Field Assistant' if m.personnel_type == 'field_assistant' else 'Technician' }}{% if m.contact_number %} &middot; {{ m.contact_number }}{% endif %}</div>
                     </div>
-                    <span class="td-pill is-{{ m.effective_status }}">{{ m.effective_status|capitalize }}</span>
                 </div>
                 {% else %}
                 <div class="p-4 text-center text-muted">This team has no members.</div>

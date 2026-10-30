@@ -138,7 +138,7 @@
 
         <div class="team-avatars">
             {% for m in members[:5] %}
-            <span class="team-avatar is-{{ m.effective_status }}{{ ' is-leader' if team.leader_id == m.id else '' }}"
+            <span class="team-avatar is-{{ team_statuses.get(team.id) }}{{ ' is-leader' if team.leader_id == m.id else '' }}"
                   title="{{ m.full_name }}{{ ' (leader)' if team.leader_id == m.id else '' }}">{{ (m.full_name.split()|map('first')|list)[:2]|join|upper }}</span>
             {% endfor %}
             {% if members|length > 5 %}
@@ -148,10 +148,8 @@
 
         <div class="team-card-foot">
             <span><strong>{{ members|length }}</strong> member{{ '' if members|length == 1 else 's' }}</span>
-            <span class="d-flex gap-2">
-                <span class="team-chip is-available">{{ avail }} available</span>
-                <span class="team-chip is-busy">{{ busy }} busy</span>
-            </span>
+            {% set ts = team_statuses.get(team.id) %}
+            <span class="team-chip is-{{ ts }}" title="Team status">{{ ts|capitalize }}</span>
         </div>
     </div>
     {% endfor %}
@@ -198,9 +196,18 @@
                             'busy': 'disp-badge-high',
                             'offline': 'disp-badge-low'
                         } %}
+                        {% set my_team = team_of.get(technician.id) %}
+                        {% if my_team %}
+                        {% set ts = team_statuses.get(my_team.id) %}
+                        <span class="disp-badge {{ tech_status_classes.get(ts, 'disp-badge-low') }}" title="Status is shared by the team">
+                            {{ ts|capitalize }}
+                        </span>
+                        <div class="disp-subtext small mt-1"><i class="bi bi-people-fill me-1"></i>Team: {{ my_team.name }}</div>
+                        {% else %}
                         <span class="disp-badge {{ tech_status_classes.get(technician.effective_status, 'disp-badge-low') }}">
                             {{ technician.effective_status|capitalize }}
                         </span>
+                        {% endif %}
                     </td>
                     <td>{{ technician.resolved_issues_count }}</td>
                 </tr>

@@ -59,6 +59,27 @@ technicians_bp = Blueprint("technicians", __name__, url_prefix="/technicians")
 from app.forms import TechnicianForm  # noqa: E402
 
 
+def team_status(team):
+    """One status for the whole team (members don't show their own status
+    once they're on a team): 'offline' when every member is offline,
+    'busy' when any member is busy, otherwise 'available'."""
+    statuses = [m.effective_status for m in team.members]
+    if not statuses or all(s == "offline" for s in statuses):
+        return "offline"
+    return "busy" if "busy" in statuses else "available"
+
+
+def _team_lookup():
+    """{technician_id: team} for every technician already on a team.
+    Returns {} if the teams tables don't exist yet."""
+    try:
+        teams = TechnicianTeam.query.all()
+    except Exception:
+        db.session.rollback()
+        return {}
+    return {m.id: t for t in teams for m in t.members}
+
+
 @technicians_bp.route("/")
 @role_required("administrator")
 def list_technicians():
@@ -81,10 +102,19 @@ def list_technicians():
 
     technicians = query.order_by(Technician.full_name.asc()).all()
 
+    # Technicians on a team show the TEAM's status (not their own), so the
+    # status filter uses the same value as the badge in the table.
+    team_of = _team_lookup()
+    team_statuses = {t.id: team_status(t) for t in set(team_of.values())}
+
+    def display_status(tech):
+        team = team_of.get(tech.id)
+        return team_statuses[team.id] if team else tech.effective_status
+
     # Filter on the derived status (busy = has open tickets), not the stored
     # column, so the filter matches the badge shown in the table.
     if status_filter:
-        technicians = [t for t in technicians if t.effective_status == status_filter]
+        technicians = [t for t in technicians if display_status(t) == status_filter]
 
     # Accounts whose mobile login was deactivated are hidden from the main
     # list and shown only via "View deactivated accounts" (?account=deactivated).
@@ -104,6 +134,8 @@ def list_technicians():
         except Exception:
             db.session.rollback()
             teams = []
+    for t in teams:
+        team_statuses.setdefault(t.id, team_status(t))
 
     return render_template(
         "technicians/list.html",
@@ -112,6 +144,8 @@ def list_technicians():
         status_filter=status_filter,
         show_deactivated=show_deactivated,
         teams=teams,
+        team_of=team_of,
+        team_statuses=team_statuses,
     )
 
 
@@ -304,18 +338,29 @@ def activate_technician_account(technician_id):
 # Create Team (popup form on the Technician list)
 # ---------------------------------------------------------------------
 
-def _team_candidates():
+def _team_candidates(team=None):
     """Technicians / field assistants that can be put on a team: everyone
-    except profiles whose mobile login has been deactivated."""
+    except profiles whose mobile login has been deactivated and anyone who
+    is already a member of a team (a person can only be in one team). When
+    editing, `team`'s own members stay selectable."""
     people = Technician.query.order_by(Technician.full_name.asc()).all()
-    return [t for t in people if t.user is None or t.user.status == "active"]
+    taken = {
+        m.id
+        for t in TechnicianTeam.query.all()
+        if team is None or t.id != team.id
+        for m in t.members
+    }
+    return [
+        t for t in people
+        if t.id not in taken and (t.user is None or t.user.status == "active")
+    ]
 
 
 def _handle_team_form(team=None):
     """Shared by create_team() and edit_team(): `team` is None when
     creating. GET returns the form; POST validates and saves (JSON
     {"ok": true} on success, the form again with errors otherwise)."""
-    candidates = _team_candidates()
+    candidates = _team_candidates(team)
     if team is not None:
         # Keep current members selectable even if their login was deactivated
         # since, so editing a team never silently drops them.
@@ -364,6 +409,11 @@ def _handle_team_form(team=None):
             errors["description"] = "Description must be 255 characters or fewer."
         if not member_ids:
             errors["members"] = "Add at least one member."
+        elif any(
+            raw.isdigit() and int(raw) not in by_id
+            for raw in request.form.getlist("member_ids")
+        ):
+            errors["members"] = "One or more selected technicians are already on another team."
         if leader_id is not None and leader_id not in member_ids:
             errors["leader"] = "The team leader must be one of the members."
 
@@ -406,7 +456,9 @@ def create_team():
 def view_team(team_id):
     """Team details popup body: members, leader, status summary."""
     team = TechnicianTeam.query.get_or_404(team_id)
-    return render_template("technicians/_team_detail.html", team=team)
+    return render_template(
+        "technicians/_team_detail.html", team=team, team_status=team_status(team)
+    )
 
 
 @technicians_bp.route("/teams/<int:team_id>/edit", methods=["GET", "POST"])
