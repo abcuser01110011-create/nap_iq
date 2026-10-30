@@ -10,7 +10,21 @@
 {% block content %}
 {% set first_name = (current_user.full_name or current_user.username).split(' ')[0] if current_user else 'there' %}
 {% set open_count = (jobs or [])|length %}
-<section class="dash-greeting" aria-label="Welcome">
+<style>
+    /* Phones / small screens: date stacked over the time on the left, a smaller
+       light/dark toggle on the same row at the right; the (inactive) bell moves
+       to the bottom navigation. */
+    @media (max-width: 991.98px) {
+        .tech-greeting .dash-greeting-top { flex-wrap: nowrap; gap: .5rem; }
+        .tech-greeting .dash-greeting-clock { flex-direction: column; align-items: flex-start; gap: 2px; font-size: .72rem; }
+        .tech-greeting .dash-greeting-clock .dash-greeting-dot { display: none; }
+        .tech-greeting .dash-greeting-tools { flex-wrap: nowrap; gap: 0; flex: 0 0 auto; }
+        .tech-greeting .dash-topbar-actions .dash-icon-btn { display: none !important; }
+        .tech-greeting .napiq-theme-toggle { width: 44px; height: 28px; border-radius: 14px; }
+        .tech-greeting .napiq-theme-toggle .napiq-theme-toggle__icon { font-size: .9rem; }
+    }
+</style>
+<section class="dash-greeting tech-greeting" aria-label="Welcome">
     <div class="dash-greeting-top">
         <div class="dash-greeting-clock">
             <button type="button" class="dash-sidebar-toggle" id="dashSidebarToggle" aria-label="Toggle navigation">

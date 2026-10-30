@@ -298,6 +298,7 @@
             }
             .tech-bottomnav .tech-bottomnav-item i { font-size: 1.35rem; line-height: 1; }
             .tech-bottomnav .tech-bottomnav-item:hover { color: #1046B8; }
+            .tech-bottomnav .tech-bottomnav-disabled, .tech-bottomnav .tech-bottomnav-disabled:hover { opacity: .45; pointer-events: none; cursor: default; }
             .tech-bottomnav .tech-bottomnav-item.active, .tech-bottomnav .tech-bottomnav-item.active:hover { color: #1046B8; }
             html[data-bs-theme="dark"] .tech-bottomnav { background: #061747; border-top-color: rgba(255,255,255,.12); }
             html[data-bs-theme="dark"] .tech-bottomnav .tech-bottomnav-item { color: rgba(255,255,255,.65); }
@@ -313,6 +314,12 @@
         <a href="{{ url_for('technician.history') }}"
            class="tech-bottomnav-item {{ 'active' if request.endpoint == 'technician.history' else '' }}">
             <i class="bi bi-ticket-perforated"></i><span>Tickets</span>
+        </a>
+        {# Notifications: technician accounts have no notifications feature yet,
+           so this is shown (same spot the top bell used to be) but inactive. #}
+        <a href="#" class="tech-bottomnav-item tech-bottomnav-disabled" aria-disabled="true" tabindex="-1"
+           title="Notifications aren't available for your account yet">
+            <i class="bi bi-bell"></i><span>Alerts</span>
         </a>
         <a href="{{ url_for('profile.index') }}"
            class="tech-bottomnav-item {{ 'active' if request.endpoint and request.endpoint.startswith('profile.') else '' }}">
