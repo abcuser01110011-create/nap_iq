@@ -248,3 +248,32 @@ def edit_technician(technician_id):
         technician=technician,
         needs_credentials=needs_credentials,
     )
+
+
+def _set_login_status(technician_id, new_status):
+    """Shared by deactivate/activate: flips the linked mobile login's
+    users.status (an 'inactive' account can't sign in -- see app/auth.py
+    and app/jwt_auth.py). The Technician profile row itself is kept."""
+    technician = Technician.query.get_or_404(technician_id)
+    if technician.user is None:
+        flash("This profile has no mobile login to change.", "warning")
+    else:
+        technician.user.status = new_status
+        db.session.commit()
+        verb = "deactivated" if new_status == "inactive" else "reactivated"
+        flash(f"Account '{technician.user.username}' has been {verb}.", "success")
+    if request.args.get("partial"):
+        return jsonify(ok=True)  # the list popup reloads the page itself
+    return redirect(url_for("technicians.list_technicians"))
+
+
+@technicians_bp.route("/<int:technician_id>/deactivate", methods=["POST"])
+@role_required("administrator")
+def deactivate_technician_account(technician_id):
+    return _set_login_status(technician_id, "inactive")
+
+
+@technicians_bp.route("/<int:technician_id>/activate", methods=["POST"])
+@role_required("administrator")
+def activate_technician_account(technician_id):
+    return _set_login_status(technician_id, "active")

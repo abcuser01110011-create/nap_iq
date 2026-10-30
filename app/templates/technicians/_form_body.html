@@ -4,7 +4,9 @@
 {% set noun = 'Field Assistant' if is_field_assistant else 'Technician' %}
 {% set has_existing_login = mode == 'edit' and technician and technician.user_id %}
 {% set show_credentials_fields = not has_existing_login %}
-{% set show_type_and_status = mode == 'edit' %}
+{# Personnel type / status are no longer editable here (kept as hidden fields so the
+   form still validates and nothing changes); use Deactivate Account below instead. #}
+{% set show_type_and_status = false %}
 {% set in_popup = request.args.get('partial') %}
 {% if in_popup %}
 <style>
@@ -71,16 +73,8 @@
         {% endif %}
 
         {% if has_existing_login %}
-        <div class="col-12" id="existing-login-field">
-            <label class="form-label">Mobile Login</label>
-            <div>
-                <span class="badge text-bg-light border">{{ technician.user.username }}</span>
-            </div>
-            <div class="form-text">
-                Already linked. To change the username or reset the password, use Manage Users instead.
-            </div>
-        </div>
-        {% else %}
+{# Already-linked mobile login: nothing to show or edit here. #}
+{% else %}
         <div class="col-12" id="credentials-fields" style="{{ '' if show_credentials_fields else 'display:none;' }}">
             <hr class="my-2">
             <p class="text-muted small mb-2">
@@ -125,4 +119,23 @@
         </button>
     </div>
 </form>
+
+{% if mode == 'edit' and technician and technician.user %}
+{% set acct_active = technician.user.status == 'active' %}
+<form method="post" class="tech-acct-form mt-2"
+      action="{{ url_for('technicians.deactivate_technician_account' if acct_active else 'technicians.activate_technician_account', technician_id=technician.id, **({'partial': 1} if in_popup else {})) }}"
+      data-confirm="{{ 'Deactivate this account? They will no longer be able to sign in to the mobile app until it is reactivated.' if acct_active else 'Reactivate this account so they can sign in again?' }}"
+      {% if not in_popup %}onsubmit="return confirm(this.dataset.confirm);"{% endif %}>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if acct_active %}
+    <button type="submit" class="btn btn-outline-danger w-100{{ ' rounded-pill fw-bold' if in_popup else '' }}">
+        <i class="bi bi-person-x me-1"></i>Deactivate Account
+    </button>
+    {% else %}
+    <button type="submit" class="btn btn-outline-success w-100{{ ' rounded-pill fw-bold' if in_popup else '' }}">
+        <i class="bi bi-person-check me-1"></i>Reactivate Account
+    </button>
+    {% endif %}
+</form>
+{% endif %}
 {% if in_popup %}</div>{% endif %}
