@@ -242,7 +242,7 @@
     }
 
     // ------------------------------------------------------------------
-    // Technician field -- card-style picker (matches the "Find Nearby
+    // Team field -- card-style picker (matches the "Find Nearby
     // NAPs" list's look: bold name, muted stats line, green "Recommended"
     // badge on the top-scoring pick) instead of a plain <select>, so the
     // workload/completed counts from /api/personnel are actually visible
@@ -261,7 +261,7 @@
                     "<strong>" + escapeHtml(p.full_name) + "</strong> (" + escapeHtml(p.status) + ")" +
                     (p.recommended ? ' <span class="badge text-bg-success">Recommended</span>' : "") +
                     '<br><span class="text-muted small">' +
-                    p.open_count + " open · " + p.completed_count + " completed" +
+                    p.member_count + " member" + (p.member_count === 1 ? "" : "s") + " · " + p.open_count + " open · " + p.completed_count + " completed" +
                     "</span></span></button>"
             );
         });
@@ -283,7 +283,7 @@
         const displayText = document.getElementById("ticketFormAssignedTeamDisplayText");
         displayText.textContent = "Loading…";
         assignedTeamPeople = [];
-        fetch("/api/personnel?type=")
+        fetch("/technicians/teams/options")
             .then((r) => r.json())
             .then((list) => {
                 assignedTeamPeople = list || [];
@@ -1098,7 +1098,7 @@
 
         // Common to every type.
         if (!document.getElementById("ticketFormAssignedTeam").value) {
-            errors.assigned_team = ["Please assign a technician."];
+            errors.assigned_team = ["Please assign a team."];
         }
         if (!document.getElementById("ticketFormDescription").value.trim()) {
             errors.description = ["Please enter a description."];

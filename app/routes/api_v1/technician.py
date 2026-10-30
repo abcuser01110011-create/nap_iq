@@ -1249,6 +1249,21 @@ def complete_assignment(assignment_id):
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
 
+    # A team job creates one Assignment per member; once one member
+    # completes it, cancel the teammates' still-open copies so they
+    # don't linger on their dashboards (and keep them "busy").
+    sibling_filter = (
+        Assignment.technical_issue_id == assignment.technical_issue_id
+        if assignment.technical_issue_id is not None
+        else Assignment.service_request_id == assignment.service_request_id
+    )
+    for sibling in Assignment.query.filter(
+        sibling_filter,
+        Assignment.id != assignment.id,
+        Assignment.status.in_(("assigned", "accepted", "in_progress")),
+    ).all():
+        sibling.status = "cancelled"
+
     if assignment.technical_issue is not None:
         assignment.technical_issue.status = "resolved"
         # Same "resolve the whole outage together" behavior the

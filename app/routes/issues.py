@@ -449,19 +449,26 @@ def _dispatch_field_assistant(issue, assigned_team_id):
     to personnel_type="field_assistant" -- any valid Technician id
     picked in that dropdown gets dispatched.
     """
-    if not assigned_team_id:
-        return
-    technician = Technician.query.filter_by(id=assigned_team_id).first()
-    if technician is None:
-        return
-    db.session.add(
-        Assignment(
-            technical_issue_id=issue.id,
-            technician_id=technician.id,
-            status="assigned",
+    # The "Team" picker now submits a TechnicianTeam id: dispatch the job to
+    # every member of that team (one Assignment each, so it shows on each
+    # member's mobile Assignments dashboard). Returns True if dispatched.
+    from app.models import TechnicianTeam
+    raw = str(assigned_team_id or "").strip()
+    if not raw.isdigit():
+        return False
+    team = TechnicianTeam.query.get(int(raw))
+    if team is None or not team.members:
+        return False
+    for member in team.members:
+        db.session.add(
+            Assignment(
+                technical_issue_id=issue.id,
+                technician_id=member.id,
+                status="assigned",
+            )
         )
-    )
     issue.status = "assigned"
+    return True
 
 
 @issues_bp.route("/report", methods=["POST"])
@@ -607,15 +614,17 @@ def report_issue():
                     newly_dispatched = existing_issue.status == "assigned"
             else:
                 assigned_team_id = request.form.get("assigned_team_id")
-                if assigned_team_id and str(current_open_assignment.technician_id) != str(assigned_team_id):
-                    picked = Technician.query.get(assigned_team_id)
-                    ignored_team_pick = picked.full_name if picked else "the selected field assistant"
+                if assigned_team_id and str(assigned_team_id).isdigit():
+                    from app.models import TechnicianTeam
+                    picked = TechnicianTeam.query.get(int(assigned_team_id))
+                    if picked is not None and current_open_assignment.technician_id not in {m.id for m in picked.members}:
+                        ignored_team_pick = picked.name
             notify_issue_updated(existing_issue)
             db.session.commit()
 
             message = f"Issue '{existing_issue.issue_code}' was updated with this report."
             if newly_dispatched:
-                message += " A field assistant was dispatched."
+                message += " The team was dispatched."
             elif ignored_team_pick:
                 current_name = current_open_assignment.technician.full_name if current_open_assignment.technician else "its current assignee"
                 message += (

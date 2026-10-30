@@ -444,6 +444,41 @@ def _handle_team_form(team=None):
     ), (400 if errors else 200)
 
 
+@technicians_bp.route("/teams/options", methods=["GET"])
+@role_required("administrator")
+def team_options():
+    """JSON list of teams for the ticket forms' "Team" picker (replaces the
+    old per-technician picker). Same shape /api/personnel returned, so
+    tickets.js can render it unchanged: `full_name` is the team name and
+    `status` is the shared team status. The lightest-loaded team that isn't
+    offline is flagged `recommended` so it is pre-selected."""
+    open_states = ("accepted", "assigned", "in_progress")
+    rows = []
+    for team in TechnicianTeam.query.order_by(TechnicianTeam.name.asc()).all():
+        if not team.members:
+            continue
+        open_count = sum(
+            1 for m in team.members for a in m.assignments if a.status in open_states
+        )
+        completed_count = sum(
+            1 for m in team.members for a in m.assignments if a.status == "completed"
+        )
+        rows.append({
+            "id": team.id,
+            "full_name": team.name,
+            "status": team_status(team),
+            "member_count": len(team.members),
+            "open_count": open_count,
+            "completed_count": completed_count,
+            "recommended": False,
+        })
+    candidates = [r for r in rows if r["status"] != "offline"] or rows
+    if candidates:
+        best = min(candidates, key=lambda r: (r["open_count"], r["full_name"].lower(), r["id"]))
+        best["recommended"] = True
+    return jsonify(rows)
+
+
 @technicians_bp.route("/teams/new", methods=["GET", "POST"])
 @role_required("administrator")
 def create_team():

@@ -214,18 +214,25 @@ def _dispatch_field_assistant(service_request, assigned_team_id):
     to personnel_type="field_assistant" -- any valid Technician id
     picked in that dropdown gets dispatched.
     """
-    if not assigned_team_id:
-        return
-    technician = Technician.query.filter_by(id=assigned_team_id).first()
-    if technician is None:
-        return
-    db.session.add(
-        Assignment(
-            service_request_id=service_request.id,
-            technician_id=technician.id,
-            status="assigned",
+    # The "Team" picker now submits a TechnicianTeam id: dispatch the job to
+    # every member of that team (one Assignment each, so it shows on each
+    # member's mobile Assignments dashboard). Returns True if dispatched.
+    from app.models import TechnicianTeam
+    raw = str(assigned_team_id or "").strip()
+    if not raw.isdigit():
+        return False
+    team = TechnicianTeam.query.get(int(raw))
+    if team is None or not team.members:
+        return False
+    for member in team.members:
+        db.session.add(
+            Assignment(
+                service_request_id=service_request.id,
+                technician_id=member.id,
+                status="assigned",
+            )
         )
-    )
+    return True
 
 
 def _notify_status_change(service_request):
