@@ -199,6 +199,34 @@
     .tf-front .td-foot { margin-top: 0; }
     .tf-front .tf-actions { background: var(--td-body, #fff); border-top: 1px solid var(--td-line, #E3EBF9); }
     @media (prefers-reduced-motion: reduce) { .tf-card { transition: none; } }
+
+    /* Phones / small tablets: the flip card is sized (by the script below) to exactly fill
+       the space between the top of the page and the Ticket Details button, so the page
+       itself never scrolls. Contents are compacted to fit. */
+    @media (max-width: 991.98px) {
+        html.tf-fit, html.tf-fit body { overflow: hidden !important; height: 100%; }
+        .tf-card { height: var(--tf-h, auto); }
+        .tf-face { min-height: 0; }
+        .tf-toast-zone { height: 2rem; }
+        .tf-front .td-head, .tf-card .td-head { padding: .7rem 1rem 1.2rem; }
+        .tf-card .td-head-icon { font-size: 1.6rem; }
+        .tf-card .td-logo { width: 38px; height: 38px; }
+        .tf-card .td-foot { height: 32px; }
+        .tf-card .td-dots { bottom: 8px; }
+        .tf-card .td-chip { width: 36px; height: 36px; font-size: 1rem; }
+        .tf-front .card-body { padding: .55rem 1rem .55rem calc(1rem + 36px + .75rem); min-height: 0; }
+        .tf-front .card-body > h2 .td-chip { left: 1rem; top: .55rem; }
+        .tf-front .card-body > h2 { margin-bottom: .2rem !important; }
+        .tf-front .card-body > p { margin-bottom: .4rem !important; font-size: .8rem; line-height: 1.3; }
+        .tf-front .tech-photo-preview { max-height: 72px; width: auto; max-width: 100%; object-fit: cover; margin-bottom: .4rem !important; }
+        .tf-front .btn-sm { padding: .15rem .55rem; font-size: .78rem; }
+        .tf-actions { padding: .55rem 1rem; }
+        .tf-card .td-body { display: flex; flex-direction: column; padding: .2rem 1rem .3rem; }
+        .tf-card .td-row { flex: 1 1 0; min-height: 0; padding: .25rem 0; gap: .75rem; }
+        .tf-card .td-label { font-size: .62rem; }
+        .tf-card .td-value { font-size: .92rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .tf-card .td-maps { margin: .1rem 0; font-size: .75rem; }
+    }
 </style>
 <div class="tf-card" id="tfCard">
 <div class="tf-face tf-front" id="tfFront">
@@ -564,6 +592,31 @@
         }).observe(el, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         check();
     }
+    // Fit the card to the screen (phones / small tablets): no page scrolling.
+    var root = document.documentElement;
+    var mq = window.matchMedia('(max-width: 991.98px)');
+    function fit() {
+        if (!mq.matches) { root.classList.remove('tf-fit'); card.style.removeProperty('--tf-h'); return; }
+        root.classList.remove('tf-fit');
+        window.scrollTo(0, 0);
+        card.style.setProperty('--tf-h', '300px');
+        var cardRect = card.getBoundingClientRect();
+        var row = btn.parentElement.getBoundingClientRect();
+        var below = row.bottom - cardRect.bottom;                    // zone + button row
+        var content = card.closest('.dash-content'), main = card.closest('.dash-main');
+        var pads = (content ? parseFloat(getComputedStyle(content).paddingBottom) : 0) +
+                   (main ? parseFloat(getComputedStyle(main).paddingBottom) : 0);
+        var h = Math.floor(window.innerHeight - cardRect.top - below - pads);
+        h = Math.max(h, 420);                                        // never smaller than this
+        card.style.setProperty('--tf-h', h + 'px');
+        root.classList.add('tf-fit');
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('load', fit);
+    if (mq.addEventListener) mq.addEventListener('change', fit);
+
     var zone = document.getElementById('tfToastZone');
     front.querySelectorAll('.alert').forEach(function (el) { zone.appendChild(el); watch(el); });
 
