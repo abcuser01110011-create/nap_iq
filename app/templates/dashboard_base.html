@@ -227,6 +227,15 @@
                         {% endif %}
                     </a>
                 </li>
+                <li>
+                    <a class="dash-nav-link {{ 'active' if request.endpoint in ['customer.my_issues', 'customer.my_issue_detail', 'customer.report_issue'] else '' }}"
+                       href="{{ url_for('customer.my_issues') }}">
+                        <i class="bi bi-ticket-perforated"></i><span>Issues</span>
+                        {% if sidebar_badges.get('customer_issues') %}
+                            <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.customer_issues }}</span>
+                        {% endif %}
+                    </a>
+                </li>
                 {# Same redundancy removal as the administrator block above — see
                    the comment there. #}
                 {% endif %}
@@ -311,6 +320,7 @@
         {% set _ = mbn.append({'href': url_for('collector.index'), 'icon': 'bi-cash-coin', 'label': 'Collections', 'bar': true, 'active': _ep.startswith('collector.')}) %}
     {% elif _role == 'user' %}
         {% set _ = mbn.append({'href': url_for('customer.my_payments'), 'icon': 'bi-cash-coin', 'label': 'Payments', 'bar': true, 'active': _ep == 'customer.my_payments', 'badge': sidebar_badges.get('customer_payments')}) %}
+        {% set _ = mbn.append({'href': url_for('customer.my_issues'), 'icon': 'bi-ticket-perforated', 'label': 'Issues', 'bar': true, 'active': _ep in ['customer.my_issues', 'customer.my_issue_detail', 'customer.report_issue'], 'badge': sidebar_badges.get('customer_issues')}) %}
     {% endif %}
     {% if _role in ('administrator', 'user') %}
         {% set _ = mbn.append({'href': url_for('notifications.index'), 'icon': 'bi-bell', 'label': 'Alerts', 'bar': _role == 'user', 'active': _ep.startswith('notifications.'), 'badge': unread_notifications_count}) %}
