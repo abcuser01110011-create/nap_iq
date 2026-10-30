@@ -1249,9 +1249,11 @@ def complete_assignment(assignment_id):
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
 
-    # A team job creates one Assignment per member; once one member
-    # completes it, cancel the teammates' still-open copies so they
-    # don't linger on their dashboards (and keep them "busy").
+    # A team job creates one Assignment per member. When any member
+    # completes it, it is completed for the whole team: every teammate's
+    # still-open copy is marked completed too, carrying the same notes,
+    # photo, port and completion time, so it leaves their dashboards and
+    # counts toward each member's resolved jobs.
     sibling_filter = (
         Assignment.technical_issue_id == assignment.technical_issue_id
         if assignment.technical_issue_id is not None
@@ -1262,7 +1264,15 @@ def complete_assignment(assignment_id):
         Assignment.id != assignment.id,
         Assignment.status.in_(("assigned", "accepted", "in_progress")),
     ).all():
-        sibling.status = "cancelled"
+        sibling.status = "completed"
+        sibling.completed_at = assignment.completed_at
+        sibling.resolution_notes = assignment.resolution_notes
+        sibling.port_number = assignment.port_number
+        sibling.photo_filename = assignment.photo_filename
+        sibling.pin_latitude = assignment.pin_latitude
+        sibling.pin_longitude = assignment.pin_longitude
+        if assignment.technical_issue_id is not None and sibling.technician is not None:
+            sibling.technician.resolved_issues_count = (sibling.technician.resolved_issues_count or 0) + 1
 
     if assignment.technical_issue is not None:
         assignment.technical_issue.status = "resolved"

@@ -770,6 +770,30 @@ def complete_assignment(assignment_id):
     assignment.status = "completed"
     assignment.completed_at = datetime.utcnow()
 
+    # A team job creates one Assignment per member. When any member
+    # completes it, it is completed for the whole team: every teammate's
+    # still-open copy is marked completed too (same notes, port and time),
+    # so it leaves their dashboards and counts toward their resolved jobs.
+    sibling_filter = (
+        Assignment.technical_issue_id == assignment.technical_issue_id
+        if assignment.technical_issue_id is not None
+        else Assignment.service_request_id == assignment.service_request_id
+    )
+    for sibling in Assignment.query.filter(
+        sibling_filter,
+        Assignment.id != assignment.id,
+        Assignment.status.in_(("assigned", "accepted", "in_progress")),
+    ).all():
+        sibling.status = "completed"
+        sibling.completed_at = assignment.completed_at
+        sibling.resolution_notes = assignment.resolution_notes
+        sibling.port_number = assignment.port_number
+        sibling.photo_filename = assignment.photo_filename
+        sibling.pin_latitude = assignment.pin_latitude
+        sibling.pin_longitude = assignment.pin_longitude
+        if assignment.technical_issue_id is not None and sibling.technician is not None:
+            sibling.technician.resolved_issues_count = (sibling.technician.resolved_issues_count or 0) + 1
+
     if assignment.technical_issue is not None:
         assignment.technical_issue.status = "resolved"
         # A Fiber Break's other connected subscribers never get their own
