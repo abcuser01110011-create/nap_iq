@@ -48,7 +48,7 @@
     {% if current_user and current_user.role == 'user' %}
     <link href="{{ url_for('static', filename='css/customer-theme.css') }}" rel="stylesheet">
     {% endif %}
-    {% if current_user and current_user.role in ('administrator', 'payment_collector') %}
+    {% if current_user and current_user.role in ('administrator', 'payment_collector', 'technician', 'field_assistant') %}
     <link href="{{ url_for('static', filename='css/admin-theme.css') }}" rel="stylesheet">
     {% endif %}
     {% block extra_head %}{% endblock %}
@@ -289,16 +289,19 @@
             .dash-main { margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
             .tech-bottomnav {
                 display: flex !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
-                background: #0b1e45; border-top: 1px solid rgba(255,255,255,.12);
-                padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 16px rgba(0,0,0,.25);
+                background: #FFFFFF; border-top: 1px solid #DCE6F8;
+                padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 18px -10px rgba(6,23,71,.35);
             }
             .tech-bottomnav .tech-bottomnav-item {
                 flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
-                padding: 6px 4px; color: rgba(255,255,255,.65); text-decoration: none; font-size: .7rem; font-weight: 600;
+                padding: 6px 4px; color: #64748B; text-decoration: none; font-size: .7rem; font-weight: 600;
             }
             .tech-bottomnav .tech-bottomnav-item i { font-size: 1.35rem; line-height: 1; }
-            .tech-bottomnav .tech-bottomnav-item:hover { color: #fff; }
-            .tech-bottomnav .tech-bottomnav-item.active, .tech-bottomnav .tech-bottomnav-item.active:hover { color: #F4B41A; }
+            .tech-bottomnav .tech-bottomnav-item:hover { color: #1046B8; }
+            .tech-bottomnav .tech-bottomnav-item.active, .tech-bottomnav .tech-bottomnav-item.active:hover { color: #1046B8; }
+            html[data-bs-theme="dark"] .tech-bottomnav { background: #061747; border-top-color: rgba(255,255,255,.12); }
+            html[data-bs-theme="dark"] .tech-bottomnav .tech-bottomnav-item { color: rgba(255,255,255,.65); }
+            html[data-bs-theme="dark"] .tech-bottomnav .tech-bottomnav-item.active { color: #FFC928; }
         }
         html.dash-embedded .tech-bottomnav { display: none !important; }
     </style>
