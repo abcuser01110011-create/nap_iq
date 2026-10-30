@@ -14,57 +14,6 @@
     </a>
 </div>
 
-<div class="subs-table-card mb-3">
-    <div class="p-3">
-        <form method="get" action="{{ url_for('technicians.list_technicians') }}" class="row g-2 align-items-end">
-            {% if show_deactivated %}<input type="hidden" name="account" value="deactivated">{% endif %}
-            <div class="col-sm-7 col-md-8">
-                <label class="form-label small text-muted mb-1">Search</label>
-                <div class="subs-search-form mb-0">
-                    <i class="bi bi-search"></i>
-                    <input
-                        type="text" name="q"
-                        placeholder="Search by name or contact number..."
-                        value="{{ search_term }}"
-                        aria-label="Search technicians"
-                        autocomplete="off"
-                    >
-                </div>
-            </div>
-            <div class="col-sm-3 col-md-2">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="status" class="form-select">
-                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
-                    <option value="available" {% if status_filter == 'available' %}selected{% endif %}>Available</option>
-                    <option value="busy" {% if status_filter == 'busy' %}selected{% endif %}>Busy</option>
-                    <option value="offline" {% if status_filter == 'offline' %}selected{% endif %}>Offline</option>
-                </select>
-            </div>
-            <div class="col-sm-2 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary rounded-pill px-3">
-                    <i class="bi bi-funnel me-1"></i>Filter
-                </button>
-                {% if search_term or status_filter %}
-                    <a href="{{ url_for('technicians.list_technicians', account='deactivated' if show_deactivated else None) }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-    </div>
-</div>
-
-{# Outside (underneath) the search card. #}
-<div class="mb-3">
-    {% if show_deactivated %}
-    <a href="{{ url_for('technicians.list_technicians') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
-        <i class="bi bi-arrow-left me-1"></i>Back to active accounts
-    </a>
-    {% else %}
-    <a href="{{ url_for('technicians.list_technicians', account='deactivated') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
-        <i class="bi bi-person-x me-1"></i>View deactivated accounts
-    </a>
-    {% endif %}
-</div>
-
 {# Team cards: sit directly above the technician table. #}
 {% if not show_deactivated %}
 <style>
@@ -162,6 +111,15 @@
 {% endif %}
 {% endif %}
 
+{# Plain-text link under the teams, right-aligned. #}
+<div class="text-end mb-3">
+    {% if show_deactivated %}
+    <a href="{{ url_for('technicians.list_technicians') }}" class="small text-secondary text-decoration-none">Back to active accounts</a>
+    {% else %}
+    <a href="{{ url_for('technicians.list_technicians', account='deactivated') }}" class="small text-secondary text-decoration-none">View deactivated accounts</a>
+    {% endif %}
+</div>
+
 <div class="disp-table-card">
     <div class="table-responsive">
         <table class="table disp-table align-middle mb-0">
@@ -215,7 +173,7 @@
                 <tr>
                     <td colspan="6" class="disp-empty">
                         <i class="bi bi-person-badge display-6 d-block mb-2"></i>
-                        {{ 'No deactivated accounts' if show_deactivated else 'No personnel found' }}{% if search_term or status_filter %} matching your filters{% endif %}.
+                        {{ 'No deactivated accounts' if show_deactivated else 'No personnel found' }}.
                     </td>
                 </tr>
                 {% endfor %}
