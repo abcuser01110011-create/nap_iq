@@ -44,7 +44,7 @@ Routes:
     POST /technicians/<id>/edit      -> edit_technician    (process edit form)
 """
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 from app.extensions import db
 from app.auth import role_required
@@ -226,7 +226,20 @@ def edit_technician(technician_id):
         db.session.commit()
         label = "Field assistant" if technician.personnel_type == "field_assistant" else "Technician"
         flash(f"{label} '{technician.full_name}' was updated successfully.", "success")
+        if request.args.get("partial"):
+            # Edit popup on the Technician list: it reloads the list itself.
+            return jsonify(ok=True)
         return redirect(url_for("technicians.list_technicians"))
+
+    # Edit popup: only the form (with any validation errors) is returned.
+    if request.args.get("partial"):
+        return render_template(
+            "technicians/_form_body.html",
+            form=form,
+            mode="edit",
+            technician=technician,
+            needs_credentials=needs_credentials,
+        )
 
     return render_template(
         "technicians/form.html",

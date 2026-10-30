@@ -8,7 +8,7 @@
     .tech-pop {
         --tp-blue: #1046B8; --tp-gold: #F4B41A;
         --tp-card: var(--bs-tertiary-bg); --tp-line: var(--bs-border-color);
-        position: relative; padding: 0.25rem 0 0;
+        position: relative; padding: 1.6rem 0 0;
     }
     /* soft corner swooshes, like the design */
     .tech-pop::before {
@@ -23,17 +23,6 @@
         border-bottom-left-radius: .4rem;
     }
     .tech-pop > * { position: relative; z-index: 1; }
-
-    .tech-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
-    .tech-head-avatar {
-        width: 64px; height: 64px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center;
-        background: var(--bs-body-bg); border: 2px solid var(--tp-gold); box-shadow: 0 2px 8px rgba(0,0,0,.15);
-        color: var(--tp-blue); font-size: 1.9rem;
-    }
-    .tech-eyebrow { display: flex; align-items: center; gap: .6rem; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
-    .tech-eyebrow::after { content: ""; width: 56px; height: 2px; background: var(--tp-gold); border-radius: 2px; }
-    .tech-name { margin: .1rem 0 0; font-size: 1.6rem; font-weight: 800; line-height: 1.15; }
-    .tech-role { color: var(--bs-secondary-color); font-size: .95rem; }
 
     .tech-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 1.1rem; }
     @media (max-width: 767.98px) { .tech-grid { grid-template-columns: 1fr; } }
@@ -57,6 +46,9 @@
     [data-bs-theme="dark"] .tech-pill.is-available { color: #4ade80; }
     [data-bs-theme="dark"] .tech-pill.is-busy { color: #fbbf24; }
 
+    .tech-ident { min-width: 0; }
+    .tech-name { margin: 0; font-size: 1.5rem; font-weight: 800; line-height: 1.15; }
+    .tech-role { color: var(--bs-secondary-color); font-size: .95rem; }
     .tech-quick { display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
     .tech-quick-row { display: flex; align-items: center; gap: .6rem; font-size: 1rem; }
     .tech-quick-row i, .tech-fact i { color: var(--bs-secondary-color); font-size: 1.1rem; width: 1.3rem; text-align: center; }
@@ -94,15 +86,6 @@
 </style>
 
 <div class="tech-pop">
-    <div class="tech-head">
-        <div class="tech-head-avatar"><i class="bi bi-person-badge-fill"></i></div>
-        <div>
-            <div class="tech-eyebrow">{{ 'Field Assistant' if is_fa else 'Technician' }} Details</div>
-            <h3 class="tech-name">{{ technician.full_name }}</h3>
-            <div class="tech-role">{{ 'Field Assistant' if is_fa else 'Field Technician' }}</div>
-        </div>
-    </div>
-
     <div class="tech-grid">
         <div class="tech-card">
             <div class="tech-profile-top">
@@ -110,14 +93,9 @@
                     <div class="tech-avatar-face"><i class="bi bi-person-fill"></i></div>
                     <span class="tech-dot {{ st_cls }}"></span>
                 </div>
-                <div class="tech-quick">
-                    <div><span class="tech-pill {{ st_cls }}">{{ st|capitalize }}</span></div>
-                    <div class="tech-quick-row"><i class="bi bi-telephone"></i>{{ technician.contact_number or "—" }}</div>
-                    <div class="tech-quick-row">
-                        <i class="bi bi-phone"></i>
-                        <span class="text-muted">Mobile Login</span>
-                        {% if technician.user %}<span class="tech-chip">{{ technician.user.username }}</span>{% else %}<span class="text-muted">Not set up</span>{% endif %}
-                    </div>
+                <div class="tech-ident">
+                    <h3 class="tech-name">{{ technician.full_name }}</h3>
+                    <div class="tech-role">{{ 'Field Assistant' if is_fa else 'Field Technician' }}</div>
                 </div>
             </div>
 
@@ -126,10 +104,6 @@
                 <div class="tech-fact"><i class="bi bi-person-lines-fill"></i><span class="k">Contact Number</span><span class="v">{{ technician.contact_number or "—" }}</span></div>
                 <div class="tech-fact"><i class="bi bi-activity"></i><span class="k">Status</span><span class="tech-pill {{ st_cls }}">{{ st|capitalize }}</span></div>
                 <div class="tech-fact"><i class="bi bi-check-circle"></i><span class="k">Resolved Issues</span><span class="v">{{ technician.resolved_issues_count }}</span></div>
-                <div class="tech-fact">
-                    <i class="bi bi-phone"></i><span class="k">Mobile Login</span>
-                    {% if technician.user %}<span class="tech-chip">{{ technician.user.username }}</span>{% else %}<span class="text-muted">Not set up</span>{% endif %}
-                </div>
             </div>
         </div>
 
@@ -180,7 +154,8 @@
     </div>
 
     <div class="tech-foot">
-        <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}" class="tech-edit">
+        <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}"
+           data-edit-url="{{ url_for('technicians.edit_technician', technician_id=technician.id, partial=1) }}" class="tech-edit">
             <i class="bi bi-pencil"></i>Edit
         </a>
     </div>

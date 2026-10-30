@@ -180,6 +180,50 @@
             }
         });
 
+        // Edit inside the popup: swap the details for the edit form.
+        var detailUrl = null;
+        bodyEl.addEventListener('click', function (e) {
+            var edit = e.target.closest('a.tech-edit[data-edit-url]');
+            if (edit) {
+                e.preventDefault();
+                detailUrl = current;
+                bodyEl.innerHTML = SPINNER;
+                fetch(edit.getAttribute('data-edit-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
+                    .then(function (html) { bodyEl.innerHTML = html; })
+                    .catch(function () { bodyEl.innerHTML = ERROR; });
+                return;
+            }
+            if (e.target.closest('[data-tech-cancel]')) {
+                e.preventDefault();
+                if (detailUrl && cache[detailUrl]) bodyEl.innerHTML = cache[detailUrl];
+                else modal.hide();
+            }
+        });
+
+        // Save from the popup: post in the background; on success reload the
+        // list (the flash message shows there), on errors show the form again.
+        bodyEl.addEventListener('submit', function (e) {
+            var form = e.target.closest('form#techEditForm');
+            if (!form) return;
+            e.preventDefault();
+            var btn = form.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
+            fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) {
+                    var type = res.headers.get('Content-Type') || '';
+                    if (type.indexOf('application/json') !== -1) {
+                        window.location.reload();
+                        return null;
+                    }
+                    return res.text().then(function (html) { bodyEl.innerHTML = html; });
+                })
+                .catch(function () {
+                    if (btn) btn.disabled = false;
+                    bodyEl.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger py-2">Could not save. Please try again.</div>');
+                });
+        });
+
         modalEl.addEventListener('hidden.bs.modal', function () {
             current = null;
             bodyEl.innerHTML = '';
