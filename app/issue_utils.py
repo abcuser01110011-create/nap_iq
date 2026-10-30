@@ -444,3 +444,22 @@ def build_consolidated_locations(parent_issue, assignment=None):
             else None
         ),
     }
+
+
+def sync_team_assignments(assignment, new_status):
+    """Team jobs create one Assignment per team member (see
+    recommendation.auto_assign_recommended_technician()). When one member
+    accepts/starts the job, move every teammate's still-waiting copy to the
+    same status so it is reflected in all their accounts (and the teammates
+    show as busy once the work is in progress). Call before commit."""
+    if assignment.technical_issue_id is not None:
+        same_job = Assignment.technical_issue_id == assignment.technical_issue_id
+    else:
+        same_job = Assignment.service_request_id == assignment.service_request_id
+    waiting = ("assigned",) if new_status == "accepted" else ("assigned", "accepted")
+    for sibling in Assignment.query.filter(
+        same_job, Assignment.id != assignment.id, Assignment.status.in_(waiting)
+    ).all():
+        sibling.status = new_status
+        if new_status == "in_progress" and sibling.technician is not None:
+            sibling.technician.status = "busy"

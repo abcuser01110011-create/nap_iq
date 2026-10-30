@@ -93,7 +93,7 @@ from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
 from app.notifications_utils import notify, notify_issue_status_change
-from app.issue_utils import resolve_consolidated_children, resolve_fiber_break_siblings
+from app.issue_utils import resolve_consolidated_children, resolve_fiber_break_siblings, sync_team_assignments
 
 api_v1_technician_bp = Blueprint(
     "api_v1_technician", __name__, url_prefix="/api/v1/technician"
@@ -547,6 +547,7 @@ def accept_assignment(assignment_id):
         return jsonify(error="That assignment isn't waiting to be accepted anymore."), 409
 
     assignment.status = "accepted"
+    sync_team_assignments(assignment, "accepted")
     db.session.commit()
 
     return jsonify(assignment=_serialize_assignment(assignment)), 200
@@ -582,6 +583,7 @@ def start_assignment(assignment_id):
         return jsonify(error="That assignment needs to be accepted before you can start work on it."), 409
 
     assignment.status = "in_progress"
+    sync_team_assignments(assignment, "in_progress")
     if assignment.technical_issue is not None:
         assignment.technical_issue.status = "in_progress"
         notify_issue_status_change(assignment.technical_issue)

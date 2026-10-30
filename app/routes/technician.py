@@ -94,6 +94,7 @@ from app.models import Technician, Assignment, CablePath, Nap, Subscriber
 from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify, notify_issue_status_change
 from app.issue_utils import (
+    sync_team_assignments,
     build_consolidated_locations,
     consolidated_missing_proof_count,
     resolve_consolidated_children,
@@ -294,6 +295,7 @@ def accept_assignment(assignment_id):
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "accepted"
+    sync_team_assignments(assignment, "accepted")
 
     # New Installation tickets skip the separate "Start Work" step on
     # the web dashboard (see ticket_detail.html's two-step layout) --
@@ -307,6 +309,7 @@ def accept_assignment(assignment_id):
     if assignment.service_request is not None and assignment.service_request.request_type == "new_installation":
         assignment.status = "in_progress"
         profile.status = "busy"
+        sync_team_assignments(assignment, "in_progress")
 
     db.session.commit()
 
@@ -350,6 +353,7 @@ def start_assignment(assignment_id):
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
 
     assignment.status = "in_progress"
+    sync_team_assignments(assignment, "in_progress")
     if assignment.technical_issue is not None:
         assignment.technical_issue.status = "in_progress"
         notify_issue_status_change(assignment.technical_issue)
