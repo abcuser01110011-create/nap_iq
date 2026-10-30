@@ -22,6 +22,8 @@
     /* Phones / small screens: date stacked over the time on the left, a smaller
        light/dark toggle on the same row at the right; the bell lives in the
        bottom navigation (Alerts). */
+    /* Account number pill and status sit side by side inside the card. */
+    .cust-acct.cust-acct--row { flex-direction: row; align-items: center; flex-wrap: wrap; gap: .6rem 1rem; max-width: none; }
     @media (max-width: 991.98px) {
         .cust-greeting .dash-greeting-top { flex-wrap: nowrap; gap: .5rem; }
         .cust-greeting .dash-greeting-clock { flex-direction: column; align-items: flex-start; gap: 2px; font-size: .72rem; }
@@ -52,6 +54,17 @@
 
     <div class="dash-greeting-body">
         <h2 class="dash-greeting-title"><span id="dashGreetingWord">Welcome</span>, <span class="dash-greeting-name">{{ first_name }}</span></h2>
+        {% if subscriber %}
+        <div class="cust-acct cust-acct--row">
+            <div class="napiq-acct-pill" role="group" aria-label="Account number">
+                <span class="napiq-acct-pill-code">{{ subscriber.subscriber_code }}</span>
+            </div>
+            <span class="napiq-acct-status">
+                <span class="napiq-acct-dot{% if subscriber.status != 'active' %} napiq-acct-dot--off{% endif %}"></span>
+                {{ subscriber.status|replace('_', ' ')|capitalize }}
+            </span>
+        </div>
+        {% endif %}
     </div>
     <div class="dash-greeting-art" aria-hidden="true"><i class="bi bi-broadcast-pin"></i></div>
 </section>
@@ -115,22 +128,6 @@
     exists on both surfaces. The hamburger sidebar/topbar shell itself
     is unchanged.
 #}
-{# Greeting + account number pill + plan/status (matches the mobile account header). #}
-<div class="napiq-acct-head mb-3">
-    <div class="napiq-acct-hi">Hi {{ (subscriber.full_name or current_user.full_name or '').split(' ')[0]|upper }}</div>
-    <div class="napiq-acct-pill" role="group" aria-label="Account number">
-        <span class="napiq-acct-pill-code">{{ subscriber.subscriber_code }}</span>
-        <i class="bi bi-chevron-down napiq-acct-pill-chevron" aria-hidden="true"></i>
-    </div>
-    <div class="napiq-acct-meta">
-        <span class="napiq-acct-plan">{{ subscriber.plan_type or "—" }}</span>
-        <span class="napiq-acct-status">
-            <span class="napiq-acct-dot{% if subscriber.status != 'active' %} napiq-acct-dot--off{% endif %}"></span>
-            {{ subscriber.status|replace('_', ' ')|capitalize }}
-        </span>
-    </div>
-</div>
-
 {# Amount to pay + due date. Turns red on the due date and after it.
    The Pay Now button is clickable but intentionally does nothing yet. #}
 <div class="napiq-pay-card mb-3{% if due and due.is_due %} napiq-pay-card--due{% endif %}">
