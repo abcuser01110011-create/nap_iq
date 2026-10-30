@@ -27,12 +27,12 @@
     <div class="tm-head">
         <div class="tm-icon"><i class="bi bi-people-fill"></i></div>
         <div>
-            <div class="tm-eyebrow">New</div>
-            <h4 class="tm-title">Create Team</h4>
+            <div class="tm-eyebrow">{{ 'Edit' if team else 'New' }}</div>
+            <h4 class="tm-title">{{ 'Edit Team' if team else 'Create Team' }}</h4>
         </div>
     </div>
 
-    <form method="post" action="{{ url_for('technicians.create_team') }}" id="teamForm" novalidate>
+    <form method="post" action="{{ form_action }}" id="teamForm" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="mb-3">
@@ -88,7 +88,7 @@
 
         <div class="tm-actions">
             <button type="button" class="btn btn-outline-secondary" data-team-cancel>Cancel</button>
-            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create Team</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{{ 'Save Changes' if team else 'Create Team' }}</button>
         </div>
     </form>
 </div>

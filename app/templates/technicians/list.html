@@ -73,9 +73,20 @@
     .team-strip-title::after { content: ""; width: 40px; height: 2px; background: #F4B41A; border-radius: 2px; }
     .team-strip-count { font-size: .75rem; color: var(--bs-secondary-color); }
     .team-strip { display: flex; gap: .85rem; overflow-x: auto; padding: .15rem .15rem .75rem; margin-bottom: .75rem; scroll-snap-type: x proximity; }
-    .team-card { flex: 0 0 280px; scroll-snap-align: start; background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); border-radius: .9rem;
+    .team-card { cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease; flex: 0 0 280px; scroll-snap-align: start; background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); border-radius: .9rem;
         padding: .95rem 1rem; position: relative; overflow: hidden; }
     .team-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, #1d5fd8, #1046B8); }
+    .team-card:hover, .team-card:focus-visible { transform: translateY(-3px); border-color: #1046B8; box-shadow: 0 10px 24px rgba(16,70,184,.28); outline: none; }
+    .team-card::before { transition: width .18s ease; }
+    .team-card:hover::before, .team-card:focus-visible::before { width: 7px; }
+    .team-card-icon { transition: transform .18s ease; }
+    .team-card:hover .team-card-icon { transform: scale(1.08) rotate(-4deg); }
+    .team-avatar { transition: margin .18s ease; }
+    .team-card:hover .team-avatar { margin-left: -3px; }
+    .team-card:hover .team-avatar:first-child { margin-left: 0; }
+    .team-card-view { position: absolute; top: .7rem; right: .8rem; font-size: .7rem; font-weight: 700; color: #1046B8; opacity: 0; transform: translateX(-4px); transition: opacity .18s ease, transform .18s ease; }
+    [data-bs-theme="dark"] .team-card-view { color: #93c5fd; }
+    .team-card:hover .team-card-view, .team-card:focus-visible .team-card-view { opacity: 1; transform: translateX(0); }
     .team-card-top { display: flex; align-items: center; gap: .7rem; }
     .team-card-icon { width: 38px; height: 38px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; color: #fff; font-size: 1.05rem;
         background: linear-gradient(160deg, #3b82f6, #1046B8); border: 2px solid #F4B41A; }
@@ -109,7 +120,9 @@
     {% set members = team.members|sort(attribute='full_name') %}
     {% set avail = members|selectattr('effective_status', 'equalto', 'available')|list|length %}
     {% set busy = members|selectattr('effective_status', 'equalto', 'busy')|list|length %}
-    <div class="team-card" title="{{ team.name }}">
+    <div class="team-card" role="button" tabindex="0" title="View {{ team.name }}"
+         data-team-detail-url="{{ url_for('technicians.view_team', team_id=team.id) }}">
+        <span class="team-card-view">View <i class="bi bi-arrow-right"></i></span>
         <div class="team-card-top">
             <div class="team-card-icon"><i class="bi bi-people-fill"></i></div>
             <div class="min-w-0" style="min-width:0;">
@@ -207,6 +220,7 @@
 
 {% block extra_scripts %}
 <style>
+    #techTeamModal { z-index: 1065; }
     /* Popup chrome: no header bar -- the card has its own header; just a close button. */
     #techDetailModal .modal-content { position: relative; overflow: hidden; border-radius: 1rem; }
     #techEditModal { z-index: 1065; }
@@ -233,7 +247,17 @@
     </div>
 </div>
 
-{# Create Team popup (portrait). Sibling of the other popups. #}
+{# Team details popup. The Create/Edit Team popup below stacks above it. #}
+<div class="modal fade" id="techTeamDetailModal" tabindex="-1" aria-label="Team details" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 1rem; overflow: hidden;">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="position:absolute; top:1rem; right:1.25rem; z-index:5;"></button>
+            <div class="modal-body px-4 py-4" id="techTeamDetailBody"></div>
+        </div>
+    </div>
+</div>
+
+{# Create / Edit Team popup (portrait). Sibling of the other popups. #}
 <div class="modal fade" id="techTeamModal" tabindex="-1" aria-label="Create team" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 460px;">
         <div class="modal-content" style="border-radius: 1rem;">
@@ -273,13 +297,32 @@
 
         function render(html) { bodyEl.innerHTML = html; syncLeader(); }
 
-        btn.addEventListener('click', function () {
+        // Opens the create (or edit) form popup for the given URL. Also used by
+        // the team details popup's Edit button, which stacks this one above it.
+        function openForm(url) {
             bodyEl.innerHTML = SPINNER;
             modal.show();
-            fetch(btn.getAttribute('data-team-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
                 .then(render)
                 .catch(function () { bodyEl.innerHTML = '<div class="text-center text-muted py-5">Could not load the form. Please try again.</div>'; });
+        }
+        window.__openTeamForm = openForm;
+        btn.addEventListener('click', function () { openForm(btn.getAttribute('data-team-url')); });
+
+        // Backdrop above the details popup when stacked on it.
+        modalEl.addEventListener('show.bs.modal', function () {
+            setTimeout(function () {
+                var backs = document.querySelectorAll('.modal-backdrop');
+                if (backs.length) backs[backs.length - 1].style.zIndex = '1060';
+            }, 0);
+        });
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            // Details popup may still be open underneath: keep the page locked.
+            if (document.querySelector('.modal.show')) {
+                document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
         });
 
         bodyEl.addEventListener('change', function (e) {
@@ -323,6 +366,55 @@
         });
 
         modalEl.addEventListener('hidden.bs.modal', function () { bodyEl.innerHTML = ''; });
+    })();
+</script>
+
+<script>
+    // Team cards: click (or Enter) opens the team details popup; its Edit
+    // button opens the edit form stacked on top.
+    (function () {
+        var strip = document.querySelector('.team-strip');
+        var modalEl = document.getElementById('techTeamDetailModal');
+        var bodyEl = document.getElementById('techTeamDetailBody');
+        if (!strip || !modalEl || !bodyEl) return;
+        // focus:false so the stacked edit popup can take keyboard focus.
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { focus: false });
+        var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+        var current = null;
+
+        function open(card) {
+            var url = card.getAttribute('data-team-detail-url');
+            current = url;
+            bodyEl.innerHTML = SPINNER;
+            modal.show();
+            fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
+                .then(function (html) { if (current === url) bodyEl.innerHTML = html; })
+                .catch(function () { if (current === url) bodyEl.innerHTML = '<div class="text-center text-muted py-5">Could not load team details. Please try again.</div>'; });
+        }
+
+        strip.addEventListener('click', function (e) {
+            var card = e.target.closest('.team-card[data-team-detail-url]');
+            if (card) open(card);
+        });
+        strip.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            var card = e.target.closest('.team-card[data-team-detail-url]');
+            if (card) { e.preventDefault(); open(card); }
+        });
+
+        bodyEl.addEventListener('click', function (e) {
+            var edit = e.target.closest('a[data-team-edit-url]');
+            if (!edit) return;
+            e.preventDefault();
+            if (window.__openTeamForm) window.__openTeamForm(edit.getAttribute('data-team-edit-url'));
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function (e) {
+            if (e.target !== modalEl) return;
+            current = null;
+            bodyEl.innerHTML = '';
+        });
     })();
 </script>
 

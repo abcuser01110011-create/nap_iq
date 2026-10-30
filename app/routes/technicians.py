@@ -311,16 +311,32 @@ def _team_candidates():
     return [t for t in people if t.user is None or t.user.status == "active"]
 
 
-@technicians_bp.route("/teams/new", methods=["GET", "POST"])
-@role_required("administrator")
-def create_team():
-    """GET returns the Create Team form (popup body); POST validates and
-    saves the team. Like the edit popup, a successful save answers with
-    JSON ({"ok": true}) so the list can reload, and a failed one returns
-    the form again with the error messages."""
+def _handle_team_form(team=None):
+    """Shared by create_team() and edit_team(): `team` is None when
+    creating. GET returns the form; POST validates and saves (JSON
+    {"ok": true} on success, the form again with errors otherwise)."""
     candidates = _team_candidates()
+    if team is not None:
+        # Keep current members selectable even if their login was deactivated
+        # since, so editing a team never silently drops them.
+        known = {t.id for t in candidates}
+        candidates = sorted(
+            candidates + [m for m in team.members if m.id not in known],
+            key=lambda t: t.full_name.lower(),
+        )
     by_id = {t.id: t for t in candidates}
-    values = {"name": "", "description": "", "member_ids": [], "leader_id": None}
+
+    if team is None:
+        values = {"name": "", "description": "", "member_ids": [], "leader_id": None}
+        action = url_for("technicians.create_team")
+    else:
+        values = {
+            "name": team.name,
+            "description": team.description or "",
+            "member_ids": [m.id for m in team.members],
+            "leader_id": team.leader_id,
+        }
+        action = url_for("technicians.edit_team", team_id=team.id)
     errors = {}
 
     if request.method == "POST":
@@ -338,8 +354,12 @@ def create_team():
             errors["name"] = "Team name is required."
         elif len(name) > 100:
             errors["name"] = "Team name must be 100 characters or fewer."
-        elif TechnicianTeam.query.filter(db.func.lower(TechnicianTeam.name) == name.lower()).first():
-            errors["name"] = "A team with this name already exists."
+        else:
+            clash = TechnicianTeam.query.filter(db.func.lower(TechnicianTeam.name) == name.lower())
+            if team is not None:
+                clash = clash.filter(TechnicianTeam.id != team.id)
+            if clash.first():
+                errors["name"] = "A team with this name already exists."
         if len(description) > 255:
             errors["description"] = "Description must be 255 characters or fewer."
         if not member_ids:
@@ -348,15 +368,20 @@ def create_team():
             errors["leader"] = "The team leader must be one of the members."
 
         if not errors:
-            team = TechnicianTeam(
-                name=name,
-                description=description or None,
-                leader_id=leader_id,
-                members=[by_id[i] for i in member_ids],
-            )
-            db.session.add(team)
+            creating = team is None
+            if creating:
+                team = TechnicianTeam()
+                db.session.add(team)
+            team.name = name
+            team.description = description or None
+            team.leader_id = leader_id
+            team.members = [by_id[i] for i in member_ids]
             db.session.commit()
-            flash(f"Team '{team.name}' was created with {len(member_ids)} member{'' if len(member_ids) == 1 else 's'}.", "success")
+            count = len(member_ids)
+            flash(
+                f"Team '{team.name}' was {'created' if creating else 'updated'} with {count} member{'' if count == 1 else 's'}.",
+                "success",
+            )
             return jsonify(ok=True)
 
     return render_template(
@@ -364,4 +389,29 @@ def create_team():
         candidates=candidates,
         values=values,
         errors=errors,
+        team=team,
+        form_action=action,
     ), (400 if errors else 200)
+
+
+@technicians_bp.route("/teams/new", methods=["GET", "POST"])
+@role_required("administrator")
+def create_team():
+    """Create Team popup (see _handle_team_form)."""
+    return _handle_team_form(None)
+
+
+@technicians_bp.route("/teams/<int:team_id>", methods=["GET"])
+@role_required("administrator")
+def view_team(team_id):
+    """Team details popup body: members, leader, status summary."""
+    team = TechnicianTeam.query.get_or_404(team_id)
+    return render_template("technicians/_team_detail.html", team=team)
+
+
+@technicians_bp.route("/teams/<int:team_id>/edit", methods=["GET", "POST"])
+@role_required("administrator")
+def edit_team(team_id):
+    """Edit Team popup (see _handle_team_form)."""
+    team = TechnicianTeam.query.get_or_404(team_id)
+    return _handle_team_form(team)
