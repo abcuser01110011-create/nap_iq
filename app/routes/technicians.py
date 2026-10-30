@@ -48,7 +48,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Technician, User
+from app.models import Technician, TechnicianTeam, User
 
 technicians_bp = Blueprint("technicians", __name__, url_prefix="/technicians")
 
@@ -287,3 +287,70 @@ def deactivate_technician_account(technician_id):
 @role_required("administrator")
 def activate_technician_account(technician_id):
     return _set_login_status(technician_id, "active")
+
+
+# ---------------------------------------------------------------------
+# Create Team (popup form on the Technician list)
+# ---------------------------------------------------------------------
+
+def _team_candidates():
+    """Technicians / field assistants that can be put on a team: everyone
+    except profiles whose mobile login has been deactivated."""
+    people = Technician.query.order_by(Technician.full_name.asc()).all()
+    return [t for t in people if t.user is None or t.user.status == "active"]
+
+
+@technicians_bp.route("/teams/new", methods=["GET", "POST"])
+@role_required("administrator")
+def create_team():
+    """GET returns the Create Team form (popup body); POST validates and
+    saves the team. Like the edit popup, a successful save answers with
+    JSON ({"ok": true}) so the list can reload, and a failed one returns
+    the form again with the error messages."""
+    candidates = _team_candidates()
+    by_id = {t.id: t for t in candidates}
+    values = {"name": "", "description": "", "member_ids": [], "leader_id": None}
+    errors = {}
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        description = (request.form.get("description") or "").strip()
+        member_ids = []
+        for raw in request.form.getlist("member_ids"):
+            if raw.isdigit() and int(raw) in by_id and int(raw) not in member_ids:
+                member_ids.append(int(raw))
+        leader_raw = (request.form.get("leader_id") or "").strip()
+        leader_id = int(leader_raw) if leader_raw.isdigit() else None
+        values = {"name": name, "description": description, "member_ids": member_ids, "leader_id": leader_id}
+
+        if not name:
+            errors["name"] = "Team name is required."
+        elif len(name) > 100:
+            errors["name"] = "Team name must be 100 characters or fewer."
+        elif TechnicianTeam.query.filter(db.func.lower(TechnicianTeam.name) == name.lower()).first():
+            errors["name"] = "A team with this name already exists."
+        if len(description) > 255:
+            errors["description"] = "Description must be 255 characters or fewer."
+        if not member_ids:
+            errors["members"] = "Add at least one member."
+        if leader_id is not None and leader_id not in member_ids:
+            errors["leader"] = "The team leader must be one of the members."
+
+        if not errors:
+            team = TechnicianTeam(
+                name=name,
+                description=description or None,
+                leader_id=leader_id,
+                members=[by_id[i] for i in member_ids],
+            )
+            db.session.add(team)
+            db.session.commit()
+            flash(f"Team '{team.name}' was created with {len(member_ids)} member{'' if len(member_ids) == 1 else 's'}.", "success")
+            return jsonify(ok=True)
+
+    return render_template(
+        "technicians/_team_form.html",
+        candidates=candidates,
+        values=values,
+        errors=errors,
+    ), (400 if errors else 200)

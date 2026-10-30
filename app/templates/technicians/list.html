@@ -4,7 +4,11 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ technicians|length }} {{ 'deactivated ' if show_deactivated else '' }}profile{{ '' if technicians|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end mb-3">
+<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
+    <button type="button" class="btn btn-outline-primary rounded-pill px-3" id="createTeamBtn"
+            data-team-url="{{ url_for('technicians.create_team') }}">
+        <i class="bi bi-people me-1"></i>Create Team
+    </button>
     <a href="{{ url_for('technicians.add_technician', type='technician') }}" class="btn btn-primary rounded-pill px-3">
         <i class="bi bi-person-plus me-1"></i>Add Technician
     </a>
@@ -142,6 +146,99 @@
         </div>
     </div>
 </div>
+
+{# Create Team popup (portrait). Sibling of the other popups. #}
+<div class="modal fade" id="techTeamModal" tabindex="-1" aria-label="Create team" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 460px;">
+        <div class="modal-content" style="border-radius: 1rem;">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="position:absolute; top:1rem; right:1rem; z-index:5;"></button>
+            <div class="modal-body px-4 py-4" id="techTeamBody"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Create Team popup: loads the form, filters members, keeps the leader
+    // picker in sync with the checked members, and saves in the background.
+    (function () {
+        var btn = document.getElementById('createTeamBtn');
+        var modalEl = document.getElementById('techTeamModal');
+        var bodyEl = document.getElementById('techTeamBody');
+        if (!btn || !modalEl || !bodyEl) return;
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+
+        function syncLeader() {
+            var sel = bodyEl.querySelector('#teamLeader');
+            if (!sel) return;
+            var keep = sel.value || sel.getAttribute('data-selected') || '';
+            var checked = bodyEl.querySelectorAll('input[name="member_ids"]:checked');
+            sel.innerHTML = '<option value="">No leader</option>';
+            checked.forEach(function (c) {
+                var o = document.createElement('option');
+                o.value = c.value; o.textContent = c.getAttribute('data-label');
+                if (c.value === keep) o.selected = true;
+                sel.appendChild(o);
+            });
+            sel.setAttribute('data-selected', '');
+            var count = bodyEl.querySelector('#teamMemberCount');
+            if (count) count.textContent = checked.length + ' selected';
+        }
+
+        function render(html) { bodyEl.innerHTML = html; syncLeader(); }
+
+        btn.addEventListener('click', function () {
+            bodyEl.innerHTML = SPINNER;
+            modal.show();
+            fetch(btn.getAttribute('data-team-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
+                .then(render)
+                .catch(function () { bodyEl.innerHTML = '<div class="text-center text-muted py-5">Could not load the form. Please try again.</div>'; });
+        });
+
+        bodyEl.addEventListener('change', function (e) {
+            if (e.target.matches('input[name="member_ids"]')) syncLeader();
+        });
+
+        bodyEl.addEventListener('input', function (e) {
+            if (!e.target.matches('#teamMemberSearch')) return;
+            var q = e.target.value.trim().toLowerCase(), shown = 0;
+            bodyEl.querySelectorAll('.tm-member').forEach(function (row) {
+                var ok = !q || (row.getAttribute('data-name') || '').indexOf(q) !== -1;
+                row.classList.toggle('d-none', !ok);
+                if (ok) shown++;
+            });
+            var none = bodyEl.querySelector('#teamMemberNoMatch');
+            if (none) none.classList.toggle('d-none', shown !== 0);
+        });
+
+        bodyEl.addEventListener('click', function (e) {
+            if (e.target.closest('[data-team-cancel]')) modal.hide();
+        });
+
+        bodyEl.addEventListener('submit', function (e) {
+            var form = e.target.closest('form#teamForm');
+            if (!form) return;
+            e.preventDefault();
+            var submit = form.querySelector('button[type="submit"]');
+            if (submit) submit.disabled = true;
+            fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) {
+                    if ((res.headers.get('Content-Type') || '').indexOf('application/json') !== -1) {
+                        window.location.reload();
+                        return null;
+                    }
+                    return res.text().then(render);
+                })
+                .catch(function () {
+                    if (submit) submit.disabled = false;
+                    bodyEl.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger py-2">Could not save. Please try again.</div>');
+                });
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () { bodyEl.innerHTML = ''; });
+    })();
+</script>
 
 <script>
     // Technician details popup: same behavior as the Subscribers list --

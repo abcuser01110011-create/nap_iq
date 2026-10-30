@@ -1,0 +1,94 @@
+{# Create Team popup body. Rendered by technicians.create_team(); the list page
+   (technicians/list.html) wires up the member search / leader picker / submit. #}
+<style>
+    .team-pop .tm-head { display: flex; align-items: center; gap: .85rem; padding-bottom: 1rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--bs-border-color); }
+    .team-pop .tm-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; color: #fff; flex: 0 0 auto;
+        background: linear-gradient(160deg, #3b82f6, #1046B8); border: 2px solid #F4B41A; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    .team-pop .tm-eyebrow { font-size: .65rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
+    .team-pop .tm-title { margin: 0; font-size: 1.3rem; font-weight: 800; line-height: 1.15; }
+    .team-pop .form-label { font-size: .8rem; font-weight: 600; color: var(--bs-secondary-color); margin-bottom: .25rem; }
+    .team-pop .form-control, .team-pop .form-select { border-radius: .6rem; padding: .55rem .8rem; }
+    .team-pop .tm-members { border: 1px solid var(--bs-border-color); border-radius: .7rem; max-height: 230px; overflow-y: auto; }
+    .team-pop .tm-member { display: flex; align-items: center; gap: .65rem; padding: .5rem .75rem; cursor: pointer; margin: 0; border-bottom: 1px solid var(--bs-border-color); }
+    .team-pop .tm-member:last-child { border-bottom: 0; }
+    .team-pop .tm-member:hover { background: rgba(16,70,184,.07); }
+    .team-pop .tm-member .tm-name { font-weight: 600; font-size: .9rem; line-height: 1.2; }
+    .team-pop .tm-member .tm-sub { font-size: .75rem; color: var(--bs-secondary-color); }
+    .team-pop .tm-dot { width: 9px; height: 9px; border-radius: 50%; margin-left: auto; flex: 0 0 auto; background: #9aa4b2; }
+    .team-pop .tm-dot.is-available { background: #22c55e; } .team-pop .tm-dot.is-busy { background: #f59e0b; }
+    .team-pop .tm-count { font-size: .75rem; color: var(--bs-secondary-color); }
+    .team-pop .tm-actions { display: flex; margin-top: 1.25rem; }
+    .team-pop .tm-actions .btn { flex: 1 1 0; padding: .6rem 1rem; font-weight: 700; }
+    .team-pop .tm-actions .btn-outline-secondary { border-radius: 999px 0 0 999px; border-right-width: 0; }
+    .team-pop .tm-actions .btn-primary { border-radius: 0 999px 999px 0; background: linear-gradient(180deg, #1d5fd8, #1046B8); border-color: #1046B8; box-shadow: 0 0 0 2px rgba(244,180,26,.6); }
+</style>
+
+<div class="team-pop">
+    <div class="tm-head">
+        <div class="tm-icon"><i class="bi bi-people-fill"></i></div>
+        <div>
+            <div class="tm-eyebrow">New</div>
+            <h4 class="tm-title">Create Team</h4>
+        </div>
+    </div>
+
+    <form method="post" action="{{ url_for('technicians.create_team') }}" id="teamForm" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="mb-3">
+            <label class="form-label" for="teamName">Team Name</label>
+            <input type="text" id="teamName" name="name" maxlength="100" required autocomplete="off"
+                   class="form-control{{ ' is-invalid' if errors.get('name') else '' }}"
+                   placeholder="e.g. Calios Fiber Crew" value="{{ values.name }}">
+            {% if errors.get('name') %}<div class="invalid-feedback d-block">{{ errors['name'] }}</div>{% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="teamDescription">Description <span class="fw-normal">(optional)</span></label>
+            <input type="text" id="teamDescription" name="description" maxlength="255" autocomplete="off"
+                   class="form-control{{ ' is-invalid' if errors.get('description') else '' }}"
+                   placeholder="e.g. Handles fiber breaks in the north area" value="{{ values.description }}">
+            {% if errors.get('description') %}<div class="invalid-feedback d-block">{{ errors['description'] }}</div>{% endif %}
+        </div>
+
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-end mb-1">
+                <label class="form-label mb-0">Members</label>
+                <span class="tm-count" id="teamMemberCount">{{ values.member_ids|length }} selected</span>
+            </div>
+            <input type="search" id="teamMemberSearch" class="form-control mb-2" placeholder="Search technicians..." autocomplete="off">
+            <div class="tm-members{{ ' border-danger' if errors.get('members') else '' }}" id="teamMemberList">
+                {% for t in candidates %}
+                <label class="tm-member" data-name="{{ t.full_name|lower }}">
+                    <input type="checkbox" class="form-check-input mt-0" name="member_ids" value="{{ t.id }}"
+                           data-label="{{ t.full_name }}" {{ 'checked' if t.id in values.member_ids else '' }}>
+                    <span>
+                        <div class="tm-name">{{ t.full_name }}</div>
+                        <div class="tm-sub">{{ 'Field Assistant' if t.personnel_type == 'field_assistant' else 'Technician' }}</div>
+                    </span>
+                    <span class="tm-dot is-{{ t.effective_status }}" title="{{ t.effective_status|capitalize }}"></span>
+                </label>
+                {% else %}
+                <div class="p-3 text-center text-muted small">No technicians available to add yet.</div>
+                {% endfor %}
+                <div class="p-3 text-center text-muted small d-none" id="teamMemberNoMatch">No match.</div>
+            </div>
+            {% if errors.get('members') %}<div class="invalid-feedback d-block">{{ errors['members'] }}</div>{% endif %}
+        </div>
+
+        <div class="mb-1">
+            <label class="form-label" for="teamLeader">Team Leader <span class="fw-normal">(optional)</span></label>
+            <select id="teamLeader" name="leader_id" class="form-select{{ ' is-invalid' if errors.get('leader') else '' }}"
+                    data-selected="{{ values.leader_id or '' }}">
+                <option value="">No leader</option>
+            </select>
+            {% if errors.get('leader') %}<div class="invalid-feedback d-block">{{ errors['leader'] }}</div>{% endif %}
+            <div class="form-text">Pick from the members you selected above.</div>
+        </div>
+
+        <div class="tm-actions">
+            <button type="button" class="btn btn-outline-secondary" data-team-cancel>Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create Team</button>
+        </div>
+    </form>
+</div>

@@ -974,3 +974,48 @@ class EmailVerification(db.Model):
 
     def __repr__(self):
         return f"<EmailVerification {self.email} ({self.purpose})>"
+
+
+# ---------------------------------------------------------------------
+# Technician teams (Technician tab > Create Team)
+# ---------------------------------------------------------------------
+# Many-to-many link between a team and its member technician/field
+# assistant profiles. Tables are created by database/add_teams.sql (the
+# app does not run create_all()).
+technician_team_members = db.Table(
+    "technician_team_members",
+    db.Column(
+        "team_id", db.Integer,
+        db.ForeignKey("technician_teams.id", ondelete="CASCADE"), primary_key=True,
+    ),
+    db.Column(
+        "technician_id", db.Integer,
+        db.ForeignKey("technicians.id", ondelete="CASCADE"), primary_key=True,
+    ),
+)
+
+
+class TechnicianTeam(db.Model):
+    """A named group of technicians / field assistants, with an optional
+    team leader (who must be one of the members)."""
+
+    __tablename__ = "technician_teams"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.String(255), nullable=True)
+    leader_id = db.Column(
+        db.Integer, db.ForeignKey("technicians.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    members = db.relationship(
+        "Technician", secondary=technician_team_members, backref="teams",
+    )
+    leader = db.relationship("Technician", foreign_keys=[leader_id])
+
+    def __repr__(self):
+        return f"<TechnicianTeam {self.name}>"
