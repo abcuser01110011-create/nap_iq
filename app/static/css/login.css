@@ -15,14 +15,68 @@
    ===================================================================== */
 
 :root {
-    --login-bg: #05091a;
-    --login-panel: transparent;
-    --login-panel-border: rgba(255, 255, 255, 0.14);
-    --login-field-bg: #0b1330;
+    /* ---- LIGHT: admin dashboard light palette (admin-theme.css) ---- */
+    --login-bg: #F3F7FF;
+    --login-bg-glow: radial-gradient(900px 460px at 100% 0%, rgba(22, 132, 255, .14), transparent 60%),
+                     radial-gradient(700px 400px at 0% 100%, rgba(255, 201, 40, .12), transparent 60%);
+    --login-panel: #FFFFFF;
+    --login-panel-border: #DCE6F8;
+    --login-card-shadow: 0 18px 44px -26px rgba(15, 27, 61, .45);
+    --login-field-bg: #FFFFFF;
+    --login-field-border: #DCE6F8;
+    --login-accent: #1046B8;
+    --login-accent-bright: #1684FF;
+    --login-link: #1046B8;
+    --login-gold: #FFC928;
+    --login-text: #0F172A;
+    --login-title: #061747;
+    --login-text-muted: #64748B;
+    --login-label: #1E293B;
+    --login-icon: #94A3B8;
+    --login-input-text: #0F172A;
+    --login-placeholder: #94A3B8;
+    --login-toggle-color: #94A3B8;
+    --login-toggle-hover-bg: #EEF3FF;
+    --login-toggle-hover-color: #061747;
+    --login-check-border: #B8C7E6;
+    --login-check-bg: #FFFFFF;
+    --login-error: #DC3545;
+    --login-focus-ring: rgba(22, 132, 255, .25);
+    --login-submit-shadow: rgba(16, 70, 184, .5);
+    --login-toast-bg: #FFFFFF;
+    color-scheme: light;
+}
+
+/* ---- DARK: admin dashboard dark palette (theme-dark.css / admin-theme.css) ---- */
+html[data-bs-theme="dark"] {
+    --login-bg: #0b0c10;
+    --login-bg-glow: radial-gradient(900px 460px at 100% 0%, rgba(22, 132, 255, .10), transparent 60%),
+                     radial-gradient(700px 400px at 0% 100%, rgba(255, 201, 40, .04), transparent 60%);
+    --login-panel: #15171d;
+    --login-panel-border: rgba(255, 255, 255, 0.08);
+    --login-card-shadow: 0 30px 70px -40px rgba(0, 0, 0, 0.7);
+    --login-field-bg: #0e1015;
     --login-field-border: rgba(255, 255, 255, 0.1);
-    --login-accent: #2258e6;
-    --login-accent-bright: #3b6bff;
-    --login-text-muted: #8b96b8;
+    --login-accent: #1046B8;
+    --login-accent-bright: #1684FF;
+    --login-link: #1684FF;
+    --login-text: #e8eaf0;
+    --login-title: #ffffff;
+    --login-text-muted: #9aa3b5;
+    --login-label: rgba(232, 234, 240, 0.85);
+    --login-icon: rgba(226, 232, 255, 0.4);
+    --login-input-text: #f4f6ff;
+    --login-placeholder: rgba(203, 213, 255, 0.32);
+    --login-toggle-color: rgba(203, 213, 255, 0.5);
+    --login-toggle-hover-bg: rgba(255, 255, 255, 0.08);
+    --login-toggle-hover-color: #eef2ff;
+    --login-check-border: rgba(255, 255, 255, 0.25);
+    --login-check-bg: rgba(255, 255, 255, 0.03);
+    --login-error: #ffb3bb;
+    --login-focus-ring: rgba(22, 132, 255, .28);
+    --login-submit-shadow: rgba(22, 132, 255, .5);
+    --login-toast-bg: #0e1015;
+    color-scheme: dark;
 }
 
 * {
@@ -36,8 +90,9 @@ html, body.login-body {
 body.login-body {
     margin: 0;
     font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-    background: var(--login-bg);
-    color: #eef2ff;
+    background: var(--login-bg-glow), var(--login-bg);
+    background-attachment: fixed;
+    color: var(--login-text);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -65,7 +120,7 @@ body.login-body {
     border-radius: 1rem;
     background: var(--login-panel);
     border: 1px solid var(--login-panel-border);
-    box-shadow: 0 30px 70px -40px rgba(0, 0, 0, 0.55);
+    box-shadow: var(--login-card-shadow);
 }
 
 .login-brand {
@@ -91,7 +146,7 @@ body.login-body {
     font-size: 1.35rem;
     font-weight: 700;
     letter-spacing: 0.01em;
-    color: #ffffff;
+    color: var(--login-title);
 }
 
 .login-brand__subtitle {
@@ -133,8 +188,8 @@ body.login-body {
     border-radius: 0.5rem;
     border: 1px solid transparent;
     line-height: 1.25;
-    background: var(--login-field-bg);
-    box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.6);
+    background: var(--login-toast-bg);
+    box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.35);
     opacity: 0;
     transform: translateY(-10px);
     animation: loginToastIn 0.25s ease forwards;
@@ -185,7 +240,7 @@ body.login-body {
     display: block;
     font-size: 0.82rem;
     font-weight: 600;
-    color: rgba(226, 232, 255, 0.85);
+    color: var(--login-label);
     margin-bottom: 0.4rem;
 }
 
@@ -196,7 +251,7 @@ body.login-body {
     margin-bottom: 0.4rem;
     font-size: 0.8rem;
     font-weight: 600;
-    color: var(--login-accent-bright);
+    color: var(--login-link);
     cursor: help;
 }
 
@@ -214,7 +269,7 @@ body.login-body {
     top: 50%;
     left: 0.85rem;
     transform: translateY(-50%);
-    color: rgba(226, 232, 255, 0.4);
+    color: var(--login-icon);
     font-size: 0.95rem;
     pointer-events: none;
 }
@@ -223,7 +278,7 @@ body.login-body {
     width: 100%;
     padding: 0.68rem 0.9rem;
     font-size: 0.95rem;
-    color: #f4f6ff;
+    color: var(--login-input-text);
     background: var(--login-field-bg);
     border: 1px solid var(--login-field-border);
     border-radius: 0.6rem;
@@ -240,23 +295,23 @@ body.login-body {
 }
 
 .login-field__input::placeholder {
-    color: rgba(203, 213, 255, 0.32);
+    color: var(--login-placeholder);
 }
 
 .login-field__input:focus {
     border-color: var(--login-accent-bright);
-    box-shadow: 0 0 0 3px rgba(59, 107, 255, 0.25);
+    box-shadow: 0 0 0 3px var(--login-focus-ring);
 }
 
 .login-field__input.is-invalid {
-    border-color: #e35d6a;
+    border-color: var(--login-error);
     box-shadow: 0 0 0 3px rgba(227, 93, 106, 0.2);
 }
 
 .login-field__error {
     margin-top: 0.4rem;
     font-size: 0.78rem;
-    color: #ffb3bb;
+    color: var(--login-error);
 }
 
 /* Refined eye toggle: a quiet circular ghost button sitting inside
@@ -274,15 +329,15 @@ body.login-body {
     border: none;
     border-radius: 50%;
     background: transparent;
-    color: rgba(203, 213, 255, 0.5);
+    color: var(--login-toggle-color);
     cursor: pointer;
     padding: 0;
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .login-field__toggle:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #eef2ff;
+    background: var(--login-toggle-hover-bg);
+    color: var(--login-toggle-hover-color);
 }
 
 .login-field__toggle:focus-visible {
@@ -326,8 +381,8 @@ body.login-body {
     width: 1.15rem;
     height: 1.15rem;
     border-radius: 0.3rem;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--login-check-border);
+    background: var(--login-check-bg);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -349,7 +404,7 @@ body.login-body {
 
 .login-remember__label {
     font-size: 0.85rem;
-    color: rgba(226, 232, 255, 0.75);
+    color: var(--login-label);
 }
 
 .login-submit {
@@ -365,14 +420,14 @@ body.login-body {
     border: none;
     border-radius: 0.65rem;
     background: linear-gradient(180deg, var(--login-accent-bright) 0%, var(--login-accent) 100%);
-    box-shadow: 0 10px 22px -8px rgba(34, 88, 230, 0.55);
+    box-shadow: 0 10px 22px -8px var(--login-submit-shadow);
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
 
 .login-submit:hover {
     filter: brightness(1.08);
-    box-shadow: 0 14px 26px -8px rgba(34, 88, 230, 0.7);
+    box-shadow: 0 14px 26px -8px var(--login-submit-shadow);
 }
 
 .login-submit:active {
@@ -408,7 +463,7 @@ body.login-body {
     margin: 1.1rem 0 0;
     font-size: 0.82rem;
     font-weight: 500;
-    color: var(--login-accent-bright);
+    color: var(--login-link);
     text-decoration: none;
 }
 
@@ -421,4 +476,61 @@ body.login-body {
     .login-card {
         padding: 1.9rem 1.4rem 1.75rem;
     }
+}
+
+/* Light-mode flash message tints (the defaults above are tuned for dark). */
+html:not([data-bs-theme="dark"]) .login-flash--danger { background: #FDECEE; border-color: #F5B5BC; color: #A61E2D; }
+html:not([data-bs-theme="dark"]) .login-flash--success { background: #E8F6EF; border-color: #A6DBC0; color: #146C43; }
+html:not([data-bs-theme="dark"]) .login-flash--warning { background: #FFF6DB; border-color: #F2D98A; color: #8A6500; }
+
+/* Gold underline accent under the brand title, as in the dashboard's active markers. */
+.login-brand__title::after {
+    content: "";
+    display: block;
+    width: 28px;
+    height: 3px;
+    margin: 0.5rem auto 0;
+    border-radius: 999px;
+    background: var(--login-gold, #FFC928);
+}
+
+/* ---------------------------------------------------------------- */
+/* Light / dark toggle -- upper right corner (same look as the        */
+/* dashboard's .napiq-theme-toggle).                                  */
+/* ---------------------------------------------------------------- */
+.login-theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 20;
+    width: 60px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 19px;
+    border: 1px solid #DCE6F8;
+    background: #FFFFFF;
+    color: #1046B8;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 6px 16px -10px rgba(15, 27, 61, .45);
+    transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+.login-theme-toggle:hover { box-shadow: 0 8px 18px -8px rgba(15, 27, 61, .5); }
+.login-theme-toggle:active { transform: scale(0.92); }
+.login-theme-toggle:focus-visible { outline: 2px solid var(--login-accent-bright); outline-offset: 2px; }
+.login-theme-toggle__icon { position: absolute; font-size: 1.15rem; line-height: 1; transition: opacity 0.3s ease, transform 0.35s ease; }
+.login-theme-toggle__icon--sun { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+.login-theme-toggle__icon--moon { opacity: 1; transform: rotate(0) scale(1); }
+html[data-bs-theme="dark"] .login-theme-toggle { background: #15171d; border-color: rgba(255, 255, 255, 0.12); color: #FFC928; box-shadow: none; }
+html[data-bs-theme="dark"] .login-theme-toggle__icon--sun { opacity: 1; transform: rotate(0) scale(1); }
+html[data-bs-theme="dark"] .login-theme-toggle__icon--moon { opacity: 0; transform: rotate(90deg) scale(0.4); }
+
+/* Soft crossfade while the theme switches. */
+html.login-theme-fade, html.login-theme-fade * {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .login-theme-toggle, .login-theme-toggle__icon { transition: none; }
 }
