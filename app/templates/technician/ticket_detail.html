@@ -37,10 +37,11 @@
 {# Consolidated tickets list every subscriber in the card below instead. #}
 {% set ticket_details_card %}
 <style>
-    .td-card { --td-navy: #061747; --td-royal: #1046B8; --td-gold: #FFC928; --td-ink: #061747; --td-label: #4A5C8C; --td-line: #E3EBF9; --td-chip: #E8EEFC; --td-body: #FFFFFF;
-               display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 1.1rem; background: var(--td-body);
+    .td-card, .tf-front { --td-navy: #061747; --td-royal: #1046B8; --td-gold: #FFC928; --td-ink: #061747; --td-label: #4A5C8C; --td-line: #E3EBF9; --td-chip: #E8EEFC; --td-body: #FFFFFF;
+    }
+    .td-card { display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 1.1rem; background: var(--td-body);
                box-shadow: 0 18px 40px -26px rgba(6, 23, 71, .6); margin-bottom: 1.5rem; }
-    html[data-bs-theme="dark"] .td-card { --td-ink: #F1F5FF; --td-label: #8FA2D4; --td-line: rgba(255,255,255,.08); --td-chip: rgba(22,132,255,.16); --td-body: #11141c; }
+    html[data-bs-theme="dark"] .td-card, html[data-bs-theme="dark"] .tf-front { --td-ink: #F1F5FF; --td-label: #8FA2D4; --td-line: rgba(255,255,255,.08); --td-chip: rgba(22,132,255,.16); --td-body: #11141c; }
     .td-head { position: relative; display: flex; align-items: center; gap: .9rem; padding: 1.1rem 1.1rem 1.5rem; color: #fff; overflow: hidden;
                background: linear-gradient(120deg, #0A2A86 0%, #0F3FB0 60%, #1046B8 100%); }
     .td-head::before, .td-head::after { content: ""; position: absolute; right: -40px; top: -60px; width: 190px; height: 190px; border-radius: 50%; border: 1px solid rgba(255,255,255,.08); }
@@ -186,18 +187,37 @@
     .tf-card.is-flipped .tf-back { visibility: visible; }
     .tf-card.is-flipped .tf-front { visibility: hidden; transition: visibility 0s .3s; }
     .tf-front > .card, .tf-back > .card { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; margin: 0 !important; }
-    .tf-front > .card + .card { border-top: 1px solid var(--napiq-border, #dee2e6) !important; }
+    .tf-front > .card + .card { border-top: 1px solid var(--td-line, #E3EBF9) !important; }
+    /* Same look as the Ticket Details card (see .td-* above). */
+    .tf-front { background: var(--td-body, #fff); border: 0; border-radius: 1.1rem; box-shadow: 0 18px 40px -26px rgba(6, 23, 71, .6); }
+    .tf-front > .td-head + .card { position: relative; margin-top: -.9rem !important; border-radius: 1.1rem 1.1rem 0 0 !important; background: var(--td-body, #fff) !important; }
+    .tf-front .card-body { position: relative; min-height: 4.6rem; padding: .95rem 1.1rem .95rem calc(1.1rem + 42px + .9rem); color: var(--td-ink); }
+    .tf-front .card-body > h2 { margin-bottom: .35rem !important; font-size: .68rem; font-weight: 700; letter-spacing: .12em; color: var(--td-label) !important; }
+    .tf-front .card-body > h2 .td-chip { position: absolute; left: 1.1rem; top: .95rem; }
+    .tf-front .card-body > p { color: var(--td-ink); }
+    .tf-front .card-body .text-muted { color: var(--td-label) !important; }
+    .tf-front .td-foot { margin-top: 0; }
+    .tf-front .tf-actions { background: var(--td-body, #fff); border-top: 1px solid var(--td-line, #E3EBF9); }
     @media (prefers-reduced-motion: reduce) { .tf-card { transition: none; } }
 </style>
 <div class="tf-card" id="tfCard">
 <div class="tf-face tf-front" id="tfFront">
+<header class="td-head">
+    <i class="bi bi-clipboard2-check td-head-icon" style="transform:none" aria-hidden="true"></i>
+    <span class="td-head-sep" aria-hidden="true"></span>
+    <div class="td-head-text">
+        <h2 class="td-title">Completion</h2>
+        <p class="td-sub">Finish the tasks to close this ticket</p>
+    </div>
+    <img class="td-logo" src="{{ url_for('static', filename='img/pg-networks-logo.png') }}" alt="PG Networks">
+</header>
 {% endif %}
 {# Consolidated tickets collect one proof photo per location instead (see the
    "Consolidated ticket" card above), so the single completion-photo card is hidden. #}
 {% if job.show_photo_card and not job.consolidated and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted mb-2">Completion Photo</h2>
+        <h2 class="h6 text-uppercase text-muted mb-2"><span class="td-chip"><i class="bi bi-camera"></i></span>Completion Photo</h2>
 
         {% if job.assignment.photo_filename %}
             <img src="{{ job.assignment.photo_filename }}" alt="Completion photo" class="tech-photo-preview mb-3">
@@ -284,7 +304,7 @@
 {% if job.is_installation and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted mb-2">Pin Location</h2>
+        <h2 class="h6 text-uppercase text-muted mb-2"><span class="td-chip"><i class="bi bi-geo-alt"></i></span>Pin Location</h2>
 
         {% if job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none %}
             <p class="small mb-2">
@@ -316,7 +336,7 @@
 {% if job.is_new_installation and show_step2 %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted mb-2">NAP &amp; Port</h2>
+        <h2 class="h6 text-uppercase text-muted mb-2"><span class="td-chip"><i class="bi bi-diagram-3"></i></span>NAP &amp; Port</h2>
 
         {% if job.nap %}
             <p class="small mb-2"><strong>NAP:</strong> {{ job.nap.nap_code }} — {{ job.nap.name }}</p>
@@ -368,7 +388,7 @@
       and (job.can_edit or job.is_closed or job.cable_path_point_count > 0) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <h2 class="h6 text-uppercase text-muted mb-2">Cable Path (Optional)</h2>
+        <h2 class="h6 text-uppercase text-muted mb-2"><span class="td-chip"><i class="bi bi-record-circle"></i></span>Cable Path (Optional)</h2>
 
         <p class="small text-muted mb-2" id="cablePathStatus">
             {% if job.cable_path_point_count > 0 %}
@@ -472,6 +492,7 @@
 {% if use_flip %}</div>{# /tf-actions #}{% endif %}
 
 {% if use_flip %}
+<footer class="td-foot" aria-hidden="true"><span class="td-dots"><i></i><i></i><i></i></span></footer>
 </div>{# /tf-front #}
 <div class="tf-face tf-back" id="tfBack" aria-hidden="true">
     {{ ticket_details_card }}
