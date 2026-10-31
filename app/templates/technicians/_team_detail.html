@@ -87,6 +87,13 @@
     .td-trace[hidden] { display: none !important; }
     .td-close { padding: .5rem 1.2rem; border-radius: 999px; font-weight: 600; border: 1px solid var(--bs-border-color); background: transparent; color: var(--bs-body-color); }
     .td-close:hover { background: var(--bs-tertiary-bg); }
+
+    .td-tabs { display: inline-flex; gap: .25rem; padding: .25rem; margin-bottom: .8rem; border-radius: 999px; background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); }
+    .td-tab { border: 0; background: transparent; padding: .3rem .95rem; border-radius: 999px; font-size: .85rem; font-weight: 600; color: var(--bs-secondary-color); transition: background-color .15s ease, color .15s ease; }
+    .td-tab:hover { color: var(--bs-body-color); background: var(--bs-tertiary-bg); }
+    .td-tab.is-active { background: linear-gradient(180deg, #1d5fd8, var(--tp-blue)); color: #fff; box-shadow: 0 2px 8px rgba(16,70,184,.35); }
+    .td-tab-count { margin-left: .3rem; font-size: .72rem; opacity: .85; }
+    .td-tabpane[hidden] { display: none !important; }
 </style>
 
 <div class="team-detail"
@@ -166,11 +173,19 @@
         </div>
 
         <div class="td-card">
+            {% set assigned_jobs = jobs|selectattr('status', 'in', ['assigned', 'accepted'])|list %}
+            {% set completed_jobs = jobs|selectattr('status', 'equalto', 'completed')|list %}
             <div class="td-head">
-                <div class="td-title"><i class="bi bi-ticket-detailed"></i>Assigned Tickets <span class="td-count">({{ jobs|length }})</span></div>
+                <div class="td-title"><i class="bi bi-ticket-detailed"></i>Assigned Tickets</div>
             </div>
-            <div class="td-list td-jobs-list">
-                {% for j in jobs %}
+            <div class="td-tabs" role="tablist">
+                <button type="button" class="td-tab is-active" role="tab" aria-selected="true" data-tab="assigned"
+                        onclick="var c=this.closest('.td-card'),k=this.dataset.tab;c.querySelectorAll('.td-tab').forEach(function(b){b.classList.toggle('is-active',b.dataset.tab===k);b.setAttribute('aria-selected',b.dataset.tab===k);});c.querySelectorAll('.td-tabpane').forEach(function(p){p.hidden=(p.dataset.tab!==k);});">Assigned <span class="td-tab-count">{{ assigned_jobs|length }}</span></button>
+                <button type="button" class="td-tab" role="tab" aria-selected="false" data-tab="completed"
+                        onclick="var c=this.closest('.td-card'),k=this.dataset.tab;c.querySelectorAll('.td-tab').forEach(function(b){b.classList.toggle('is-active',b.dataset.tab===k);b.setAttribute('aria-selected',b.dataset.tab===k);});c.querySelectorAll('.td-tabpane').forEach(function(p){p.hidden=(p.dataset.tab!==k);});">Completed <span class="td-tab-count">{{ completed_jobs|length }}</span></button>
+            </div>
+            <div class="td-list td-jobs-list td-tabpane" data-tab="assigned">
+                {% for j in assigned_jobs %}
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
@@ -182,9 +197,26 @@
                     <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
                 </div>
                 {% else %}
-                <div class="p-4 text-center text-muted">No tickets assigned to this team yet.</div>
+                <div class="p-4 text-center text-muted">No assigned tickets.</div>
                 {% endfor %}
             </div>
+            <div class="td-list td-jobs-list td-tabpane" data-tab="completed" hidden>
+                {% for j in completed_jobs %}
+                <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
+                     data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
+                     data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
+                     data-assigned="{{ j.assigned_label }}" data-techs="{{ j.techs|join(', ') }}">
+                    <div class="td-job-top">
+                        <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
+                        <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
+                    </div>
+                    <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">No completed tickets yet.</div>
+                {% endfor %}
+            </div>
+        </div>
         </div>
         </div>
     </div>
