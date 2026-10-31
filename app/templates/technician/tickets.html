@@ -33,6 +33,75 @@
     html[data-bs-theme="dark"] .tech-tickets-title { color: #fff; }
     html[data-bs-theme="dark"] .tech-tickets-history { color: #9ca3af !important; }
 </style>
+{% set in_progress_jobs = jobs|selectattr('assignment.status', 'equalto', 'in_progress')|list %}
+{% set assigned_jobs = jobs|rejectattr('assignment.status', 'equalto', 'in_progress')|list %}
+{% set assignment_status_classes = {
+    'assigned': 'text-bg-secondary',
+    'accepted': 'text-bg-info',
+    'in_progress': 'text-bg-primary'
+} %}
+
+{#
+    Compact, tappable ticket cards (see .tech-ticket-list / .tech-ticket-card in
+    dashboard.css) -- each card is just a summary; tapping it opens the full ticket
+    detail page (technician/ticket_detail.html), which is where Start / Notes /
+    Complete and the Navigate / Open in Maps links live.
+#}
+{% macro ticket_card(job) %}
+<a class="tech-ticket-card" href="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}">
+    <div class="tech-ticket-top">
+        <span class="tech-ticket-code">{{ job.ticket_code }}</span>
+        <span class="badge rounded-pill {{ assignment_status_classes.get(job.assignment.status, 'text-bg-secondary') }}">
+            {{ job.status_label }}
+        </span>
+    </div>
+    <div class="tech-ticket-title">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;font-size:.8rem;white-space:nowrap;">(Affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
+    {% if job.subscriber_name %}
+    <div class="tech-ticket-row"><i class="bi bi-person"></i><span>{{ job.subscriber_name.split(' — ')[-1] }}</span></div>
+    {% endif %}
+    {% if job.contact_number %}
+    <div class="tech-ticket-row"><i class="bi bi-telephone"></i><span>{{ job.contact_number }}</span></div>
+    {% endif %}
+    <div class="tech-ticket-row"><i class="bi bi-geo-alt"></i><span>{{ job.address }}</span></div>
+    {% if job.nap %}
+    <div class="tech-ticket-row"><i class="bi bi-diagram-3"></i><span>{{ job.nap.nap_code }}{% if job.port_number %} · Port {{ job.port_number }}{% endif %}</span></div>
+    {% endif %}
+    <div class="tech-ticket-footer">
+        <span class="tech-ticket-viewbtn">View Details &rarr;</span>
+    </div>
+</a>
+{% endmacro %}
+
+<style>
+    /* Two containers: what the technician is working on now, then everything assigned. */
+    .tt-wrap { display: flex; flex-direction: column; gap: .75rem; }
+    .tt-box { display: flex; flex-direction: column; min-height: 0; padding: .65rem .65rem .35rem; border-radius: 1.1rem;
+        background: var(--bs-body-bg, #fff); border: 1px solid var(--napiq-border, rgba(0,0,0,.1)); box-shadow: 0 8px 22px -16px rgba(6,23,71,.45); }
+    .tt-box-head { display: flex; align-items: center; justify-content: space-between; padding: 0 .25rem .5rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; flex: 0 0 auto; }
+    .tt-box-head .tt-count { min-width: 1.5rem; padding: .05rem .5rem; border-radius: 999px; text-align: center; font-size: .72rem; letter-spacing: 0; color: #fff; background: #6b7280; }
+    .tt-box.is-progress .tt-box-head { color: #1046B8; }
+    .tt-box.is-progress .tt-box-head .tt-count { background: #1684FF; }
+    .tt-live { display: inline-block; width: 8px; height: 8px; margin-right: .4rem; border-radius: 50%; background: #1684FF; box-shadow: 0 0 0 0 rgba(22,132,255,.6); animation: ttPulse 1.6s infinite; }
+    @keyframes ttPulse { 70% { box-shadow: 0 0 0 7px rgba(22,132,255,0); } 100% { box-shadow: 0 0 0 0 rgba(22,132,255,0); } }
+    .tt-scroll { min-height: 0; overflow-y: auto; padding-bottom: .35rem; -webkit-overflow-scrolling: touch; }
+    .tt-scroll .tech-ticket-list { padding: 0 !important; display: flex; flex-direction: column; gap: .6rem; }
+    .tt-empty { padding: 1rem .5rem 1.1rem; text-align: center; font-size: .85rem; color: #6b7280; }
+    .tt-empty i { display: block; margin-bottom: .25rem; font-size: 1.6rem; opacity: .6; }
+    html[data-bs-theme="dark"] .tt-box.is-progress .tt-box-head { color: #7db3ff; }
+
+    @media (max-width: 991.98px) {
+        html.tt-fit, html.tt-fit body { overflow: hidden !important; height: 100%; }
+        .tt-wrap { height: var(--tt-h, auto); }
+        .tt-box.is-progress { flex: 0 1 auto; max-height: 48%; }
+        .tt-box.is-assigned { flex: 1 1 0; }
+        .tt-scroll .tech-ticket-card { padding: .7rem .8rem; }
+        .tt-scroll .tech-ticket-title { margin: .05rem 0 .35rem; font-size: .98rem; }
+        .tt-scroll .tech-ticket-row { margin-top: .3rem; font-size: .82rem; }
+        .tt-scroll .tech-ticket-footer { margin-top: .5rem; padding-top: .45rem; }
+        .tech-tickets-card .card-header { padding-bottom: .5rem; }
+    }
+</style>
+
 <div class="card tech-tickets-card">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h1 class="tech-tickets-title"><i class="bi bi-ticket-perforated"></i>Tickets</h1>
@@ -40,54 +109,57 @@
             <i class="bi bi-clock-history me-1"></i>View ticket history
         </a>
     </div>
-    <div class="card-body p-0">
-        {% if jobs %}
-        {#
-            Compact, tappable ticket cards (see .tech-ticket-list /
-            .tech-ticket-card in dashboard.css) -- each card is just a
-            summary (ticket code, status, type, location, priority);
-            tapping it opens the full ticket detail page
-            (technician/ticket_detail.html), which is where
-            Start/Notes/Complete and the Navigate/Open in Maps
-            links actually live now.
-        #}
-        <div class="tech-ticket-list">
-            {% set assignment_status_classes = {
-                'assigned': 'text-bg-secondary',
-                'accepted': 'text-bg-info',
-                'in_progress': 'text-bg-primary'
-            } %}
-            {% for job in jobs %}
-            <a class="tech-ticket-card" href="{{ url_for('technician.ticket_detail', assignment_id=job.assignment.id) }}">
-                <div class="tech-ticket-top">
-                    <span class="tech-ticket-code">{{ job.ticket_code }}</span>
-                    <span class="badge rounded-pill {{ assignment_status_classes.get(job.assignment.status, 'text-bg-secondary') }}">
-                        {{ job.status_label }}
-                    </span>
-                </div>
-                <div class="tech-ticket-title">{{ job.type_label }}{% if job.affected_count %} <span style="color:#fbbf24;font-weight:600;font-size:.8rem;white-space:nowrap;">(Affected: {{ job.affected_count }} subscriber{{ 's' if job.affected_count != 1 else '' }})</span>{% endif %}</div>
-                {% if job.subscriber_name %}
-                <div class="tech-ticket-row"><i class="bi bi-person"></i><span>{{ job.subscriber_name.split(' — ')[-1] }}</span></div>
-                {% endif %}
-                {% if job.contact_number %}
-                <div class="tech-ticket-row"><i class="bi bi-telephone"></i><span>{{ job.contact_number }}</span></div>
-                {% endif %}
-                <div class="tech-ticket-row"><i class="bi bi-geo-alt"></i><span>{{ job.address }}</span></div>
-                {% if job.nap %}
-                <div class="tech-ticket-row"><i class="bi bi-diagram-3"></i><span>{{ job.nap.nap_code }}{% if job.port_number %} · Port {{ job.port_number }}{% endif %}</span></div>
-                {% endif %}
-                <div class="tech-ticket-footer">
-                    <span class="tech-ticket-viewbtn">View Details &rarr;</span>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="p-4 text-center text-muted">
-            <i class="bi bi-inbox display-6 d-block mb-2"></i>
-            No open assignments right now.
-        </div>
-        {% endif %}
-    </div>
 </div>
+
+<div class="tt-wrap" id="ttWrap">
+    <section class="tt-box is-progress" id="ttProgress">
+        <div class="tt-box-head"><span><span class="tt-live"></span>In Progress</span><span class="tt-count">{{ in_progress_jobs|length }}</span></div>
+        <div class="tt-scroll">
+            {% if in_progress_jobs %}
+            <div class="tech-ticket-list">{% for job in in_progress_jobs %}{{ ticket_card(job) }}{% endfor %}</div>
+            {% else %}
+            <div class="tt-empty"><i class="bi bi-hourglass"></i>No ticket in progress.<br>Open an assigned ticket below and tap Start Work.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="tt-box is-assigned" id="ttAssigned">
+        <div class="tt-box-head"><span>Assigned Tickets</span><span class="tt-count">{{ assigned_jobs|length }}</span></div>
+        <div class="tt-scroll">
+            {% if assigned_jobs %}
+            <div class="tech-ticket-list">{% for job in assigned_jobs %}{{ ticket_card(job) }}{% endfor %}</div>
+            {% else %}
+            <div class="tt-empty"><i class="bi bi-inbox"></i>No assigned tickets right now.</div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<script>
+(function () {
+    var wrap = document.getElementById('ttWrap');
+    if (!wrap) return;
+    var root = document.documentElement;
+    var mq = window.matchMedia('(max-width: 991.98px)');
+    function fit() {
+        root.classList.remove('tt-fit');
+        wrap.style.removeProperty('--tt-h');
+        if (!mq.matches) return;
+        window.scrollTo(0, 0);
+        var top = wrap.getBoundingClientRect().top;
+        var content = wrap.closest('.dash-content'), main = wrap.closest('.dash-main');
+        var pads = (content ? parseFloat(getComputedStyle(content).paddingBottom) : 0) +
+                   (main ? parseFloat(getComputedStyle(main).paddingBottom) : 0);
+        var h = Math.floor(window.innerHeight - top - pads);
+        if (h < 320) return;   // tiny screen: fall back to normal page scrolling
+        wrap.style.setProperty('--tt-h', h + 'px');
+        root.classList.add('tt-fit');
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('load', fit);
+    if (mq.addEventListener) mq.addEventListener('change', fit);
+})();
+</script>
 {% endblock %}
