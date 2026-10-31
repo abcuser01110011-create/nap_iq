@@ -119,10 +119,19 @@
      onclick="var t=event.target,p=this.querySelector('.td-pop'),r=t.closest('.td-job[data-code]');
               if(r){var d=r.dataset,set=function(k,v){p.querySelector('[data-f='+k+']').textContent=v||'\u2014';};
                 set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);
-                var lv=p.querySelector('.td-pop-live'),wn=p.querySelector('.td-pop-warn');lv.hidden=(d.status!=='in_progress');wn.hidden=true;wn.innerHTML='';
-                if(!lv.hidden&&!window.tdLiveMapReady){wn.innerHTML='<i class=&quot;bi bi-exclamation-triangle-fill&quot;></i><span>The live map is unavailable right now. Please reload the page and try again.</span>';wn.hidden=false;}
+                var lv=p.querySelector('.td-pop-live'),wn=p.querySelector('.td-pop-warn'),u=p.dataset;lv.hidden=(d.status!=='in_progress');wn.hidden=true;wn.innerHTML='';
+                if(lv.hidden){if(window.tdLiveMapDestroy){window.tdLiveMapDestroy();}}
+                else if(window.tdLiveMapShow){window.tdLiveMapShow(r);}
+                else{
+                  var ld=function(src,ok,bad){var s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=bad;document.head.appendChild(s);},
+                      fail=function(m){wn.textContent=m;wn.hidden=false;},
+                      go=function(){ld(u.mapJs,function(){window.tdLiveMapShow(r);},function(){fail('The live map script could not be loaded. Please reload the page and try again.');});};
+                  if(!document.getElementById('tdLeafletCss')){var c=document.createElement('link');c.id='tdLeafletCss';c.rel='stylesheet';c.href=u.leafletCss;document.head.appendChild(c);}
+                  if(typeof L!=='undefined'){go();}
+                  else{ld(u.leafletJs,go,function(){ld(u.leafletCdn,go,function(){fail('The map library could not be loaded. Check your internet connection and try again.');});});}
+                }
                 p.hidden=false;p.querySelector('.td-pop-x').focus();return;}
-              if(t===p||t.closest('.td-pop-x')){p.hidden=true;}">
+              if(t===p||t.closest('.td-pop-x')){p.hidden=true;if(window.tdLiveMapDestroy){window.tdLiveMapDestroy();}}">
     <div class="td-eyebrow">Team Details</div>
 
     <div class="td-grid">
@@ -239,7 +248,11 @@
         </div>
     </div>
 
-    <div class="td-pop" hidden data-live-url="{{ url_for('technicians.team_live', team_id=team.id) }}">
+    <div class="td-pop" hidden data-live-url="{{ url_for('technicians.team_live', team_id=team.id) }}"
+         data-leaflet-css="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}"
+         data-leaflet-js="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"
+         data-leaflet-cdn="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+         data-map-js="{{ url_for('static', filename='js/team-live-map.js') }}?v={{ asset_version('js/team-live-map.js') }}">
         <div class="td-pop-card" role="dialog" aria-label="Ticket details">
             <div class="td-pop-head">
                 <div>
