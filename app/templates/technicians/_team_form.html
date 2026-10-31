@@ -77,10 +77,10 @@
         </div>
 
         <div class="mb-1">
-            <label class="form-label" for="teamLeader">Team Leader <span class="fw-normal">(optional)</span></label>
-            <select id="teamLeader" name="leader_id" class="form-select{{ ' is-invalid' if errors.get('leader') else '' }}"
+            <label class="form-label" for="teamLeader">Team Leader <span class="text-danger" title="Required">*</span></label>
+            <select id="teamLeader" name="leader_id" required class="form-select{{ ' is-invalid' if errors.get('leader') else '' }}"
                     data-selected="{{ values.leader_id or '' }}">
-                <option value="">No leader</option>
+                <option value="">Select a team leader</option>
             </select>
             {% if errors.get('leader') %}<div class="invalid-feedback d-block">{{ errors['leader'] }}</div>{% endif %}
             <div class="form-text">Pick from the members you selected above.</div>

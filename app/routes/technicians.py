@@ -416,7 +416,9 @@ def _handle_team_form(team=None):
             for raw in request.form.getlist("member_ids")
         ):
             errors["members"] = "One or more selected technicians are already on another team."
-        if leader_id is not None and leader_id not in member_ids:
+        if leader_id is None:
+            errors["leader"] = "Team leader is required."
+        elif leader_id not in member_ids:
             errors["leader"] = "The team leader must be one of the members."
 
         if not errors:

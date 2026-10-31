@@ -248,7 +248,7 @@
             if (!sel) return;
             var keep = sel.value || sel.getAttribute('data-selected') || '';
             var checked = bodyEl.querySelectorAll('input[name="member_ids"]:checked');
-            sel.innerHTML = '<option value="">No leader</option>';
+            sel.innerHTML = '<option value="">Select a team leader</option>';
             checked.forEach(function (c) {
                 var o = document.createElement('option');
                 o.value = c.value; o.textContent = c.getAttribute('data-label');

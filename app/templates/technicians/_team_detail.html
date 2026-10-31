@@ -11,9 +11,14 @@
     .team-detail > * { position: relative; z-index: 1; }
     .td-eyebrow { display: flex; align-items: center; gap: .6rem; margin: 0 0 .9rem; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
     .td-eyebrow::after { content: ""; width: 56px; height: 2px; background: var(--tp-gold); border-radius: 2px; }
-    .td-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.1rem; align-items: start; }
-    .td-col { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; }
-    @media (max-width: 767.98px) { .td-grid { grid-template-columns: 1fr; } }
+    .td-grid { display: grid; grid-template-columns: 1fr 1.5fr; grid-template-areas: "team prog" "mem tix"; gap: 1.1rem; align-items: stretch; }
+    .td-col { display: contents; }
+    .td-c-team { grid-area: team; } .td-c-prog { grid-area: prog; } .td-c-mem { grid-area: mem; } .td-c-tix { grid-area: tix; }
+    .td-grid > .td-col > .td-card, .td-card { min-width: 0; }
+    /* Members card matches the Assigned Tickets card's size: it stretches to the same row height and its list fills it (scrolls if long). */
+    .td-c-mem { display: flex; flex-direction: column; }
+    .td-c-mem .td-list { flex: 1 1 0; min-height: 0; max-height: none; }
+    @media (max-width: 767.98px) { .td-grid { grid-template-columns: 1fr; grid-template-areas: "team" "prog" "mem" "tix"; } .td-c-mem .td-list { flex: none; max-height: 330px; } }
     .td-job { padding: .5rem .9rem; border-top: 1px solid var(--bs-border-color); }
     .td-job:first-child { border-top: 0; }
     .td-job-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
@@ -111,7 +116,7 @@
 
     <div class="td-grid">
         <div class="td-col">
-        <div class="td-card">
+        <div class="td-card td-c-team">
             <div class="td-top">
                 <div class="td-icon"><i class="bi bi-people-fill"></i></div>
                 <div style="min-width:0;">
@@ -120,18 +125,13 @@
                 </div>
             </div>
             <div class="td-facts">
-                <div class="td-fact"><i class="bi bi-star-fill td-star"></i><span class="k">Team Leader</span>
-                    <span class="v">{{ team.leader.full_name if team.leader else 'None' }}</span></div>
-                <div class="td-fact"><i class="bi bi-people"></i><span class="k">Members</span><span class="v">{{ members|length }}</span></div>
-                <div class="td-fact"><i class="bi bi-activity"></i><span class="k">Team Status</span>
-                    <span class="v">{{ team_status|capitalize }}</span></div>
                 <div class="td-fact"><i class="bi bi-calendar3"></i><span class="k">Created</span><span class="v">{{ team.created_at.strftime('%b %d, %Y') }}</span></div>
                 <div class="td-fact"><i class="bi bi-clock-history"></i><span class="k">Last Updated</span><span class="v">{{ team.updated_at.strftime('%b %d, %Y %I:%M %p') }}</span></div>
             </div>
         </div>
 
 
-        <div class="td-card">
+        <div class="td-card td-c-mem">
             <div class="td-head">
                 <div class="td-title"><i class="bi bi-person-lines-fill"></i>Members <span class="td-count">({{ members|length }})</span></div>
             </div>
@@ -152,7 +152,7 @@
         </div>
 
         <div class="td-col">
-        <div class="td-card">
+        <div class="td-card td-c-prog">
             <div class="td-head">
                 <div class="td-title"><i class="bi bi-wrench-adjustable-circle"></i>In Progress <span class="td-count">({{ in_progress|length }})</span></div>
             </div>
@@ -174,7 +174,7 @@
             </div>
         </div>
 
-        <div class="td-card">
+        <div class="td-card td-c-tix">
             {% set assigned_jobs = jobs|selectattr('status', 'in', ['assigned', 'accepted'])|list %}
             {% set completed_jobs = jobs|selectattr('status', 'equalto', 'completed')|list %}
             <div class="td-head">
