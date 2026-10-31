@@ -143,8 +143,31 @@
     </footer>
 </section>
 {% endset %}
-{% if not job.consolidated and (not job.is_new_installation or show_step1) and not use_flip %}
-{{ ticket_details_card }}
+{# fit_mode: phones show the details card sized to the screen (no page scrolling)
+   with the action button right beneath it. Consolidated tickets keep their long list. #}
+{% set fit_mode = (not job.consolidated) and (not job.is_new_installation or show_step1) and (not use_flip) %}
+{% if fit_mode %}
+<style>
+    @media (max-width: 991.98px) {
+        html.td-fit, html.td-fit body { overflow: hidden !important; height: 100%; }
+        #tdFitCard .td-card { height: var(--td-h, auto); margin-bottom: 0; }
+        #tdFitCard .td-head { padding: .7rem 1rem 1.2rem; }
+        #tdFitCard .td-head-icon { font-size: 1.6rem; }
+        #tdFitCard .td-logo { width: 38px; height: 38px; }
+        #tdFitCard .td-foot { height: 32px; }
+        #tdFitCard .td-dots { bottom: 8px; }
+        #tdFitCard .td-body { display: flex; flex-direction: column; padding: .2rem 1rem .3rem; }
+        #tdFitCard .td-row { flex: 1 1 0; min-height: 0; padding: .25rem 0; gap: .75rem; }
+        #tdFitCard .td-chip { width: 36px; height: 36px; font-size: 1rem; }
+        #tdFitCard .td-label { font-size: .62rem; }
+        #tdFitCard .td-value { font-size: .92rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        #tdFitCard .td-maps { margin: .1rem 0; font-size: .75rem; }
+        .td-actions-fit { margin-top: .6rem; }
+        .td-actions-fit > form, .td-actions-fit > .btn { flex: 1 1 0; margin: 0; }
+        .td-actions-fit .btn { width: 100%; padding: .6rem 1rem; font-size: 1rem; font-weight: 600; }
+    }
+</style>
+<div id="tdFitCard">{{ ticket_details_card }}</div>
 {% endif %}
 
 {# Ticket consolidation: every affected location, with map + per-stop navigation #}
@@ -417,7 +440,7 @@
 {% endif %}
 
 {% if use_flip %}<div class="tf-actions">{% endif %}
-{% if not use_flip %}
+{% if not use_flip and not fit_mode %}
 <style>
     /* The ticket-details card can be as tall as the screen on a phone, which pushed
        Start Work / Notes / Mark Complete below the fold (behind the bottom bar), so
@@ -431,7 +454,7 @@
     .td-actions-bar:empty { display: none; }
 </style>
 {% endif %}
-<div class="d-flex flex-wrap gap-2{{ '' if use_flip else ' td-actions-bar' }}">
+<div class="d-flex flex-wrap gap-2{{ ' td-actions-fit' if fit_mode else ('' if use_flip else ' td-actions-bar') }}">
     {% if job.can_start %}
         {% if active_assignment %}
         {# Another ticket is still in progress: don't submit, warn instead. #}
@@ -507,6 +530,39 @@
 </div>
 
 {% if use_flip %}</div>{# /tf-actions #}{% endif %}
+
+{% if fit_mode %}
+<script>
+(function () {
+    var wrap = document.getElementById('tdFitCard');
+    var bar = document.querySelector('.td-actions-fit');
+    if (!wrap) return;
+    var card = wrap.querySelector('.td-card');
+    var root = document.documentElement;
+    var mq = window.matchMedia('(max-width: 991.98px)');
+    function fit() {
+        root.classList.remove('td-fit');
+        if (!mq.matches || !card) { card && card.style.removeProperty('--td-h'); return; }
+        window.scrollTo(0, 0);
+        card.style.setProperty('--td-h', '300px');
+        var cardRect = card.getBoundingClientRect();
+        var below = bar ? bar.getBoundingClientRect().bottom - cardRect.bottom : 0;   // gap + button row
+        var content = card.closest('.dash-content'), main = card.closest('.dash-main');
+        var pads = (content ? parseFloat(getComputedStyle(content).paddingBottom) : 0) +
+                   (main ? parseFloat(getComputedStyle(main).paddingBottom) : 0);
+        var h = Math.floor(window.innerHeight - cardRect.top - below - pads);
+        if (h < 380) { card.style.removeProperty('--td-h'); return; }   // too small a screen: let it scroll normally
+        card.style.setProperty('--td-h', h + 'px');
+        root.classList.add('td-fit');
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('load', fit);
+    if (mq.addEventListener) mq.addEventListener('change', fit);
+})();
+</script>
+{% endif %}
 
 {% if use_flip %}
 <footer class="td-foot" aria-hidden="true"><span class="td-dots"><i></i><i></i><i></i></span></footer>
