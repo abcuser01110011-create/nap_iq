@@ -553,11 +553,19 @@ def team_live(team_id):
             .all()
         ) if member_ids else []
         if any(st == "in_progress" for st, _m in rows):
-            payload[ref] = _tech_fields(rows)
+            payload[ref] = dict(_tech_fields(rows), status="in_progress")
+        elif rows:
+            # No longer in progress (finished / consolidated job completed,
+            # or pulled back): tell the popup its real status so it can drop
+            # the live map instead of showing a stale position + warnings.
+            order = {"completed": 4, "accepted": 3, "assigned": 2, "cancelled": 1}
+            best = max((st for st, _m in rows), key=lambda x: order.get(x, 0))
+            payload[ref] = {"status": best}
     else:
         for j in _team_jobs(team):
             if j["status"] == "in_progress":
                 payload[j["ref"]] = {k: j[k] for k in ("tech_name", "tech_lat", "tech_lng", "tech_updated_at", "tech_age_s")}
+                payload[j["ref"]]["status"] = "in_progress"
 
     response = jsonify({"tickets": payload, "server_time": datetime.utcnow().isoformat() + "Z"})
     response.headers["Cache-Control"] = "no-store"
@@ -571,6 +579,28 @@ _JOB_REQUEST_LABELS = {
     "upgrade": "Plan Upgrade",
     "add_nap": "Add NAP",
 }
+
+
+def _consolidated_info(issue):
+    """Consolidated-ticket facts for a team job row. A consolidated job is a
+    parent TechnicalIssue that folded in other tickets of the same NAP (see
+    issue_utils.consolidate_nap_issues): one trip covers every subscriber.
+    Returns the flag, the number of locations and a one-line-per-location
+    label for the ticket popup."""
+    children = list(issue.child_issues or []) if issue is not None else []
+    if not children:
+        return {"consolidated": False, "consolidated_count": 0, "consolidated_label": ""}
+    lines = []
+    for t in [issue] + children:
+        sub = t.subscriber
+        name = sub.full_name if sub else (t.issue_code or f"ISS-{t.id:04d}")
+        addr = (sub.address if sub and sub.address else t.address) or ""
+        lines.append(f"{name} \u2014 {addr}" if addr else name)
+    return {
+        "consolidated": True,
+        "consolidated_count": len(lines),
+        "consolidated_label": "\n".join(lines),
+    }
 
 
 def _team_jobs(team):
@@ -628,7 +658,9 @@ def _team_jobs(team):
                 type_label, address, who, code = "Job", None, None, f"Job #{a.id}"
 
             priority = (issue.priority if issue is not None else (request_.priority if request_ is not None else None))
+            cons = _consolidated_info(issue)
             by_ticket[key] = {
+                **cons,
                 "ref": f"{key[0]}:{key[1]}",
                 "code": code,
                 "type": type_label,

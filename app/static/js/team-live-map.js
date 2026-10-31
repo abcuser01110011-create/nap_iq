@@ -26,6 +26,7 @@
         var FAIL_LIMIT = 3;               // consecutive failed refreshes before warning about OUR connection
         var ROUTE_MIN_MS = 10 * 1000;     // don't ask the routing service more often than this
         var ROUTE_MIN_MOVE_M = 25;        // ...or for tiny movements
+        var ROUTE_RETRY_MS = 15 * 1000;   // retry a failed route lookup this often
         var live = null;                  // the open popup's map state
 
         function num(v) { var n = parseFloat(v); return (v === '' || v == null || isNaN(n)) ? null : n; }
@@ -57,8 +58,72 @@
             clearInterval(live.refreshTimer);
             clearInterval(live.tickTimer);
             live.destroyed = true;
-            live.map.remove();
+            try { live.map.remove(); } catch (e) { /* already gone */ }
             live = null;
+        }
+
+        // The ticket is no longer in progress (the technician completed it --
+        // for a consolidated ticket that is the whole group -- or it was pulled
+        // back). Drop the live map, the "last location" line and every warning,
+        // update the popup's status and move the row to the Completed tab.
+        function finish(status) {
+            var l = live;
+            if (!l) return;
+            var pop = l.pop, root = l.root, ref = l.ref;
+            destroy();
+            if (pop) {
+                var box = pop.querySelector('.td-pop-live');
+                var mapEl = pop.querySelector('.td-pop-map');
+                var info = pop.querySelector('.td-pop-mapinfo');
+                var warn = pop.querySelector('.td-pop-warn');
+                if (warn) { warn.hidden = true; warn.innerHTML = ''; warn.classList.remove('is-error'); }
+                if (info) info.innerHTML = '';
+                if (mapEl) { mapEl.hidden = true; mapEl.innerHTML = ''; mapEl.className = mapEl.className.replace(/\bleaflet-[^\s]+/g, '').trim(); }
+                if (box) box.hidden = true;
+                var st = pop.querySelector('[data-f=status]');
+                if (st) st.textContent = status === 'completed' ? 'Completed' : (status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ') : '\u2014');
+            }
+            if (status === 'completed') moveRowToCompleted(root, ref);
+        }
+
+        function moveRowToCompleted(root, ref) {
+            if (!root || !ref) return;
+            var prog = root.querySelector('.td-c-prog .td-jobs-list');
+            var done = root.querySelector('.td-tabpane[data-tab="completed"]');
+            if (!prog || !done) return;
+            var row = null;
+            prog.querySelectorAll('.td-job').forEach(function (r) { if (r.dataset.ref === ref) row = r; });
+            if (!row) return;
+            row.dataset.status = 'completed';
+            row.dataset.statusLabel = 'Completed';
+            row.dataset.techLat = ''; row.dataset.techLng = ''; row.dataset.techAge = ''; row.dataset.techAt = '';
+            var top = row.querySelector('.td-job-top');
+            if (top && !top.querySelector('.td-st')) {
+                var cons = top.querySelector('.td-cons');
+                var wrap = document.createElement('span');
+                wrap.className = 'td-badges';
+                if (cons) wrap.appendChild(cons);
+                var badge = document.createElement('span');
+                badge.className = 'td-st is-completed';
+                badge.textContent = 'Completed';
+                wrap.appendChild(badge);
+                top.appendChild(wrap);
+            }
+            prog.removeChild(row);
+            if (!prog.querySelector('.td-job')) {
+                var empty = document.createElement('div');
+                empty.className = 'p-4 text-center text-muted';
+                empty.textContent = 'No work in progress right now.';
+                prog.appendChild(empty);
+            }
+            var placeholder = done.querySelector('.p-4');
+            if (placeholder) done.removeChild(placeholder);
+            done.insertBefore(row, done.firstChild);
+            var n = prog.querySelectorAll('.td-job').length;
+            var cnt = root.querySelector('.td-c-prog .td-count');
+            if (cnt) cnt.textContent = '(' + n + ')';
+            var tabCount = root.querySelector('.td-tab[data-tab="completed"] .td-tab-count');
+            if (tabCount) tabCount.textContent = String(done.querySelectorAll('.td-job').length);
         }
 
         // ---- warnings (always inside the popup, under the map) ----
@@ -81,7 +146,7 @@
                 level = 'error';
                 text = '<b>You\u2019re offline.</b> The live location can\u2019t be refreshed until your connection is back.';
             } else if (live.ended) {
-                text = 'This ticket is no longer in progress, so live tracking has stopped.';
+                text = '';
             } else if (live.failCount >= FAIL_LIMIT) {
                 level = 'error';
                 text = '<b>Couldn\u2019t refresh the live location.</b> This looks like a connection problem on your side or the server; showing the last known position and retrying.';
@@ -104,8 +169,9 @@
             }
             if (!live.dest) parts.push('<span>No destination location on file.</span>');
             if (live.tech) {
-                var when = live.at ? 'last location ' + fmtClock(new Date(live.at)) + ' \u00b7 ' : '';
-                parts.push('<span>' + when + 'updating every second</span>');
+                var age = currentAge();
+                if (age != null && age > STALE_S) parts.push('<span>last location ' + (live.at ? fmtClock(new Date(live.at)) : 'unknown') + ' \u00b7 waiting for the technician</span>');
+                else parts.push('<span>' + (live.at ? 'last location ' + fmtClock(new Date(live.at)) + ' \u00b7 ' : '') + 'updating every second</span>');
             }
             live.info.innerHTML = parts.join('');
         }
@@ -119,12 +185,16 @@
                 l.routeM = null;
                 return;
             }
+            // Until the new route arrives, the old (possibly far-behind) road
+            // geometry must not stay on screen: fall back to the straight line.
+            if (l.routeSolid && l.line) { l.map.removeLayer(l.line); l.line = null; l.routeSolid = false; l.routeM = null; }
             if (!l.line) l.line = L.polyline([l.tech, l.dest], { color: '#0d8bf2', weight: 4, dashArray: '6 8' }).addTo(l.map);
-            else if (l.routeM == null) l.line.setLatLngs([l.tech, l.dest]);
+            else l.line.setLatLngs([l.tech, l.dest]);
             fetch(OSRM + l.tech[1] + ',' + l.tech[0] + ';' + l.dest[1] + ',' + l.dest[0] + '?overview=full&geometries=geojson')
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (data) {
-                    if (live !== l || l.routeToken !== token || !data || !data.routes || !data.routes[0]) return;
+                    if (live !== l || l.routeToken !== token) return;
+                    if (!data || !data.routes || !data.routes[0]) { l.routeAt = Date.now(); return; }
                     var rt = data.routes[0];
                     if (l.line) l.map.removeLayer(l.line);
                     l.line = L.polyline(rt.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }), { color: '#0d8bf2', weight: 5, opacity: .85 }).addTo(l.map);
@@ -132,7 +202,7 @@
                     l.routeSolid = true;
                     renderInfo();
                 })
-                .catch(function () { /* keep the straight-line fallback */ });
+                .catch(function () { if (live === l) l.routeAt = Date.now(); /* keep the straight-line fallback; the tick retries */ });
         }
 
         function fit() {
@@ -178,10 +248,9 @@
                     l.busy = false;
                     l.failCount = 0;
                     var t = data.tickets && data.tickets[l.ref];
-                    if (!t) {                       // moved on from in-progress
+                    if (!t || (t.status && t.status !== 'in_progress')) {   // completed / moved on from in-progress
                         l.ended = true;
-                        clearInterval(l.refreshTimer);
-                        evaluate();
+                        finish(t && t.status ? t.status : 'completed');
                         return;
                     }
                     var tech = (t.tech_lat != null && t.tech_lng != null) ? [t.tech_lat, t.tech_lng] : null;
@@ -212,16 +281,22 @@
             var warn = pop.querySelector('.td-pop-warn');
             destroy();
             if (!box || !mapEl || row.dataset.status !== 'in_progress') return;
+            // Leaflet measures its container when the map is created: building it
+            // inside a hidden popup gave it a 0x0 size, which left the pins and the
+            // route out of line with the tiles. Reveal everything first.
+            pop.hidden = false;
+            box.hidden = false;
+            mapEl.hidden = false;
+            mapEl.innerHTML = '';
 
             var d = row.dataset;
             var dest = (num(d.destLat) != null && num(d.destLng) != null) ? [num(d.destLat), num(d.destLng)] : null;
             var tech = (num(d.techLat) != null && num(d.techLng) != null) ? [num(d.techLat), num(d.techLng)] : null;
 
-            mapEl.hidden = false;
             var map = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
             var tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
             live = {
-                map: map, info: info, warn: warn, code: d.code, liveUrl: pop.dataset.liveUrl,
+                map: map, info: info, warn: warn, pop: pop, root: root, code: d.code, liveUrl: pop.dataset.liveUrl,
                 ref: d.ref, tech: tech, dest: dest, techName: d.techName || '',
                 ageS: num(d.techAge), at: d.techAt || null, fetchedAt: Date.now(),
                 techMarker: null, line: null, routeM: null,
@@ -232,11 +307,19 @@
             if (dest) L.marker(dest, { icon: pin('#16a34a', 'Destination') }).addTo(map);
 
             if (!dest && !tech) map.setView([14.28, 121.41], 12);   // nothing to plot yet: show the service area
+            map.invalidateSize();
             paint(true, false);
-            setTimeout(fit, 80);   // popup was just revealed: re-measure once it has its final size
+            // the popup fades/slides in: re-measure once it has settled
+            setTimeout(function () { if (live && live.map === map) fit(); }, 80);
+            setTimeout(function () { if (live && live.map === map) fit(); }, 350);
 
             live.refreshTimer = setInterval(refresh, REFRESH_MS);
-            live.tickTimer = setInterval(evaluate, 5 * 1000);        // staleness is time-based: re-check every few seconds
+            live.tickTimer = setInterval(function () {
+                if (!live) return;
+                evaluate();
+                renderInfo();
+                if (!live.routeSolid && live.tech && live.dest && Date.now() - (live.routeAt || 0) >= ROUTE_RETRY_MS) drawRoute();
+            }, 5 * 1000);        // staleness is time-based: re-check every few seconds
         }
 
         // Opened/closed by the Team Details popup (technicians/_team_detail.html).

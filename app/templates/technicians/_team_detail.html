@@ -32,6 +32,10 @@
     .td-st.is-completed { background: rgba(34,197,94,.18); color: #16a34a; }
     [data-bs-theme="dark"] .td-st.is-in_progress { color: #7fb0ff; } [data-bs-theme="dark"] .td-st.is-completed { color: #4ade80; } [data-bs-theme="dark"] .td-st.is-accepted, [data-bs-theme="dark"] .td-st.is-assigned { color: #fbbf24; }
     .td-jobs-list { max-height: 230px; }
+    .td-badges { display: inline-flex; align-items: center; gap: .35rem; flex: 0 0 auto; }
+    .td-cons { display: inline-flex; align-items: center; gap: .3rem; padding: .12rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; background: rgba(124,58,237,.14); color: #6d28d9; }
+    [data-bs-theme="dark"] .td-cons { color: #c4b5fd; }
+    .td-pop-rows dd.is-lines { white-space: pre-line; }
     .td-card { background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); border-radius: .9rem; padding: 1.25rem; }
     .td-top { display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; margin-bottom: .9rem; border-bottom: 1px solid var(--bs-border-color); }
     .td-icon { width: 76px; height: 76px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font-size: 2.2rem; color: #fff;
@@ -118,7 +122,9 @@
      onkeydown="if((event.key==='Enter'||event.key===' ')&amp;&amp;event.target.classList.contains('td-job')){event.preventDefault();this.onclick(event);}"
      onclick="var t=event.target,p=this.querySelector('.td-pop'),r=t.closest('.td-job[data-code]');
               if(r){var d=r.dataset,set=function(k,v){p.querySelector('[data-f='+k+']').textContent=v||'\u2014';};
-                set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);
+                set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);set('status',d.statusLabel);set('consolidated',d.consolidated);
+                p.querySelectorAll('.td-pop-cons').forEach(function(e){e.hidden=!d.consolidated;});
+                p.hidden=false;
                 var lv=p.querySelector('.td-pop-live'),wn=p.querySelector('.td-pop-warn'),u=p.dataset;lv.hidden=(d.status!=='in_progress');wn.hidden=true;wn.innerHTML='';
                 if(lv.hidden){if(window.tdLiveMapDestroy){window.tdLiveMapDestroy();}}
                 else if(window.tdLiveMapShow){window.tdLiveMapShow(r);}
@@ -130,7 +136,7 @@
                   if(typeof L!=='undefined'){go();}
                   else{ld(u.leafletJs,go,function(){ld(u.leafletCdn,go,function(){fail('The map library could not be loaded. Check your internet connection and try again.');});});}
                 }
-                p.hidden=false;p.querySelector('.td-pop-x').focus();return;}
+                p.querySelector('.td-pop-x').focus();return;}
               if(t===p||t.closest('.td-pop-x')){p.hidden=true;if(window.tdLiveMapDestroy){window.tdLiveMapDestroy();}}">
     <div class="td-eyebrow">Team Details</div>
 
@@ -183,10 +189,11 @@
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
                      data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
-                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
+                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}"
+                     data-consolidated="{{ j.consolidated_label }}" data-consolidated-count="{{ j.consolidated_count }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
-                        
+                        {% if j.consolidated %}<span class="td-cons" title="One job covering {{ j.consolidated_count }} subscribers"><i class="bi bi-diagram-3-fill"></i>Consolidated &middot; {{ j.consolidated_count }}</span>{% endif %}
                     </div>
                     <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
                 </div>
@@ -215,10 +222,11 @@
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
                      data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
-                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
+                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}"
+                     data-consolidated="{{ j.consolidated_label }}" data-consolidated-count="{{ j.consolidated_count }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
-                        <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
+                        <span class="td-badges">{% if j.consolidated %}<span class="td-cons" title="One job covering {{ j.consolidated_count }} subscribers"><i class="bi bi-diagram-3-fill"></i>Consolidated &middot; {{ j.consolidated_count }}</span>{% endif %}<span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span></span>
                     </div>
                     <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
                 </div>
@@ -233,10 +241,11 @@
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
                      data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
-                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
+                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}"
+                     data-consolidated="{{ j.consolidated_label }}" data-consolidated-count="{{ j.consolidated_count }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
-                        <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
+                        <span class="td-badges">{% if j.consolidated %}<span class="td-cons" title="One job covering {{ j.consolidated_count }} subscribers"><i class="bi bi-diagram-3-fill"></i>Consolidated &middot; {{ j.consolidated_count }}</span>{% endif %}<span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span></span>
                     </div>
                     <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
                 </div>
@@ -267,6 +276,8 @@
                 <dt>Subscriber</dt><dd data-f="who">&mdash;</dd>
                 <dt>Address</dt><dd data-f="address">&mdash;</dd>
                 <dt>Assigned on</dt><dd data-f="assigned">&mdash;</dd>
+                <dt>Status</dt><dd data-f="status">&mdash;</dd>
+                <dt class="td-pop-cons" hidden>Consolidated</dt><dd class="td-pop-cons is-lines" data-f="consolidated" hidden>&mdash;</dd>
             </dl>
             <div class="td-pop-live" hidden>
                 <div class="td-pop-live-title"><i class="bi bi-geo-alt-fill"></i>Live location</div>
