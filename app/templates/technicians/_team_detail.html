@@ -14,12 +14,12 @@
     .td-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.1rem; align-items: start; }
     .td-col { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; }
     @media (max-width: 767.98px) { .td-grid { grid-template-columns: 1fr; } }
-    .td-job { padding: .7rem .9rem; border-top: 1px solid var(--bs-border-color); }
+    .td-job { padding: .5rem .9rem; border-top: 1px solid var(--bs-border-color); }
     .td-job:first-child { border-top: 0; }
     .td-job-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
     .td-job-code { font-weight: 700; font-size: .9rem; }
     .td-job-type { font-weight: 500; font-size: .88rem; }
-    .td-job-sub { font-size: .78rem; color: var(--bs-secondary-color); margin-top: .15rem; }
+    .td-job-sub { font-size: .78rem; color: var(--bs-secondary-color); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .td-st { display: inline-block; padding: .12rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; background: rgba(148,163,184,.25); color: var(--bs-secondary-color); }
     .td-st.is-in_progress { background: rgba(16,70,184,.16); color: #1046B8; }
     .td-st.is-accepted { background: rgba(244,180,26,.28); color: #b45309; }
@@ -93,6 +93,8 @@
     .td-tab:hover { color: var(--bs-body-color); background: var(--bs-tertiary-bg); }
     .td-tab.is-active { background: linear-gradient(180deg, #1d5fd8, var(--tp-blue)); color: #fff; box-shadow: 0 2px 8px rgba(16,70,184,.35); }
     .td-tab-count { margin-left: .3rem; font-size: .72rem; opacity: .85; }
+    /* Fixed height = exactly 5 ticket rows, so a tab with 1 ticket doesn't shrink the card; more than 5 scrolls. */
+    .td-tabpane { height: var(--td-pane-h, 308px); max-height: none; }
     .td-tabpane[hidden] { display: none !important; }
 </style>
 
@@ -216,7 +218,6 @@
                 <div class="p-4 text-center text-muted">No completed tickets yet.</div>
                 {% endfor %}
             </div>
-        </div>
         </div>
         </div>
     </div>
