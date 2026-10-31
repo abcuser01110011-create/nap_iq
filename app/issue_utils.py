@@ -446,6 +446,33 @@ def build_consolidated_locations(parent_issue, assignment=None):
     }
 
 
+def other_in_progress_assignment(technician, assignment=None):
+    """The technician's own in-progress assignment other than `assignment`,
+    or None. A technician may only work one ticket at a time: starting a
+    second one is refused while this returns something."""
+    if technician is None:
+        return None
+    query = Assignment.query.filter(
+        Assignment.technician_id == technician.id,
+        Assignment.status == "in_progress",
+    )
+    if assignment is not None and assignment.id is not None:
+        query = query.filter(Assignment.id != assignment.id)
+    return query.order_by(Assignment.assigned_at.asc(), Assignment.id.asc()).first()
+
+
+def assignment_ticket_label(assignment):
+    """Short ticket code for messages (ISS-0002 / SO-0007)."""
+    if assignment is None:
+        return ""
+    issue = assignment.technical_issue
+    if issue is not None:
+        return issue.issue_code or f"ISS-{issue.id:04d}"
+    if assignment.service_request_id is not None:
+        return f"SO-{assignment.service_request_id:04d}"
+    return f"Job #{assignment.id}"
+
+
 def sync_team_assignments(assignment, new_status):
     """Team jobs create one Assignment per team member (see
     recommendation.auto_assign_recommended_technician()). When one member

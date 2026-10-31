@@ -95,6 +95,8 @@ from app.forms import ResolutionNotesForm
 from app.notifications_utils import notify, notify_issue_status_change
 from app.issue_utils import (
     sync_team_assignments,
+    other_in_progress_assignment,
+    assignment_ticket_label,
     build_consolidated_locations,
     consolidated_missing_proof_count,
     resolve_consolidated_children,
@@ -320,11 +322,16 @@ def ticket_detail(assignment_id):
     profile = _get_own_profile_or_403()
     assignment = _get_own_assignment_or_403(profile, assignment_id)
 
+    active = other_in_progress_assignment(profile, assignment)
     return render_template(
         "technician/ticket_detail.html",
         profile=profile,
         job=_serialize_job(assignment),
         notes_form=ResolutionNotesForm(),
+        # The technician's other in-progress ticket (blocks starting this one).
+        active_assignment=active,
+        active_label=assignment_ticket_label(active) if active else None,
+        show_blocked=bool(active) and request.args.get("blocked") == "1",
     )
 
 
@@ -353,6 +360,15 @@ def accept_assignment(assignment_id):
     if assignment.status != "assigned":
         flash("That assignment isn't waiting to be accepted anymore.", "warning")
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    # A new installation goes straight to in-progress on accept, so it is
+    # subject to the same one-ticket-at-a-time rule as Start Work.
+    if (
+        assignment.service_request is not None
+        and assignment.service_request.request_type == "new_installation"
+        and other_in_progress_assignment(profile, assignment) is not None
+    ):
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id, blocked=1))
 
     assignment.status = "accepted"
     sync_team_assignments(assignment, "accepted")
@@ -411,6 +427,10 @@ def start_assignment(assignment_id):
     if assignment.status not in ("assigned", "accepted"):
         flash("That assignment can't be started anymore.", "warning")
         return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id))
+
+    # One ticket at a time: finish the in-progress one first.
+    if other_in_progress_assignment(profile, assignment) is not None:
+        return redirect(url_for("technician.ticket_detail", assignment_id=assignment.id, blocked=1))
 
     assignment.status = "in_progress"
     sync_team_assignments(assignment, "in_progress")

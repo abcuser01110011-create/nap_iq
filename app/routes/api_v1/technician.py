@@ -93,7 +93,13 @@ from app.nap_recommendation import recommend_naps
 from app.nap_status import slot_usage, sync_nap_status
 from app.routes.service_requests import _sync_subscriber_nap
 from app.notifications_utils import notify, notify_issue_status_change
-from app.issue_utils import resolve_consolidated_children, resolve_fiber_break_siblings, sync_team_assignments
+from app.issue_utils import (
+    assignment_ticket_label,
+    other_in_progress_assignment,
+    resolve_consolidated_children,
+    resolve_fiber_break_siblings,
+    sync_team_assignments,
+)
 
 api_v1_technician_bp = Blueprint(
     "api_v1_technician", __name__, url_prefix="/api/v1/technician"
@@ -581,6 +587,16 @@ def start_assignment(assignment_id):
 
     if assignment.status not in ("assigned", "accepted"):
         return jsonify(error="That assignment needs to be accepted before you can start work on it."), 409
+
+    # One ticket at a time: finish the in-progress one first.
+    active = other_in_progress_assignment(profile, assignment)
+    if active is not None:
+        label = assignment_ticket_label(active)
+        return jsonify(
+            error=f"You still have an in-progress ticket ({label}). Finish it first before starting another ticket.",
+            code="ticket_in_progress",
+            active_assignment_id=active.id,
+        ), 409
 
     assignment.status = "in_progress"
     sync_team_assignments(assignment, "in_progress")

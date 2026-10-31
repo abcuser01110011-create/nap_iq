@@ -419,12 +419,19 @@
 {% if use_flip %}<div class="tf-actions">{% endif %}
 <div class="d-flex flex-wrap gap-2">
     {% if job.can_start %}
+        {% if active_assignment %}
+        {# Another ticket is still in progress: don't submit, warn instead. #}
+        <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#activeTicketModal">
+            <i class="bi bi-play-fill me-1"></i>Start Work
+        </button>
+        {% else %}
         <form method="post" action="{{ url_for('technician.start_assignment', assignment_id=job.assignment.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-info">
                 <i class="bi bi-play-fill me-1"></i>Start Work
             </button>
         </form>
+        {% endif %}
         {% if job.is_new_installation %}
         {# Plain button only for now -- no decline route/handler wired
            up yet, on purpose; clicking it does nothing until that
@@ -629,6 +636,40 @@
         </form>
     </div>
 </div>
+
+{% if active_assignment %}
+<div class="modal fade" id="activeTicketModal" tabindex="-1" aria-labelledby="activeTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center p-4">
+                <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                     style="width:64px;height:64px;background:rgba(245,158,11,.18);color:#d97706;font-size:2rem;">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <h5 class="fw-bold mb-2" id="activeTicketModalLabel">You still have a ticket in progress</h5>
+                <p class="text-muted mb-4">
+                    <strong>{{ active_label }}</strong> is still in progress. Make sure to finish it first before starting another ticket.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <a class="btn btn-primary" href="{{ url_for('technician.ticket_detail', assignment_id=active_assignment.id) }}">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Go to {{ active_label }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% if show_blocked %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('activeTicketModal');
+    if (el && window.bootstrap) { new bootstrap.Modal(el).show(); }
+    if (window.history && history.replaceState) { history.replaceState(null, '', location.pathname); }
+});
+</script>
+{% endif %}
+{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
