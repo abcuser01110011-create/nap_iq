@@ -44,6 +44,8 @@ Routes:
     POST /technicians/<id>/edit      -> edit_technician    (process edit form)
 """
 
+from datetime import datetime
+
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 
 from app.extensions import db
@@ -491,9 +493,71 @@ def create_team():
 def view_team(team_id):
     """Team details popup body: members, leader, status summary."""
     team = TechnicianTeam.query.get_or_404(team_id)
+    jobs = _team_jobs(team)
+    in_progress = [j for j in jobs if j["status"] == "in_progress"]
     return render_template(
-        "technicians/_team_detail.html", team=team, team_status=team_status(team)
+        "technicians/_team_detail.html",
+        team=team,
+        team_status=team_status(team),
+        jobs=jobs,
+        in_progress=in_progress,
     )
+
+
+_JOB_REQUEST_LABELS = {
+    "new_installation": "New Installation",
+    "disconnection": "Disconnection",
+    "relocation": "Relocation",
+    "upgrade": "Plan Upgrade",
+    "add_nap": "Add NAP",
+}
+
+
+def _team_jobs(team):
+    """Every ticket (repair or service order) assigned to any member of
+    `team`, newest first, one row per ticket. A ticket dispatched to a
+    team is stored as one Assignment per member, so rows are de-duplicated
+    by the ticket they point at; when members disagree on status, the
+    furthest-along one wins (in progress > accepted > assigned > ...)."""
+    rank = {"in_progress": 4, "accepted": 3, "assigned": 2, "completed": 1, "cancelled": 0}
+    by_ticket = {}
+    for member in team.members:
+        for a in member.assignments:
+            if a.technical_issue_id is not None:
+                key = ("TN", a.technical_issue_id)
+            elif a.service_request_id is not None:
+                key = ("SO", a.service_request_id)
+            else:
+                key = ("JOB", a.id)
+            row = by_ticket.get(key)
+            if row is not None and rank.get(row["status"], 0) >= rank.get(a.status, 0):
+                continue
+
+            issue, request_ = a.technical_issue, a.service_request
+            if issue is not None:
+                type_label = issue.issue_type
+                subscriber = issue.subscriber
+                address = (subscriber.address if subscriber and subscriber.address else issue.address)
+                who = subscriber.full_name if subscriber else None
+                code = issue.issue_code or f"ISS-{issue.id:04d}"
+            elif request_ is not None:
+                type_label = _JOB_REQUEST_LABELS.get(request_.request_type, request_.request_type)
+                subscriber = request_.subscriber
+                address = request_.address or (subscriber.address if subscriber else None)
+                who = request_.full_name or (subscriber.full_name if subscriber else None)
+                code = f"SO-{request_.id:04d}"
+            else:
+                type_label, address, who, code = "Job", None, None, f"Job #{a.id}"
+
+            by_ticket[key] = {
+                "code": code,
+                "type": type_label,
+                "who": who,
+                "address": address,
+                "status": a.status,
+                "assigned_at": a.assigned_at,
+            }
+    return sorted(by_ticket.values(), key=lambda r: r["assigned_at"] or datetime.min, reverse=True)
 
 
 @technicians_bp.route("/teams/<int:team_id>/edit", methods=["GET", "POST"])
