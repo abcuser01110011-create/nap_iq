@@ -549,14 +549,28 @@ def _team_jobs(team):
             else:
                 type_label, address, who, code = "Job", None, None, f"Job #{a.id}"
 
+            priority = (issue.priority if issue is not None else (request_.priority if request_ is not None else None))
             by_ticket[key] = {
                 "code": code,
                 "type": type_label,
                 "who": who,
                 "address": address,
                 "status": a.status,
+                "priority": priority,
                 "assigned_at": a.assigned_at,
+                "assigned_label": a.assigned_at.strftime("%b %d, %Y %I:%M %p") if a.assigned_at else "",
+                "techs": [],
             }
+        # every member holding this same ticket (for the "Assigned to" line)
+        for a in member.assignments:
+            if a.technical_issue_id is not None:
+                k = ("TN", a.technical_issue_id)
+            elif a.service_request_id is not None:
+                k = ("SO", a.service_request_id)
+            else:
+                k = ("JOB", a.id)
+            if k in by_ticket and member.full_name not in by_ticket[k]["techs"]:
+                by_ticket[k]["techs"].append(member.full_name)
     return sorted(by_ticket.values(), key=lambda r: r["assigned_at"] or datetime.min, reverse=True)
 
 

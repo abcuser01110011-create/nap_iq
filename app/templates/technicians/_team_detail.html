@@ -61,9 +61,43 @@
     .td-edit { display: inline-flex; align-items: center; gap: .5rem; padding: .55rem 1.6rem; border-radius: 999px; font-weight: 700; color: #fff; text-decoration: none;
         background: linear-gradient(180deg, #1d5fd8, var(--tp-blue)); box-shadow: 0 0 0 2px rgba(244,180,26,.7), 0 4px 10px rgba(16,70,184,.35); }
     .td-edit:hover { color: #fff; filter: brightness(1.08); }
+
+    .td-job.is-click { cursor: pointer; position: relative; transition: background-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+    .td-job.is-click::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tp-gold); opacity: 0; transition: opacity .15s ease; }
+    .td-job.is-click:hover, .td-job.is-click:focus-visible { background: rgba(16,70,184,.08); box-shadow: 0 4px 14px -6px rgba(16,70,184,.45); transform: translateX(2px); outline: none; z-index: 1; }
+    .td-job.is-click:hover::before, .td-job.is-click:focus-visible::before { opacity: 1; }
+    .td-job.is-click:active { transform: translateX(2px) scale(.995); }
+    .td-pop[hidden] { display: none !important; }
+    .td-pop { position: absolute; inset: -1.5rem; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+        background: rgba(15,23,42,.5); backdrop-filter: blur(2px); border-radius: .5rem; }
+    .td-pop-card { width: min(480px, 100%); background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); border-radius: .9rem; padding: 1.25rem 1.4rem 1.2rem; box-shadow: 0 20px 50px -12px rgba(0,0,0,.45); animation: tdPopIn .16s ease; }
+    @keyframes tdPopIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+    .td-pop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; padding-bottom: .8rem; border-bottom: 1px solid var(--bs-border-color); }
+    .td-pop-eyebrow { font-size: .68rem; letter-spacing: .2em; text-transform: uppercase; font-weight: 600; color: var(--bs-secondary-color); }
+    .td-pop-title { font-size: 1.25rem; font-weight: 800; line-height: 1.2; margin: .15rem 0 0; }
+    .td-pop-x { border: 0; background: transparent; font-size: 1.4rem; line-height: 1; color: var(--bs-secondary-color); padding: .1rem .35rem; border-radius: .4rem; }
+    .td-pop-x:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); }
+    .td-pop-rows { display: grid; grid-template-columns: 7.5rem 1fr; gap: .6rem .8rem; font-size: .9rem; margin: 0; }
+    .td-pop-rows dt { color: var(--bs-secondary-color); font-weight: 400; }
+    .td-pop-rows dd { margin: 0; font-weight: 500; word-break: break-word; }
+    .td-pop-foot { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.1rem; padding-top: .9rem; border-top: 1px solid var(--bs-border-color); }
+    .td-trace { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem 1.3rem; border-radius: 999px; border: 0; font-weight: 700; color: #fff;
+        background: linear-gradient(180deg, #1d5fd8, var(--tp-blue)); box-shadow: 0 0 0 2px rgba(244,180,26,.7), 0 4px 10px rgba(16,70,184,.35); }
+    .td-trace:hover { filter: brightness(1.08); }
+    .td-trace[hidden] { display: none !important; }
+    .td-close { padding: .5rem 1.2rem; border-radius: 999px; font-weight: 600; border: 1px solid var(--bs-border-color); background: transparent; color: var(--bs-body-color); }
+    .td-close:hover { background: var(--bs-tertiary-bg); }
 </style>
 
-<div class="team-detail">
+<div class="team-detail"
+     onkeydown="if((event.key==='Enter'||event.key===' ')&amp;&amp;event.target.classList.contains('td-job')){event.preventDefault();this.onclick(event);}"
+     onclick="var t=event.target,p=this.querySelector('.td-pop'),r=t.closest('.td-job[data-code]');
+              if(r){var d=r.dataset,set=function(k,v){p.querySelector('[data-f='+k+']').textContent=v||'\u2014';};
+                set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);set('techs',d.techs);
+                var st=p.querySelector('[data-f=status]');st.textContent=d.statusLabel;st.className='td-st is-'+d.status;
+                p.querySelector('.td-trace').hidden=(d.status!=='in_progress');
+                p.hidden=false;p.querySelector('.td-pop-x').focus();return;}
+              if(t===p||t.closest('.td-pop-x')||t.closest('.td-close')){p.hidden=true;}">
     <div class="td-eyebrow">Team Details</div>
 
     <div class="td-grid">
@@ -115,7 +149,10 @@
             </div>
             <div class="td-list td-jobs-list">
                 {% for j in in_progress %}
-                <div class="td-job">
+                <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
+                     data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
+                     data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
+                     data-assigned="{{ j.assigned_label }}" data-techs="{{ j.techs|join(', ') }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
                         
@@ -134,7 +171,10 @@
             </div>
             <div class="td-list td-jobs-list">
                 {% for j in jobs %}
-                <div class="td-job">
+                <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
+                     data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
+                     data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
+                     data-assigned="{{ j.assigned_label }}" data-techs="{{ j.techs|join(', ') }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
                         <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
@@ -146,6 +186,32 @@
                 {% endfor %}
             </div>
         </div>
+        </div>
+    </div>
+
+    <div class="td-pop" hidden>
+        <div class="td-pop-card" role="dialog" aria-label="Ticket details">
+            <div class="td-pop-head">
+                <div>
+                    <div class="td-pop-eyebrow">Ticket Details</div>
+                    <h4 class="td-pop-title"><span data-f="code">&mdash;</span></h4>
+                </div>
+                <button type="button" class="td-pop-x" aria-label="Close">&times;</button>
+            </div>
+            <dl class="td-pop-rows">
+                <dt>Type</dt><dd data-f="type">&mdash;</dd>
+                <dt>Status</dt><dd><span class="td-st" data-f="status">&mdash;</span></dd>
+                <dt>Priority</dt><dd data-f="priority">&mdash;</dd>
+                <dt>Subscriber</dt><dd data-f="who">&mdash;</dd>
+                <dt>Address</dt><dd data-f="address">&mdash;</dd>
+                <dt>Assigned to</dt><dd data-f="techs">&mdash;</dd>
+                <dt>Assigned on</dt><dd data-f="assigned">&mdash;</dd>
+            </dl>
+            <div class="td-pop-foot">
+                <button type="button" class="td-close">Close</button>
+                {# Static for now: shown only for in-progress tickets, no action wired yet. #}
+                <button type="button" class="td-trace" hidden><i class="bi bi-geo-alt"></i>Trace Progress</button>
+            </div>
         </div>
     </div>
 
