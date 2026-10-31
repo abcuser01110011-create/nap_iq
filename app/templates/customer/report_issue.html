@@ -215,7 +215,19 @@
     // ---- Draft persistence -------------------------------------------------
     // Keeps issue type, description and the captured photo in localStorage so a
     // failed submit (server re-render) or a page refresh never loses progress.
-    var KEY = 'napiq_issue_draft_v1';
+    // The draft is private to the signed-in account: localStorage is shared by every
+    // account used in this browser, so an unscoped key leaked one subscriber's draft
+    // (type, description, photo) into the next subscriber's form.
+    var USER_ID = '{{ current_user.id if current_user else "anon" }}';
+    var KEY = 'napiq_issue_draft_v2_' + USER_ID;
+    try {
+        // drop the old shared draft and any draft that belongs to another account
+        localStorage.removeItem('napiq_issue_draft_v1');
+        Object.keys(localStorage).forEach(function (k) {
+            if (k.indexOf('napiq_issue_draft_v2_') === 0 && k !== KEY) localStorage.removeItem(k);
+        });
+        sessionStorage.removeItem('napiq_issue_submitting');
+    } catch (e) {}
     var FLAG = 'napiq_issue_submitting';
     var typeEl = form.querySelector('[name="issue_type"]');
     var descEl = form.querySelector('[name="description"]');
