@@ -23,7 +23,11 @@
 {# Flip card: the work cards (photo / pin / NAP & port / cable path) are merged
    into ONE card; "Ticket Details" (below Mark Complete) flips it over to show
    the ticket details on the back. Not used for consolidated tickets. #}
-{% set use_flip = show_step2 and not job.consolidated and (job.show_photo_card or job.is_installation) %}
+{# Before work starts (status 'assigned') EVERY ticket type shows just the ticket details
+   with Start Work beneath; the work cards (photo / pin / NAP & port / cable path) only
+   appear once the ticket is started. #}
+{% set pre_start = job.assignment.status == 'assigned' %}
+{% set use_flip = show_step2 and not pre_start and not job.consolidated and (job.show_photo_card or job.is_installation) %}
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <a href="{{ url_for('technician.tickets') }}" class="small text-decoration-none">
@@ -320,7 +324,7 @@
 </div>
 {% endif %}
 
-{% if job.is_installation and (not job.is_new_installation or show_step2) %}
+{% if job.is_installation and not pre_start and (not job.is_new_installation or show_step2) %}
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <h2 class="h6 text-uppercase text-muted mb-2"><span class="td-chip"><i class="bi bi-geo-alt"></i></span>Pin Location</h2>
