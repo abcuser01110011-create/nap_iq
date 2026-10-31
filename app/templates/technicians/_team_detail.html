@@ -179,7 +179,7 @@
             <div class="td-list td-jobs-list">
                 {% for j in in_progress %}
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
-                     data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
+                     data-code="{{ j.code }}" data-ref="{{ j.ref }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
                      data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
@@ -211,7 +211,7 @@
             <div class="td-list td-jobs-list td-tabpane" data-tab="assigned">
                 {% for j in assigned_jobs %}
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
-                     data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
+                     data-code="{{ j.code }}" data-ref="{{ j.ref }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
                      data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
@@ -229,7 +229,7 @@
             <div class="td-list td-jobs-list td-tabpane" data-tab="completed" hidden>
                 {% for j in completed_jobs %}
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
-                     data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
+                     data-code="{{ j.code }}" data-ref="{{ j.ref }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
                      data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"

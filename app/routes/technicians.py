@@ -50,7 +50,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Technician, TechnicianTeam, User
+from app.models import Assignment, Technician, TechnicianTeam, User
 
 technicians_bp = Blueprint("technicians", __name__, url_prefix="/technicians")
 
@@ -509,24 +509,56 @@ def view_team(team_id):
 @technicians_bp.route("/teams/<int:team_id>/live", methods=["GET"])
 @role_required("administrator")
 def team_live(team_id):
-    """JSON feed for the ticket popup's live map: the latest technician
-    position + destination of each of the team's in-progress tickets. The
-    popup polls this every 5 minutes (the same cadence the technician app
-    reports its GPS fix at)."""
+    """JSON feed for the ticket popup's live map.
+
+    The popup polls this about once a second, so with `?ref=SO:12` /
+    `?ref=TN:3` (the ticket's own key) it runs ONE small query -- just that
+    ticket's assignments among the team's members -- instead of rebuilding
+    the whole ticket list. Without `ref` it returns every in-progress
+    ticket of the team."""
     team = TechnicianTeam.query.get_or_404(team_id)
+    ref = (request.args.get("ref") or "").strip()
+
+    def _num(v):
+        return float(v) if v is not None else None
+
+    def _tech_fields(holders):
+        """holders: [(assignment_status, Technician)] -> tech_* fields."""
+        with_gps = [(st, m) for st, m in holders if m.current_latitude is not None and m.current_longitude is not None]
+        pick = (
+            next(((st, m) for st, m in with_gps if st == "in_progress"), None)
+            or (with_gps[0] if with_gps else None)
+            or next(((st, m) for st, m in holders if st == "in_progress"), None)
+        )
+        out = {"tech_name": None, "tech_lat": None, "tech_lng": None, "tech_updated_at": None, "tech_age_s": None}
+        if pick is not None:
+            m = pick[1]
+            out["tech_name"] = m.full_name
+            out["tech_lat"] = _num(m.current_latitude)
+            out["tech_lng"] = _num(m.current_longitude)
+            if out["tech_lat"] is not None and m.updated_at is not None:
+                out["tech_updated_at"] = m.updated_at.isoformat() + "Z"
+                out["tech_age_s"] = max(0, int((datetime.utcnow() - m.updated_at).total_seconds()))
+        return out
+
     payload = {}
-    for j in _team_jobs(team):
-        if j["status"] != "in_progress":
-            continue
-        payload[j["code"]] = {
-            "tech_name": j["tech_name"],
-            "tech_lat": j["tech_lat"],
-            "tech_lng": j["tech_lng"],
-            "tech_updated_at": j["tech_updated_at"],
-            "tech_age_s": j["tech_age_s"],
-            "dest_lat": j["dest_lat"],
-            "dest_lng": j["dest_lng"],
-        }
+    kind, _, raw_id = ref.partition(":")
+    if kind in ("TN", "SO") and raw_id.isdigit():
+        member_ids = [m.id for m in team.members]
+        col = Assignment.technical_issue_id if kind == "TN" else Assignment.service_request_id
+        rows = (
+            db.session.query(Assignment.status, Technician)
+            .join(Technician, Technician.id == Assignment.technician_id)
+            .filter(Assignment.technician_id.in_(member_ids or [0]), col == int(raw_id))
+            .all()
+        ) if member_ids else []
+        if any(st == "in_progress" for st, _m in rows):
+            payload[ref] = _tech_fields(rows)
+    else:
+        for j in _team_jobs(team):
+            if j["status"] == "in_progress":
+                payload[j["ref"]] = {k: j[k] for k in ("tech_name", "tech_lat", "tech_lng", "tech_updated_at", "tech_age_s")}
+
     response = jsonify({"tickets": payload, "server_time": datetime.utcnow().isoformat() + "Z"})
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -597,6 +629,7 @@ def _team_jobs(team):
 
             priority = (issue.priority if issue is not None else (request_.priority if request_ is not None else None))
             by_ticket[key] = {
+                "ref": f"{key[0]}:{key[1]}",
                 "code": code,
                 "type": type_label,
                 "who": who,

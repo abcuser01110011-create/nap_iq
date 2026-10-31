@@ -2,9 +2,10 @@
  *
  * Shows the technician's last reported position, the destination and the
  * driving route between them (same approach as the subscriber's "Arriving"
- * map on My Issues). The technician app reports a GPS fix every 5 minutes,
- * so the map re-reads it on that cadence, and warns inside the popup when
- * the technician can't be tracked.
+ * map on My Issues). The technician's page reports a GPS fix about once a
+ * second while the job is in progress, and this map re-reads it every
+ * second (a single small query per tick), warning inside the popup when the
+ * technician can't be tracked.
  *
  * Loaded on demand by technicians/_team_detail.html (after Leaflet), which
  * then calls window.tdLiveMapShow(row) / window.tdLiveMapDestroy().
@@ -20,16 +21,19 @@
         window.tdLiveMapReady = true;
 
         var OSRM = 'https://router.project-osrm.org/route/v1/driving/';
-        var REFRESH_MS = 5 * 60 * 1000;   // same cadence the technician app reports at
-        var STALE_S = 12 * 60;            // two missed reports + a little slack
+        var REFRESH_MS = 1000;            // how often the map re-reads the technician's position
+        var STALE_S = 30;                 // no new fix for this long => can't be tracked
+        var FAIL_LIMIT = 3;               // consecutive failed refreshes before warning about OUR connection
+        var ROUTE_MIN_MS = 10 * 1000;     // don't ask the routing service more often than this
+        var ROUTE_MIN_MOVE_M = 25;        // ...or for tiny movements
         var live = null;                  // the open popup's map state
 
         function num(v) { var n = parseFloat(v); return (v === '' || v == null || isNaN(n)) ? null : n; }
         function esc(x) { var d = document.createElement('div'); d.textContent = x == null ? '' : String(x); return d.innerHTML; }
         function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m'; }
-        function fmtClock(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+        function fmtClock(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }); }
         function fmtAgo(sec) {
-            if (sec < 60) return 'less than a minute';
+            if (sec < 60) return Math.max(1, Math.round(sec)) + ' sec';
             var min = Math.round(sec / 60);
             if (min < 60) return min + ' min';
             var h = Math.floor(min / 60), r = min % 60;
@@ -52,6 +56,7 @@
             if (!live) return;
             clearInterval(live.refreshTimer);
             clearInterval(live.tickTimer);
+            live.destroyed = true;
             live.map.remove();
             live = null;
         }
@@ -77,9 +82,9 @@
                 text = '<b>You\u2019re offline.</b> The live location can\u2019t be refreshed until your connection is back.';
             } else if (live.ended) {
                 text = 'This ticket is no longer in progress, so live tracking has stopped.';
-            } else if (live.refreshFailed) {
+            } else if (live.failCount >= FAIL_LIMIT) {
                 level = 'error';
-                text = '<b>Couldn\u2019t refresh the live location.</b> This looks like a connection problem; showing the last known position. Retrying in a few minutes.';
+                text = '<b>Couldn\u2019t refresh the live location.</b> This looks like a connection problem on your side or the server; showing the last known position and retrying.';
             } else if (!live.tech) {
                 text = '<b>The technician can\u2019t be tracked yet.</b> No location has been reported. They may be offline, out of signal, or haven\u2019t opened the job in the technician app.';
             } else if (age != null && age > STALE_S) {
@@ -100,17 +105,22 @@
             if (!live.dest) parts.push('<span>No destination location on file.</span>');
             if (live.tech) {
                 var when = live.at ? 'last location ' + fmtClock(new Date(live.at)) + ' \u00b7 ' : '';
-                parts.push('<span>' + when + 'refreshes every 5 minutes</span>');
+                parts.push('<span>' + when + 'updating every second</span>');
             }
             live.info.innerHTML = parts.join('');
         }
 
         function drawRoute() {
             var l = live, token = l.routeToken = {};
-            if (l.line) { l.map.removeLayer(l.line); l.line = null; }
-            l.routeM = null;
-            if (!l.tech || !l.dest) return;
-            l.line = L.polyline([l.tech, l.dest], { color: '#0d8bf2', weight: 4, dashArray: '6 8' }).addTo(l.map);
+            l.routeAt = Date.now();
+            l.routeFrom = l.tech;
+            if (!l.tech || !l.dest) {
+                if (l.line) { l.map.removeLayer(l.line); l.line = null; }
+                l.routeM = null;
+                return;
+            }
+            if (!l.line) l.line = L.polyline([l.tech, l.dest], { color: '#0d8bf2', weight: 4, dashArray: '6 8' }).addTo(l.map);
+            else if (l.routeM == null) l.line.setLatLngs([l.tech, l.dest]);
             fetch(OSRM + l.tech[1] + ',' + l.tech[0] + ';' + l.dest[1] + ',' + l.dest[0] + '?overview=full&geometries=geojson')
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (data) {
@@ -119,6 +129,7 @@
                     if (l.line) l.map.removeLayer(l.line);
                     l.line = L.polyline(rt.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }), { color: '#0d8bf2', weight: 5, opacity: .85 }).addTo(l.map);
                     l.routeM = rt.distance;
+                    l.routeSolid = true;
                     renderInfo();
                 })
                 .catch(function () { /* keep the straight-line fallback */ });
@@ -134,25 +145,39 @@
             else if (pts.length === 1) live.map.setView(pts[0], 16);
         }
 
-        function paint(moved) {
-            if (live.techMarker) { live.map.removeLayer(live.techMarker); live.techMarker = null; }
-            if (live.tech) live.techMarker = L.marker(live.tech, { icon: pin('#0d8bf2', 'Technician') }).addTo(live.map);
-            if (moved) { drawRoute(); fit(); }
+        function paint(first, moved) {
+            if (live.tech) {
+                if (live.techMarker) live.techMarker.setLatLng(live.tech);
+                else live.techMarker = L.marker(live.tech, { icon: pin('#0d8bf2', 'Technician') }).addTo(live.map);
+            } else if (live.techMarker) { live.map.removeLayer(live.techMarker); live.techMarker = null; }
+
+            if (first) { drawRoute(); fit(); }
+            else if (moved) {
+                // keep the pin on screen, but never fight the admin's own panning/zooming
+                if (live.tech && !live.map.getBounds().contains(live.tech)) fit();
+                // the straight line follows the pin every tick; the real route is refreshed sparingly
+                var far = live.routeFrom && live.tech ? haversine(live.routeFrom[0], live.routeFrom[1], live.tech[0], live.tech[1]) : Infinity;
+                if (!live.routeAt || (Date.now() - live.routeAt >= ROUTE_MIN_MS && far >= ROUTE_MIN_MOVE_M)) drawRoute();
+                else if (live.line && !live.routeSolid && live.tech && live.dest) live.line.setLatLngs([live.tech, live.dest]);
+            }
             renderInfo();
             evaluate();
         }
 
-        // ---- 5-minute refresh ----
+        // ---- 1-second refresh ----
         function refresh() {
-            if (!live) return;
+            if (!live || live.busy || live.ended) return;
             var l = live;
-            if (navigator.onLine === false) { l.refreshFailed = false; evaluate(); return; }
-            fetch(l.liveUrl, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } })
+            if (navigator.onLine === false) { evaluate(); return; }
+            l.busy = true;
+            var url = l.liveUrl + (l.liveUrl.indexOf('?') < 0 ? '?' : '&') + 'ref=' + encodeURIComponent(l.ref);
+            fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' } })
                 .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                 .then(function (data) {
                     if (live !== l) return;
-                    l.refreshFailed = false;
-                    var t = data.tickets && data.tickets[l.code];
+                    l.busy = false;
+                    l.failCount = 0;
+                    var t = data.tickets && data.tickets[l.ref];
                     if (!t) {                       // moved on from in-progress
                         l.ended = true;
                         clearInterval(l.refreshTimer);
@@ -160,17 +185,19 @@
                         return;
                     }
                     var tech = (t.tech_lat != null && t.tech_lng != null) ? [t.tech_lat, t.tech_lng] : null;
-                    var moved = (!tech !== !l.tech) || (tech && l.tech && (tech[0] !== l.tech[0] || tech[1] !== l.tech[1]));
+                    var moved = (!tech !== !l.tech) || !!(tech && l.tech && (tech[0] !== l.tech[0] || tech[1] !== l.tech[1]));
+                    var stampChanged = (t.tech_updated_at || null) !== (l.at || null);
                     l.tech = tech;
                     l.techName = t.tech_name || l.techName;
                     l.ageS = t.tech_age_s;
                     l.at = t.tech_updated_at;
                     l.fetchedAt = Date.now();
-                    paint(moved);
+                    if (moved || stampChanged) paint(false, moved); else evaluate();
                 })
                 .catch(function () {
                     if (live !== l) return;
-                    l.refreshFailed = true;         // our own connection / the server is unreachable
+                    l.busy = false;
+                    l.failCount = (l.failCount || 0) + 1;   // a single hiccup isn't a warning; FAIL_LIMIT in a row is
                     evaluate();
                 });
         }
@@ -195,28 +222,28 @@
             var tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
             live = {
                 map: map, info: info, warn: warn, code: d.code, liveUrl: pop.dataset.liveUrl,
-                tech: tech, dest: dest, techName: d.techName || '',
+                ref: d.ref, tech: tech, dest: dest, techName: d.techName || '',
                 ageS: num(d.techAge), at: d.techAt || null, fetchedAt: Date.now(),
                 techMarker: null, line: null, routeM: null,
-                refreshFailed: false, tilesFailed: false, ended: false
+                failCount: 0, busy: false, tilesFailed: false, ended: false, routeSolid: false
             };
             tiles.on('tileerror', function () { if (live && !live.tilesFailed) { live.tilesFailed = true; evaluate(); } });
             tiles.on('tileload', function () { if (live && live.tilesFailed) { live.tilesFailed = false; evaluate(); } });
             if (dest) L.marker(dest, { icon: pin('#16a34a', 'Destination') }).addTo(map);
 
             if (!dest && !tech) map.setView([14.28, 121.41], 12);   // nothing to plot yet: show the service area
-            paint(true);
+            paint(true, false);
             setTimeout(fit, 80);   // popup was just revealed: re-measure once it has its final size
 
             live.refreshTimer = setInterval(refresh, REFRESH_MS);
-            live.tickTimer = setInterval(evaluate, 60 * 1000);       // staleness is time-based: re-check each minute
+            live.tickTimer = setInterval(evaluate, 5 * 1000);        // staleness is time-based: re-check every few seconds
         }
 
         // Opened/closed by the Team Details popup (technicians/_team_detail.html).
         window.tdLiveMapShow = show;
         window.tdLiveMapDestroy = destroy;
 
-        window.addEventListener('online', function () { if (live) { live.refreshFailed = false; refresh(); } });
+        window.addEventListener('online', function () { if (live) { live.failCount = 0; refresh(); } });
         window.addEventListener('offline', function () { evaluate(); });
         document.addEventListener('visibilitychange', function () { if (!document.hidden && live) refresh(); });
         // closing the whole Team Details popup also tears the map down
