@@ -106,6 +106,12 @@
     .td-pin { position: relative; width: 0; height: 0; }
     .td-pin__dot { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
     .td-pin__tag { position: absolute; left: 12px; top: -11px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+    .td-pop-warn { margin-top: .6rem; display: flex; align-items: flex-start; gap: .55rem; padding: .55rem .75rem; border-radius: .6rem; font-size: .8rem; line-height: 1.35;
+        background: rgba(245,158,11,.14); border: 1px solid rgba(245,158,11,.5); color: #92400e; }
+    .td-pop-warn[hidden] { display: none !important; }
+    .td-pop-warn.is-error { background: rgba(220,38,38,.1); border-color: rgba(220,38,38,.45); color: #b91c1c; }
+    .td-pop-warn i { margin-top: .1rem; flex: 0 0 auto; }
+    [data-bs-theme="dark"] .td-pop-warn { color: #fbbf24; } [data-bs-theme="dark"] .td-pop-warn.is-error { color: #f87171; }
 </style>
 
 <div class="team-detail"
@@ -113,7 +119,8 @@
      onclick="var t=event.target,p=this.querySelector('.td-pop'),r=t.closest('.td-job[data-code]');
               if(r){var d=r.dataset,set=function(k,v){p.querySelector('[data-f='+k+']').textContent=v||'\u2014';};
                 set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);
-                p.querySelector('.td-pop-live').hidden=(d.status!=='in_progress');
+                var lv=p.querySelector('.td-pop-live'),wn=p.querySelector('.td-pop-warn');lv.hidden=(d.status!=='in_progress');wn.hidden=true;wn.innerHTML='';
+                if(!lv.hidden&&!window.tdLiveMapReady){wn.innerHTML='<i class=&quot;bi bi-exclamation-triangle-fill&quot;></i><span>The live map is unavailable right now. Please reload the page and try again.</span>';wn.hidden=false;}
                 p.hidden=false;p.querySelector('.td-pop-x').focus();return;}
               if(t===p||t.closest('.td-pop-x')){p.hidden=true;}">
     <div class="td-eyebrow">Team Details</div>
@@ -166,7 +173,7 @@
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
-                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
+                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
                      data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
@@ -198,7 +205,7 @@
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
-                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
+                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
                      data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
@@ -216,7 +223,7 @@
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
                      data-assigned="{{ j.assigned_label }}"
-                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
+                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-age="{{ j.tech_age_s if j.tech_age_s is not none else '' }}" data-tech-at="{{ j.tech_updated_at or '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
                      data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
@@ -232,7 +239,7 @@
         </div>
     </div>
 
-    <div class="td-pop" hidden>
+    <div class="td-pop" hidden data-live-url="{{ url_for('technicians.team_live', team_id=team.id) }}">
         <div class="td-pop-card" role="dialog" aria-label="Ticket details">
             <div class="td-pop-head">
                 <div>
@@ -252,6 +259,7 @@
                 <div class="td-pop-live-title"><i class="bi bi-geo-alt-fill"></i>Live location</div>
                 <div class="td-pop-map" role="img" aria-label="Map showing the technician and the destination"></div>
                 <div class="td-pop-mapinfo"></div>
+                <div class="td-pop-warn" role="alert" hidden></div>
             </div>
         </div>
     </div>

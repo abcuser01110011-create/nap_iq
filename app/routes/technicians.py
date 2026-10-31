@@ -506,6 +506,32 @@ def view_team(team_id):
     )
 
 
+@technicians_bp.route("/teams/<int:team_id>/live", methods=["GET"])
+@role_required("administrator")
+def team_live(team_id):
+    """JSON feed for the ticket popup's live map: the latest technician
+    position + destination of each of the team's in-progress tickets. The
+    popup polls this every 5 minutes (the same cadence the technician app
+    reports its GPS fix at)."""
+    team = TechnicianTeam.query.get_or_404(team_id)
+    payload = {}
+    for j in _team_jobs(team):
+        if j["status"] != "in_progress":
+            continue
+        payload[j["code"]] = {
+            "tech_name": j["tech_name"],
+            "tech_lat": j["tech_lat"],
+            "tech_lng": j["tech_lng"],
+            "tech_updated_at": j["tech_updated_at"],
+            "tech_age_s": j["tech_age_s"],
+            "dest_lat": j["dest_lat"],
+            "dest_lng": j["dest_lng"],
+        }
+    response = jsonify({"tickets": payload, "server_time": datetime.utcnow().isoformat() + "Z"})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 _JOB_REQUEST_LABELS = {
     "new_installation": "New Installation",
     "disconnection": "Disconnection",
@@ -584,6 +610,8 @@ def _team_jobs(team):
                 "tech_name": None,
                 "tech_lat": None,
                 "tech_lng": None,
+                "tech_updated_at": None,
+                "tech_age_s": None,
             }
 
     # The member out working the ticket: prefer one whose own assignment is
@@ -602,6 +630,12 @@ def _team_jobs(team):
             row["tech_name"] = m.full_name
             row["tech_lat"] = _num(m.current_latitude)
             row["tech_lng"] = _num(m.current_longitude)
+            # The technician app posts a GPS fix every 5 minutes while a job
+            # is in progress and stamps technicians.updated_at each time, so
+            # that stamp doubles as "last heard from" (utc).
+            if row["tech_lat"] is not None and m.updated_at is not None:
+                row["tech_updated_at"] = m.updated_at.isoformat() + "Z"
+                row["tech_age_s"] = max(0, int((datetime.utcnow() - m.updated_at).total_seconds()))
 
     return sorted(by_ticket.values(), key=lambda r: r["assigned_at"] or datetime.min, reverse=True)
 
