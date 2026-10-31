@@ -107,8 +107,7 @@
      onkeydown="if((event.key==='Enter'||event.key===' ')&amp;&amp;event.target.classList.contains('td-job')){event.preventDefault();this.onclick(event);}"
      onclick="var t=event.target,p=this.querySelector('.td-pop'),r=t.closest('.td-job[data-code]');
               if(r){var d=r.dataset,set=function(k,v){p.querySelector('[data-f='+k+']').textContent=v||'\u2014';};
-                set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);set('techs',d.techs);
-                var st=p.querySelector('[data-f=status]');st.textContent=d.statusLabel;st.className='td-st is-'+d.status;
+                set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);
                 p.querySelector('.td-trace').hidden=(d.status!=='in_progress');
                 p.hidden=false;p.querySelector('.td-pop-x').focus();return;}
               if(t===p||t.closest('.td-pop-x')||t.closest('.td-close')){p.hidden=true;}">
@@ -233,11 +232,9 @@
             </div>
             <dl class="td-pop-rows">
                 <dt>Type</dt><dd data-f="type">&mdash;</dd>
-                <dt>Status</dt><dd><span class="td-st" data-f="status">&mdash;</span></dd>
                 <dt>Priority</dt><dd data-f="priority">&mdash;</dd>
                 <dt>Subscriber</dt><dd data-f="who">&mdash;</dd>
                 <dt>Address</dt><dd data-f="address">&mdash;</dd>
-                <dt>Assigned to</dt><dd data-f="techs">&mdash;</dd>
                 <dt>Assigned on</dt><dd data-f="assigned">&mdash;</dd>
             </dl>
             <div class="td-pop-foot">
