@@ -660,6 +660,21 @@
         </div>
     </div>
 </div>
+
+{# Subscriber details popup -- opened from a GeoMap popup's "View Subs"
+   button (see openSubscriberDetailsModal() in napmap.js). Filled with
+   the same partial the Subscribers list's detail popup uses. #}
+<div class="modal fade" id="subscriberDetailModal" tabindex="-1" aria-label="Subscriber details" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <span class="text-muted small">Subscriber details</span>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 pb-4" id="subscriberDetailBody"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
