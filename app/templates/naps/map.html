@@ -689,7 +689,31 @@
    <script src="{{ url_for('static', ...) }}"> tag on this page). #}
 <script>window.NAP_ICON_URL = "{{ url_for('static', filename='img/nap-icon-blue.png') }}";</script>
 <script src="{{ url_for('static', filename='js/cable-path-geometry.js') }}?v={{ asset_version('js/cable-path-geometry.js') }}"></script>
-<script src="{{ url_for('static', filename='js/napmap.js') }}?v={{ asset_version('js/napmap.js') }}"></script>
+{# "-subsmodal" forces browsers/CDNs to re-fetch napmap.js (the View Subs
+   button now opens a popup) even if the file's mtime didn't change on deploy. #}
+<script src="{{ url_for('static', filename='js/napmap.js') }}?v={{ asset_version('js/napmap.js') }}-subsmodal"></script>
+{# Safety net: if a stale cached napmap.js still renders "View Subs" as a
+   plain link, open the subscriber popup instead of leaving the map. #}
+<script>
+(function () {
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest && e.target.closest('.leaflet-popup a[href^="/subscribers/"]');
+        if (!link) return;
+        var m = /^\/subscribers\/(\d+)/.exec(link.getAttribute('href'));
+        var modalEl = document.getElementById('subscriberDetailModal');
+        var bodyEl = document.getElementById('subscriberDetailBody');
+        if (!m || !modalEl || !bodyEl || typeof bootstrap === 'undefined') return;
+        e.preventDefault();
+        e.stopPropagation();
+        bodyEl.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        fetch('/subscribers/' + m[1] + '?partial=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+            .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
+            .then(function (html) { bodyEl.innerHTML = html; })
+            .catch(function () { bodyEl.innerHTML = '<div class="text-center text-muted py-5">Could not load subscriber details. Please try again.</div>'; });
+    }, true);
+})();
+</script>
 {# "+ Tickets" quick-create dropdown/modal -- self-contained, loads
    after napmap.js only so it can piggyback on the Add NAP button's
    existing mode toggle for the "Add NAP" menu item; otherwise reads

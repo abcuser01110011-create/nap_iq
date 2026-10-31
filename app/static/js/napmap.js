@@ -573,6 +573,7 @@
         // Same delegated-listener pattern, for the issue popup's
         // "View Ticket" button (see handleViewTicketButtonInPopup).
         map.on("popupopen", handleViewTicketButtonInPopup);
+        map.on("popupopen", handleViewSubsButtonInPopup);
         // Same pattern, for the subscriber popup's reverse-geocoded
         // address line (see resolveSubscriberAddress()).
         map.on("popupopen", handleSubscriberAddressInPopup);
@@ -643,6 +644,7 @@
         setupQuickAdd();
         setupReportIssue();
         setupTicketDetailsModal();
+        setupSubscriberDetailsModal();
         setupNapDetailPanel();
 
         // Background safety net -- see refreshLiveData()'s docstring.
@@ -1635,7 +1637,7 @@
             "<h6>" + escapeHtml(issue.issue_type) + "</h6>" +
             '<div class="issue-popup-address">' + escapeHtml(issue.address || "\u2014") + "</div>" +
             '<div class="d-flex gap-1">' +
-            '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + issue.subscriber_id + '">View Subs</a>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary flex-fill" data-view-subs-id="' + issue.subscriber_id + '">View Subs</button>' +
             '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
             'data-view-ticket-id="' + issue.id + '">' +
             '<i class="bi bi-file-earmark-text me-1"></i>View Ticket</button>' +
@@ -1763,6 +1765,65 @@
             const entityId = Number(btn.getAttribute("data-view-ticket-id"));
             const issue = allIssues.find((i) => i.id === entityId);
             if (issue) openTicketDetailsModal(issue);
+        });
+    }
+
+    // ---------------- View Subs (subscriber details popup) ----------------
+    // The popup's "View Subs" button opens #subscriberDetailModal
+    // (naps/map.html) filled from the same server-rendered partial the
+    // Subscribers list's detail popup uses (/subscribers/<id>?partial=1),
+    // so the admin stays on the map instead of navigating away.
+    const subscriberDetailCache = {};
+    let subscriberDetailCurrent = null;
+
+    const SUBS_DETAIL_SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+    const SUBS_DETAIL_ERROR = '<div class="text-center text-muted py-5">Could not load subscriber details. Please try again.</div>';
+
+    function openSubscriberDetailsModal(subscriberId) {
+        const modalEl = document.getElementById("subscriberDetailModal");
+        const bodyEl = document.getElementById("subscriberDetailBody");
+        if (!modalEl || !bodyEl || typeof bootstrap === "undefined") return;
+
+        const url = "/subscribers/" + subscriberId + "?partial=1";
+        subscriberDetailCurrent = url;
+        bodyEl.innerHTML = subscriberDetailCache[url] || SUBS_DETAIL_SPINNER;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        if (subscriberDetailCache[url]) return;
+
+        fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" }, credentials: "same-origin" })
+            .then((res) => {
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                return res.text();
+            })
+            .then((html) => {
+                subscriberDetailCache[url] = html;
+                if (subscriberDetailCurrent === url) bodyEl.innerHTML = html;
+            })
+            .catch(() => {
+                if (subscriberDetailCurrent === url) bodyEl.innerHTML = SUBS_DETAIL_ERROR;
+            });
+    }
+
+    function setupSubscriberDetailsModal() {
+        const modalEl = document.getElementById("subscriberDetailModal");
+        if (!modalEl) return;
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            subscriberDetailCurrent = null;
+            const bodyEl = document.getElementById("subscriberDetailBody");
+            if (bodyEl) bodyEl.innerHTML = "";
+        });
+    }
+
+    /** Delegated "popupopen" handler: wires the popup's
+     * `[data-view-subs-id]` button to the subscriber details modal. */
+    function handleViewSubsButtonInPopup(event) {
+        const container = event.popup.getElement();
+        if (!container) return;
+        const btn = container.querySelector("[data-view-subs-id]");
+        if (!btn) return;
+
+        btn.addEventListener("click", () => {
+            openSubscriberDetailsModal(Number(btn.getAttribute("data-view-subs-id")));
         });
     }
 
@@ -2526,7 +2587,7 @@
             "<h6>" + escapeHtml(subscriber.full_name) + "</h6>" +
             '<div class="subscriber-popup-address" data-address-for="' + subscriber.id + '">Locating address\u2026</div>' +
             '<div class="d-flex gap-1">' +
-            '<a class="btn btn-sm btn-outline-secondary flex-fill" href="/subscribers/' + subscriber.id + '">View Subs</a>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary flex-fill" data-view-subs-id="' + subscriber.id + '">View Subs</button>' +
             (openIssue ?
                 '<button type="button" class="btn btn-sm btn-outline-info flex-fill" ' +
                 'data-view-ticket-id="' + openIssue.id + '">' +
