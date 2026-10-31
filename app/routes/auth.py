@@ -54,7 +54,7 @@ def _is_safe_next_url(next_url: str) -> bool:
     return bool(next_url) and next_url.startswith("/") and not next_url.startswith("//")
 
 
-def _next_url_allowed_for_role(next_url: str, role: str) -> bool:
+def _next_url_allowed_for_role(next_url: str, role: str, user=None) -> bool:
     """True unless `next_url` resolves to a route that @role_required
     has restricted to roles that don't include `role`.
 
@@ -86,7 +86,19 @@ def _next_url_allowed_for_role(next_url: str, role: str) -> bool:
 
     view = current_app.view_functions.get(endpoint)
     allowed_roles = getattr(view, "role_required_roles", None)
-    return allowed_roles is None or role in allowed_roles
+    if allowed_roles is not None and role not in allowed_roles:
+        return False
+
+    # Same leftover-`next` problem, one level deeper: a technician-allowed page
+    # that points at ONE specific ticket (/technician/tickets/1). If that ticket
+    # belongs to a different technician (the previous account in this browser),
+    # the page would answer 403 "Access Denied" right after login.
+    if user is not None and endpoint in ("technician.ticket_detail", "technician.mobile_job_detail"):
+        from app.models import Assignment, Technician
+        profile = Technician.query.filter_by(user_id=user.id).first()
+        assignment = Assignment.query.get(_args.get("assignment_id")) if _args.get("assignment_id") else None
+        return bool(profile and assignment and assignment.technician_id == profile.id)
+    return True
 
 
 def _login_limits(view):
@@ -136,7 +148,7 @@ def _handle_login(portal):
             flash(f"Welcome back, {user.full_name}.", "success")
 
             next_url = request.args.get("next") or request.form.get("next")
-            if _is_safe_next_url(next_url) and _next_url_allowed_for_role(next_url, user.role):
+            if _is_safe_next_url(next_url) and _next_url_allowed_for_role(next_url, user.role, user):
                 return redirect(next_url)
             return redirect(url_for("auth.home"))
 

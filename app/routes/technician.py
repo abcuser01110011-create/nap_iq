@@ -180,6 +180,11 @@ def _get_own_assignment_or_403(profile, assignment_id):
     changing the id in the URL."""
     assignment = Assignment.query.get_or_404(assignment_id)
     if assignment.technician_id != profile.id:
+        if request.method == "GET":
+            # A stale link / bookmark / back-button page from another account:
+            # send them to their own tickets instead of a dead-end 403 page.
+            flash("That ticket isn't assigned to your account.", "warning")
+            abort(redirect(url_for("technician.tickets")))
         abort(403)
     return assignment
 
