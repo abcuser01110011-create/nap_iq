@@ -85,13 +85,6 @@
     .td-pop-rows { display: grid; grid-template-columns: 7.5rem 1fr; gap: .6rem .8rem; font-size: .9rem; margin: 0; }
     .td-pop-rows dt { color: var(--bs-secondary-color); font-weight: 400; }
     .td-pop-rows dd { margin: 0; font-weight: 500; word-break: break-word; }
-    .td-pop-foot { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.1rem; padding-top: .9rem; border-top: 1px solid var(--bs-border-color); }
-    .td-trace { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem 1.3rem; border-radius: 999px; border: 0; font-weight: 700; color: #fff;
-        background: linear-gradient(180deg, #1d5fd8, var(--tp-blue)); box-shadow: 0 0 0 2px rgba(244,180,26,.7), 0 4px 10px rgba(16,70,184,.35); }
-    .td-trace:hover { filter: brightness(1.08); }
-    .td-trace[hidden] { display: none !important; }
-    .td-close { padding: .5rem 1.2rem; border-radius: 999px; font-weight: 600; border: 1px solid var(--bs-border-color); background: transparent; color: var(--bs-body-color); }
-    .td-close:hover { background: var(--bs-tertiary-bg); }
 
     .td-tabs { display: inline-flex; gap: .25rem; padding: .25rem; margin-bottom: .8rem; border-radius: 999px; background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); }
     .td-tab { border: 0; background: transparent; padding: .3rem .95rem; border-radius: 999px; font-size: .85rem; font-weight: 600; color: var(--bs-secondary-color); transition: background-color .15s ease, color .15s ease; }
@@ -101,6 +94,18 @@
     /* Fixed height = exactly 5 ticket rows, so a tab with 1 ticket doesn't shrink the card; more than 5 scrolls. */
     .td-tabpane { height: var(--td-pane-h, 308px); max-height: none; }
     .td-tabpane[hidden] { display: none !important; }
+    .td-pop { overflow-y: auto; }
+    .td-pop-live { margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--bs-border-color); }
+    .td-pop-live[hidden] { display: none !important; }
+    .td-pop-live-title { display: flex; align-items: center; gap: .4rem; font-size: .8rem; font-weight: 700; margin-bottom: .5rem; }
+    .td-pop-live-title i { color: #dc2626; }
+    .td-pop-map { height: 230px; border-radius: .6rem; border: 1px solid var(--bs-border-color); overflow: hidden; isolation: isolate; background: var(--bs-tertiary-bg); }
+    .td-pop-map[hidden] { display: none !important; }
+    .td-pop-mapinfo { margin-top: .5rem; font-size: .8rem; color: var(--bs-secondary-color); display: grid; gap: .15rem; }
+    .td-pop-mapinfo b { color: var(--bs-body-color); font-weight: 600; }
+    .td-pin { position: relative; width: 0; height: 0; }
+    .td-pin__dot { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+    .td-pin__tag { position: absolute; left: 12px; top: -11px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 </style>
 
 <div class="team-detail"
@@ -108,9 +113,9 @@
      onclick="var t=event.target,p=this.querySelector('.td-pop'),r=t.closest('.td-job[data-code]');
               if(r){var d=r.dataset,set=function(k,v){p.querySelector('[data-f='+k+']').textContent=v||'\u2014';};
                 set('code',d.code);set('type',d.type);set('who',d.who);set('address',d.address);set('priority',d.priority);set('assigned',d.assigned);
-                p.querySelector('.td-trace').hidden=(d.status!=='in_progress');
+                p.querySelector('.td-pop-live').hidden=(d.status!=='in_progress');
                 p.hidden=false;p.querySelector('.td-pop-x').focus();return;}
-              if(t===p||t.closest('.td-pop-x')||t.closest('.td-close')){p.hidden=true;}">
+              if(t===p||t.closest('.td-pop-x')){p.hidden=true;}">
     <div class="td-eyebrow">Team Details</div>
 
     <div class="td-grid">
@@ -160,7 +165,9 @@
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
-                     data-assigned="{{ j.assigned_label }}" data-techs="{{ j.techs|join(', ') }}">
+                     data-assigned="{{ j.assigned_label }}"
+                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
+                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
                         
@@ -190,7 +197,9 @@
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
-                     data-assigned="{{ j.assigned_label }}" data-techs="{{ j.techs|join(', ') }}">
+                     data-assigned="{{ j.assigned_label }}"
+                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
+                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
                         <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
@@ -206,7 +215,9 @@
                 <div class="td-job is-click" role="button" tabindex="0" title="View ticket details"
                      data-code="{{ j.code }}" data-type="{{ j.type }}" data-status="{{ j.status }}" data-status-label="{{ j.status|replace('_', ' ')|capitalize }}"
                      data-who="{{ j.who or '' }}" data-address="{{ j.address or '' }}" data-priority="{{ (j.priority or '')|capitalize }}"
-                     data-assigned="{{ j.assigned_label }}" data-techs="{{ j.techs|join(', ') }}">
+                     data-assigned="{{ j.assigned_label }}"
+                     data-tech-name="{{ j.tech_name or '' }}" data-tech-lat="{{ j.tech_lat if j.tech_lat is not none else '' }}" data-tech-lng="{{ j.tech_lng if j.tech_lng is not none else '' }}"
+                     data-dest-lat="{{ j.dest_lat if j.dest_lat is not none else '' }}" data-dest-lng="{{ j.dest_lng if j.dest_lng is not none else '' }}">
                     <div class="td-job-top">
                         <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
                         <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
@@ -237,10 +248,10 @@
                 <dt>Address</dt><dd data-f="address">&mdash;</dd>
                 <dt>Assigned on</dt><dd data-f="assigned">&mdash;</dd>
             </dl>
-            <div class="td-pop-foot">
-                <button type="button" class="td-close">Close</button>
-                {# Static for now: shown only for in-progress tickets, no action wired yet. #}
-                <button type="button" class="td-trace" hidden><i class="bi bi-geo-alt"></i>Trace Progress</button>
+            <div class="td-pop-live" hidden>
+                <div class="td-pop-live-title"><i class="bi bi-geo-alt-fill"></i>Live location</div>
+                <div class="td-pop-map" role="img" aria-label="Map showing the technician and the destination"></div>
+                <div class="td-pop-mapinfo"></div>
             </div>
         </div>
     </div>

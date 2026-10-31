@@ -520,34 +520,52 @@ def _team_jobs(team):
     `team`, newest first, one row per ticket. A ticket dispatched to a
     team is stored as one Assignment per member, so rows are de-duplicated
     by the ticket they point at; when members disagree on status, the
-    furthest-along one wins (in progress > accepted > assigned > ...)."""
+    furthest-along one wins (in progress > accepted > assigned > ...).
+
+    Each row also carries what the ticket popup's live map needs: the
+    destination (where the issue/installation is) and the current GPS
+    position of the member working it (`tech_*`, None until the technician
+    app has reported one)."""
     rank = {"in_progress": 4, "accepted": 3, "assigned": 2, "completed": 1, "cancelled": 0}
+
+    def _num(v):
+        return float(v) if v is not None else None
+
+    def _key(a):
+        if a.technical_issue_id is not None:
+            return ("TN", a.technical_issue_id)
+        if a.service_request_id is not None:
+            return ("SO", a.service_request_id)
+        return ("JOB", a.id)
+
     by_ticket = {}
+    holders = {}  # ticket key -> [(assignment_status, member)]
     for member in team.members:
         for a in member.assignments:
-            if a.technical_issue_id is not None:
-                key = ("TN", a.technical_issue_id)
-            elif a.service_request_id is not None:
-                key = ("SO", a.service_request_id)
-            else:
-                key = ("JOB", a.id)
+            key = _key(a)
+            holders.setdefault(key, []).append((a.status, member))
             row = by_ticket.get(key)
             if row is not None and rank.get(row["status"], 0) >= rank.get(a.status, 0):
                 continue
 
             issue, request_ = a.technical_issue, a.service_request
+            dest_lat = dest_lng = None
             if issue is not None:
                 type_label = issue.issue_type
                 subscriber = issue.subscriber
                 address = (subscriber.address if subscriber and subscriber.address else issue.address)
                 who = subscriber.full_name if subscriber else None
                 code = issue.issue_code or f"ISS-{issue.id:04d}"
+                dest_lat = _num(issue.latitude) if issue.latitude is not None else _num(getattr(subscriber, "latitude", None))
+                dest_lng = _num(issue.longitude) if issue.longitude is not None else _num(getattr(subscriber, "longitude", None))
             elif request_ is not None:
                 type_label = _JOB_REQUEST_LABELS.get(request_.request_type, request_.request_type)
                 subscriber = request_.subscriber
                 address = request_.address or (subscriber.address if subscriber else None)
                 who = request_.full_name or (subscriber.full_name if subscriber else None)
                 code = f"SO-{request_.id:04d}"
+                dest_lat = _num(request_.latitude) if request_.latitude is not None else _num(getattr(subscriber, "latitude", None))
+                dest_lng = _num(request_.longitude) if request_.longitude is not None else _num(getattr(subscriber, "longitude", None))
             else:
                 type_label, address, who, code = "Job", None, None, f"Job #{a.id}"
 
@@ -561,18 +579,30 @@ def _team_jobs(team):
                 "priority": priority,
                 "assigned_at": a.assigned_at,
                 "assigned_label": a.assigned_at.strftime("%b %d, %Y %I:%M %p") if a.assigned_at else "",
-                "techs": [],
+                "dest_lat": dest_lat,
+                "dest_lng": dest_lng,
+                "tech_name": None,
+                "tech_lat": None,
+                "tech_lng": None,
             }
-        # every member holding this same ticket (for the "Assigned to" line)
-        for a in member.assignments:
-            if a.technical_issue_id is not None:
-                k = ("TN", a.technical_issue_id)
-            elif a.service_request_id is not None:
-                k = ("SO", a.service_request_id)
-            else:
-                k = ("JOB", a.id)
-            if k in by_ticket and member.full_name not in by_ticket[k]["techs"]:
-                by_ticket[k]["techs"].append(member.full_name)
+
+    # The member out working the ticket: prefer one whose own assignment is
+    # in progress and who has reported a GPS position; else any holder with
+    # a position; else just the in-progress holder's name.
+    for key, row in by_ticket.items():
+        people = holders.get(key, [])
+        with_gps = [(st, m) for st, m in people if m.current_latitude is not None and m.current_longitude is not None]
+        pick = (
+            next(((st, m) for st, m in with_gps if st == "in_progress"), None)
+            or (with_gps[0] if with_gps else None)
+            or next(((st, m) for st, m in people if st == "in_progress"), None)
+        )
+        if pick is not None:
+            m = pick[1]
+            row["tech_name"] = m.full_name
+            row["tech_lat"] = _num(m.current_latitude)
+            row["tech_lng"] = _num(m.current_longitude)
+
     return sorted(by_ticket.values(), key=lambda r: r["assigned_at"] or datetime.min, reverse=True)
 
 

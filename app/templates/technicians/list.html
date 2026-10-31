@@ -3,6 +3,10 @@
 {% block page_title %}Technician{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ technicians|length }} {{ 'deactivated ' if show_deactivated else '' }}profile{{ '' if technicians|length == 1 else 's' }} shown</p>{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
     <button type="button" class="btn btn-outline-primary rounded-pill px-3" id="createTeamBtn"
@@ -184,6 +188,106 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script>
+    // Team details > ticket popup: for an in-progress ticket, show a live map
+    // with the technician's last reported position, the destination and the
+    // driving route between them (same approach as the subscriber's
+    // "Arriving" map on the My Issues page).
+    (function () {
+        var bodyEl = document.getElementById('techTeamDetailBody');
+        if (!bodyEl || typeof L === 'undefined') return;
+        var OSRM = 'https://router.project-osrm.org/route/v1/driving/';
+        var live = null;   // { map, token }
+
+        function num(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+        function esc(x) { var d = document.createElement('div'); d.textContent = x == null ? '' : String(x); return d.innerHTML; }
+        function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m'; }
+        function haversine(a, b, c, d) {
+            var R = 6371000, r = Math.PI / 180, dLat = (c - a) * r, dLng = (d - b) * r;
+            var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return 2 * R * Math.asin(Math.sqrt(h));
+        }
+        function pin(color, label) {
+            return L.divIcon({
+                className: 'td-pin',
+                html: '<span class="td-pin__dot" style="background:' + color + '"></span><span class="td-pin__tag" style="background:' + color + '">' + label + '</span>',
+                iconSize: [0, 0]
+            });
+        }
+        function destroy() { if (live) { live.map.remove(); live = null; } }
+
+        function show(row) {
+            var pop = bodyEl.querySelector('.td-pop');
+            if (!pop) return;
+            var box = pop.querySelector('.td-pop-live');
+            var mapEl = pop.querySelector('.td-pop-map');
+            var info = pop.querySelector('.td-pop-mapinfo');
+            destroy();
+            if (!box || !mapEl || row.dataset.status !== 'in_progress') return;
+
+            var d = row.dataset;
+            var dest = (num(d.destLat) != null && num(d.destLng) != null) ? [num(d.destLat), num(d.destLng)] : null;
+            var tech = (num(d.techLat) != null && num(d.techLng) != null) ? [num(d.techLat), num(d.techLng)] : null;
+            var name = d.techName ? esc(d.techName) : 'Not available';
+
+            if (!dest && !tech) {
+                mapEl.hidden = true;
+                info.innerHTML = '<span>No location on file for this ticket yet.</span>';
+                return;
+            }
+            mapEl.hidden = false;
+            info.innerHTML = '<span>Technician: <b>' + name + '</b></span>' +
+                (tech ? '' : '<span>The technician\u2019s location hasn\u2019t been reported yet.</span>') +
+                (dest ? '' : '<span>No destination location on file.</span>');
+
+            var map = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+            var token = {};
+            live = { map: map, token: token };
+            var pts = [];
+            if (dest) { L.marker(dest, { icon: pin('#16a34a', 'Destination') }).addTo(map); pts.push(dest); }
+            if (tech) { L.marker(tech, { icon: pin('#0d8bf2', 'Technician') }).addTo(map); pts.push(tech); }
+
+            function fit() {
+                map.invalidateSize();
+                if (pts.length > 1) map.fitBounds(L.latLngBounds(pts), { padding: [36, 36], maxZoom: 17 });
+                else map.setView(pts[0], 16);
+            }
+            fit();
+            setTimeout(fit, 80);   // popup was just revealed: re-measure once it has its final size
+
+            if (tech && dest) {
+                var straight = L.polyline([tech, dest], { color: '#0d8bf2', weight: 4, dashArray: '6 8' }).addTo(map);
+                info.insertAdjacentHTML('beforeend', '<span class="td-dist">Distance: <b>' + fmtDist(haversine(tech[0], tech[1], dest[0], dest[1])) + '</b> (straight-line)</span>');
+                fetch(OSRM + tech[1] + ',' + tech[0] + ';' + dest[1] + ',' + dest[0] + '?overview=full&geometries=geojson')
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (!live || live.token !== token || !data || !data.routes || !data.routes[0]) return;
+                        var rt = data.routes[0];
+                        map.removeLayer(straight);
+                        L.polyline(rt.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }), { color: '#0d8bf2', weight: 5, opacity: .85 }).addTo(map);
+                        var el = info.querySelector('.td-dist');
+                        if (el) el.innerHTML = 'Route distance: <b>' + fmtDist(rt.distance) + '</b>';
+                    })
+                    .catch(function () { /* keep the straight-line fallback */ });
+            }
+        }
+
+        function onOpen(e) {
+            var row = e.target.closest && e.target.closest('.td-job[data-code]');
+            if (row) show(row);
+            else if (e.target.closest && (e.target.closest('.td-pop-x') || e.target.classList.contains('td-pop'))) destroy();
+        }
+        bodyEl.addEventListener('click', onOpen);
+        bodyEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') onOpen(e);
+        });
+        // closing / reloading the team popup also tears the map down
+        var modalEl = document.getElementById('techTeamDetailModal');
+        if (modalEl) modalEl.addEventListener('hidden.bs.modal', function (e) { if (e.target === modalEl) destroy(); });
+    })();
+</script>
 <style>
     #techTeamModal { z-index: 1065; }
     /* Popup chrome: no header bar -- the card has its own header; just a close button. */
