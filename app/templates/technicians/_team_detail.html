@@ -11,8 +11,22 @@
     .team-detail > * { position: relative; z-index: 1; }
     .td-eyebrow { display: flex; align-items: center; gap: .6rem; margin: 0 0 .9rem; font-size: .7rem; letter-spacing: .22em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
     .td-eyebrow::after { content: ""; width: 56px; height: 2px; background: var(--tp-gold); border-radius: 2px; }
-    .td-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.1rem; }
+    .td-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.1rem; align-items: start; }
+    .td-col { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; }
     @media (max-width: 767.98px) { .td-grid { grid-template-columns: 1fr; } }
+    .td-job { padding: .7rem .9rem; border-top: 1px solid var(--bs-border-color); }
+    .td-job:first-child { border-top: 0; }
+    .td-job-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+    .td-job-code { font-weight: 700; font-size: .9rem; }
+    .td-job-type { font-weight: 500; font-size: .88rem; }
+    .td-job-sub { font-size: .78rem; color: var(--bs-secondary-color); margin-top: .15rem; }
+    .td-st { display: inline-block; padding: .12rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; background: rgba(148,163,184,.25); color: var(--bs-secondary-color); }
+    .td-st.is-in_progress { background: rgba(16,70,184,.16); color: #1046B8; }
+    .td-st.is-accepted { background: rgba(244,180,26,.28); color: #b45309; }
+    .td-st.is-assigned { background: rgba(244,180,26,.2); color: #b45309; }
+    .td-st.is-completed { background: rgba(34,197,94,.18); color: #16a34a; }
+    [data-bs-theme="dark"] .td-st.is-in_progress { color: #7fb0ff; } [data-bs-theme="dark"] .td-st.is-completed { color: #4ade80; } [data-bs-theme="dark"] .td-st.is-accepted, [data-bs-theme="dark"] .td-st.is-assigned { color: #fbbf24; }
+    .td-jobs-list { max-height: 230px; }
     .td-card { background: var(--bs-tertiary-bg); border: 1px solid var(--bs-border-color); border-radius: .9rem; padding: 1.25rem; }
     .td-top { display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; margin-bottom: .9rem; border-bottom: 1px solid var(--bs-border-color); }
     .td-icon { width: 76px; height: 76px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font-size: 2.2rem; color: #fff;
@@ -53,6 +67,7 @@
     <div class="td-eyebrow">Team Details</div>
 
     <div class="td-grid">
+        <div class="td-col">
         <div class="td-card">
             <div class="td-top">
                 <div class="td-icon"><i class="bi bi-people-fill"></i></div>
@@ -72,6 +87,7 @@
             </div>
         </div>
 
+
         <div class="td-card">
             <div class="td-head">
                 <div class="td-title"><i class="bi bi-person-lines-fill"></i>Members <span class="td-count">({{ members|length }})</span></div>
@@ -89,6 +105,47 @@
                 <div class="p-4 text-center text-muted">This team has no members.</div>
                 {% endfor %}
             </div>
+        </div>
+        </div>
+
+        <div class="td-col">
+        <div class="td-card">
+            <div class="td-head">
+                <div class="td-title"><i class="bi bi-wrench-adjustable-circle"></i>In Progress <span class="td-count">({{ in_progress|length }})</span></div>
+            </div>
+            <div class="td-list td-jobs-list">
+                {% for j in in_progress %}
+                <div class="td-job">
+                    <div class="td-job-top">
+                        <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
+                        
+                    </div>
+                    <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">No work in progress right now.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="td-card">
+            <div class="td-head">
+                <div class="td-title"><i class="bi bi-ticket-detailed"></i>Assigned Tickets <span class="td-count">({{ jobs|length }})</span></div>
+            </div>
+            <div class="td-list td-jobs-list">
+                {% for j in jobs %}
+                <div class="td-job">
+                    <div class="td-job-top">
+                        <span><span class="td-job-code">{{ j.code }}</span> <span class="td-job-type">&middot; {{ j.type }}</span></span>
+                        <span class="td-st is-{{ j.status }}">{{ j.status|replace("_", " ")|capitalize }}</span>
+                    </div>
+                    <div class="td-job-sub">{% if j.who %}{{ j.who }}{% endif %}{% if j.who and j.address %} &middot; {% endif %}{{ j.address or '' }}</div>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">No tickets assigned to this team yet.</div>
+                {% endfor %}
+            </div>
+        </div>
         </div>
     </div>
 
