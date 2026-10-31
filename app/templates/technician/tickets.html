@@ -88,6 +88,8 @@
     .tt-empty { padding: 1rem .5rem 1.1rem; text-align: center; font-size: .85rem; color: #6b7280; }
     .tt-empty i { display: block; margin-bottom: .25rem; font-size: 1.6rem; opacity: .6; }
     html[data-bs-theme="dark"] .tt-box.is-progress .tt-box-head { color: #7db3ff; }
+    .tt-box:target { animation: ttFlash 1.4s ease-out; }
+    @keyframes ttFlash { 0% { box-shadow: 0 0 0 3px rgba(22,132,255,.8); } 100% { box-shadow: 0 8px 22px -16px rgba(6,23,71,.45); } }
 
     @media (max-width: 991.98px) {
         html.tt-fit, html.tt-fit body { overflow: hidden !important; height: 100%; }

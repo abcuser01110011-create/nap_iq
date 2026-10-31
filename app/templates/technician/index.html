@@ -76,6 +76,15 @@
 {% if profile is not none %}
 <style>
     .tech-overview .tech-ov-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    /* Overview cards are shortcuts: lift + glow on hover, icon pop, arrow slides in. */
+    .tech-overview .dash-stat-card-link { position: relative; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease; }
+    .tech-overview .dash-stat-card-link:hover, .tech-overview .dash-stat-card-link:focus-visible { transform: translateY(-3px); box-shadow: 0 14px 26px -14px rgba(16, 70, 184, .7); }
+    .tech-overview .dash-stat-card-link .dash-stat-icon { transition: transform .18s ease; }
+    .tech-overview .dash-stat-card-link:hover .dash-stat-icon, .tech-overview .dash-stat-card-link:focus-visible .dash-stat-icon { transform: scale(1.12) rotate(-4deg); }
+    .tech-overview .dash-stat-card-link::after { transition: transform .18s ease, color .18s ease; }
+    .tech-overview .dash-stat-card-link:hover::after, .tech-overview .dash-stat-card-link:focus-visible::after { transform: translateX(4px); color: #1684FF !important; }
+    .tech-overview .dash-stat-card-link:active { transform: translateY(0) scale(.98); }
+    @media (prefers-reduced-motion: reduce) { .tech-overview .dash-stat-card-link, .tech-overview .dash-stat-icon { transition: none; } }
     @media (min-width: 992px) { .tech-overview .tech-ov-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
     .tech-overview .dash-stat-card { height: 100%; }
     .tech-overview .tech-ov-rate-bar { height: 6px; border-radius: 999px; background: var(--napiq-border); overflow: hidden; margin-top: .35rem; }
@@ -120,35 +129,35 @@
     </div>
     <div class="card-body">
         <div class="tech-ov-grid">
-            <div class="dash-stat-card">
+            <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('technician.tickets') ~ '#ttAssigned' }}" title="View open tickets">
                 <span class="dash-stat-icon stat-icon-blue"><i class="bi bi-inbox"></i></span>
                 <div class="dash-stat-body">
                     <span class="dash-stat-value">{{ stats.open }}</span>
                     <span class="dash-stat-label">Open Tickets</span>
                 </div>
-            </div>
-            <div class="dash-stat-card">
+            </a>
+            <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('technician.tickets') ~ '#ttProgress' }}" title="View tickets in progress">
                 <span class="dash-stat-icon stat-icon-orange"><i class="bi bi-hourglass-split"></i></span>
                 <div class="dash-stat-body">
                     <span class="dash-stat-value">{{ stats.in_progress }}</span>
                     <span class="dash-stat-label">In Progress</span>
                 </div>
-            </div>
-            <div class="dash-stat-card">
+            </a>
+            <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('technician.history') }}" title="View completed tickets">
                 <span class="dash-stat-icon stat-icon-green"><i class="bi bi-check-circle"></i></span>
                 <div class="dash-stat-body">
                     <span class="dash-stat-value">{{ stats.completed }}</span>
                     <span class="dash-stat-label">Completed</span>
                 </div>
-            </div>
-            <div class="dash-stat-card">
+            </a>
+            <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('technician.history') }}" title="View ticket history">
                 <span class="dash-stat-icon stat-icon-royal"><i class="bi bi-graph-up-arrow"></i></span>
                 <div class="dash-stat-body">
                     <span class="dash-stat-value">{{ stats.rate }}%</span>
                     <span class="dash-stat-label">Completion Rate</span>
                     <div class="tech-ov-rate-bar" role="progressbar" aria-valuenow="{{ stats.rate }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ stats.rate }}%"></span></div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 </div>
