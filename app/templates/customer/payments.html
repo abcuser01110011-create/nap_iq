@@ -5,33 +5,7 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">Payment history on your account</p>{% endblock %}
 
 {% block content %}
-{% if hitpay_enabled %}
-<div class="card shadow-sm mb-3">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-credit-card-2-front me-1"></i>Pay Online</span>
-        {% if hitpay_sandbox %}<span class="badge text-bg-warning">Test mode</span>{% endif %}
-    </div>
-    <div class="card-body">
-        <form method="post" action="{{ url_for('hitpay.pay_online') }}" class="row g-2 align-items-end">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="col-12 col-sm">
-                <label for="payOnlineAmount" class="form-label small text-muted mb-1">Amount ({{ hitpay_currency }})</label>
-                <input type="number" class="form-control" id="payOnlineAmount" name="amount"
-                       min="1" max="100000" step="0.01" inputmode="decimal" placeholder="0.00" required>
-            </div>
-            <div class="col-12 col-sm-auto">
-                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-lock-fill me-1"></i>Pay with HitPay</button>
-            </div>
-        </form>
-        {% if hitpay_sandbox %}
-        <p class="small text-muted mt-3 mb-0">
-            Demo only &mdash; no real money moves. At checkout use test card <strong>4242 4242 4242 4242</strong>,
-            any future expiry date and any 3-digit CVC. The payment shows as <em>Confirmed</em> below once HitPay notifies the server.
-        </p>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
+{% set payment_status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
 <div class="card shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <span><i class="bi bi-cash-coin me-1"></i>My Payments</span>
@@ -44,25 +18,24 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Amount</th>
-                        <th>Method</th>
                         <th>Reference #</th>
-                        <th>Status</th>
+                        <th class="text-end" style="width: 1%;"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% set payment_status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
                     {% for payment in payments %}
-                    <tr>
-                        <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
-                        <td>{{ "%.2f"|format(payment.amount) }}</td>
-                        <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
-                        <td>{{ payment.reference_number or "—" }}</td>
-                        <td>
-                            <span class="badge {{ payment_status_classes.get(payment.status, 'text-bg-secondary') }}">
-                                {{ payment.status|capitalize }}
-                            </span>
-                        </td>
+                    <tr role="button" tabindex="0" style="cursor: pointer;"
+                        data-bs-toggle="modal" data-bs-target="#paymentDetailModal"
+                        data-date="{{ payment.payment_date.strftime('%Y-%m-%d') }}"
+                        data-amount="{{ '%.2f'|format(payment.amount) }}"
+                        data-method="{{ payment.payment_method|replace('_', ' ')|capitalize }}"
+                        data-reference="{{ payment.reference_number or '—' }}"
+                        data-status="{{ payment.status|capitalize }}"
+                        data-status-class="{{ payment_status_classes.get(payment.status, 'text-bg-secondary') }}"
+                        data-remarks="{{ payment.remarks or '' }}">
+                        <td class="text-nowrap">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                        <td class="text-break">{{ payment.reference_number or "—" }}</td>
+                        <td class="text-end text-muted"><i class="bi bi-chevron-right"></i></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -76,4 +49,66 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Payment details popup (filled from the clicked row's data-* attributes) -->
+<div class="modal fade" id="paymentDetailModal" tabindex="-1" aria-labelledby="paymentDetailTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentDetailTitle">Payment details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Date</dt>
+                    <dd class="col-sm-8" data-field="date"></dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Amount</dt>
+                    <dd class="col-sm-8">&#8369;<span data-field="amount"></span></dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Method</dt>
+                    <dd class="col-sm-8" data-field="method"></dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Reference #</dt>
+                    <dd class="col-sm-8 text-break" data-field="reference"></dd>
+                    <dt class="col-sm-4 text-muted fw-normal">Status</dt>
+                    <dd class="col-sm-8"><span class="badge" data-field="status"></span></dd>
+                    <div data-field-wrap="remarks" class="row g-0 m-0 p-0">
+                        <dt class="col-sm-4 text-muted fw-normal">Remarks</dt>
+                        <dd class="col-sm-8 mb-0" data-field="remarks"></dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var modal = document.getElementById("paymentDetailModal");
+    if (!modal) return;
+    function field(name) { return modal.querySelector('[data-field="' + name + '"]'); }
+
+    modal.addEventListener("show.bs.modal", function (event) {
+        var row = event.relatedTarget;
+        if (!row) return;
+        var d = row.dataset;
+        field("date").textContent = d.date;
+        field("amount").textContent = d.amount;
+        field("method").textContent = d.method;
+        field("reference").textContent = d.reference;
+        var badge = field("status");
+        badge.textContent = d.status;
+        badge.className = "badge " + d.statusClass;
+        field("remarks").textContent = d.remarks;
+        modal.querySelector('[data-field-wrap="remarks"]').style.display = d.remarks ? "" : "none";
+    });
+
+    // Keyboard: Enter / Space on a focused row opens it, same as a click.
+    document.querySelectorAll('tr[data-bs-target="#paymentDetailModal"]').forEach(function (row) {
+        row.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); row.click(); }
+        });
+    });
+})();
+</script>
 {% endblock %}
