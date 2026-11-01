@@ -323,7 +323,7 @@
         {% set _ = mbn.append({'href': url_for('customer.my_issues'), 'icon': 'bi-ticket-perforated', 'label': 'Issues', 'bar': true, 'active': _ep in ['customer.my_issues', 'customer.my_issue_detail', 'customer.report_issue'], 'badge': sidebar_badges.get('customer_issues')}) %}
     {% endif %}
     {% if _role in ('administrator', 'user') %}
-        {% set _ = mbn.append({'href': url_for('notifications.index'), 'icon': 'bi-bell', 'label': 'Alerts', 'bar': _role == 'user', 'active': _ep.startswith('notifications.'), 'badge': unread_notifications_count}) %}
+        {% set _ = mbn.append({'href': url_for('notifications.index'), 'icon': 'bi-bell', 'label': 'Notification', 'bar': _role == 'user', 'active': _ep.startswith('notifications.'), 'badge': unread_notifications_count}) %}
     {% endif %}
     {% set _ = mbn.append({'href': url_for('profile.index'), 'icon': 'bi-person-circle', 'label': 'Profile', 'bar': _role != 'administrator',
         'active': _ep.startswith('profile.') or _ep.startswith('settings.')}) %}
@@ -344,7 +344,7 @@
         <button type="button" class="mbn-item {{ 'active' if mbn_more_active else '' }}" id="mbnMoreBtn"
                 aria-haspopup="true" aria-expanded="false" aria-controls="mbnSheet">
             <i class="bi bi-grid"></i><span class="mbn-label">More</span>
-            {% if unread_notifications_count and _role in ('administrator', 'user') and not mbn_bar|selectattr('label', 'equalto', 'Alerts')|list %}<span class="mbn-dot"></span>{% endif %}
+            {% if unread_notifications_count and _role in ('administrator', 'user') and not mbn_bar|selectattr('label', 'equalto', 'Notification')|list %}<span class="mbn-dot"></span>{% endif %}
         </button>
         {% endif %}
     </nav>
