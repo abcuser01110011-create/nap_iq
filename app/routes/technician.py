@@ -996,6 +996,9 @@ def complete_assignment(assignment_id):
                 "You're connected!",
                 f"Your installation is complete — {subscriber.subscriber_code} is now active. "
                 "Welcome to PG Networks!",
+                admin_title=f"Installation completed — {subscriber.subscriber_code}",
+                admin_message=f"{subscriber.full_name} ({subscriber.subscriber_code}) is now "
+                "connected and active.",
                 customer_user_id=subscriber.user_id,
                 entity_type="service_request",
                 entity_id=service_request.id,

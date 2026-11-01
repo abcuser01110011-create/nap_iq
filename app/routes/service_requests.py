@@ -252,9 +252,8 @@ def _notify_status_change(service_request):
         "service_request",
         f"Service request {label} — {service_request.status.replace('_', ' ')}",
         f"Your {service_request.request_type.replace('_', ' ')} request is now "
-        f"'{service_request.status.replace('_', ' ')}'."
-        if customer_user_id
-        else f"Service request {label} ({service_request.request_type.replace('_', ' ')}) "
+        f"'{service_request.status.replace('_', ' ')}'.",
+        admin_message=f"Service request {label} ({service_request.request_type.replace('_', ' ')}) "
         f"is now '{service_request.status.replace('_', ' ')}'.",
         customer_user_id=customer_user_id,
         entity_type="service_request",

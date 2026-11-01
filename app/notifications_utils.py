@@ -19,7 +19,8 @@ from app.extensions import db
 from app.models import Notification
 
 
-def notify(category, title, message, *, customer_user_id=None, entity_type=None, entity_id=None):
+def notify(category, title, message, *, customer_user_id=None, entity_type=None, entity_id=None,
+           admin_title=None, admin_message=None):
     """Records a notification for an event.
 
     Always creates one 'administrator'-audience row (system-wide —
@@ -34,14 +35,21 @@ def notify(category, title, message, *, customer_user_id=None, entity_type=None,
     `entity_type`/`entity_id` are optional pointers back to the record
     this notification is about (e.g. "service_request", 42) so the
     notifications list can link to it.
+
+    `title`/`message` are the CUSTOMER's wording ("Your reported issue
+    is now ..."). The Administrator row used to get that same text, so
+    admins saw messages addressed to the customer. `admin_title` /
+    `admin_message` give the Administrator row its own third-person
+    wording; they fall back to `title`/`message` when not given (fine
+    for events that already read neutrally).
     """
     db.session.add(
         Notification(
             audience="administrator",
             user_id=None,
             category=category,
-            title=title,
-            message=message,
+            title=admin_title or title,
+            message=admin_message or message,
             entity_type=entity_type,
             entity_id=entity_id,
         )
@@ -160,6 +168,41 @@ def notify_payment_pending_confirmation(payment):
     )
 
 
+def notify_online_payment_received(payment):
+    """Records a notification when a customer's online (HitPay) payment
+    is confirmed by the HitPay webhook: the subscriber sees a receipt-style
+    message, and every Administrator sees who paid and how much. Called
+    from app/routes/hitpay.py's `hitpay_webhook()` right before its commit,
+    so it is saved together with the 'confirmed' status."""
+    subscriber = payment.subscriber
+    amount = f"\u20b1{payment.amount:,.2f}"
+    notify(
+        "payment",
+        "Payment received",
+        f"We received your online payment of {amount}. Thank you!",
+        admin_title=f"Online payment received \u2014 {subscriber.subscriber_code}",
+        admin_message=f"{subscriber.full_name} ({subscriber.subscriber_code}) paid {amount} online via HitPay.",
+        customer_user_id=subscriber.user_id,
+        entity_type="payment",
+        entity_id=payment.id,
+    )
+
+
+def notify_online_payment_needs_review(payment):
+    """Administrator-only alert for an online payment HitPay reports as
+    completed but whose paid amount does not match what was requested
+    (the payment stays 'pending' until someone checks it)."""
+    subscriber = payment.subscriber
+    notify(
+        "payment",
+        f"Online payment needs review \u2014 {subscriber.subscriber_code}",
+        f"HitPay reported a payment from {subscriber.full_name} whose amount does not match "
+        f"the requested \u20b1{payment.amount:,.2f}. Please check it in HitPay and confirm or void it.",
+        entity_type="payment",
+        entity_id=payment.id,
+    )
+
+
 def notify_issue_status_change(issue):
     """Records a Phase 17 notification for a technical issue's status
     change — same `notify()` call shape as
@@ -175,9 +218,8 @@ def notify_issue_status_change(issue):
     notify(
         "issue",
         f"Technical issue {label} — {issue.status.replace('_', ' ')}",
-        f"Your reported issue is now '{issue.status.replace('_', ' ')}'."
-        if customer_user_id
-        else f"Technical issue {label} ({issue.issue_type}) is now "
+        f"Your reported issue is now '{issue.status.replace('_', ' ')}'.",
+        admin_message=f"Technical issue {label} ({issue.issue_type}) is now "
         f"'{issue.status.replace('_', ' ')}'.",
         customer_user_id=customer_user_id,
         entity_type="issue",

@@ -24,6 +24,7 @@ from app.auth import role_required
 from app.billing_utils import monthly_due_info
 from app.extensions import db
 from app.models import Payment
+from app.notifications_utils import notify_online_payment_needs_review, notify_online_payment_received
 from app.routes.customer import _no_subscriber_redirect, _own_subscriber_or_none
 
 hitpay_bp = Blueprint("hitpay", __name__, url_prefix="/customer/payments")
@@ -160,6 +161,7 @@ def hitpay_webhook():
     if paid is None or paid != Decimal(payment.amount).quantize(Decimal("0.01")):
         current_app.logger.warning("HitPay amount mismatch on payment %s: got %s, expected %s", payment.id, paid, payment.amount)
         payment.remarks = "HitPay online payment - amount mismatch, needs review"[:500]
+        notify_online_payment_needs_review(payment)
         db.session.commit()
         return "amount mismatch", 200
 
@@ -171,5 +173,6 @@ def hitpay_webhook():
     payment.payment_date = date.today()
     payment.reference_number = str(data.get("id") or payment.reference_number or "")[:50] or None
     payment.remarks = ("HitPay online payment" + (f" ({method})" if method else ""))[:500]
+    notify_online_payment_received(payment)
     db.session.commit()
     return "ok", 200
