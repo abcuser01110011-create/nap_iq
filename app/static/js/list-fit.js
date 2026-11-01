@@ -29,6 +29,8 @@
     var noun = (counter && counter.getAttribute('data-lf-noun')) || 'record';
     var originalCount = counter ? counter.textContent : '';
 
+    var card = document.querySelector('.disp-table-card');
+    var fitRows = null;
     var page = 1;
     var matches = rows.slice();
 
@@ -59,6 +61,11 @@
         if (page > pages) page = pages;
         var start = (page - 1) * PAGE_SIZE;
         var end = Math.min(start + PAGE_SIZE, total);
+
+        // Fewer than a full page: let the card shrink to its rows instead of
+        // leaving a big empty box.
+        if (card) card.classList.toggle('lf-short', total < PAGE_SIZE);
+        if (fitRows) fitRows();
 
         rows.forEach(function (row) { row.classList.add('d-none'); });
         matches.slice(start, end).forEach(function (row) { row.classList.remove('d-none'); });
@@ -101,7 +108,7 @@
     function applyFilter() {
         var term = input ? input.value.trim().toLowerCase() : '';
         matches = rows.filter(function (row) {
-            return !term || (row.dataset.search || '').indexOf(term) !== -1;
+            return !term || (row.dataset.search || row.textContent.toLowerCase()).indexOf(term) !== -1;
         });
         page = 1;
         if (noMatchRow) {
@@ -119,10 +126,15 @@
     var wrap = table && table.closest('.table-responsive');
     if (table && wrap) {
         var fit = function () {
+            if (card && card.classList.contains('lf-short')) {
+                table.style.setProperty('--subs-row-h', '48px');
+                return;
+            }
             var thead = table.querySelector('thead');
             var avail = wrap.clientHeight - (thead ? thead.offsetHeight : 0) - 1;
             table.style.setProperty('--subs-row-h', Math.max(40, avail / PAGE_SIZE) + 'px');
         };
+        fitRows = fit;
         fit();
         window.addEventListener('resize', fit);
         window.addEventListener('load', fit);

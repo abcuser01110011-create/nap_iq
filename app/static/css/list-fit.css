@@ -85,6 +85,7 @@ button.subs-edit-btn {
         flex-direction: column;
         border-radius: 0.75rem;
     }
+    body.list-fit .disp-table-card.lf-short { flex: 0 1 auto; }
     body.list-fit .disp-table-card .table-responsive {
         flex: 1 1 auto;
         min-height: 0;

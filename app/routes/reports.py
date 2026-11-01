@@ -316,6 +316,17 @@ def _build_overview_report():
     }
 
 
+def _kpi(label, value, icon, tone, sub=""):
+    """One summary card for the strip above each report's table."""
+    if isinstance(value, int):
+        value = f"{value:,}"
+    return {"label": label, "value": value, "icon": icon, "tone": tone, "sub": sub}
+
+
+def _share(n, total):
+    return f"{round(n / total * 100)}% of total" if total else ""
+
+
 def _parse_date_range(prefix):
     """Parses `?{prefix}_start=` / `?{prefix}_end=` (YYYY-MM-DD) query
     params for one report's date filter. Returns a 5-tuple: (start,
@@ -455,6 +466,15 @@ def _build_issues_report():
         "issue_status_summary": issue_status_summary,
         "issue_priority_summary": issue_priority_summary,
         "issue_status_order": ISSUE_STATUS_ORDER,
+        "kpis": [
+            _kpi("Total Issues", total_issues_in_range, "bi-exclamation-triangle-fill", "primary"),
+            _kpi("Open", sum(status_counts.get(x, 0) for x in OPEN_ISSUE_STATUSES), "bi-hourglass-split", "warning",
+                 _share(sum(status_counts.get(x, 0) for x in OPEN_ISSUE_STATUSES), total_issues_in_range)),
+            _kpi("Resolved / Closed", status_counts.get("resolved", 0) + status_counts.get("closed", 0), "bi-check-circle-fill", "success",
+                 _share(status_counts.get("resolved", 0) + status_counts.get("closed", 0), total_issues_in_range)),
+            _kpi("High / Critical", priority_counts.get("high", 0) + priority_counts.get("critical", 0), "bi-fire", "danger",
+                 _share(priority_counts.get("high", 0) + priority_counts.get("critical", 0), total_issues_in_range)),
+        ],
     }
 
 
@@ -481,6 +501,12 @@ def _build_nap_inventory_report():
         "inv_status_filter": status_filter,
         "inventory_naps": naps,
         "inventory_status_counts": status_counts,
+        "kpis": [
+            _kpi("Total NAPs", len(naps), "bi-diagram-3-fill", "primary"),
+            _kpi("Active", status_counts.get("active", 0), "bi-check-circle-fill", "success", _share(status_counts.get("active", 0), len(naps))),
+            _kpi("Full", status_counts.get("full", 0), "bi-hdd-network-fill", "warning", _share(status_counts.get("full", 0), len(naps))),
+            _kpi("Maintenance / Inactive", status_counts.get("maintenance", 0) + status_counts.get("inactive", 0), "bi-tools", "danger"),
+        ],
         "nap_status_order": NAP_STATUS_ORDER,
     }
 
@@ -538,6 +564,13 @@ def _build_port_availability_report():
         "total_ports": total_ports,
         "total_used_ports": total_used_ports,
         "overall_utilization_pct": overall_utilization_pct,
+        "kpis": [
+            _kpi("Total NAPs", len(nap_utilization), "bi-hdd-network-fill", "primary"),
+            _kpi("Ports Used", f"{total_used_ports:,} / {total_ports:,}", "bi-plug-fill", "violet", f"{overall_utilization_pct}% utilization"),
+            _kpi("Ports Available", total_ports - total_used_ports, "bi-ethernet", "success"),
+            _kpi("Near Capacity", len(near_capacity), "bi-exclamation-triangle-fill", "danger",
+                 (", ".join(r["nap_code"] for r in near_capacity[:3]) + ("…" if len(near_capacity) > 3 else "")) if near_capacity else f"None at {NEAR_CAPACITY_THRESHOLD_PCT}%+"),
+        ],
         "nap_status_order": NAP_STATUS_ORDER,
     }
 
@@ -583,6 +616,12 @@ def _build_subscribers_report():
         "subscriber_status_counts": status_counts,
         "subscriber_status_order": SUBSCRIBER_STATUS_ORDER,
         "total_subscribers": len(subscribers),
+        "kpis": [
+            _kpi("Total Subscribers", len(subscribers), "bi-people-fill", "primary"),
+            _kpi("Active", status_counts.get("active", 0), "bi-check-circle-fill", "success", _share(status_counts.get("active", 0), len(subscribers))),
+            _kpi("Inactive", status_counts.get("inactive", 0), "bi-pause-circle-fill", "warning", _share(status_counts.get("inactive", 0), len(subscribers))),
+            _kpi("Disconnected", status_counts.get("disconnected", 0), "bi-x-circle-fill", "danger", _share(status_counts.get("disconnected", 0), len(subscribers))),
+        ],
     }
 
 
@@ -628,6 +667,12 @@ def _build_service_requests_report():
         "service_request_status_order": SERVICE_REQUEST_STATUS_ORDER,
         "service_request_type_order": SERVICE_REQUEST_TYPE_ORDER,
         "total_service_requests": len(requests_),
+        "kpis": [
+            _kpi("Total Requests", len(requests_), "bi-clipboard-check-fill", "primary"),
+            _kpi("Pending", status_counts.get("pending", 0), "bi-hourglass-split", "warning", _share(status_counts.get("pending", 0), len(requests_))),
+            _kpi("Approved / Scheduled", status_counts.get("approved", 0) + status_counts.get("scheduled", 0), "bi-calendar-check-fill", "violet"),
+            _kpi("Completed", status_counts.get("completed", 0), "bi-check-circle-fill", "success", _share(status_counts.get("completed", 0), len(requests_))),
+        ],
     }
 
 
@@ -681,6 +726,13 @@ def _build_payments_report():
         "total_payments": len(payments),
         "total_amount": total_amount,
         "confirmed_amount": confirmed_amount,
+        "kpis": [
+            _kpi("Total Payments", len(payments), "bi-cash-coin", "primary"),
+            _kpi("Total Amount", f"\u20b1{total_amount:,.0f}", "bi-wallet2", "violet"),
+            _kpi("Confirmed", f"\u20b1{confirmed_amount:,.0f}", "bi-check-circle-fill", "success", f"{status_counts.get('confirmed', 0)} payments"),
+            _kpi("Pending / Overdue", status_counts.get("pending", 0) + status_counts.get("overdue", 0), "bi-hourglass-split", "warning",
+                 f"\u20b1{total_amount_by_status.get('pending', 0) + total_amount_by_status.get('overdue', 0):,.0f}"),
+        ],
     }
 
 
@@ -773,6 +825,12 @@ def _build_technician_workload_report():
         "wl_technician_choices": _technician_choices(),
         "technician_workload": technician_workload,
         "open_assignment_statuses": OPEN_ASSIGNMENT_STATUSES,
+        "kpis": [
+            _kpi("Technicians", len(technician_workload), "bi-person-badge-fill", "primary"),
+            _kpi("Open Assignments", sum(r["total_open"] for r in technician_workload), "bi-hourglass-split", "warning"),
+            _kpi("Completed" + (" (in range)" if (start or end_exclusive) else ""), sum(r["completed_in_range"] for r in technician_workload), "bi-check-circle-fill", "success"),
+            _kpi("Resolved (all-time)", sum(r["resolved_issues_count"] for r in technician_workload), "bi-trophy-fill", "violet"),
+        ],
     }
 
 

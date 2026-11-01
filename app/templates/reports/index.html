@@ -1,7 +1,8 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Reports &amp; Analytics{% endblock %}
-{% block body_class %}{{ 'reports-fit' if active_report == 'overview' else '' }}{% endblock %}
+{% block body_class %}{{ 'reports-fit' if active_report == 'overview' else 'list-fit reports-list' }}{% endblock %}
 {% block extra_head %}
+<link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/reports.css') }}" rel="stylesheet">
 {% endblock %}
 {% block page_title %}Reports &amp; Analytics{% endblock %}
@@ -187,728 +188,386 @@
 <script type="application/json" id="repData">{{ chart_data|tojson }}</script>
 {% endif %}
 
+{# ================================================================ #}
+{# Shared pieces for the six list-style reports                      #}
+{# ================================================================ #}
+{% macro kpi_strip(kpis) %}
+<div class="rep-kpis rep-kpis-compact">
+    {% for k in kpis %}
+    <div class="rep-kpi rep-tone-{{ k.tone }}">
+        <span class="rep-kpi-icon"><i class="bi {{ k.icon }}"></i></span>
+        <div class="rep-kpi-body">
+            <div class="rep-kpi-value">{{ k.value }}</div>
+            <div class="rep-kpi-label">{{ k.label }}</div>
+            {% if k.sub %}<div class="rep-kpi-trend flat">{{ k.sub }}</div>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro f_date(name, label, value) %}
+<label class="rep-field"><span>{{ label }}</span><input type="date" name="{{ name }}" value="{{ value }}"></label>
+{% endmacro %}
+
+{% macro f_select(name, label, all_label, options, current) %}
+<label class="rep-field">
+    <select name="{{ name }}" aria-label="{{ label }}">
+        <option value="">{{ all_label }}</option>
+        {% for o in options %}
+            {% if o is string %}{% set v = o %}{% set l = o|replace('_', ' ')|capitalize %}{% else %}{% set v = o[0] %}{% set l = o[1] %}{% endif %}
+            <option value="{{ v }}" {{ 'selected' if (current|string) == (v|string) else '' }}>{{ l }}</option>
+        {% endfor %}
+    </select>
+</label>
+{% endmacro %}
+
+{% macro search_box() %}
+<div class="rep-search">
+    <i class="bi bi-search"></i>
+    <input type="text" data-lf-search placeholder="Search this report..." aria-label="Search this report"
+           autocomplete="off" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+</div>
+{% endmacro %}
+
+{% macro pager() %}
+<div class="subs-pager" data-lf-pager hidden>
+    <nav aria-label="Report pages"><ul class="subs-pager-list" data-lf-pager-list></ul></nav>
+</div>
+{% endmacro %}
+
+{% macro empty_row(cols, icon, text) %}
+<tr><td colspan="{{ cols }}" class="disp-empty"><i class="bi {{ icon }} display-6 d-block mb-2"></i>{{ text }}</td></tr>
+{% endmacro %}
+
+{% macro nomatch_row(cols) %}
+<tr data-lf-nomatch class="d-none"><td colspan="{{ cols }}" class="disp-empty"><i class="bi bi-search display-6 d-block mb-2"></i>No rows match "<span data-lf-nomatch-q></span>".</td></tr>
+{% endmacro %}
+
+{% macro clear_link(report, active) %}
+{% if active %}<a href="{{ url_for('reports.index', report=report) }}" class="btn btn-link btn-sm text-decoration-none">Clear</a>{% endif %}
+{% endmacro %}
+
+{% macro filter_btn() %}
+<button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+{% endmacro %}
+
 {# ---------------------------------------------------------------- #}
 {# ISSUES                                                             #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'issues' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-1 text-muted"></i>Technical Issue Report</h5>
-        <span class="text-muted small">{{ total_issues_in_range }} issue{{ '' if total_issues_in_range == 1 else 's' }}</span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="issues">
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">From</label>
-                <input type="date" class="form-control" name="iss_start" value="{{ iss_start_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">To</label>
-                <input type="date" class="form-control" name="iss_end" value="{{ iss_end_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="iss_status" class="form-select">
-                    <option value="" {% if not iss_status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in issue_status_order %}
-                    <option value="{{ s }}" {% if iss_status_filter == s %}selected{% endif %}>{{ s|replace('_',' ')|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Type</label>
-                <select name="iss_type" class="form-select">
-                    <option value="" {% if not iss_type_filter %}selected{% endif %}>All Types</option>
-                    {% for t in issue_types %}
-                    <option value="{{ t }}" {% if iss_type_filter == t %}selected{% endif %}>{{ t|replace('_',' ')|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">NAP</label>
-                <select name="iss_nap" class="form-select">
-                    <option value="" {% if not iss_nap_filter %}selected{% endif %}>All NAPs</option>
-                    {% for nap_id, nap_label in issue_nap_choices %}
-                    <option value="{{ nap_id }}" {% if iss_nap_filter == nap_id %}selected{% endif %}>{{ nap_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Technician</label>
-                <select name="iss_technician" class="form-select">
-                    <option value="" {% if not iss_technician_filter %}selected{% endif %}>All Technicians</option>
-                    {% for tech_id, tech_label in issue_technician_choices %}
-                    <option value="{{ tech_id }}" {% if iss_technician_filter == tech_id %}selected{% endif %}>{{ tech_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if iss_start_date or iss_end_date or iss_status_filter or iss_type_filter or iss_nap_filter or iss_technician_filter %}
-                    <a href="{{ url_for('reports.index', report='issues') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if total_issues_in_range == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
-                No technical issues match the current filters.
-            </div>
-        {% else %}
-        <div class="row g-4 mb-4">
-            <div class="col-lg-6">
-                <div class="small text-muted mb-2">By status</div>
-                {% set status_colors = {'pending': 'secondary', 'assigned': 'info', 'in_progress': 'primary', 'resolved': 'success', 'closed': 'dark'} %}
-                {% for row in issue_status_summary %}
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-capitalize">{{ row.status.replace('_', ' ') }}</span>
-                        <span class="text-muted">{{ row.count }} ({{ row.pct }}%)</span>
-                    </div>
-                    <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-{{ status_colors.get(row.status, 'secondary') }}"
-                             role="progressbar" style="width: {{ row.pct }}%;"
-                             aria-valuenow="{{ row.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="issues">
+        {{ f_date('iss_start', 'From', iss_start_date) }}
+        {{ f_date('iss_end', 'To', iss_end_date) }}
+        {{ f_select('iss_status', 'Status', 'All statuses', issue_status_order, iss_status_filter) }}
+        {{ f_select('iss_type', 'Type', 'All types', issue_types, iss_type_filter) }}
+        {{ f_select('iss_nap', 'NAP', 'All NAPs', issue_nap_choices, iss_nap_filter) }}
+        {{ f_select('iss_technician', 'Technician', 'All technicians', issue_technician_choices, iss_technician_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('issues', iss_start_date or iss_end_date or iss_status_filter or iss_type_filter or iss_nap_filter or iss_technician_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead><tr><th>Issue</th><th>Priority</th><th>Subscriber</th><th>NAP</th><th>Status</th><th>Reported</th></tr></thead>
+            <tbody data-lf-body>
+                {% for issue in issues_rows %}
+                <tr class="disp-row lf-row">
+                    <td>
+                        <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="disp-primary-link">{{ issue.issue_code or ('#' ~ issue.id) }}</a>
+                        <div class="disp-subtext">{{ issue.issue_type|replace('_', ' ')|capitalize }}</div>
+                    </td>
+                    <td><span class="disp-badge disp-badge-{{ issue.priority }}">{{ issue.priority|capitalize }}</span></td>
+                    <td>{% if issue.subscriber %}<span class="disp-code-pill">{{ issue.subscriber.subscriber_code }}</span> {{ issue.subscriber.full_name }}{% else %}<span class="disp-subtext">—</span>{% endif %}</td>
+                    <td>{{ issue.nap.nap_code if issue.nap else "—" }}</td>
+                    <td><span class="disp-badge disp-badge-{{ issue.status }}">{{ issue.status|replace('_', ' ')|capitalize }}</span></td>
+                    <td class="disp-subtext">{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
+                </tr>
+                {% else %}
+                {{ empty_row(6, 'bi-check2-circle', 'No technical issues match the current filters.') }}
                 {% endfor %}
-            </div>
-            <div class="col-lg-6">
-                <div class="small text-muted mb-2">By priority</div>
-                {% set priority_colors = {'critical': 'danger', 'high': 'warning', 'medium': 'primary', 'low': 'secondary'} %}
-                {% for row in issue_priority_summary %}
-                <div class="mb-2">
-                    <div class="d-flex justify-content-between small mb-1">
-                        <span class="text-capitalize">{{ row.priority }}</span>
-                        <span class="text-muted">{{ row.count }} ({{ row.pct }}%)</span>
-                    </div>
-                    <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-{{ priority_colors.get(row.priority, 'secondary') }}"
-                             role="progressbar" style="width: {{ row.pct }}%;"
-                             aria-valuenow="{{ row.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="disp-table-card">
-        <div class="table-responsive">
-            <table class="table disp-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Issue</th>
-                        <th>Priority</th>
-                        <th>Subscriber</th>
-                        <th>NAP</th>
-                        <th>Status</th>
-                        <th>Reported</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for issue in issues_rows %}
-                    <tr class="disp-row">
-                        <td>
-                            <a href="{{ url_for('issues.view_issue', issue_id=issue.id) }}" class="disp-primary-link">
-                                {{ issue.issue_code or ('#' ~ issue.id) }}
-                            </a>
-                            <div class="disp-subtext">{{ issue.issue_type|replace('_', ' ')|capitalize }}</div>
-                        </td>
-                        <td>
-                            <span class="disp-badge disp-badge-{{ issue.priority }}">
-                                {{ issue.priority|capitalize }}
-                            </span>
-                        </td>
-                        <td class="small">{% if issue.subscriber %}<span class="disp-code-pill">{{ issue.subscriber.subscriber_code }}</span> {{ issue.subscriber.full_name }}{% else %}<span class="disp-subtext">—</span>{% endif %}</td>
-                        <td>{{ issue.nap.nap_code if issue.nap else "—" }}</td>
-                        <td>
-                            <span class="disp-badge disp-badge-{{ issue.status }}">
-                                {{ issue.status|replace('_', ' ')|capitalize }}
-                            </span>
-                        </td>
-                        <td class="disp-subtext">{{ issue.created_at.strftime('%Y-%m-%d') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        </div>
-        {% endif %}
+                {% if issues_rows %}{{ nomatch_row(6) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# NAP INVENTORY                                                     #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'nap_inventory' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-diagram-3 me-1 text-muted"></i>NAP Inventory Report</h5>
-        <span class="text-muted small">{{ inventory_naps|length }} NAP{{ '' if inventory_naps|length == 1 else 's' }}</span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="nap_inventory">
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="inv_status" class="form-select">
-                    <option value="" {% if not inv_status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in nap_status_order %}
-                    <option value="{{ s }}" {% if inv_status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if inv_status_filter %}
-                    <a href="{{ url_for('reports.index', report='nap_inventory') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if inventory_naps|length == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-inbox display-6 d-block mb-2"></i>
-                No NAPs match the current filters.
-            </div>
-        {% else %}
-        <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
-            {% for s in nap_status_order %}
-            <span>{{ s|capitalize }}: <strong>{{ inventory_status_counts.get(s, 0) }}</strong></span>
-            {% endfor %}
-        </div>
-        <div class="disp-table-card">
-        <div class="table-responsive">
-            <table class="table disp-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>NAP Code</th>
-                        <th>Name</th>
-                        <th>Location</th>
-                        <th class="text-center">Total Ports</th>
-                        <th class="text-center">Available Ports</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for nap in inventory_naps %}
-                    <tr class="disp-row">
-                        <td>
-                            <a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}" class="disp-primary-link">{{ nap.nap_code }}</a>
-                        </td>
-                        <td>{{ nap.name }}</td>
-                        <td class="disp-subtext">{{ nap.address or (nap.latitude ~ ', ' ~ nap.longitude) }}</td>
-                        <td class="text-center">{{ nap.total_ports }}</td>
-                        <td class="text-center">
-                            <span class="disp-badge {{ 'disp-badge-resolved' if nap.available_ports > 0 else 'disp-badge-closed' }}">
-                                {{ nap.available_ports }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="disp-badge disp-badge-{{ nap.status }}">
-                                {{ nap.status|capitalize }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        </div>
-        {% endif %}
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="nap_inventory">
+        {{ f_select('inv_status', 'Status', 'All statuses', nap_status_order, inv_status_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('nap_inventory', inv_status_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead><tr><th>NAP Code</th><th>Name</th><th>Location</th><th class="text-center">Total Ports</th><th class="text-center">Available Ports</th><th>Status</th></tr></thead>
+            <tbody data-lf-body>
+                {% for nap in inventory_naps %}
+                <tr class="disp-row lf-row">
+                    <td><a href="{{ url_for('naps.view_nap', nap_id=nap.id) }}" class="disp-primary-link">{{ nap.nap_code }}</a></td>
+                    <td>{{ nap.name }}</td>
+                    <td class="disp-subtext">{{ nap.address or (nap.latitude ~ ', ' ~ nap.longitude) }}</td>
+                    <td class="text-center">{{ nap.total_ports }}</td>
+                    <td class="text-center"><span class="disp-badge {{ 'disp-badge-resolved' if nap.available_ports > 0 else 'disp-badge-closed' }}">{{ nap.available_ports }}</span></td>
+                    <td><span class="disp-badge disp-badge-{{ nap.status }}">{{ nap.status|capitalize }}</span></td>
+                </tr>
+                {% else %}
+                {{ empty_row(6, 'bi-inbox', 'No NAPs match the current filters.') }}
+                {% endfor %}
+                {% if inventory_naps %}{{ nomatch_row(6) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# NAP PORT AVAILABILITY                                             #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'port_availability' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-hdd-network me-1 text-muted"></i>NAP Port Availability Report</h5>
-        <span class="text-muted small">
-            {{ total_used_ports }} / {{ total_ports }} ports used overall ({{ overall_utilization_pct }}%)
-        </span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="port_availability">
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="port_status" class="form-select">
-                    <option value="" {% if not port_status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in nap_status_order %}
-                    <option value="{{ s }}" {% if port_status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if port_status_filter %}
-                    <a href="{{ url_for('reports.index', report='port_availability') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if total_naps == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-hdd-network display-6 d-block mb-2"></i>
-                No NAPs match the current filters.
-            </div>
-        {% else %}
-            {% if near_capacity %}
-            <div class="alert alert-warning d-flex align-items-start gap-2 mb-4">
-                <i class="bi bi-exclamation-triangle-fill mt-1"></i>
-                <div>
-                    <strong>{{ near_capacity|length }} NAP{{ '' if near_capacity|length == 1 else 's' }} near capacity</strong>
-                    <div class="small">
-                        {{ near_capacity_threshold }}% or more of ports used, or manually marked "full":
-                        {% for row in near_capacity %}
-                            <a href="{{ url_for('naps.view_nap', nap_id=row.id) }}" class="text-decoration-none fw-semibold">{{ row.nap_code }}</a>{{ ", " if not loop.last else "" }}
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="disp-table-card">
-            <div class="table-responsive">
-                <table class="table disp-table align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>NAP Code</th>
-                            <th>Name</th>
-                            <th>Status</th>
-                            <th style="width: 30%;">Utilization</th>
-                            <th class="text-end">Used / Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in nap_utilization %}
-                        <tr class="disp-row">
-                            <td>
-                                <a href="{{ url_for('naps.view_nap', nap_id=row.id) }}" class="disp-primary-link">{{ row.nap_code }}</a>
-                            </td>
-                            <td>{{ row.name }}</td>
-                            <td>
-                                <span class="disp-badge disp-badge-{{ row.status }}">
-                                    {{ row.status|capitalize }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="progress flex-grow-1" style="height: 8px;">
-                                        <div class="progress-bar {{ 'bg-danger' if row.pct >= near_capacity_threshold else ('bg-warning' if row.pct >= 70 else 'bg-success') }}"
-                                             role="progressbar" style="width: {{ row.pct }}%;"
-                                             aria-valuenow="{{ row.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                    </div>
-                                    <span class="disp-subtext" style="min-width: 3.5em;">{{ row.pct }}%</span>
-                                </div>
-                            </td>
-                            <td class="text-end disp-subtext">{{ row.used_ports }} / {{ row.total_ports }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            </div>
-        {% endif %}
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="port_availability">
+        {{ f_select('port_status', 'Status', 'All statuses', nap_status_order, port_status_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('port_availability', port_status_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead><tr><th>NAP Code</th><th>Name</th><th>Status</th><th style="width: 30%;">Utilization</th><th class="text-end">Used / Total</th></tr></thead>
+            <tbody data-lf-body>
+                {% for row in nap_utilization %}
+                <tr class="disp-row lf-row">
+                    <td><a href="{{ url_for('naps.view_nap', nap_id=row.id) }}" class="disp-primary-link">{{ row.nap_code }}</a></td>
+                    <td>{{ row.name }}</td>
+                    <td><span class="disp-badge disp-badge-{{ row.status }}">{{ row.status|capitalize }}</span></td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1" style="height: 8px;">
+                                <div class="progress-bar {{ 'bg-danger' if row.pct >= near_capacity_threshold else ('bg-warning' if row.pct >= 70 else 'bg-success') }}"
+                                     role="progressbar" style="width: {{ row.pct }}%;" aria-valuenow="{{ row.pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <span class="disp-subtext" style="min-width: 3.5em;">{{ row.pct }}%</span>
+                        </div>
+                    </td>
+                    <td class="text-end disp-subtext">{{ row.used_ports }} / {{ row.total_ports }}</td>
+                </tr>
+                {% else %}
+                {{ empty_row(5, 'bi-hdd-network', 'No NAPs match the current filters.') }}
+                {% endfor %}
+                {% if nap_utilization %}{{ nomatch_row(5) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# SUBSCRIBERS                                                       #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'subscribers' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-person-vcard me-1 text-muted"></i>Subscriber Report</h5>
-        <span class="text-muted small">{{ total_subscribers }} subscriber{{ '' if total_subscribers == 1 else 's' }}</span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="subscribers">
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Installed From</label>
-                <input type="date" class="form-control" name="sub_start" value="{{ sub_start_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Installed To</label>
-                <input type="date" class="form-control" name="sub_end" value="{{ sub_end_date }}">
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="sub_status" class="form-select">
-                    <option value="" {% if not sub_status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in subscriber_status_order %}
-                    <option value="{{ s }}" {% if sub_status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">NAP</label>
-                <select name="sub_nap" class="form-select">
-                    <option value="" {% if not sub_nap_filter %}selected{% endif %}>All NAPs</option>
-                    {% for nap_id, nap_label in subscriber_nap_choices %}
-                    <option value="{{ nap_id }}" {% if sub_nap_filter == nap_id %}selected{% endif %}>{{ nap_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if sub_start_date or sub_end_date or sub_status_filter or sub_nap_filter %}
-                    <a href="{{ url_for('reports.index', report='subscribers') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if total_subscribers == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-person-vcard display-6 d-block mb-2"></i>
-                No subscribers match the current filters.
-            </div>
-        {% else %}
-        <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
-            {% for s in subscriber_status_order %}
-            <span>{{ s|capitalize }}: <strong>{{ subscriber_status_counts.get(s, 0) }}</strong></span>
-            {% endfor %}
-        </div>
-        <div class="disp-table-card">
-        <div class="table-responsive">
-            <table class="table disp-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Code</th>
-                        <th>Full Name</th>
-                        <th>Plan</th>
-                        <th>Connected NAP</th>
-                        <th>Status</th>
-                        <th>Installed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set sub_badge_classes = {'active': 'disp-badge-active', 'inactive': 'disp-badge-inactive', 'disconnected': 'disp-badge-critical', 'pending_review': 'disp-badge-pending'} %}
-                    {% for subscriber in subscribers_rows %}
-                    <tr class="disp-row">
-                        <td>
-                            <a href="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}" class="disp-primary-link">{{ subscriber.subscriber_code }}</a>
-                        </td>
-                        <td>{{ subscriber.full_name }}</td>
-                        <td>{{ subscriber.plan_type or "—" }}</td>
-                        <td>{{ subscriber.nap.nap_code if subscriber.nap else "—" }}</td>
-                        <td>
-                            <span class="disp-badge {{ sub_badge_classes.get(subscriber.status, 'disp-badge-inactive') }}">
-                                {{ subscriber.status|replace('_', ' ')|capitalize }}
-                            </span>
-                        </td>
-                        <td class="disp-subtext">{{ subscriber.installed_at.strftime('%Y-%m-%d') if subscriber.installed_at else "—" }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        </div>
-        {% endif %}
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="subscribers">
+        {{ f_date('sub_start', 'Installed from', sub_start_date) }}
+        {{ f_date('sub_end', 'to', sub_end_date) }}
+        {{ f_select('sub_status', 'Status', 'All statuses', subscriber_status_order, sub_status_filter) }}
+        {{ f_select('sub_nap', 'NAP', 'All NAPs', subscriber_nap_choices, sub_nap_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('subscribers', sub_start_date or sub_end_date or sub_status_filter or sub_nap_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead><tr><th>Code</th><th>Full Name</th><th>Plan</th><th>Connected NAP</th><th>Status</th><th>Installed</th></tr></thead>
+            <tbody data-lf-body>
+                {% set sub_badge_classes = {'active': 'disp-badge-active', 'inactive': 'disp-badge-inactive', 'disconnected': 'disp-badge-critical', 'pending_review': 'disp-badge-pending'} %}
+                {% for subscriber in subscribers_rows %}
+                <tr class="disp-row lf-row">
+                    <td><a href="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id) }}" class="disp-primary-link">{{ subscriber.subscriber_code }}</a></td>
+                    <td>{{ subscriber.full_name }}</td>
+                    <td>{{ subscriber.plan_type or "—" }}</td>
+                    <td>{{ subscriber.nap.nap_code if subscriber.nap else "—" }}</td>
+                    <td><span class="disp-badge {{ sub_badge_classes.get(subscriber.status, 'disp-badge-inactive') }}">{{ subscriber.status|replace('_', ' ')|capitalize }}</span></td>
+                    <td class="disp-subtext">{{ subscriber.installed_at.strftime('%Y-%m-%d') if subscriber.installed_at else "—" }}</td>
+                </tr>
+                {% else %}
+                {{ empty_row(6, 'bi-person-vcard', 'No subscribers match the current filters.') }}
+                {% endfor %}
+                {% if subscribers_rows %}{{ nomatch_row(6) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# SERVICE REQUESTS                                                  #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'service_requests' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-clipboard-check me-1 text-muted"></i>Service Request Report</h5>
-        <span class="text-muted small">{{ total_service_requests }} request{{ '' if total_service_requests == 1 else 's' }}</span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="service_requests">
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">From</label>
-                <input type="date" class="form-control" name="sr_start" value="{{ sr_start_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">To</label>
-                <input type="date" class="form-control" name="sr_end" value="{{ sr_end_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="sr_status" class="form-select">
-                    <option value="" {% if not sr_status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in service_request_status_order %}
-                    <option value="{{ s }}" {% if sr_status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Type</label>
-                <select name="sr_type" class="form-select">
-                    <option value="" {% if not sr_type_filter %}selected{% endif %}>All Types</option>
-                    {% for t in service_request_type_order %}
-                    <option value="{{ t }}" {% if sr_type_filter == t %}selected{% endif %}>{{ t|replace('_',' ')|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">NAP</label>
-                <select name="sr_nap" class="form-select">
-                    <option value="" {% if not sr_nap_filter %}selected{% endif %}>All NAPs</option>
-                    {% for nap_id, nap_label in sr_nap_choices %}
-                    <option value="{{ nap_id }}" {% if sr_nap_filter == nap_id %}selected{% endif %}>{{ nap_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if sr_start_date or sr_end_date or sr_status_filter or sr_type_filter or sr_nap_filter %}
-                    <a href="{{ url_for('reports.index', report='service_requests') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if total_service_requests == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-clipboard-x display-6 d-block mb-2"></i>
-                No service requests match the current filters.
-            </div>
-        {% else %}
-        <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
-            {% for s in service_request_status_order %}
-            <span>{{ s|capitalize }}: <strong>{{ service_request_status_counts.get(s, 0) }}</strong></span>
-            {% endfor %}
-        </div>
-        <div class="disp-table-card">
-        <div class="table-responsive">
-            <table class="table disp-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Subscriber</th>
-                        <th>Requested NAP</th>
-                        <th>Status</th>
-                        <th>Submitted</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set sr_status_classes = {'pending': 'disp-badge-high', 'approved': 'disp-badge-assigned', 'scheduled': 'disp-badge-medium', 'completed': 'disp-badge-resolved', 'rejected': 'disp-badge-critical'} %}
-                    {% for r in service_requests_rows %}
-                    <tr class="disp-row">
-                        <td>
-                            <a href="{{ url_for('service_requests.edit_request', request_id=r.id) }}" class="disp-primary-link text-capitalize">
-                                {{ r.request_type|replace('_', ' ') }}
-                            </a>
-                        </td>
-                        <td class="small">{% if r.subscriber %}<span class="disp-code-pill">{{ r.subscriber.subscriber_code }}</span> {{ r.subscriber.full_name }}{% else %}<span class="disp-subtext">No subscriber record</span>{% endif %}</td>
-                        <td>{{ r.requested_nap.nap_code if r.requested_nap else "—" }}</td>
-                        <td><span class="disp-badge {{ sr_status_classes.get(r.status, 'disp-badge-low') }}">{{ r.status|capitalize }}</span></td>
-                        <td class="disp-subtext">{{ r.created_at.strftime('%Y-%m-%d') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        </div>
-        {% endif %}
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="service_requests">
+        {{ f_date('sr_start', 'From', sr_start_date) }}
+        {{ f_date('sr_end', 'To', sr_end_date) }}
+        {{ f_select('sr_status', 'Status', 'All statuses', service_request_status_order, sr_status_filter) }}
+        {{ f_select('sr_type', 'Type', 'All types', service_request_type_order, sr_type_filter) }}
+        {{ f_select('sr_nap', 'NAP', 'All NAPs', sr_nap_choices, sr_nap_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('service_requests', sr_start_date or sr_end_date or sr_status_filter or sr_type_filter or sr_nap_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead><tr><th>Type</th><th>Subscriber</th><th>Requested NAP</th><th>Status</th><th>Submitted</th></tr></thead>
+            <tbody data-lf-body>
+                {% set sr_status_classes = {'pending': 'disp-badge-high', 'approved': 'disp-badge-assigned', 'scheduled': 'disp-badge-medium', 'completed': 'disp-badge-resolved', 'rejected': 'disp-badge-critical'} %}
+                {% for r in service_requests_rows %}
+                <tr class="disp-row lf-row">
+                    <td><a href="{{ url_for('service_requests.edit_request', request_id=r.id) }}" class="disp-primary-link text-capitalize">{{ 'Nap Installation' if r.request_type == 'add_nap' else r.request_type|replace('_', ' ') }}</a></td>
+                    <td>{% if r.subscriber %}<span class="disp-code-pill">{{ r.subscriber.subscriber_code }}</span> {{ r.subscriber.full_name }}{% else %}<span class="disp-subtext">No subscriber record</span>{% endif %}</td>
+                    <td>{{ r.requested_nap.nap_code if r.requested_nap else "—" }}</td>
+                    <td><span class="disp-badge {{ sr_status_classes.get(r.status, 'disp-badge-low') }}">{{ r.status|capitalize }}</span></td>
+                    <td class="disp-subtext">{{ r.created_at.strftime('%Y-%m-%d') }}</td>
+                </tr>
+                {% else %}
+                {{ empty_row(5, 'bi-clipboard-x', 'No service requests match the current filters.') }}
+                {% endfor %}
+                {% if service_requests_rows %}{{ nomatch_row(5) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# PAYMENTS                                                          #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'payments' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-cash-coin me-1 text-muted"></i>Payment Report</h5>
-        <span class="text-muted small">{{ total_payments }} payment{{ '' if total_payments == 1 else 's' }} &middot; {{ "%.2f"|format(total_amount) }} total &middot; {{ "%.2f"|format(confirmed_amount) }} confirmed</span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="payments">
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">From</label>
-                <input type="date" class="form-control" name="pay_start" value="{{ pay_start_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">To</label>
-                <input type="date" class="form-control" name="pay_end" value="{{ pay_end_date }}">
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="pay_status" class="form-select">
-                    <option value="" {% if not pay_status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in payment_status_order %}
-                    <option value="{{ s }}" {% if pay_status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Method</label>
-                <select name="pay_method" class="form-select">
-                    <option value="" {% if not pay_method_filter %}selected{% endif %}>All Methods</option>
-                    {% for m in payment_method_order %}
-                    <option value="{{ m }}" {% if pay_method_filter == m %}selected{% endif %}>{{ m|replace('_',' ')|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if pay_start_date or pay_end_date or pay_status_filter or pay_method_filter %}
-                    <a href="{{ url_for('reports.index', report='payments') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if total_payments == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-cash display-6 d-block mb-2"></i>
-                No payments match the current filters.
-            </div>
-        {% else %}
-        <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
-            {% for s in payment_status_order %}
-            <span>{{ s|capitalize }}: <strong>{{ payment_status_counts.get(s, 0) }}</strong></span>
-            {% endfor %}
-        </div>
-        <div class="disp-table-card">
-        <div class="table-responsive">
-            <table class="table disp-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Subscriber</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Reference #</th>
-                        <th>Collector</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set pay_status_classes = {'confirmed': 'disp-badge-resolved', 'pending': 'disp-badge-pending', 'overdue': 'disp-badge-critical', 'voided': 'disp-badge-closed'} %}
-                    {% for payment in payments_rows %}
-                    <tr class="disp-row">
-                        <td class="disp-subtext">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
-                        <td class="small"><span class="disp-code-pill">{{ payment.subscriber.subscriber_code }}</span> {{ payment.subscriber.full_name }}</td>
-                        <td>{{ "%.2f"|format(payment.amount) }}</td>
-                        <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
-                        <td>{{ payment.reference_number or "—" }}</td>
-                        <td>{{ payment.collector.full_name if payment.collector else "—" }}</td>
-                        <td><span class="disp-badge {{ pay_status_classes.get(payment.status, 'disp-badge-low') }}">{{ payment.status|capitalize }}</span></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        </div>
-        {% endif %}
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="payments">
+        {{ f_date('pay_start', 'From', pay_start_date) }}
+        {{ f_date('pay_end', 'To', pay_end_date) }}
+        {{ f_select('pay_status', 'Status', 'All statuses', payment_status_order, pay_status_filter) }}
+        {{ f_select('pay_method', 'Method', 'All methods', payment_method_order, pay_method_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('payments', pay_start_date or pay_end_date or pay_status_filter or pay_method_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead><tr><th>Date</th><th>Subscriber</th><th>Amount</th><th>Method</th><th>Reference #</th><th>Collector</th><th>Status</th></tr></thead>
+            <tbody data-lf-body>
+                {% set pay_status_classes = {'confirmed': 'disp-badge-resolved', 'pending': 'disp-badge-pending', 'overdue': 'disp-badge-critical', 'voided': 'disp-badge-closed'} %}
+                {% for payment in payments_rows %}
+                <tr class="disp-row lf-row">
+                    <td class="disp-subtext">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                    <td><span class="disp-code-pill">{{ payment.subscriber.subscriber_code }}</span> {{ payment.subscriber.full_name }}</td>
+                    <td class="lf-amount">{{ "%.2f"|format(payment.amount) }}</td>
+                    <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
+                    <td>{{ payment.reference_number or "—" }}</td>
+                    <td>{{ payment.collector.full_name if payment.collector else "—" }}</td>
+                    <td><span class="disp-badge {{ pay_status_classes.get(payment.status, 'disp-badge-low') }}">{{ payment.status|capitalize }}</span></td>
+                </tr>
+                {% else %}
+                {{ empty_row(7, 'bi-cash', 'No payments match the current filters.') }}
+                {% endfor %}
+                {% if payments_rows %}{{ nomatch_row(7) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# TECHNICIAN WORKLOAD                                               #}
 {# ---------------------------------------------------------------- #}
 {% if active_report == 'technicians' %}
-<div class="card shadow-sm">
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="mb-0"><i class="bi bi-person-badge me-1 text-muted"></i>Technician Workload Report</h5>
-        <span class="text-muted small">{{ technician_workload|length }} technician{{ '' if technician_workload|length == 1 else 's' }}</span>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('reports.index') }}" class="row g-2 align-items-end mb-4">
-            <input type="hidden" name="report" value="technicians">
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Completed From</label>
-                <input type="date" class="form-control" name="wl_start" value="{{ wl_start_date }}">
-            </div>
-            <div class="col-sm-6 col-md-2">
-                <label class="form-label small text-muted mb-1">Completed To</label>
-                <input type="date" class="form-control" name="wl_end" value="{{ wl_end_date }}">
-            </div>
-            <div class="col-sm-6 col-md-3">
-                <label class="form-label small text-muted mb-1">Technician</label>
-                <select name="wl_technician" class="form-select">
-                    <option value="" {% if not wl_technician_filter %}selected{% endif %}>All Technicians</option>
-                    {% for tech_id, tech_label in wl_technician_choices %}
-                    <option value="{{ tech_id }}" {% if wl_technician_filter == tech_id %}selected{% endif %}>{{ tech_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-6 col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if wl_start_date or wl_end_date or wl_technician_filter %}
-                    <a href="{{ url_for('reports.index', report='technicians') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
-
-        {% if technician_workload|length == 0 %}
-            <div class="text-center text-muted py-4">
-                <i class="bi bi-person-badge display-6 d-block mb-2"></i>
-                No technicians match the current filters.
-            </div>
-        {% else %}
-            <div class="disp-table-card">
-            <div class="table-responsive">
-                <table class="table disp-table align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Technician</th>
-                            <th>Status</th>
-                            {% for status in open_assignment_statuses %}
-                            <th class="text-end text-capitalize">{{ status.replace('_', ' ') }}</th>
-                            {% endfor %}
-                            <th class="text-end">Total Open</th>
-                            <th class="text-end">Completed{% if wl_start_date or wl_end_date %} (in range){% endif %}</th>
-                            <th class="text-end">Resolved (all-time)</th>
-                            <th class="text-end">Avg. Resolution Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set tech_status_classes = {'available': 'disp-badge-resolved', 'busy': 'disp-badge-high', 'offline': 'disp-badge-low'} %}
-                        {% for row in technician_workload %}
-                        <tr class="disp-row">
-                            <td>
-                                <a href="{{ url_for('technicians.view_technician', technician_id=row.id) }}" class="disp-primary-link">{{ row.full_name }}</a>
-                            </td>
-                            <td>
-                                <span class="disp-badge {{ tech_status_classes.get(row.status, 'disp-badge-low') }} text-capitalize">
-                                    {{ row.status }}
-                                </span>
-                            </td>
-                            {% for status in open_assignment_statuses %}
-                            <td class="text-end">{{ row.open_counts.get(status, 0) }}</td>
-                            {% endfor %}
-                            <td class="text-end fw-semibold">{{ row.total_open }}</td>
-                            <td class="text-end">{{ row.completed_in_range }}</td>
-                            <td class="text-end">{{ row.resolved_issues_count }}</td>
-                            <td class="text-end disp-subtext">
-                                {% if row.avg_resolution_hours is not none %}
-                                    {{ row.avg_resolution_hours }} hrs
-                                {% else %}
-                                    <span class="disp-subtext">No completed work yet</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            </div>
-        {% endif %}
+{{ kpi_strip(kpis) }}
+<div class="rep-filterbar">
+    {{ search_box() }}
+    <form method="get" action="{{ url_for('reports.index') }}" class="rep-filter-form">
+        <input type="hidden" name="report" value="technicians">
+        {{ f_date('wl_start', 'Completed from', wl_start_date) }}
+        {{ f_date('wl_end', 'to', wl_end_date) }}
+        {{ f_select('wl_technician', 'Technician', 'All technicians', wl_technician_choices, wl_technician_filter) }}
+        {{ filter_btn() }}
+        {{ clear_link('technicians', wl_start_date or wl_end_date or wl_technician_filter) }}
+    </form>
+</div>
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead>
+                <tr>
+                    <th>Technician</th><th>Status</th>
+                    {% for status in open_assignment_statuses %}<th class="text-end text-capitalize">{{ status.replace('_', ' ') }}</th>{% endfor %}
+                    <th class="text-end">Total Open</th>
+                    <th class="text-end">Completed{% if wl_start_date or wl_end_date %} (in range){% endif %}</th>
+                    <th class="text-end">Resolved (all-time)</th>
+                    <th class="text-end">Avg. Resolution</th>
+                </tr>
+            </thead>
+            <tbody data-lf-body>
+                {% set tech_status_classes = {'available': 'disp-badge-resolved', 'busy': 'disp-badge-high', 'offline': 'disp-badge-low'} %}
+                {% for row in technician_workload %}
+                <tr class="disp-row lf-row">
+                    <td><a href="{{ url_for('technicians.view_technician', technician_id=row.id) }}" class="disp-primary-link">{{ row.full_name }}</a></td>
+                    <td><span class="disp-badge {{ tech_status_classes.get(row.status, 'disp-badge-low') }} text-capitalize">{{ row.status }}</span></td>
+                    {% for status in open_assignment_statuses %}<td class="text-end">{{ row.open_counts.get(status, 0) }}</td>{% endfor %}
+                    <td class="text-end fw-semibold">{{ row.total_open }}</td>
+                    <td class="text-end">{{ row.completed_in_range }}</td>
+                    <td class="text-end">{{ row.resolved_issues_count }}</td>
+                    <td class="text-end disp-subtext">{% if row.avg_resolution_hours is not none %}{{ row.avg_resolution_hours }} hrs{% else %}No completed work yet{% endif %}</td>
+                </tr>
+                {% else %}
+                {{ empty_row(6 + open_assignment_statuses|length, 'bi-person-badge', 'No technicians match the current filters.') }}
+                {% endfor %}
+                {% if technician_workload %}{{ nomatch_row(6 + open_assignment_statuses|length) }}{% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
+{{ pager() }}
 {% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
+{% if active_report != 'overview' %}<script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>{% endif %}
 <script src="{{ url_for('static', filename='js/reports-ui.js') }}?v={{ asset_version('js/reports-ui.js') }}"></script>
 {% endblock %}

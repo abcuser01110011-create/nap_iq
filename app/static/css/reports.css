@@ -254,3 +254,59 @@
     .rep-tabs { gap: 0.1rem; }
     .rep-export { padding: 0.4rem 0.75rem; }
 }
+
+/* ---------- List-style report tabs (Issues, NAP Inventory, ...) ---------- */
+.rep-tone-danger { --tone: var(--napiq-danger); }
+.rep-kpis-compact { margin-bottom: 0.8rem; }
+.rep-kpis-compact .rep-kpi { min-height: 0; padding: 0.65rem 1rem; }
+.rep-kpis-compact .rep-kpi-icon { width: 40px; height: 40px; font-size: 1.1rem; }
+.rep-kpis-compact .rep-kpi-value { font-size: 1.35rem; }
+.rep-kpis-compact .rep-kpi-trend { margin-top: 0; }
+
+.rep-filterbar {
+    display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+}
+.rep-search {
+    flex: 1 1 220px; display: flex; align-items: center; gap: 0.6rem;
+    background: var(--napiq-surface); border: 1px solid var(--napiq-border);
+    border-radius: 2rem; padding: 0.4rem 1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 20px -12px rgba(15, 23, 42, 0.18);
+}
+.rep-search:focus-within { border-color: var(--napiq-primary); box-shadow: 0 0 0 3px rgba(15, 95, 166, 0.15); }
+.rep-search i { color: var(--napiq-text-muted); }
+.rep-search input { border: none; background: transparent; outline: none; flex: 1; min-width: 0; font-size: 0.82rem; color: inherit; }
+
+.rep-filter-form {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.5rem;
+    background: var(--napiq-surface); border: 1px solid var(--napiq-border);
+    border-radius: 2rem; padding: 0.25rem 0.4rem 0.25rem 0.9rem; margin: 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 20px -12px rgba(15, 23, 42, 0.18);
+}
+.rep-field { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.72rem; font-weight: 700; color: var(--napiq-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.rep-field input, .rep-field select {
+    border: 1px solid var(--napiq-border); background: var(--napiq-bg); color: inherit;
+    border-radius: 1rem; padding: 0.22rem 0.55rem; font-size: 0.78rem; text-transform: none; letter-spacing: 0; font-weight: 600;
+    max-width: 170px; outline: none;
+}
+.rep-field input:focus, .rep-field select:focus { border-color: var(--napiq-primary); }
+.rep-filter-form .btn { border-radius: 2rem; font-size: 0.75rem; padding: 0.3rem 0.8rem; font-weight: 600; }
+
+@media (min-width: 768px) and (min-height: 520px) {
+    body.reports-list .rep-toolbar,
+    body.reports-list .rep-kpis,
+    body.reports-list .rep-filterbar { flex-shrink: 0; }
+    body.reports-list .rep-toolbar { margin-bottom: 0.7rem; }
+    body.reports-list .rep-kpis-compact { margin-bottom: 0.6rem; }
+    body.reports-list .rep-kpis-compact .rep-kpi { padding: 0.5rem 0.9rem; }
+    body.reports-list .rep-kpis-compact .rep-kpi-value { font-size: 1.2rem; }
+    body.reports-list .rep-kpis-compact .rep-kpi-icon { width: 34px; height: 34px; font-size: 0.95rem; }
+    body.reports-list .rep-filterbar { margin-bottom: 0.6rem; }
+    body.reports-list .rep-search { padding: 0.3rem 0.9rem; }
+}
+@media (max-width: 767.98px) {
+    .rep-filter-form { border-radius: 1rem; width: 100%; }
+}
+
+.rep-field input[type="date"] { max-width: 128px; padding: 0.22rem 0.4rem; }
+.rep-search { flex: 1 1 150px; }
