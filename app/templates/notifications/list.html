@@ -26,6 +26,63 @@
 </div>
 {% endif %}
 
+{% if current_user.role == 'user' %}
+{# Customer view: a plain tappable list showing only the notification itself. #}
+<style>
+    .notif-list { background: var(--bs-body-bg, #fff); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .notif-item { display: flex; align-items: flex-start; gap: .75rem; width: 100%; padding: .9rem 1rem; border: 0; border-bottom: 1px solid rgba(128,128,128,.18); background: transparent; text-align: left; color: inherit; text-decoration: none; cursor: pointer; }
+    .notif-item:last-child { border-bottom: 0; }
+    .notif-item:hover, .notif-item:focus-visible { background: rgba(13,110,253,.06); outline: none; }
+    .notif-dot { flex: 0 0 10px; height: 10px; margin-top: .4rem; border-radius: 50%; background: transparent; }
+    .notif-item--unread .notif-dot { background: #0d6efd; }
+    .notif-body { flex: 1 1 auto; min-width: 0; }
+    .notif-title { display: block; font-weight: 500; }
+    .notif-item--unread .notif-title { font-weight: 700; }
+    .notif-msg { display: block; font-size: .85rem; color: #6c757d; margin-top: .15rem; }
+    .notif-chevron { flex: 0 0 auto; align-self: center; color: #adb5bd; }
+</style>
+<div class="notif-list">
+    {% for n in notifications %}
+    {% set link = links.get(n.id) %}
+    {% set mark_url = url_for('notifications.mark_read', notification_id=n.id) %}
+    {% if link %}
+    <a href="{{ link }}" class="notif-item{{ ' notif-item--unread' if not n.is_read }}"
+       {% if not n.is_read %}data-mark-read-url="{{ mark_url }}"{% endif %}>
+    {% else %}
+    <button type="button" class="notif-item{{ ' notif-item--unread' if not n.is_read }}"
+            {% if not n.is_read %}data-mark-read-url="{{ mark_url }}" data-reload="1"{% endif %}>
+    {% endif %}
+        <span class="notif-dot" aria-hidden="true"></span>
+        <span class="notif-body">
+            <span class="notif-title">{{ n.title }}</span>
+            <span class="notif-msg">{{ n.message }}</span>
+        </span>
+        {% if link %}<i class="bi bi-chevron-right notif-chevron"></i>{% endif %}
+    {% if link %}</a>{% else %}</button>{% endif %}
+    {% else %}
+    <div class="p-4 text-center text-muted">
+        <i class="bi bi-bell-slash display-6 d-block mb-2"></i>
+        No notifications yet.
+    </div>
+    {% endfor %}
+</div>
+<script>
+(function () {
+    var CSRF = "{{ csrf_token() }}";
+    document.querySelectorAll(".notif-item[data-mark-read-url]").forEach(function (item) {
+        item.addEventListener("click", function () {
+            var done = fetch(item.getAttribute("data-mark-read-url"), {
+                method: "POST", credentials: "same-origin", keepalive: true,
+                headers: { "X-CSRFToken": CSRF, "X-Requested-With": "XMLHttpRequest" }
+            }).catch(function () {});
+            // Links navigate on their own; items with no target page just
+            // refresh so the unread dot and badges update.
+            if (item.getAttribute("data-reload")) done.then(function () { window.location.reload(); });
+        });
+    });
+})();
+</script>
+{% else %}
 <div class="disp-table-card">
     <div class="table-responsive">
         <table class="table disp-table align-middle mb-0">
@@ -91,4 +148,5 @@
         </table>
     </div>
 </div>
+{% endif %}
 {% endblock %}

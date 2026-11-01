@@ -189,21 +189,6 @@
 </div>
 {% endif %}
 
-{% if payments %}
-{% set last_payment = payments[0] %}
-<div class="card shadow-sm mb-3 napiq-account-card">
-    <div class="card-body">
-        <span class="napiq-account-label">Last payment</span>
-        <div class="napiq-account-code">
-            {% if last_payment.amount is not none %}&#8369;{{ '%.2f'|format(last_payment.amount) }}{% else %}—{% endif %}
-        </div>
-        <span class="napiq-account-row-label">
-            {{ last_payment.payment_method|replace('_', ' ')|capitalize }} &middot; {{ last_payment.status|capitalize }}
-        </span>
-    </div>
-</div>
-{% endif %}
-
 {% if not app_progress %}
 <div class="d-flex flex-wrap gap-2 mb-3">
     {% if open_issue %}
