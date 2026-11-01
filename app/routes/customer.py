@@ -75,6 +75,7 @@ from datetime import timedelta, timezone
 
 from flask import Blueprint, current_app, render_template, redirect, url_for, flash, g, request, jsonify
 
+from app import hitpay
 from app.extensions import db, limiter
 from app.auth import role_required
 from app.models import Assignment, Plan, ServiceRequest, Subscriber, TechnicalIssue
@@ -154,6 +155,7 @@ def index():
         service_requests=subscriber.service_requests if subscriber else [],
         payments=subscriber.payments if subscriber else [],
         due=monthly_due_info(subscriber) if subscriber else None,
+        hitpay_enabled=hitpay.is_configured(),
         # Oldest open ticket: the home Report button shows a popup instead
         # of navigating when one exists (one open report at a time).
         open_issue=open_issue_for_subscriber(subscriber.id) if subscriber else None,
@@ -788,4 +790,7 @@ def my_payments():
         "customer/payments.html",
         subscriber=subscriber,
         payments=subscriber.payments,
+        hitpay_enabled=hitpay.is_configured(),
+        hitpay_sandbox=hitpay.is_sandbox(),
+        hitpay_currency=hitpay.currency(),
     )

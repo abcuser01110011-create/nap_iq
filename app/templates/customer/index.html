@@ -129,7 +129,7 @@
     is unchanged.
 #}
 {# Amount to pay + due date. Turns red on the due date and after it.
-   The Pay Now button is clickable but intentionally does nothing yet. #}
+   Pay Now starts a HitPay checkout when HITPAY_API_KEY/HITPAY_SALT are set. #}
 <div class="napiq-pay-card mb-3{% if due and due.is_due %} napiq-pay-card--due{% endif %}">
     <div class="napiq-pay-info">
         <span class="napiq-pay-label">Amount To Pay</span>
@@ -143,7 +143,16 @@
         <span class="napiq-pay-due">Due date is set one month after installation</span>
         {% endif %}
     </div>
+    {% if hitpay_enabled %}
+    {# HitPay online payment: the amount is recomputed on the server (see routes/hitpay.py). #}
+    <form method="post" action="{{ url_for('hitpay.pay_online') }}" class="m-0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="use_due" value="1">
+        <button type="submit" class="napiq-pay-btn" id="payNowBtn"{% if not (due and due.can_pay) %} disabled aria-disabled="true"{% endif %}>PAY NOW</button>
+    </form>
+    {% else %}
     <button type="button" class="napiq-pay-btn" id="payNowBtn"{% if not (due and due.can_pay) %} disabled aria-disabled="true"{% endif %}>PAY NOW</button>
+    {% endif %}
 </div>
 
 {% if app_progress %}

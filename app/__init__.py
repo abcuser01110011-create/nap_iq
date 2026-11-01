@@ -249,6 +249,7 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.service_requests import service_requests_bp
     from app.routes.payments import payments_bp
     from app.routes.notifications import notifications_bp
+    from app.routes.hitpay import hitpay_bp, hitpay_webhook_bp
     from app.routes.api_v1 import api_v1_auth_bp, api_v1_technician_bp, api_v1_customer_bp
 
     app.register_blueprint(main_bp)
@@ -270,6 +271,8 @@ def create_app(config_class: type = Config) -> Flask:
     app.register_blueprint(settings_bp)
     app.register_blueprint(service_requests_bp)
     app.register_blueprint(payments_bp)
+    app.register_blueprint(hitpay_bp)
+    app.register_blueprint(hitpay_webhook_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(api_v1_auth_bp)
     app.register_blueprint(api_v1_technician_bp)
@@ -290,6 +293,9 @@ def create_app(config_class: type = Config) -> Flask:
     csrf.exempt(api_v1_auth_bp)
     csrf.exempt(api_v1_technician_bp)
     csrf.exempt(api_v1_customer_bp)
+    # HitPay's server calls this webhook (no session / CSRF token); it is
+    # authenticated by its HMAC signature instead (app/hitpay.verify_signature).
+    csrf.exempt(hitpay_webhook_bp)
 
     # ---- Error handlers (Phase 7) ----
     @app.errorhandler(403)

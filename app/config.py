@@ -186,6 +186,16 @@ class Config:
     RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
     MAIL_DEFAULT_SENDER_NAME = os.environ.get("MAIL_DEFAULT_SENDER_NAME", "PG Networks")
 
+    # ---- HitPay online payments (see HITPAY_SETUP.md) ----
+    # Leave HITPAY_API_KEY / HITPAY_SALT empty and the "Pay online" box simply
+    # doesn't appear. HITPAY_ENV is "sandbox" (test money) or "production".
+    HITPAY_API_KEY = os.environ.get("HITPAY_API_KEY", "").strip()
+    HITPAY_SALT = os.environ.get("HITPAY_SALT", "").strip()
+    HITPAY_ENV = os.environ.get("HITPAY_ENV", "sandbox").strip().lower()
+    HITPAY_CURRENCY = os.environ.get("HITPAY_CURRENCY", "").strip()                  # blank = SGD sandbox / PHP production
+    HITPAY_PAYMENT_METHODS = os.environ.get("HITPAY_PAYMENT_METHODS", "").strip()    # blank = all enabled on the account
+    HITPAY_PUBLIC_BASE_URL = os.environ.get("HITPAY_PUBLIC_BASE_URL", "").strip()    # e.g. https://pgnetworks.vercel.app
+
     # How long a sent verification code stays valid, and how many wrong
     # attempts are tolerated before the applicant has to request a new
     # one — mirrors the same "short-lived, attempt-limited" shape used
