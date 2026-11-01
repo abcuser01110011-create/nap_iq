@@ -10,16 +10,11 @@
 {% endblock %}
 
 {% block content %}
-{# Moved here from the home screen: history shortcut + live progress of issues still being worked on. #}
+{# Moved here from the home screen: live progress of issues still being worked on, then recent (finished) issues. #}
 {% set active_issues = technical_issues|selectattr('status', 'in', ['pending', 'assigned', 'accepted', 'in_progress'])|list %}
 {% set active_ids = active_issues|map(attribute='id')|list %}
 {% set active_progress = progress_data|selectattr('id', 'in', active_ids)|list %}
 <div class="ip-home-wrap mb-3">
-    <div class="ip-home-top">
-        <a href="#issueHistory" class="btn btn-sm btn-outline-primary ip-history-btn">
-            <i class="bi bi-clock-history me-1"></i>View reported issue history
-        </a>
-    </div>
     {% if active_progress %}
     <div class="card shadow-sm napiq-account-card ip-home-card">
         <div class="card-body">
@@ -42,27 +37,24 @@
     {% endif %}
 </div>
 
-<div class="card shadow-sm" id="issueHistory">
+{# Recent reported issues: everything NOT still being worked on (those are in the progress card above). #}
+{% set recent_issues = technical_issues|rejectattr('id', 'in', active_ids)|list %}
+{% set issue_status_classes = {
+    'pending': 'text-bg-secondary',
+    'assigned': 'text-bg-info',
+    'accepted': 'text-bg-info',
+    'in_progress': 'text-bg-primary',
+    'resolved': 'text-bg-success',
+    'closed': 'text-bg-dark'
+} %}
+<div class="card shadow-sm" id="recentIssues">
     <div class="card-header bg-white ip-list-header">
-        <span class="ip-list-title"><i class="bi bi-exclamation-triangle me-1"></i>Technical Issues</span>
-        <a href="{{ url_for('customer.report_issue') }}" class="btn btn-primary ip-report-btn">
-            <i class="bi bi-plus-lg me-1"></i>Report an Issue
-        </a>
+        <span class="ip-list-title"><i class="bi bi-clock-history me-1"></i>Recent reported issues</span>
     </div>
     <div class="card-body p-0">
-        {% if technical_issues %}
-        {# History list: a plain list, one row per issue. Tapping a row opens
-           that issue's own history/details page. #}
-        {% set issue_status_classes = {
-            'pending': 'text-bg-secondary',
-            'assigned': 'text-bg-info',
-            'accepted': 'text-bg-info',
-            'in_progress': 'text-bg-primary',
-            'resolved': 'text-bg-success',
-            'closed': 'text-bg-dark'
-        } %}
+        {% if recent_issues %}
         <div class="list-group list-group-flush ip-hist-list">
-            {% for issue in technical_issues %}
+            {% for issue in recent_issues[:5] %}
             <a href="{{ url_for('customer.my_issue_detail', issue_id=issue.id) }}"
                class="list-group-item list-group-item-action ip-hist-row">
                 <span class="ip-hist-main">
@@ -77,7 +69,7 @@
         {% else %}
         <div class="p-4 text-center text-muted">
             <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
-            No technical issues reported for your account.
+            No recent issues.
         </div>
         {% endif %}
     </div>
