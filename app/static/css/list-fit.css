@@ -1,0 +1,129 @@
+/* ---------------------------------------------------------------- */
+/* LIST PAGES - "fit to screen" compact layout (Subscribers style)   */
+/* Used by: issues/list.html (Tickets), payments/list.html           */
+/* Scoped to body.list-fit, so no other page is affected.            */
+/* Behaviour is driven by static/js/list-fit.js.                     */
+/*                                                                   */
+/* Goal: topbar + filter bar + 10 table rows + pager all fit inside  */
+/* the browser window with no vertical page scrolling. Row height    */
+/* shrinks/grows automatically with the screen height.               */
+/* ---------------------------------------------------------------- */
+
+/* Payment status badges (shared disp-badge palette has no equivalent) */
+.disp-badge-confirmed {
+    background: rgba(25, 135, 84, 0.15);
+    color: var(--napiq-success);
+}
+.disp-badge-overdue {
+    background: rgba(220, 53, 69, 0.15);
+    color: var(--napiq-danger);
+}
+.disp-badge-voided {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--napiq-text-muted);
+}
+
+.lf-amount {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.lf-inline-form {
+    display: inline-flex;
+    margin: 0;
+}
+
+button.subs-edit-btn {
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+}
+
+/* Desktop / laptop only. Phones & small tablets keep normal scrolling. */
+@media (min-width: 768px) and (min-height: 520px) {
+
+    body.list-fit .dash-shell { height: 100vh; min-height: 0; }
+    body.list-fit .dash-main { height: 100vh; overflow: hidden; }
+
+    body.list-fit .dash-topbar {
+        min-height: 54px;
+        padding: 0.35rem 1.25rem;
+        flex-shrink: 0;
+    }
+    body.list-fit .dash-topbar-title h1 { font-size: 1.05rem; }
+
+    body.list-fit .dash-content {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        padding: 0.75rem 1.25rem;
+    }
+    body.list-fit .dash-content > .flash-stack {
+        flex-shrink: 0;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* ---- Filter bar ---- */
+    body.list-fit .subs-filterbar {
+        flex-shrink: 0;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+    }
+    body.list-fit .subs-search-form { padding: 0.4rem 1rem; }
+    body.list-fit .subs-search-form input { font-size: 0.82rem; }
+    body.list-fit .subs-pill-group { padding: 0.2rem; }
+    body.list-fit .subs-pill { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+    body.list-fit .subs-filterbar .btn { font-size: 0.75rem; padding: 0.35rem 0.7rem; }
+
+    /* ---- Table card fills the rest of the screen ---- */
+    body.list-fit .disp-table-card {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        border-radius: 0.75rem;
+    }
+    body.list-fit .disp-table-card .table-responsive {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    body.list-fit .disp-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 0.55rem 1rem;
+        font-size: 0.65rem;
+        background: var(--napiq-surface);
+    }
+
+    /* --subs-row-h is set by list-fit.js so the 10 rows exactly fill the
+       card; 48px is only the no-JS fallback. */
+    body.list-fit .disp-table tbody tr.lf-row { height: var(--subs-row-h, 48px); }
+    body.list-fit .disp-table tbody td { padding: 0.3rem 1rem; }
+
+    body.list-fit .disp-primary-link { font-size: 0.82rem; line-height: 1.2; }
+    body.list-fit .disp-subtext { font-size: 0.7rem; line-height: 1.2; margin-top: 0; }
+    body.list-fit .disp-table tbody td:not(:first-child) { font-size: 0.82rem; }
+    body.list-fit .disp-assignment { font-size: 0.82rem; }
+    body.list-fit .disp-badge { font-size: 0.68rem; padding: 0.2rem 0.6rem; }
+    body.list-fit .subs-edit-btn { width: 26px; height: 26px; font-size: 0.75rem; }
+    body.list-fit .subs-chevron { font-size: 0.75rem; }
+
+    /* ---- Pager: outside the card, right below it ---- */
+    body.list-fit .subs-pager {
+        flex-shrink: 0;
+        border-top: none;
+        padding: 0.6rem 0 0;
+    }
+    body.list-fit .subs-pager-list {
+        padding: 0.2rem;
+        --pager-w: 1.85rem;
+        --pager-h: 1.85rem;
+        --pager-nav-w: 3.2rem;
+    }
+    body.list-fit .subs-pager-link { font-size: 0.8rem; }
+}

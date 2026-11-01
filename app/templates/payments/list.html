@@ -1,57 +1,69 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Payments{% endblock %}
+{% block body_class %}list-fit{% endblock %}
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
+{% endblock %}
 {% block page_title %}Payments{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">{{ payments|length }} payment{{ '' if payments|length == 1 else 's' }} shown &middot; all collectors</p>{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0" id="paymentsRecordCount" data-lf-count data-lf-noun="payment">{{ payments|length }} payment{{ '' if payments|length == 1 else 's' }} shown &middot; all collectors</p>{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end mb-3">
-    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary">
+{% set method_options = [
+    ('', 'All'),
+    ('cash', 'Cash'),
+    ('gcash', 'GCash'),
+    ('bank_transfer', 'Bank Transfer'),
+    ('other', 'Other'),
+] %}
+{% set status_options = [
+    ('', 'All'),
+    ('confirmed', 'Confirmed'),
+    ('pending', 'Pending'),
+    ('overdue', 'Overdue'),
+    ('voided', 'Voided'),
+] %}
+
+<div class="subs-filterbar">
+    <form method="get" action="{{ url_for('payments.list_payments') }}" class="subs-search-form" id="paymentsSearchForm">
+        {% if method_filter %}<input type="hidden" name="method" value="{{ method_filter }}">{% endif %}
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        <i class="bi bi-search"></i>
+        <input
+            type="text" name="q" id="paymentsSearchInput"
+            placeholder="Filter by subscriber or reference #..."
+            value="{{ search_term }}"
+            aria-label="Filter payments"
+            autocomplete="off" data-lf-search
+        >
+    </form>
+
+    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary btn-sm">
         <i class="bi bi-plus-lg me-1"></i>Add Payment
     </a>
-</div>
 
-<div class="card shadow-sm mb-3">
-    <div class="card-body">
-        <form method="get" action="{{ url_for('payments.list_payments') }}" class="row g-2 align-items-end">
-            <div class="col-sm-6 col-md-5">
-                <label class="form-label small text-muted mb-1">Search</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" name="q" placeholder="Subscriber or reference #..." value="{{ search_term }}">
-                </div>
-            </div>
-            <div class="col-sm-3 col-md-3">
-                <label class="form-label small text-muted mb-1">Method</label>
-                <select name="method" class="form-select">
-                    <option value="" {% if not method_filter %}selected{% endif %}>All Methods</option>
-                    {% for m in ['cash', 'gcash', 'bank_transfer', 'other'] %}
-                    <option value="{{ m }}" {% if method_filter == m %}selected{% endif %}>{{ m|replace('_',' ')|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-3 col-md-2">
-                <label class="form-label small text-muted mb-1">Status</label>
-                <select name="status" class="form-select">
-                    <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
-                    {% for s in ['confirmed', 'pending', 'overdue', 'voided'] %}
-                    <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|capitalize }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-sm-12 col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filter</button>
-                {% if search_term or method_filter or status_filter %}
-                    <a href="{{ url_for('payments.list_payments') }}" class="btn btn-link text-decoration-none">Clear</a>
-                {% endif %}
-            </div>
-        </form>
+    <div class="subs-pill-group" role="group" aria-label="Filter by method">
+        {% for value, label in method_options %}
+            <a
+                class="subs-pill {{ 'subs-pill-active' if method_filter == value else '' }}"
+                href="{{ url_for('payments.list_payments', q=search_term, method=value, status=status_filter) }}"
+            >{{ label }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="subs-pill-group" role="group" aria-label="Filter by status">
+        {% for value, label in status_options %}
+            <a
+                class="subs-pill {{ 'subs-pill-active' if status_filter == value else '' }}"
+                href="{{ url_for('payments.list_payments', q=search_term, method=method_filter, status=value) }}"
+            >{{ label }}</a>
+        {% endfor %}
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="disp-table-card">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+        <table class="table disp-table align-middle mb-0" data-lf-table>
+            <thead>
                 <tr>
                     <th>Date</th>
                     <th>Subscriber</th>
@@ -63,44 +75,95 @@
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
-            <tbody>
-                {% set status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
+            <tbody id="paymentsTableBody" data-lf-body>
                 {% for payment in payments %}
-                <tr>
-                    <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
-                    <td>{{ payment.subscriber.subscriber_code }} — {{ payment.subscriber.full_name }}</td>
-                    <td>{{ "%.2f"|format(payment.amount) }}</td>
+                {% set search_blob = [
+                    payment.subscriber.full_name,
+                    payment.subscriber.subscriber_code,
+                    payment.reference_number,
+                    payment.collector.full_name if payment.collector else "",
+                    payment.payment_method|replace('_', ' '),
+                    payment.status,
+                    payment.payment_date.strftime('%Y-%m-%d'),
+                    "%.2f"|format(payment.amount),
+                ]|select|join(' ')|lower %}
+                <tr class="disp-row disp-row-clickable lf-row"
+                    data-search="{{ search_blob }}"
+                    data-href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}">
+                    <td class="disp-subtext">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <div class="subs-name">{{ payment.subscriber.full_name }}</div>
+                        <div class="disp-subtext">{{ payment.subscriber.subscriber_code }}</div>
+                    </td>
+                    <td class="lf-amount">{{ "%.2f"|format(payment.amount) }}</td>
                     <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
                     <td>{{ payment.reference_number or "—" }}</td>
                     <td>{{ payment.collector.full_name if payment.collector else "—" }}</td>
-                    <td><span class="badge {{ status_classes.get(payment.status, 'text-bg-secondary') }}">{{ payment.status|capitalize }}</span></td>
+                    <td>
+                        <span class="disp-badge disp-badge-{{ payment.status }}">{{ payment.status|capitalize }}</span>
+                    </td>
                     <td class="text-end">
-                        <div class="d-flex gap-2 justify-content-end">
+                        <div class="subs-row-actions">
                             {% if payment.status in ('pending', 'overdue') %}
                             <form method="post" action="{{ url_for('payments.void_payment', payment_id=payment.id) }}"
-                                  onsubmit="return confirm('Void this payment?');">
+                                  class="lf-inline-form" onsubmit="return confirm('Void this payment?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-dark" title="Void">
+                                <button type="submit" class="subs-edit-btn" title="Void">
                                     <i class="bi bi-slash-circle"></i>
                                 </button>
                             </form>
                             {% endif %}
-                            <a href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                            <a href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}"
+                               class="subs-edit-btn" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
                         </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-5">
+                    <td colspan="8" class="disp-empty">
                         <i class="bi bi-cash display-6 d-block mb-2"></i>
                         No payments found{% if search_term or method_filter or status_filter %} matching your filters{% endif %}.
                     </td>
                 </tr>
                 {% endfor %}
+                {% if payments %}
+                <tr id="paymentsNoMatchRow" class="d-none" data-lf-nomatch>
+                    <td colspan="8" class="disp-empty">
+                        <i class="bi bi-search display-6 d-block mb-2"></i>
+                        No payments match "<span data-lf-nomatch-q></span>".
+                    </td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
 </div>
+
+{# Pagination lives OUTSIDE the table card, directly under it
+   (same pill pager as the Subscribers list). #}
+<div class="subs-pager" id="paymentsPager" data-lf-pager hidden>
+    <nav aria-label="Payment pages">
+        <ul class="subs-pager-list" data-lf-pager-list></ul>
+    </nav>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>
+<script>
+    // Clicking anywhere on a payment row opens its edit form (buttons and
+    // links inside the row keep their own behaviour).
+    (function () {
+        var tbody = document.getElementById('paymentsTableBody');
+        if (!tbody) return;
+        tbody.addEventListener('click', function (e) {
+            if (e.target.closest('a, button, form')) return;
+            var row = e.target.closest('tr[data-href]');
+            if (row) window.location.href = row.getAttribute('data-href');
+        });
+    })();
+</script>
 {% endblock %}
