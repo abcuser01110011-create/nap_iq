@@ -1,7 +1,11 @@
 {% extends "dashboard_base.html" %}
-{% block title %}Reports{% endblock %}
-{% block page_title %}Reports{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">Seven operational reports — pick a tab below, each with its own filters</p>{% endblock %}
+{% block title %}Reports &amp; Analytics{% endblock %}
+{% block body_class %}{{ 'reports-fit' if active_report == 'overview' else '' }}{% endblock %}
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/reports.css') }}" rel="stylesheet">
+{% endblock %}
+{% block page_title %}Reports &amp; Analytics{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Overview of your ISP operations and performance</p>{% endblock %}
 
 {% block content %}
 
@@ -13,6 +17,7 @@
 {# sitting in the page waiting to be revealed by JS.                 #}
 {# ---------------------------------------------------------------- #}
 {% set report_meta = {
+    'overview': {'label': 'Overview', 'icon': 'bi-house-door'},
     'issues': {'label': 'Issues', 'icon': 'bi-exclamation-triangle'},
     'nap_inventory': {'label': 'NAP Inventory', 'icon': 'bi-diagram-3'},
     'port_availability': {'label': 'Port Availability', 'icon': 'bi-hdd-network'},
@@ -22,16 +27,165 @@
     'technicians': {'label': 'Technicians', 'icon': 'bi-person-badge'},
 } %}
 
-<ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto text-nowrap">
-    {% for key in report_keys %}
-    <li class="nav-item">
-        <a class="nav-link {{ 'active' if active_report == key else '' }}"
-           href="{{ url_for('reports.index', report=key) }}">
-            <i class="bi {{ report_meta[key].icon }} me-1"></i>{{ report_meta[key].label }}
+<div class="rep-toolbar">
+    <nav class="rep-tabs" aria-label="Reports">
+        {% for key in report_keys %}
+        <a class="rep-tab {{ 'active' if active_report == key else '' }}"
+           href="{{ url_for('reports.index', report=key) }}"
+           {% if active_report == key %}aria-current="page"{% endif %}>
+            <i class="bi {{ report_meta[key].icon }}"></i>{{ report_meta[key].label }}
         </a>
-    </li>
-    {% endfor %}
-</ul>
+        {% endfor %}
+    </nav>
+    <div class="rep-actions">
+        {% if active_report == 'overview' %}
+        <form method="get" action="{{ url_for('reports.index') }}" class="rep-range m-0">
+            <input type="hidden" name="report" value="overview">
+            <i class="bi bi-calendar3"></i>
+            <select name="range" aria-label="Date range" onchange="this.form.submit()">
+                {% for days, label in range_options.items() %}
+                <option value="{{ days }}" {{ 'selected' if range_days == days else '' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+        <button type="button" id="repExportBtn" class="btn btn-primary rep-export" data-report="{{ active_report }}">
+            <i class="bi bi-download me-1"></i>Export Report
+        </button>
+    </div>
+</div>
+
+{# ---------------------------------------------------------------- #}
+{# OVERVIEW (Reports & Analytics dashboard)                          #}
+{# ---------------------------------------------------------------- #}
+{% macro trend(change, good_when) %}
+    {# good_when = 'up' (more is better) or 'down' (less is better) #}
+    {% if change is none %}
+        <div class="rep-kpi-trend flat">No prior data</div>
+    {% elif change == 0 %}
+        <div class="rep-kpi-trend flat">No change</div>
+    {% else %}
+        {% set dir = 'up' if change > 0 else 'down' %}
+        <div class="rep-kpi-trend {{ dir }}-{{ 'good' if dir == good_when else 'bad' }}">
+            <i class="bi bi-arrow-{{ dir }}"></i> {{ '%+.1f'|format(change) }}%
+        </div>
+    {% endif %}
+{% endmacro %}
+
+{% if active_report == 'overview' %}
+<div class="rep-ov">
+    <div class="rep-kpis">
+        <div class="rep-kpi rep-tone-primary">
+            <span class="rep-kpi-icon"><i class="bi bi-people-fill"></i></span>
+            <div class="rep-kpi-body">
+                <div class="rep-kpi-value">{{ '{:,}'.format(total_subscribers) }}</div>
+                <div class="rep-kpi-label">Total Subscribers</div>
+                {{ trend(subscriber_growth_pct, 'up') }}
+            </div>
+            <div class="rep-spark" data-spark="subscribers"></div>
+        </div>
+        <div class="rep-kpi rep-tone-warning">
+            <span class="rep-kpi-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            <div class="rep-kpi-body">
+                <div class="rep-kpi-value">{{ '{:,}'.format(open_issues) }}</div>
+                <div class="rep-kpi-label">Open Issues</div>
+                {{ trend(issues_change_pct, 'down') }}
+            </div>
+            <div class="rep-spark" data-spark="issues"></div>
+        </div>
+        <div class="rep-kpi rep-tone-success">
+            <span class="rep-kpi-icon"><i class="bi bi-wallet2"></i></span>
+            <div class="rep-kpi-body">
+                <div class="rep-kpi-value">&#8369;{{ '{:,.0f}'.format(collections_now) }}</div>
+                <div class="rep-kpi-label">Collections ({{ range_options[range_days]|lower }})</div>
+                {{ trend(collections_change_pct, 'up') }}
+            </div>
+            <div class="rep-spark" data-spark="collections"></div>
+        </div>
+        <div class="rep-kpi rep-tone-violet">
+            <span class="rep-kpi-icon"><i class="bi bi-broadcast-pin"></i></span>
+            <div class="rep-kpi-body">
+                <div class="rep-kpi-value">{{ '{:,}'.format(available_ports) }}</div>
+                <div class="rep-kpi-label">Available NAP Ports</div>
+                <div class="rep-kpi-trend flat">{{ capacity_pct }}% capacity used</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="rep-grid">
+        <section class="rep-card">
+            <div class="rep-card-head">
+                <h2 class="rep-card-title"><i class="bi bi-graph-up-arrow"></i>Subscriber Growth</h2>
+                <a class="rep-card-link" href="{{ url_for('reports.index', report='subscribers') }}">View Report <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div class="rep-chart" id="repGrowthChart"></div>
+        </section>
+
+        <section class="rep-card">
+            <div class="rep-card-head">
+                <h2 class="rep-card-title"><i class="bi bi-ticket-detailed"></i>Issue Overview</h2>
+                <a class="rep-card-link" href="{{ url_for('reports.index', report='issues') }}">View Report <i class="bi bi-arrow-right"></i></a>
+            </div>
+            {% if issues_total %}
+            <div class="rep-split">
+                <div class="rep-donut" id="repIssueDonut"></div>
+                <ul class="rep-legend">
+                    {% for row in issue_breakdown %}
+                    <li><span class="rep-swatch rep-sw-{{ row.key }}"></span>{{ row.label }}<span class="rep-pct">{{ row.pct }}%</span></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% else %}
+            <div class="rep-empty">No issues were reported in this period.</div>
+            {% endif %}
+        </section>
+
+        <section class="rep-card">
+            <div class="rep-card-head">
+                <h2 class="rep-card-title"><i class="bi bi-broadcast"></i>NAP Utilization</h2>
+                <a class="rep-card-link" href="{{ url_for('reports.index', report='port_availability') }}">View Report <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <div class="rep-split">
+                <div class="rep-donut" id="repNapDonut"></div>
+                <div class="rep-bars">
+                    {% for row in nap_classes %}
+                    <div class="rep-bar-row">
+                        <span class="rep-swatch rep-sw-{{ row.key }}"></span>
+                        <span class="rep-bar-label">{{ row.label }}</span>
+                        <span class="rep-bar-count">{{ row.count }}</span>
+                        <span class="rep-bar-track"><span class="rep-bar-fill rep-sw-{{ row.key }}" style="width: {{ row.pct }}%; display: block;"></span></span>
+                        <span class="rep-bar-pct">{{ row.pct }}%</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <section class="rep-card">
+            <div class="rep-card-head">
+                <h2 class="rep-card-title"><i class="bi bi-activity"></i>Recent Activity</h2>
+                <a class="rep-card-link" href="{{ url_for('notifications.index') }}">View All <i class="bi bi-arrow-right"></i></a>
+            </div>
+            {% if recent_activity %}
+            <ul class="rep-timeline">
+                {% for e in recent_activity %}
+                <li class="rep-event">
+                    <div class="rep-event-main">
+                        <div class="rep-event-line"><strong>{{ e.kind }}</strong> {{ e.text }}</div>
+                        {% if e.sub %}<div class="rep-event-sub">{{ e.sub }}</div>{% endif %}
+                    </div>
+                    <span class="rep-event-time">{{ e.ago }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="rep-empty">No recent activity yet.</div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+<script type="application/json" id="repData">{{ chart_data|tojson }}</script>
+{% endif %}
 
 {# ---------------------------------------------------------------- #}
 {# ISSUES                                                             #}
@@ -753,4 +907,8 @@
     </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/reports-ui.js') }}?v={{ asset_version('js/reports-ui.js') }}"></script>
 {% endblock %}

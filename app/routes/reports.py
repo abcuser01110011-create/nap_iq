@@ -21,6 +21,10 @@ both simpler and cheaper than computing seven reports' worth of queries
 on every page load.
 
 Report keys (the `report=` query value, also each tab's id):
+    overview     — Reports & Analytics dashboard: KPI cards, subscriber
+                    growth, issue overview, NAP utilization and recent
+                    activity for a selectable range (`?range=7|30|90|365`).
+                    This is the default tab.
     issues       — Technical Issue Report (Phase 13, extended)
     nap_inventory — NAP Inventory Report (Phase 23, new)
     port_availability — NAP Port Availability Report (Phase 13's
@@ -44,7 +48,7 @@ Routes:
     GET /reports/ -> index   (the only route this module has ever needed)
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from flask import Blueprint, render_template, request, flash
 
@@ -63,6 +67,7 @@ from app.models import (
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 REPORT_KEYS = (
+    "overview",
     "issues",
     "nap_inventory",
     "port_availability",
@@ -94,6 +99,221 @@ OPEN_ASSIGNMENT_STATUSES = ("assigned", "accepted", "in_progress")
 # (always flagged regardless of the exact port count, since that
 # status was a deliberate human call, not just a derived number).
 NEAR_CAPACITY_THRESHOLD_PCT = 90
+
+
+# -----------------------------------------------------------------------
+# OVERVIEW (Reports & Analytics dashboard) — read-only aggregates for the
+# default tab. Everything is computed in Python from a handful of simple
+# queries so it stays portable between SQLite (tests) and Postgres/MySQL.
+# -----------------------------------------------------------------------
+OVERVIEW_RANGES = {7: "Last 7 Days", 30: "Last 30 Days", 90: "Last 90 Days", 365: "Last 12 Months"}
+OPEN_ISSUE_STATUSES = ("pending", "assigned", "in_progress")
+OVERVIEW_BUCKETS = 8
+
+# Share of a NAP's ports in use that puts it in each utilization class.
+NAP_HEALTHY_BELOW_PCT = 60
+NAP_LOW_PORTS_BELOW_PCT = 80
+
+
+def _pct_change(current, previous):
+    """Percent change vs the previous period, rounded to 1 decimal, or
+    None when there is no previous-period value to compare against."""
+    if not previous:
+        return None
+    return round((current - previous) / previous * 100, 1)
+
+
+def _bucket_index(moment, start, step_seconds, buckets):
+    idx = int((moment - start).total_seconds() // step_seconds)
+    return max(0, min(buckets - 1, idx))
+
+
+def _time_ago(moment, now):
+    seconds = max(0, int((now - moment).total_seconds()))
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{seconds // 60}m ago"
+    if seconds < 86400:
+        return f"{seconds // 3600}h ago"
+    if seconds < 86400 * 30:
+        return f"{seconds // 86400}d ago"
+    return moment.strftime("%b %d, %Y")
+
+
+def _build_overview_report():
+    try:
+        range_days = int(request.args.get("range", 30))
+    except (TypeError, ValueError):
+        range_days = 30
+    if range_days not in OVERVIEW_RANGES:
+        range_days = 30
+
+    now = datetime.utcnow()
+    start = now - timedelta(days=range_days)
+    prev_start = start - timedelta(days=range_days)
+    step = (now - start).total_seconds() / OVERVIEW_BUCKETS
+    label_fmt = "%b %d" if range_days < 365 else "%b %Y"
+
+    # ---- Subscribers -------------------------------------------------
+    installed = [row[0] for row in db.session.query(Subscriber.installed_at).all()]
+    total_subscribers = len(installed)
+    undated = sum(1 for d in installed if d is None)
+    dated = sorted(d for d in installed if d is not None)
+
+    def subscribers_as_of(moment):
+        cutoff = moment.date()
+        return undated + sum(1 for d in dated if d <= cutoff)
+
+    growth_points = []
+    for i in range(OVERVIEW_BUCKETS + 1):
+        moment = start + timedelta(seconds=step * i)
+        growth_points.append({"label": moment.strftime(label_fmt), "value": subscribers_as_of(moment)})
+    subscribers_at_start = growth_points[0]["value"]
+    subscriber_growth_pct = _pct_change(total_subscribers, subscribers_at_start)
+    subscriber_spark = [p["value"] for p in growth_points]
+
+    # ---- Issues ------------------------------------------------------
+    issue_rows = db.session.query(
+        TechnicalIssue.status, TechnicalIssue.created_at
+    ).filter(TechnicalIssue.created_at >= prev_start).all()
+    open_issues = TechnicalIssue.query.filter(
+        TechnicalIssue.status.in_(OPEN_ISSUE_STATUSES)
+    ).count()
+
+    issues_now = [r for r in issue_rows if r.created_at >= start]
+    issues_prev_count = len(issue_rows) - len(issues_now)
+    issue_spark = [0] * OVERVIEW_BUCKETS
+    for r in issues_now:
+        issue_spark[_bucket_index(r.created_at, start, step, OVERVIEW_BUCKETS)] += 1
+    issues_change_pct = _pct_change(len(issues_now), issues_prev_count)
+
+    resolved_n = sum(1 for r in issues_now if r.status in ("resolved", "closed"))
+    progress_n = sum(1 for r in issues_now if r.status in ("assigned", "in_progress"))
+    pending_n = sum(1 for r in issues_now if r.status == "pending")
+    issues_total = len(issues_now)
+
+    def share(n):
+        return round(n / issues_total * 100, 1) if issues_total else 0
+
+    issue_breakdown = [
+        {"key": "resolved", "label": "Resolved", "count": resolved_n, "pct": share(resolved_n)},
+        {"key": "progress", "label": "In Progress", "count": progress_n, "pct": share(progress_n)},
+        {"key": "open", "label": "Open", "count": pending_n, "pct": share(pending_n)},
+    ]
+
+    # ---- Collections -------------------------------------------------
+    pay_rows = db.session.query(Payment.payment_date, Payment.amount).filter(
+        Payment.status == "confirmed", Payment.payment_date >= prev_start.date()
+    ).all()
+    collections_now = 0.0
+    collections_prev = 0.0
+    collections_spark = [0.0] * OVERVIEW_BUCKETS
+    for pay_date, amount in pay_rows:
+        moment = datetime.combine(pay_date, datetime.min.time())
+        if moment >= datetime.combine(start.date(), datetime.min.time()):
+            collections_now += float(amount)
+            collections_spark[_bucket_index(moment, start, step, OVERVIEW_BUCKETS)] += float(amount)
+        else:
+            collections_prev += float(amount)
+    collections_change_pct = _pct_change(collections_now, collections_prev)
+
+    # ---- NAP ports / utilization ------------------------------------
+    naps = Nap.query.all()
+    usable = [n for n in naps if n.status != "inactive"]
+    available_ports = sum(n.available_ports or 0 for n in usable if n.status != "maintenance")
+    ports_total = sum(n.total_ports or 0 for n in usable)
+    ports_used = sum(n.used_ports or 0 for n in usable)
+    capacity_pct = round(ports_used / ports_total * 100) if ports_total else 0
+
+    classes = {"healthy": 0, "low": 0, "high": 0, "full": 0}
+    for n in usable:
+        pct = (n.used_ports / n.total_ports * 100) if n.total_ports else 0
+        if n.status == "full" or pct >= 100:
+            classes["full"] += 1
+        elif pct >= NAP_LOW_PORTS_BELOW_PCT:
+            classes["high"] += 1
+        elif pct >= NAP_HEALTHY_BELOW_PCT:
+            classes["low"] += 1
+        else:
+            classes["healthy"] += 1
+    nap_total = len(usable)
+    nap_classes = [
+        {"key": "healthy", "label": "Healthy", "count": classes["healthy"]},
+        {"key": "low", "label": "Low Ports", "count": classes["low"]},
+        {"key": "high", "label": "High Usage", "count": classes["high"]},
+        {"key": "full", "label": "Full", "count": classes["full"]},
+    ]
+    for c in nap_classes:
+        c["pct"] = round(c["count"] / nap_total * 100) if nap_total else 0
+
+    # ---- Recent activity --------------------------------------------
+    events = []
+    for issue in TechnicalIssue.query.order_by(TechnicalIssue.created_at.desc()).limit(5).all():
+        events.append({
+            "when": issue.created_at,
+            "kind": "New Ticket",
+            "text": f"{issue.issue_code or '#' + str(issue.id)} - {str(issue.issue_type).replace('_', ' ').title()}",
+            "sub": f"Status: {str(issue.status).replace('_', ' ').title()}",
+        })
+    for pay in Payment.query.order_by(Payment.created_at.desc()).limit(5).all():
+        code = pay.subscriber.subscriber_code if pay.subscriber else ""
+        events.append({
+            "when": pay.created_at,
+            "kind": "Payment " + ("Received" if pay.status == "confirmed" else pay.status.title()),
+            "text": f"\u20b1{float(pay.amount):,.2f}" + (f" \u2013 {code}" if code else ""),
+            "sub": "",
+        })
+    for sr in ServiceRequest.query.order_by(ServiceRequest.created_at.desc()).limit(5).all():
+        events.append({
+            "when": sr.created_at,
+            "kind": "Service Request",
+            "text": ("Nap Installation" if sr.request_type == "add_nap" else str(sr.request_type).replace("_", " ").title()),
+            "sub": f"Status: {str(sr.status).title()}",
+        })
+    events.sort(key=lambda e: e["when"], reverse=True)
+    recent_activity = [dict(e, ago=_time_ago(e["when"], now)) for e in events[:5]]
+
+    chart_data = {
+        "growth": growth_points,
+        "sparks": {
+            "subscribers": subscriber_spark,
+            "issues": issue_spark,
+            "collections": [round(v, 2) for v in collections_spark],
+        },
+        "issues": issue_breakdown,
+        "issues_total": issues_total,
+        "nap_capacity_pct": capacity_pct,
+        "nap_classes": nap_classes,
+        "export": {
+            "range": OVERVIEW_RANGES[range_days],
+            "kpis": [
+                ["Total Subscribers", total_subscribers],
+                ["Open Issues", open_issues],
+                ["Collections (confirmed, " + OVERVIEW_RANGES[range_days] + ")", round(collections_now, 2)],
+                ["Available NAP Ports", available_ports],
+                ["NAP Capacity Used %", capacity_pct],
+            ],
+        },
+    }
+
+    return {
+        "range_days": range_days,
+        "range_options": OVERVIEW_RANGES,
+        "total_subscribers": total_subscribers,
+        "subscriber_growth_pct": subscriber_growth_pct,
+        "open_issues": open_issues,
+        "issues_change_pct": issues_change_pct,
+        "collections_now": collections_now,
+        "collections_change_pct": collections_change_pct,
+        "available_ports": available_ports,
+        "capacity_pct": capacity_pct,
+        "issue_breakdown": issue_breakdown,
+        "issues_total": issues_total,
+        "nap_classes": nap_classes,
+        "recent_activity": recent_activity,
+        "chart_data": chart_data,
+    }
 
 
 def _parse_date_range(prefix):
@@ -557,6 +777,7 @@ def _build_technician_workload_report():
 
 
 _REPORT_BUILDERS = {
+    "overview": _build_overview_report,
     "issues": _build_issues_report,
     "nap_inventory": _build_nap_inventory_report,
     "port_availability": _build_port_availability_report,
@@ -571,12 +792,12 @@ _REPORT_BUILDERS = {
 @role_required("administrator")
 def index():
     """Renders the tabbed Reports page. `?report=<key>` selects which
-    of the seven reports is active (defaults to `issues`); an unknown
-    key falls back to `issues` too rather than 404ing, so a stale or
+    of the reports is active (defaults to `overview`); an unknown
+    key falls back to `overview` too rather than 404ing, so a stale or
     hand-edited link degrades gracefully instead of breaking."""
-    active_report = request.args.get("report", "issues")
+    active_report = request.args.get("report", "overview")
     if active_report not in REPORT_KEYS:
-        active_report = "issues"
+        active_report = "overview"
 
     context = _REPORT_BUILDERS[active_report]()
     context["active_report"] = active_report
