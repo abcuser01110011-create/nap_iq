@@ -5,15 +5,44 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">Technical issues reported on your account</p>{% endblock %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 {% endblock %}
 
 {% block content %}
-<a href="{{ url_for('customer.index') }}" class="btn btn-sm btn-outline-secondary mb-3">
-    <i class="bi bi-arrow-left me-1"></i>Back
-</a>
+{# Moved here from the home screen: history shortcut + live progress of issues still being worked on. #}
+{% set active_issues = technical_issues|selectattr('status', 'in', ['pending', 'assigned', 'accepted', 'in_progress'])|list %}
+{% set active_ids = active_issues|map(attribute='id')|list %}
+{% set active_progress = progress_data|selectattr('id', 'in', active_ids)|list %}
+<div class="ip-home-wrap mb-3">
+    <div class="ip-home-top">
+        <a href="#issueHistory" class="btn btn-sm btn-outline-primary ip-history-btn">
+            <i class="bi bi-clock-history me-1"></i>View reported issue history
+        </a>
+    </div>
+    {% if active_progress %}
+    <div class="card shadow-sm napiq-account-card ip-home-card">
+        <div class="card-body">
+            <span class="napiq-account-label">Reported issue progress</span>
+            <div class="ip-home-list">
+                {% for p in active_progress %}
+                {% set issue = active_issues|selectattr('id', 'equalto', p.id)|first %}
+                <div class="ip-home-item" data-issue-id="{{ p.id }}">
+                    <div class="ip-home-head">
+                        <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
+                        <span class="text-muted small">{{ issue.issue_type }}</span>
+                        <span class="badge ms-auto issue-status-badge text-bg-secondary">{{ p.status_label }}</span>
+                    </div>
+                    <div class="issue-progress" data-issue-id="{{ p.id }}"></div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm" id="issueHistory">
     <div class="card-header bg-white ip-list-header">
         <span class="ip-list-title"><i class="bi bi-exclamation-triangle me-1"></i>Technical Issues</span>
         <a href="{{ url_for('customer.report_issue') }}" class="btn btn-primary ip-report-btn">
@@ -53,4 +82,18 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+{# blocks don't share {% set %} variables, so recompute the active list here #}
+{% set active_ids = technical_issues|selectattr('status', 'in', ['pending', 'assigned', 'accepted', 'in_progress'])|map(attribute='id')|list %}
+{% set active_progress = progress_data|selectattr('id', 'in', active_ids)|list %}
+{% if active_progress %}
+<script>
+    window.ISSUE_PROGRESS_INITIAL = {{ active_progress|tojson }};
+    window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
+</script>
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
+{% endif %}
 {% endblock %}

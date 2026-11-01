@@ -187,36 +187,6 @@
         </div>
     </div>
 </div>
-{% else %}
-{# Reported-issue progress tracker (moved here from the old "Open issues" tile) #}
-<div class="ip-home-wrap mb-3">
-    <div class="ip-home-top">
-        <a href="{{ url_for('customer.my_issues') }}" class="btn btn-sm btn-outline-primary ip-history-btn">
-            <i class="bi bi-clock-history me-1"></i>View reported issue history
-        </a>
-    </div>
-    {% if progress_data %}
-    <div class="card shadow-sm napiq-account-card ip-home-card">
-        <div class="card-body">
-            <span class="napiq-account-label">Reported issue progress</span>
-            <div class="ip-home-list">
-                {% for p in progress_data %}
-                {% set issue = technical_issues|selectattr('id', 'equalto', p.id)|first %}
-                <div class="ip-home-item" data-issue-id="{{ p.id }}">
-                    <div class="ip-home-head">
-                        <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
-                        <span class="text-muted small">{{ issue.issue_type }}</span>
-                        <span class="badge ms-auto issue-status-badge text-bg-secondary">{{ p.status_label }}</span>
-                    </div>
-                    <div class="issue-progress" data-issue-id="{{ p.id }}"></div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
 {% endif %}
 
 {% if payments %}
@@ -296,13 +266,5 @@
 {% endif %}
 {% if subscriber is not none %}
 <script src="{{ url_for('static', filename='js/customer-troubleshooting.js') }}"></script>
-{% endif %}
-{% if subscriber is not none and progress_data %}
-<script>
-    window.ISSUE_PROGRESS_INITIAL = {{ progress_data|tojson }};
-    window.ISSUE_PROGRESS_URL = "{{ url_for('customer.my_issues_progress') }}";
-</script>
-<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
-<script src="{{ url_for('static', filename='js/customer-issue-progress.js') }}"></script>
 {% endif %}
 {% endblock %}
