@@ -147,9 +147,12 @@ def _handle_login(portal):
 
             flash(f"Welcome back, {user.full_name}.", "success")
 
-            next_url = request.args.get("next") or request.form.get("next")
-            if _is_safe_next_url(next_url) and _next_url_allowed_for_role(next_url, user.role, user):
-                return redirect(next_url)
+            # Always land on the role's own dashboard (auth.home ->
+            # ROLE_HOME_ENDPOINT: Administrator -> Dashboard, Technician ->
+            # technician home, Collector -> collector home, Subscriber ->
+            # customer home). A `?next=` deep link (e.g. the last page a
+            # session expired on) is deliberately ignored so every sign-in
+            # starts from the dashboard.
             return redirect(url_for("auth.home"))
 
     return render_template("auth/login.html", form=form, portal=portal)
