@@ -50,8 +50,9 @@ Routes:
     POST /payments/<id>/void      -> void_payment     (quick action, pending/overdue -> voided)
 """
 
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
+from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, redirect, url_for, request, flash, g
 
 from app.extensions import db
@@ -75,18 +76,94 @@ def _populate_subscriber_choices(form):
     ]
 
 
+PERIOD_OPTIONS = (
+    ("", "All time"),
+    ("today", "Today"),
+    ("week", "This week"),
+    ("month", "This month"),
+)
+
+
+def _is_online(payment):
+    """HitPay checkout payments are created by hitpay.py with no
+    collector and a 'HitPay online payment' remark."""
+    return payment.collector_id is None and "hitpay" in (payment.remarks or "").lower()
+
+
+def _period_start(period, today):
+    if period == "today":
+        return today
+    if period == "week":
+        return today - timedelta(days=today.weekday())
+    if period == "month":
+        return today.replace(day=1)
+    return None
+
+
+def _summary_cards(today):
+    """Headline numbers for the strip above the table. Always computed
+    over ALL payments (not the filtered list) so they don't jump around
+    as the admin searches/filters."""
+    rows = db.session.query(Payment.status, Payment.amount, Payment.payment_date).all()
+    month_start = today.replace(day=1)
+    prev_month_end = month_start - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+    # Compare month-to-date against the same number of days last month.
+    prev_cutoff = prev_month_start + timedelta(days=today.day - 1)
+
+    month_total = prev_total = today_total = 0.0
+    today_count = 0
+    pending_total = overdue_total = 0.0
+    pending_n = overdue_n = 0
+    for status, amount, pay_date in rows:
+        amount = float(amount)
+        if status == "confirmed":
+            if pay_date >= month_start:
+                month_total += amount
+            elif prev_month_start <= pay_date <= prev_cutoff:
+                prev_total += amount
+            if pay_date == today:
+                today_total += amount
+                today_count += 1
+        elif status == "pending":
+            pending_total += amount
+            pending_n += 1
+        elif status == "overdue":
+            overdue_total += amount
+            overdue_n += 1
+
+    change = round((month_total - prev_total) / prev_total * 100, 1) if prev_total else None
+    return {
+        "month_total": month_total,
+        "month_change": change,
+        "today_total": today_total,
+        "today_count": today_count,
+        "pending_total": pending_total,
+        "pending_n": pending_n,
+        "overdue_total": overdue_total,
+        "overdue_n": overdue_n,
+    }
+
+
 @payments_bp.route("/")
 @role_required("administrator")
 def list_payments():
     """Displays all payments regardless of which collector recorded
     them, with optional search (subscriber name/code or reference
-    number) and payment-method/status filtering via query string
-    parameters (?q=...&method=...&status=...)."""
+    number), payment-method / status / period filtering via query
+    string parameters (?q=...&method=...&status=...&period=...)."""
     search_term = request.args.get("q", "").strip()
     method_filter = request.args.get("method", "").strip()
     status_filter = request.args.get("status", "").strip()
+    period_filter = request.args.get("period", "").strip()
+    if period_filter not in {p for p, _ in PERIOD_OPTIONS}:
+        period_filter = ""
 
-    query = Payment.query.join(Subscriber)
+    today = date.today()
+    query = Payment.query.join(Subscriber).options(
+        joinedload(Payment.subscriber).joinedload(Subscriber.nap),
+        joinedload(Payment.collector),
+    )
 
     if search_term:
         like_pattern = f"%{search_term}%"
@@ -104,14 +181,24 @@ def list_payments():
     if status_filter:
         query = filter_enum_eq(query, Payment.status, status_filter)
 
+    start = _period_start(period_filter, today)
+    if start:
+        query = query.filter(Payment.payment_date >= start)
+
     payments = query.order_by(Payment.payment_date.desc(), Payment.created_at.desc()).all()
+    online_ids = {p.id for p in payments if _is_online(p)}
 
     return render_template(
         "payments/list.html",
         payments=payments,
+        online_ids=online_ids,
+        summary=_summary_cards(today),
+        today=today,
         search_term=search_term,
         method_filter=method_filter,
         status_filter=status_filter,
+        period_filter=period_filter,
+        period_options=PERIOD_OPTIONS,
     )
 
 

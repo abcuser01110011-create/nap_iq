@@ -1,19 +1,20 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Payments{% endblock %}
-{% block body_class %}list-fit{% endblock %}
+{% block body_class %}list-fit payments-page{% endblock %}
 {% block extra_head %}
 <link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/payments.css') }}" rel="stylesheet">
 {% endblock %}
 {% block page_title %}Payments{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0" id="paymentsRecordCount" data-lf-count data-lf-noun="payment">{{ payments|length }} payment{{ '' if payments|length == 1 else 's' }} shown &middot; all collectors</p>{% endblock %}
 
 {% block content %}
 {% set method_options = [
-    ('', 'All'),
+    ('', 'All methods'),
     ('cash', 'Cash'),
     ('gcash', 'GCash'),
     ('bank_transfer', 'Bank Transfer'),
-    ('other', 'Other'),
+    ('other', 'Other / Online'),
 ] %}
 {% set status_options = [
     ('', 'All'),
@@ -22,99 +23,186 @@
     ('overdue', 'Overdue'),
     ('voided', 'Voided'),
 ] %}
+{% set method_meta = {
+    'cash': ('bi-cash-stack', 'Cash'),
+    'gcash': ('bi-phone', 'GCash'),
+    'bank_transfer': ('bi-bank', 'Bank Transfer'),
+    'other': ('bi-three-dots', 'Other'),
+} %}
 
+{# ---------------- Summary cards ---------------- #}
+<div class="pay-kpis">
+    <div class="pay-kpi pay-tone-success">
+        <span class="pay-kpi-icon"><i class="bi bi-graph-up-arrow"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Collected this month</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(summary.month_total) }}</div>
+            {% if summary.month_change is none %}
+                <div class="pay-kpi-sub">Confirmed payments</div>
+            {% else %}
+                <div class="pay-kpi-sub {{ 'pay-up' if summary.month_change >= 0 else 'pay-down' }}">
+                    <i class="bi bi-arrow-{{ 'up' if summary.month_change >= 0 else 'down' }}"></i>
+                    {{ '%+.1f'|format(summary.month_change) }}% vs last month
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="pay-kpi pay-tone-primary">
+        <span class="pay-kpi-icon"><i class="bi bi-calendar-check"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Collected today</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(summary.today_total) }}</div>
+            <div class="pay-kpi-sub">{{ summary.today_count }} payment{{ '' if summary.today_count == 1 else 's' }} confirmed</div>
+        </div>
+    </div>
+    <a class="pay-kpi pay-tone-warning pay-kpi-link" href="{{ url_for('payments.list_payments', status='pending') }}">
+        <span class="pay-kpi-icon"><i class="bi bi-hourglass-split"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Pending confirmation</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(summary.pending_total) }}</div>
+            <div class="pay-kpi-sub">{{ summary.pending_n }} awaiting review</div>
+        </div>
+    </a>
+    <a class="pay-kpi pay-tone-danger pay-kpi-link" href="{{ url_for('payments.list_payments', status='overdue') }}">
+        <span class="pay-kpi-icon"><i class="bi bi-exclamation-octagon"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Overdue</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(summary.overdue_total) }}</div>
+            <div class="pay-kpi-sub">{{ summary.overdue_n }} need follow-up</div>
+        </div>
+    </a>
+</div>
+
+{# ---------------- Filter bar ---------------- #}
 <div class="subs-filterbar">
     <form method="get" action="{{ url_for('payments.list_payments') }}" class="subs-search-form" id="paymentsSearchForm">
         {% if method_filter %}<input type="hidden" name="method" value="{{ method_filter }}">{% endif %}
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        {% if period_filter %}<input type="hidden" name="period" value="{{ period_filter }}">{% endif %}
         <i class="bi bi-search"></i>
-        <input
-            type="text" name="q" id="paymentsSearchInput"
-            placeholder="Filter by subscriber or reference #..."
-            value="{{ search_term }}"
-            aria-label="Filter payments"
-            autocomplete="off" data-lf-search
-        >
+        <input type="text" name="q" id="paymentsSearchInput"
+               placeholder="Search subscriber, code or reference..."
+               value="{{ search_term }}" aria-label="Filter payments"
+               autocomplete="off" data-lf-search>
     </form>
 
-    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>Add Payment
-    </a>
-
-    <div class="subs-pill-group" role="group" aria-label="Filter by method">
-        {% for value, label in method_options %}
-            <a
-                class="subs-pill {{ 'subs-pill-active' if method_filter == value else '' }}"
-                href="{{ url_for('payments.list_payments', q=search_term, method=value, status=status_filter) }}"
-            >{{ label }}</a>
+    <div class="subs-pill-group" role="group" aria-label="Filter by period">
+        {% for value, label in period_options %}
+            <a class="subs-pill {{ 'subs-pill-active' if period_filter == value else '' }}"
+               href="{{ url_for('payments.list_payments', q=search_term, method=method_filter, status=status_filter, period=value) }}">{{ label }}</a>
         {% endfor %}
+    </div>
+
+    <div class="dropdown">
+        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle pay-method-btn" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-wallet2 me-1"></i>{{ (method_options|selectattr(0, 'equalto', method_filter)|first)[1] }}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            {% for value, label in method_options %}
+            <li><a class="dropdown-item {{ 'active' if method_filter == value else '' }}"
+                   href="{{ url_for('payments.list_payments', q=search_term, method=value, status=status_filter, period=period_filter) }}">{{ label }}</a></li>
+            {% endfor %}
+        </ul>
     </div>
 
     <div class="subs-pill-group" role="group" aria-label="Filter by status">
         {% for value, label in status_options %}
-            <a
-                class="subs-pill {{ 'subs-pill-active' if status_filter == value else '' }}"
-                href="{{ url_for('payments.list_payments', q=search_term, method=method_filter, status=value) }}"
-            >{{ label }}</a>
+            <a class="subs-pill {{ 'subs-pill-active' if status_filter == value else '' }}"
+               href="{{ url_for('payments.list_payments', q=search_term, method=method_filter, status=value, period=period_filter) }}">{{ label }}</a>
         {% endfor %}
     </div>
+
+    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Add Payment
+    </a>
 </div>
 
+{# ---------------- Table ---------------- #}
 <div class="disp-table-card">
     <div class="table-responsive">
         <table class="table disp-table align-middle mb-0" data-lf-table>
             <thead>
                 <tr>
-                    <th>Date</th>
                     <th>Subscriber</th>
                     <th>Amount</th>
                     <th>Method</th>
-                    <th>Reference #</th>
-                    <th>Collector</th>
+                    <th>Reference</th>
+                    <th>Paid on</th>
+                    <th>Collected by</th>
                     <th>Status</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody id="paymentsTableBody" data-lf-body>
                 {% for payment in payments %}
-                {% set search_blob = [
-                    payment.subscriber.full_name,
-                    payment.subscriber.subscriber_code,
-                    payment.reference_number,
-                    payment.collector.full_name if payment.collector else "",
-                    payment.payment_method|replace('_', ' '),
-                    payment.status,
-                    payment.payment_date.strftime('%Y-%m-%d'),
-                    "%.2f"|format(payment.amount),
-                ]|select|join(' ')|lower %}
+                {% set sub = payment.subscriber %}
+                {% set online = payment.id in online_ids %}
+                {% set method_icon, method_label = method_meta.get(payment.payment_method, ('bi-three-dots', 'Other')) %}
+                {% if online %}{% set method_icon = 'bi-credit-card-2-front' %}{% set method_label = 'Online (HitPay)' %}{% endif %}
+                {% set ref = payment.reference_number or '' %}
+                {% set days_ago = (today - payment.payment_date).days %}
+                {% set initials = (sub.full_name.split()|map('first')|list)[:2]|join|upper %}
+                {% set collector_name = payment.collector.full_name if payment.collector else ('Online' if online else '—') %}
                 <tr class="disp-row disp-row-clickable lf-row"
-                    data-search="{{ search_blob }}"
-                    data-href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}">
-                    <td class="disp-subtext">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                    data-search="{{ [sub.full_name, sub.subscriber_code, ref, collector_name, method_label, payment.status, '%.2f'|format(payment.amount), payment.payment_date.strftime('%Y-%m-%d')]|select|join(' ')|lower }}"
+                    data-name="{{ sub.full_name }}"
+                    data-code="{{ sub.subscriber_code }}"
+                    data-plan="{{ sub.plan_type or '' }}"
+                    data-nap="{{ sub.nap.nap_code if sub.nap else '' }}"
+                    data-amount="{{ '{:,.2f}'.format(payment.amount) }}"
+                    data-status="{{ payment.status }}"
+                    data-method="{{ method_label }}"
+                    data-method-icon="{{ method_icon }}"
+                    data-ref="{{ ref }}"
+                    data-date="{{ payment.payment_date.strftime('%B %d, %Y') }}"
+                    data-created="{{ payment.created_at.strftime('%b %d, %Y %H:%M') }}"
+                    data-updated="{{ payment.updated_at.strftime('%b %d, %Y %H:%M') }}"
+                    data-collector="{{ collector_name }}"
+                    data-remarks="{{ payment.remarks or '' }}"
+                    data-edit="{{ url_for('payments.edit_payment', payment_id=payment.id) }}"
+                    {% if payment.status in ('pending', 'overdue') %}data-void="{{ url_for('payments.void_payment', payment_id=payment.id) }}"{% endif %}>
                     <td>
-                        <div class="subs-name">{{ payment.subscriber.full_name }}</div>
-                        <div class="disp-subtext">{{ payment.subscriber.subscriber_code }}</div>
+                        <div class="pay-person">
+                            <span class="pay-avatar pay-av-{{ sub.id % 5 }}">{{ initials }}</span>
+                            <div class="pay-person-text">
+                                <div class="subs-name">{{ sub.full_name }}</div>
+                                <div class="disp-subtext">{{ sub.subscriber_code }}</div>
+                            </div>
+                        </div>
                     </td>
-                    <td class="lf-amount">{{ "%.2f"|format(payment.amount) }}</td>
-                    <td class="text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
-                    <td>{{ payment.reference_number or "—" }}</td>
-                    <td>{{ payment.collector.full_name if payment.collector else "—" }}</td>
+                    <td class="lf-amount"><span class="pay-peso">&#8369;</span>{{ '{:,.2f}'.format(payment.amount) }}</td>
+                    <td><span class="pay-method"><i class="bi {{ method_icon }}"></i>{{ method_label }}</span></td>
                     <td>
-                        <span class="disp-badge disp-badge-{{ payment.status }}">{{ payment.status|capitalize }}</span>
+                        {% if ref %}
+                        <span class="pay-ref" title="{{ ref }}">
+                            <code>{{ ref if ref|length <= 14 else ref[:6] ~ '…' ~ ref[-4:] }}</code>
+                            <button type="button" class="pay-copy" data-copy="{{ ref }}" title="Copy reference" aria-label="Copy reference"><i class="bi bi-copy"></i></button>
+                        </span>
+                        {% else %}<span class="disp-subtext">—</span>{% endif %}
                     </td>
+                    <td>
+                        <div>{{ payment.payment_date.strftime('%b %d, %Y') }}</div>
+                        <div class="disp-subtext">{{ 'Today' if days_ago == 0 else ('Yesterday' if days_ago == 1 else (days_ago ~ ' days ago' if days_ago > 1 else '')) }}</div>
+                    </td>
+                    <td>
+                        {% if payment.collector %}{{ payment.collector.full_name }}
+                        {% elif online %}<span class="pay-chip-online"><i class="bi bi-globe2"></i>Online</span>
+                        {% else %}<span class="disp-subtext">—</span>{% endif %}
+                    </td>
+                    <td><span class="disp-badge pay-status disp-badge-{{ payment.status }}"><span class="pay-dot"></span>{{ payment.status|capitalize }}</span></td>
                     <td class="text-end">
                         <div class="subs-row-actions">
                             {% if payment.status in ('pending', 'overdue') %}
                             <form method="post" action="{{ url_for('payments.void_payment', payment_id=payment.id) }}"
-                                  class="lf-inline-form" onsubmit="return confirm('Void this payment?');">
+                                  class="lf-inline-form" onsubmit="event.stopPropagation(); return confirm('Void this payment?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="subs-edit-btn" title="Void">
+                                <button type="submit" class="subs-edit-btn" title="Void" onclick="event.stopPropagation();">
                                     <i class="bi bi-slash-circle"></i>
                                 </button>
                             </form>
                             {% endif %}
                             <a href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}"
-                               class="subs-edit-btn" title="Edit">
+                               class="subs-edit-btn" title="Edit" onclick="event.stopPropagation();">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
@@ -124,13 +212,14 @@
                 {% else %}
                 <tr>
                     <td colspan="8" class="disp-empty">
-                        <i class="bi bi-cash display-6 d-block mb-2"></i>
-                        No payments found{% if search_term or method_filter or status_filter %} matching your filters{% endif %}.
+                        <i class="bi bi-receipt display-6 d-block mb-2"></i>
+                        <div class="fw-semibold">No payments found</div>
+                        <div class="small">{% if search_term or method_filter or status_filter or period_filter %}Nothing matches your filters. <a href="{{ url_for('payments.list_payments') }}">Clear filters</a>{% else %}Recorded and online payments will show up here.{% endif %}</div>
                     </td>
                 </tr>
                 {% endfor %}
                 {% if payments %}
-                <tr id="paymentsNoMatchRow" class="d-none" data-lf-nomatch>
+                <tr data-lf-nomatch class="d-none">
                     <td colspan="8" class="disp-empty">
                         <i class="bi bi-search display-6 d-block mb-2"></i>
                         No payments match "<span data-lf-nomatch-q></span>".
@@ -142,28 +231,50 @@
     </div>
 </div>
 
-{# Pagination lives OUTSIDE the table card, directly under it
-   (same pill pager as the Subscribers list). #}
 <div class="subs-pager" id="paymentsPager" data-lf-pager hidden>
-    <nav aria-label="Payment pages">
-        <ul class="subs-pager-list" data-lf-pager-list></ul>
-    </nav>
+    <nav aria-label="Payment pages"><ul class="subs-pager-list" data-lf-pager-list></ul></nav>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+{# Payment details popup (filled from the row's data-* attributes) #}
+<div class="modal fade" id="paymentDetailModal" tabindex="-1" aria-label="Payment details" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content pay-receipt">
+            <div class="modal-header border-0 pb-0">
+                <span class="text-muted small">Payment details</span>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 pb-3">
+                <div class="pay-receipt-hero">
+                    <span class="pay-avatar pay-av-0 pay-avatar-lg" id="pdAvatar"></span>
+                    <div class="pay-receipt-amount" id="pdAmount"></div>
+                    <span class="disp-badge pay-status" id="pdStatus"></span>
+                </div>
+                <dl class="pay-dl">
+                    <dt>Subscriber</dt><dd><span id="pdName"></span> <span class="disp-code-pill" id="pdCode"></span></dd>
+                    <dt>Plan / NAP</dt><dd id="pdPlan"></dd>
+                    <dt>Method</dt><dd><i class="bi" id="pdMethodIcon"></i> <span id="pdMethod"></span></dd>
+                    <dt>Reference</dt><dd><code id="pdRef"></code> <button type="button" class="pay-copy" id="pdCopy" title="Copy reference"><i class="bi bi-copy"></i></button></dd>
+                    <dt>Paid on</dt><dd id="pdDate"></dd>
+                    <dt>Collected by</dt><dd id="pdCollector"></dd>
+                    <dt>Recorded</dt><dd id="pdCreated"></dd>
+                    <dt>Last updated</dt><dd id="pdUpdated"></dd>
+                    <dt id="pdRemarksLabel">Remarks</dt><dd id="pdRemarks"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <form method="post" id="pdVoidForm" class="me-auto" onsubmit="return confirm('Void this payment?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-slash-circle me-1"></i>Void</button>
+                </form>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <a href="#" class="btn btn-primary btn-sm" id="pdEdit"><i class="bi bi-pencil me-1"></i>Edit</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>
-<script>
-    // Clicking anywhere on a payment row opens its edit form (buttons and
-    // links inside the row keep their own behaviour).
-    (function () {
-        var tbody = document.getElementById('paymentsTableBody');
-        if (!tbody) return;
-        tbody.addEventListener('click', function (e) {
-            if (e.target.closest('a, button, form')) return;
-            var row = e.target.closest('tr[data-href]');
-            if (row) window.location.href = row.getAttribute('data-href');
-        });
-    })();
-</script>
+<script src="{{ url_for('static', filename='js/payments.js') }}?v={{ asset_version('js/payments.js') }}"></script>
 {% endblock %}
