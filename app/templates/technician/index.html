@@ -87,6 +87,13 @@
     @media (prefers-reduced-motion: reduce) { .tech-overview .dash-stat-card-link, .tech-overview .dash-stat-icon { transition: none; } }
     @media (min-width: 992px) { .tech-overview .tech-ov-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
     .tech-overview .dash-stat-card { height: 100%; }
+    .tech-overview .dash-stat-label { white-space: normal; overflow: visible; text-overflow: clip; }
+    @media (max-width: 575.98px) {
+        .tech-overview .dash-stat-card { padding: .7rem 1.6rem .7rem .65rem; gap: .55rem; }
+        .tech-overview .dash-stat-icon { width: 36px; height: 36px; font-size: 1rem; }
+        .tech-overview .dash-stat-card::after { right: .5rem; }
+        .tech-overview .dash-stat-value { font-size: 1.25rem; }
+    }
     .tech-overview .tech-ov-rate-bar { height: 6px; border-radius: 999px; background: var(--napiq-border); overflow: hidden; margin-top: .35rem; }
     .tech-overview .tech-ov-rate-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1046B8, #1684FF); }
 </style>

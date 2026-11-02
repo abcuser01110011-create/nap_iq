@@ -1826,9 +1826,11 @@ html.dash-sidebar-collapsed:not(.dash-sidebar-open) .dash-soon-badge {
 .dash-stat-label {
     font-size: 0.78rem;
     color: var(--napiq-text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Show the whole label (wrap onto a 2nd line if needed) instead of
+       truncating it with "..." on narrow cards. */
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
 }
 
 /* ---------------- Summary panels (NAP status / Issue status) ---------------- */
