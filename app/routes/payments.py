@@ -43,6 +43,7 @@ shared form class.
 
 Routes:
     GET  /payments/               -> list_payments  (search + method/status filter)
+    GET  /payments/billing        -> billing          (per-subscriber paid/partial/unpaid view)
     GET  /payments/add            -> add_payment      (show add form)
     POST /payments/add            -> add_payment      (process add form)
     GET  /payments/<id>/edit      -> edit_payment     (show edit form)
@@ -50,6 +51,7 @@ Routes:
     POST /payments/<id>/void      -> void_payment     (quick action, pending/overdue -> voided)
 """
 
+import calendar
 from datetime import datetime, date, timedelta
 
 from sqlalchemy.orm import joinedload
@@ -58,7 +60,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from app.extensions import db
 from app.query_utils import filter_enum_eq
 from app.auth import role_required
-from app.models import Payment, Subscriber
+from app.models import Payment, Subscriber, Plan
 from app.forms import RecordPaymentForm
 from app.notifications_utils import notify_payment_overdue, notify_payment_pending_confirmation
 
@@ -202,6 +204,170 @@ def list_payments():
     )
 
 
+# -----------------------------------------------------------------------
+# SUBSCRIBERS BILLING VIEW — one row per subscriber for a chosen month
+# -----------------------------------------------------------------------
+BILLING_STATUS_ORDER = ("overdue", "unpaid", "partial", "pending", "paid", "unpriced")
+BILLING_STATUS_LABELS = {
+    "": "All",
+    "paid": "Paid",
+    "partial": "Partial",
+    "pending": "Pending",
+    "unpaid": "Unpaid",
+    "overdue": "Overdue",
+}
+
+
+def _parse_month(raw, today):
+    try:
+        first = datetime.strptime(raw, "%Y-%m").date().replace(day=1)
+    except (TypeError, ValueError):
+        first = today.replace(day=1)
+    last = first.replace(day=calendar.monthrange(first.year, first.month)[1])
+    return first, last
+
+
+def _month_key(d):
+    return d.strftime("%Y-%m")
+
+
+def _due_date_for(subscriber, first, last):
+    """Monthly due date: the subscriber's install day-of-month (same
+    anniversary idea billing_utils.py uses), clamped to the month."""
+    day = subscriber.installed_at.day if subscriber.installed_at else 1
+    return first.replace(day=min(day, last.day))
+
+
+@payments_bp.route("/billing")
+@role_required("administrator")
+def billing():
+    """Subscribers view: every billable subscriber with what they owe for
+    the selected month, what they've paid, and a Paid / Partial / Pending /
+    Unpaid / Overdue status (`?month=YYYY-MM&status=...`).
+
+    Amount owed = the subscriber's Plan.monthly_fee. "Paid" counts
+    confirmed payments dated inside the month; "pending" payments are
+    shown separately (awaiting confirmation) and voided ones are ignored.
+    """
+    today = date.today()
+    first, last = _parse_month(request.args.get("month", ""), today)
+    status_filter = request.args.get("status", "").strip()
+    if status_filter not in BILLING_STATUS_LABELS:
+        status_filter = ""
+
+    fees = {
+        (p.name or "").strip().lower(): float(p.monthly_fee)
+        for p in Plan.query.all() if p.monthly_fee is not None
+    }
+
+    pay_rows = (
+        db.session.query(Payment.subscriber_id, Payment.status, Payment.amount)
+        .filter(Payment.payment_date >= first, Payment.payment_date <= last)
+        .all()
+    )
+    paid_by, pending_by, overdue_flag = {}, {}, set()
+    for sub_id, status, amount in pay_rows:
+        amount = float(amount)
+        if status == "confirmed":
+            paid_by[sub_id] = paid_by.get(sub_id, 0.0) + amount
+        elif status == "pending":
+            pending_by[sub_id] = pending_by.get(sub_id, 0.0) + amount
+        elif status == "overdue":
+            overdue_flag.add(sub_id)
+
+    last_paid = dict(
+        db.session.query(Payment.subscriber_id, db.func.max(Payment.payment_date))
+        .filter(Payment.status == "confirmed")
+        .group_by(Payment.subscriber_id)
+        .all()
+    )
+
+    subscribers = Subscriber.query.options(joinedload(Subscriber.nap)).order_by(Subscriber.full_name).all()
+    rows = []
+    for sub in subscribers:
+        has_activity = sub.id in paid_by or sub.id in pending_by
+        if sub.status != "active" and not has_activity:
+            continue
+        if sub.installed_at and sub.installed_at > last:
+            continue   # not installed yet in that month
+
+        fee = fees.get((sub.plan_type or "").strip().lower())
+        paid = round(paid_by.get(sub.id, 0.0), 2)
+        pending = round(pending_by.get(sub.id, 0.0), 2)
+        due_date = _due_date_for(sub, first, last)
+        is_late = last < today or today > due_date
+
+        if fee is None:
+            status = "unpriced"
+            balance = 0.0
+        else:
+            balance = round(max(fee - paid, 0.0), 2)
+            if paid >= fee:
+                status = "paid"
+            elif paid > 0:
+                status = "partial"
+            elif pending > 0:
+                status = "pending"
+            elif is_late or sub.id in overdue_flag:
+                status = "overdue"
+            else:
+                status = "unpaid"
+
+        rows.append({
+            "sub": sub,
+            "fee": fee,
+            "paid": paid,
+            "pending": pending,
+            "balance": balance,
+            "pct": min(100, round(paid / fee * 100)) if fee else 0,
+            "due_date": due_date,
+            "late": is_late and balance > 0 and status in ("partial", "overdue"),
+            "last_paid": last_paid.get(sub.id),
+            "status": status,
+        })
+
+    counts = {k: 0 for k in BILLING_STATUS_LABELS}
+    counts[""] = len(rows)
+    for r in rows:
+        if r["status"] in counts:
+            counts[r["status"]] += 1
+
+    priced = [r for r in rows if r["fee"] is not None]
+    expected = sum(r["fee"] for r in priced)
+    collected = sum(r["paid"] for r in priced)
+    outstanding = sum(r["balance"] for r in priced)
+    rate = round(collected / expected * 100) if expected else 0
+    unpriced = sum(1 for r in rows if r["fee"] is None)
+
+    if status_filter:
+        rows = [r for r in rows if r["status"] == status_filter]
+    order = {k: i for i, k in enumerate(BILLING_STATUS_ORDER)}
+    rows.sort(key=lambda r: (order[r["status"]], r["sub"].full_name.lower()))
+
+    prev_month = (first - timedelta(days=1)).replace(day=1)
+    next_month = last + timedelta(days=1)
+
+    return render_template(
+        "payments/billing.html",
+        rows=rows,
+        counts=counts,
+        status_labels=BILLING_STATUS_LABELS,
+        status_filter=status_filter,
+        month=first,
+        month_value=_month_key(first),
+        prev_month=_month_key(prev_month),
+        next_month=_month_key(next_month),
+        is_current_month=(first == today.replace(day=1)),
+        current_month=_month_key(today),
+        expected=expected,
+        collected=collected,
+        outstanding=outstanding,
+        rate=rate,
+        unpriced=unpriced,
+        today=today,
+    )
+
+
 @payments_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_payment():
@@ -212,6 +378,16 @@ def add_payment():
     form = RecordPaymentForm()
     form.status.choices = form.status.choices + [("voided", "Voided")]
     _populate_subscriber_choices(form)
+
+    if request.method == "GET":
+        # Prefill from the Subscribers billing view's "Record payment"
+        # button (?subscriber_id=..&amount=..).
+        pre_sub = request.args.get("subscriber_id", type=int)
+        if pre_sub:
+            form.subscriber_id.data = pre_sub
+        pre_amount = request.args.get("amount", type=float)
+        if pre_amount and pre_amount > 0:
+            form.amount.data = round(pre_amount, 2)
 
     if form.validate_on_submit():
         payment = Payment(

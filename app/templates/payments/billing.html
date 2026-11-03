@@ -1,0 +1,186 @@
+{% extends "dashboard_base.html" %}
+{% block title %}Payments &middot; Subscribers{% endblock %}
+{% block body_class %}list-fit payments-page{% endblock %}
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/payments.css') }}" rel="stylesheet">
+{% endblock %}
+{% block page_title %}Payments{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0" id="paymentsRecordCount" data-lf-count data-lf-noun="subscriber">{{ rows|length }} subscriber{{ '' if rows|length == 1 else 's' }} &middot; {{ month.strftime('%B %Y') }}</p>{% endblock %}
+
+{% block content %}
+{% set pill_order = ['', 'overdue', 'unpaid', 'partial', 'pending', 'paid'] %}
+
+<div class="pay-kpis">
+    <div class="pay-kpi pay-tone-primary">
+        <span class="pay-kpi-icon"><i class="bi bi-bullseye"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Expected for {{ month.strftime('%b %Y') }}</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(expected) }}</div>
+            <div class="pay-kpi-sub">{{ counts[''] }} billable subscriber{{ '' if counts[''] == 1 else 's' }}</div>
+        </div>
+    </div>
+    <div class="pay-kpi pay-tone-success">
+        <span class="pay-kpi-icon"><i class="bi bi-cash-coin"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Collected</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(collected) }}</div>
+            <div class="pay-kpi-sub">{{ counts.paid }} fully paid &middot; {{ counts.partial }} partial</div>
+        </div>
+    </div>
+    <div class="pay-kpi pay-tone-danger">
+        <span class="pay-kpi-icon"><i class="bi bi-hourglass-bottom"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Outstanding</div>
+            <div class="pay-kpi-value">&#8369;{{ '{:,.2f}'.format(outstanding) }}</div>
+            <div class="pay-kpi-sub">{{ counts.unpaid + counts.overdue }} unpaid &middot; {{ counts.overdue }} overdue</div>
+        </div>
+    </div>
+    <div class="pay-kpi pay-tone-warning">
+        <span class="pay-kpi-icon"><i class="bi bi-pie-chart"></i></span>
+        <div class="pay-kpi-body">
+            <div class="pay-kpi-label">Collection rate</div>
+            <div class="pay-kpi-value">{{ rate }}%</div>
+            <div class="pay-rate-track"><span style="width: {{ rate }}%"></span></div>
+        </div>
+    </div>
+</div>
+
+<div class="subs-filterbar">
+    <div class="subs-pill-group pay-view-switch" role="group" aria-label="View">
+        <a class="subs-pill" href="{{ url_for('payments.list_payments') }}"><i class="bi bi-receipt me-1"></i>Transactions</a>
+        <a class="subs-pill subs-pill-active" href="{{ url_for('payments.billing', month=month_value) }}"><i class="bi bi-people me-1"></i>Subscribers</a>
+    </div>
+
+    <div class="subs-search-form">
+        <i class="bi bi-search"></i>
+        <input type="text" placeholder="Search subscriber, code, plan or NAP..." aria-label="Filter subscribers"
+               autocomplete="off" data-lf-search onkeydown="if (event.key === 'Enter') event.preventDefault();">
+    </div>
+
+    <form method="get" action="{{ url_for('payments.billing') }}" class="pay-month">
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        <a class="pay-month-nav" href="{{ url_for('payments.billing', month=prev_month, status=status_filter) }}" title="Previous month" aria-label="Previous month"><i class="bi bi-chevron-left"></i></a>
+        <label class="pay-month-label"><i class="bi bi-calendar3"></i>
+            <input type="month" name="month" value="{{ month_value }}" max="{{ current_month }}" onchange="this.form.submit()" aria-label="Billing month">
+        </label>
+        <a class="pay-month-nav {{ 'is-disabled' if is_current_month else '' }}" href="{{ url_for('payments.billing', month=next_month, status=status_filter) }}" title="Next month" aria-label="Next month"><i class="bi bi-chevron-right"></i></a>
+    </form>
+
+    <div class="subs-pill-group" role="group" aria-label="Filter by billing status">
+        {% for key in pill_order %}
+            <a class="subs-pill {{ 'subs-pill-active' if status_filter == key else '' }}"
+               href="{{ url_for('payments.billing', month=month_value, status=key) }}">{{ status_labels[key] }}<span class="pay-count">{{ counts[key] }}</span></a>
+        {% endfor %}
+    </div>
+
+    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Add Payment
+    </a>
+</div>
+
+<div class="disp-table-card">
+    <div class="table-responsive">
+        <table class="table disp-table pay-billing align-middle mb-0" data-lf-table>
+            <thead>
+                <tr>
+                    <th>Subscriber</th>
+                    <th>Plan</th>
+                    <th>Monthly fee</th>
+                    <th style="min-width: 120px;">Paid</th>
+                    <th>Balance</th>
+                    <th>Due date</th>
+                    <th>Last payment</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody data-lf-body>
+                {% for r in rows %}
+                {% set sub = r.sub %}
+                {% set initials = (sub.full_name.split()|map('first')|list)[:2]|join|upper %}
+                <tr class="disp-row disp-row-clickable lf-row"
+                    data-search="{{ [sub.full_name, sub.subscriber_code, sub.plan_type, sub.nap.nap_code if sub.nap else '', r.status]|select|join(' ')|lower }}"
+                    data-href="{{ url_for('payments.list_payments', q=sub.subscriber_code) }}">
+                    <td>
+                        <div class="pay-person">
+                            <span class="pay-avatar pay-av-{{ sub.id % 5 }}">{{ initials }}</span>
+                            <div class="pay-person-text">
+                                <div class="subs-name">{{ sub.full_name }}</div>
+                                <div class="disp-subtext">{{ sub.subscriber_code }}{% if sub.nap %} &middot; {{ sub.nap.nap_code }}{% endif %}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ sub.plan_type or '—' }}</td>
+                    <td class="lf-amount">{% if r.fee is not none %}<span class="pay-peso">&#8369;</span>{{ '{:,.2f}'.format(r.fee) }}{% else %}<span class="disp-subtext">No rate set</span>{% endif %}</td>
+                    <td>
+                        {% if r.fee is not none %}
+                        <div class="pay-paid">
+                            <span class="lf-amount"><span class="pay-peso">&#8369;</span>{{ '{:,.2f}'.format(r.paid) }}</span>
+                            <div class="pay-bar"><span class="pay-bar-fill pay-bar-{{ r.status }}" style="width: {{ r.pct }}%"></span></div>
+                        </div>
+                        {% if r.pending %}<div class="disp-subtext">+ &#8369;{{ '{:,.2f}'.format(r.pending) }} pending</div>{% endif %}
+                        {% else %}<span class="disp-subtext">—</span>{% endif %}
+                    </td>
+                    <td class="lf-amount {{ 'pay-balance-late' if r.late else '' }}">{% if r.fee is not none %}{% if r.balance %}<span class="pay-peso">&#8369;</span>{{ '{:,.2f}'.format(r.balance) }}{% else %}<span class="disp-subtext">—</span>{% endif %}{% else %}—{% endif %}</td>
+                    <td>
+                        <div>{{ r.due_date.strftime('%b %d, %Y') }}</div>
+                        {% if r.late %}<div class="disp-subtext pay-balance-late">{{ (today - r.due_date).days }} day{{ '' if (today - r.due_date).days == 1 else 's' }} late</div>{% endif %}
+                    </td>
+                    <td>{% if r.last_paid %}{{ r.last_paid.strftime('%b %d, %Y') }}{% else %}<span class="disp-subtext">Never</span>{% endif %}</td>
+                    <td><span class="disp-badge pay-status disp-badge-{{ r.status }}"><span class="pay-dot"></span>{{ 'No rate' if r.status == 'unpriced' else r.status|capitalize }}</span></td>
+                    <td class="text-end">
+                        <div class="subs-row-actions">
+                            {% if r.balance %}
+                            <a href="{{ url_for('payments.add_payment', subscriber_id=sub.id, amount=r.balance) }}"
+                               class="subs-edit-btn" title="Record payment" onclick="event.stopPropagation();"><i class="bi bi-plus-lg"></i></a>
+                            {% endif %}
+                            <a href="{{ url_for('payments.list_payments', q=sub.subscriber_code) }}"
+                               class="subs-edit-btn" title="View payment history" onclick="event.stopPropagation();"><i class="bi bi-clock-history"></i></a>
+                            <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="disp-empty">
+                        <i class="bi bi-people display-6 d-block mb-2"></i>
+                        <div class="fw-semibold">No subscribers {% if status_filter %}marked {{ status_labels[status_filter]|lower }}{% else %}to bill{% endif %} for {{ month.strftime('%B %Y') }}</div>
+                        {% if status_filter %}<div class="small"><a href="{{ url_for('payments.billing', month=month_value) }}">Show all</a></div>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if rows %}
+                <tr data-lf-nomatch class="d-none">
+                    <td colspan="9" class="disp-empty"><i class="bi bi-search display-6 d-block mb-2"></i>No subscribers match "<span data-lf-nomatch-q></span>".</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="subs-pager" data-lf-pager hidden>
+    <nav aria-label="Subscriber pages"><ul class="subs-pager-list" data-lf-pager-list></ul></nav>
+</div>
+
+{% if unpriced %}
+<div class="pay-note"><i class="bi bi-info-circle me-1"></i>{{ unpriced }} subscriber{{ '' if unpriced == 1 else 's' }} on a plan with no monthly fee set are excluded from the totals &mdash; set fees under Settings &rsaquo; Plans.</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>
+<script>
+    // Row click -> that subscriber's payment history.
+    (function () {
+        var body = document.querySelector('[data-lf-body]');
+        if (!body) return;
+        body.addEventListener('click', function (e) {
+            if (e.target.closest('a, button')) return;
+            var row = e.target.closest('tr[data-href]');
+            if (row) window.location.href = row.getAttribute('data-href');
+        });
+    })();
+</script>
+{% endblock %}

@@ -75,6 +75,11 @@
 
 {# ---------------- Filter bar ---------------- #}
 <div class="subs-filterbar">
+    <div class="subs-pill-group pay-view-switch" role="group" aria-label="View">
+        <a class="subs-pill subs-pill-active" href="{{ url_for('payments.list_payments') }}"><i class="bi bi-receipt me-1"></i>Transactions</a>
+        <a class="subs-pill" href="{{ url_for('payments.billing') }}"><i class="bi bi-people me-1"></i>Subscribers</a>
+    </div>
+
     <form method="get" action="{{ url_for('payments.list_payments') }}" class="subs-search-form" id="paymentsSearchForm">
         {% if method_filter %}<input type="hidden" name="method" value="{{ method_filter }}">{% endif %}
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}

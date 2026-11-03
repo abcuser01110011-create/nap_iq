@@ -103,3 +103,42 @@
 }
 @media (max-width: 1199.98px) { .pay-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 575.98px) { .pay-kpis { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Subscribers (billing) view ---------- */
+.disp-badge-paid    { background: rgba(25, 135, 84, 0.15); color: var(--napiq-success); }
+.disp-badge-partial { background: rgba(124, 92, 255, 0.15); color: #7c5cff; }
+.disp-badge-unpaid  { background: rgba(107, 114, 128, 0.15); color: var(--napiq-text-muted); }
+.disp-badge-unpriced { background: transparent; color: var(--napiq-text-muted); border: 1px dashed var(--napiq-border); }
+
+.pay-view-switch .subs-pill { display: inline-flex; align-items: center; }
+.pay-count {
+    margin-left: 0.4rem; font-size: 0.66rem; font-weight: 700; padding: 0.05rem 0.4rem;
+    border-radius: 2rem; background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.subs-pill-active .pay-count { background: rgba(255, 255, 255, 0.25); }
+
+.pay-month { display: inline-flex; align-items: center; gap: 0.15rem; margin: 0;
+    background: var(--napiq-surface); border: 1px solid var(--napiq-border); border-radius: 2rem; padding: 0.2rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 20px -12px rgba(15, 23, 42, 0.18); }
+.pay-month-nav { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--napiq-text-muted); text-decoration: none; }
+.pay-month-nav:hover { background: var(--napiq-bg); color: var(--napiq-primary); }
+.pay-month-nav.is-disabled { opacity: 0.35; pointer-events: none; }
+.pay-month-label { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; color: var(--napiq-text-muted); }
+.pay-month-label input { border: none; background: transparent; color: inherit; font-size: 0.8rem; font-weight: 600; outline: none; }
+
+.pay-paid { display: flex; flex-direction: column; gap: 4px; }
+.pay-bar { height: 5px; border-radius: 5px; background: var(--napiq-bg); overflow: hidden; width: 110px; }
+.pay-bar-fill { display: block; height: 100%; border-radius: 5px; background: var(--napiq-primary); }
+.pay-bar-paid { background: var(--napiq-success); }
+.pay-bar-partial { background: #7c5cff; }
+.pay-balance-late { color: var(--napiq-danger) !important; font-weight: 700; }
+
+.pay-rate-track { height: 6px; border-radius: 6px; background: var(--napiq-bg); overflow: hidden; margin-top: 0.3rem; width: 140px; max-width: 100%; }
+.pay-rate-track span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #f59e0b, #198754); }
+.pay-note { flex-shrink: 0; margin-top: 0.5rem; font-size: 0.75rem; color: var(--napiq-text-muted); }
+.pay-billing th, .pay-billing td { white-space: nowrap; }
+@media (max-width: 1599.98px) {
+    body.list-fit .disp-table.pay-billing thead th, body.list-fit .disp-table.pay-billing tbody td { padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
+    .pay-bar { width: 90px; }
+}
