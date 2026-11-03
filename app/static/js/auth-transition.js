@@ -16,6 +16,15 @@
 // unchanged -- this file never has to know or guess which one
 // happened.
 //
+// Theming: a form may also carry data-auth-theme="staff", which gives
+// the overlay the bright ISP-network look (see the STAFF THEME section
+// of auth-transition.css). Without it the original dark overlay is used,
+// so customer-facing pages are unaffected. Staff pages supply:
+//   window.NAPIQ_STAFF_LOADER_ICON_URL -- navy logo that reads on a light background
+//   window.NAPIQ_STAFF_SCENE_URL       -- background scene SVG (preloaded
+//                                         here so it's already cached the
+//                                         moment the overlay appears)
+//
 // Duration + a live "connection" readout come from network-speed.js
 // (window.NAPIQNetworkSpeed), which must be loaded first. If it isn't
 // present for some reason, this falls back to the old fixed 3s so the
@@ -73,9 +82,10 @@
         }
     }
 
-    function buildOverlay(config, netState) {
+    function buildOverlay(config, netState, theme) {
+        var isStaff = theme === "staff";
         var overlay = document.createElement("div");
-        overlay.className = "auth-transition-overlay";
+        overlay.className = "auth-transition-overlay" + (isStaff ? " auth-transition-overlay--staff" : "");
 
         var stepsHtml = config.steps
             .map(function (label, index) {
@@ -91,13 +101,16 @@
             })
             .join("");
 
-        var iconUrl = window.NAPIQ_LOADER_ICON_URL || "";
+        var iconUrl = (isStaff && window.NAPIQ_STAFF_LOADER_ICON_URL) || window.NAPIQ_LOADER_ICON_URL || "";
+        // Staff theme: gold orbit arc that circles the logo ring.
+        var orbitHtml = isStaff ? '<span class="auth-transition-orbit"></span>' : "";
 
         overlay.innerHTML =
             '<div class="auth-transition-panel">' +
             '<div class="auth-transition-icon-ring">' +
             '<span class="auth-transition-ping"></span>' +
             '<span class="auth-transition-ping auth-transition-ping--delay"></span>' +
+            orbitHtml +
             '<div class="auth-transition-icon-box">' +
             '<img src="' + iconUrl + '" alt="" class="auth-transition-logo">' +
             "</div>" +
@@ -196,6 +209,15 @@
         };
     }
 
+    // Warm the browser cache with the staff scene artwork as soon as the
+    // page has a staff-themed auth form, so the overlay doesn't flash a
+    // blank background while the SVG downloads.
+    if (window.NAPIQ_STAFF_SCENE_URL && document.querySelector('form[data-auth-theme="staff"]')) {
+        try {
+            new Image().src = window.NAPIQ_STAFF_SCENE_URL;
+        } catch (e) {}
+    }
+
     document.addEventListener("submit", function (event) {
         var form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
@@ -219,7 +241,7 @@
         var netState = currentNetworkState();
         var plannedDuration = netState.quality === "unknown" ? FALLBACK_DURATION_MS : durationForQuality(netState.quality);
 
-        var overlay = buildOverlay(config, netState);
+        var overlay = buildOverlay(config, netState, form.getAttribute("data-auth-theme"));
         var animation = runStepAnimation(overlay, config.steps.length, plannedDuration);
 
         var submitTimer = setTimeout(submitForm, plannedDuration);

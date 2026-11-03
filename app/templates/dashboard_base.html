@@ -248,7 +248,7 @@
                Replaces the old red Logout button, the Profile button and
                the Settings nav link. #}
             <div class="dash-sidebar-actions">
-                <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout" id="logoutForm" class="dash-logout-form">
+                <form method="post" action="{{ url_for('auth.logout') }}" data-auth-transition="signout"{% if current_user and current_user.role != 'user' %} data-auth-theme="staff"{% endif %} id="logoutForm" class="dash-logout-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 </form>
 
@@ -600,6 +600,7 @@
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/notifications-popover.js') }}"></script>
 <script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono-blue.png') }}";</script>
+{% if current_user and current_user.role != 'user' %}<script>window.NAPIQ_STAFF_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}"; window.NAPIQ_STAFF_SCENE_URL = "{{ url_for('static', filename='img/auth-scene-staff.svg') }}";</script>{% endif %}
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
 <script>

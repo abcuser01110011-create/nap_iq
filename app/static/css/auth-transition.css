@@ -259,3 +259,205 @@
     background: linear-gradient(90deg, #2258e6, #6a8dff);
     transition: width linear;
 }
+
+
+/* =====================================================================
+   STAFF THEME  ("PG light network" loading screen)
+   ---------------------------------------------------------------------
+   Opt-in via data-auth-theme="staff" on the <form> (see login.html and
+   the logout forms in dashboard_base.html / base.html). auth-transition.js
+   then adds .auth-transition-overlay--staff to the overlay, which
+   switches this one component to a bright, ISP-themed look: soft blue
+   sky, floating network icons, city skyline + cell tower, and a gold
+   orbit ring around the PG Networks mark.
+
+   Everything below is scoped under .auth-transition-overlay--staff, so
+   the default (dark) overlay -- still used by the customer portal and
+   customer sign-up -- is completely unchanged.
+
+   The scenery (background, network lines, icon bubbles, skyline, tower,
+   globe) is a single self-contained SVG: static/img/auth-scene-staff.svg.
+   ===================================================================== */
+
+.auth-transition-overlay--staff {
+    background: #eef4ff url("../img/auth-scene-staff.svg") center / cover no-repeat;
+    color: #0a2a8f;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.auth-transition-overlay--staff .auth-transition-panel {
+    position: relative;
+    isolation: isolate;
+    padding: 1rem 1.5rem;
+}
+
+/* Soft white halo behind the text so it stays crisp over the scenery. */
+.auth-transition-overlay--staff .auth-transition-panel::before {
+    content: "";
+    position: absolute;
+    inset: -2.5rem -4.5rem;
+    z-index: -1;
+    background: radial-gradient(closest-side, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0));
+    pointer-events: none;
+}
+
+/* ---- Logo + gold orbit ring ---------------------------------------- */
+
+.auth-transition-overlay--staff .auth-transition-icon-ring {
+    width: 10rem;
+    height: 10rem;
+    margin-bottom: 1.5rem;
+}
+
+/* The dark theme's blue "ping" rings aren't used here. */
+.auth-transition-overlay--staff .auth-transition-ping {
+    display: none;
+}
+
+/* Static pale-gold ring + frosted disc behind the mark. */
+.auth-transition-overlay--staff .auth-transition-icon-ring::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(242, 169, 59, 0.38);
+    background: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 12px 40px rgba(47, 109, 240, 0.16);
+}
+
+/* Comet-style gold arc that circles the ring (conic gradient, masked
+   down to a thin band so only the ring itself is drawn). */
+.auth-transition-overlay--staff .auth-transition-orbit {
+    position: absolute;
+    inset: -1px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(242, 169, 59, 0) 0deg, rgba(242, 169, 59, 0) 235deg, #f2a93b 340deg, rgba(242, 169, 59, 0) 360deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3.5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3.5px));
+    animation: authTransitionOrbit 1.4s linear infinite;
+}
+
+@keyframes authTransitionOrbit {
+    to { transform: rotate(360deg); }
+}
+
+.auth-transition-overlay--staff .auth-transition-icon-box {
+    width: 6.1rem;
+    height: 6.75rem;
+}
+
+/* ---- Text ---------------------------------------------------------- */
+
+.auth-transition-overlay--staff .auth-transition-title {
+    margin: 0 0 0.65rem;
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: 0.005em;
+    color: #0a2a8f;
+}
+
+.auth-transition-overlay--staff .auth-transition-network {
+    margin: 0 0 1.35rem;
+    font-size: 0.88rem;
+    color: #4b5563;
+}
+
+.auth-transition-overlay--staff .auth-transition-network-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    background: #94a3b8;
+}
+
+.auth-transition-overlay--staff .auth-transition-network[data-quality="fast"] .auth-transition-network-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+.auth-transition-overlay--staff .auth-transition-network[data-quality="moderate"] .auth-transition-network-dot {
+    background: #2f6df0;
+    box-shadow: 0 0 0 3px rgba(47, 109, 240, 0.16);
+}
+
+.auth-transition-overlay--staff .auth-transition-network[data-quality="slow"] .auth-transition-network-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.auth-transition-overlay--staff .auth-transition-network[data-quality="offline"] .auth-transition-network-dot {
+    background: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+/* ---- Steps --------------------------------------------------------- */
+
+.auth-transition-overlay--staff .auth-transition-steps {
+    gap: 0.8rem;
+    margin: 0 0 1.5rem;
+}
+
+.auth-transition-overlay--staff .auth-transition-step {
+    gap: 0.75rem;
+    opacity: 0.8;
+}
+
+.auth-transition-overlay--staff .auth-transition-step[data-state="active"],
+.auth-transition-overlay--staff .auth-transition-step[data-state="done"] {
+    opacity: 1;
+}
+
+.auth-transition-overlay--staff .auth-transition-step-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 2px solid #2f6df0;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.auth-transition-overlay--staff .auth-transition-step[data-state="pending"] .auth-transition-step-icon {
+    border-color: rgba(47, 109, 240, 0.7);
+}
+
+.auth-transition-overlay--staff .auth-transition-step[data-state="active"] .auth-transition-step-icon,
+.auth-transition-overlay--staff .auth-transition-step[data-state="done"] .auth-transition-step-icon {
+    border-color: #1763ec;
+}
+
+.auth-transition-overlay--staff .auth-transition-step[data-state="done"] .auth-transition-step-icon {
+    background: #1763ec;
+}
+
+.auth-transition-overlay--staff .auth-transition-step-icon i {
+    font-size: 0.95rem;
+}
+
+.auth-transition-overlay--staff .auth-transition-step-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: #1763ec;
+}
+
+.auth-transition-overlay--staff .auth-transition-step-label {
+    font-size: 1.02rem;
+    font-weight: 500;
+    color: #0a2a8f;
+}
+
+/* ---- Progress bar -------------------------------------------------- */
+
+.auth-transition-overlay--staff .auth-transition-progress {
+    width: 20rem;
+    max-width: 70vw;
+    height: 4px;
+    border-radius: 4px;
+    background: #dde2ea;
+}
+
+.auth-transition-overlay--staff .auth-transition-progress-bar {
+    border-radius: 4px;
+    background: linear-gradient(90deg, #1558e6, #3d86ff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-transition-overlay--staff .auth-transition-orbit {
+        animation: none;
+    }
+}

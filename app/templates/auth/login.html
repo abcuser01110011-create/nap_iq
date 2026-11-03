@@ -59,7 +59,7 @@
             {% endwith %}
         </div>
 
-        <form method="post" action="{{ url_for('auth.customer_login' if portal == 'customer' else 'auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin">
+        <form method="post" action="{{ url_for('auth.customer_login' if portal == 'customer' else 'auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin"{% if portal != 'customer' %} data-auth-theme="staff"{% endif %}>
             {{ form.hidden_tag() }}
 
             <div class="login-field">
@@ -109,6 +109,7 @@
 </div>
 
 <script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono-blue.png') }}";</script>
+{% if portal != 'customer' %}<script>window.NAPIQ_STAFF_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}"; window.NAPIQ_STAFF_SCENE_URL = "{{ url_for('static', filename='img/auth-scene-staff.svg') }}";</script>{% endif %}
 <script src="{{ url_for('static', filename='js/login-theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
