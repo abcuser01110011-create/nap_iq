@@ -22,7 +22,7 @@
         rel="stylesheet"
     >
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/auth-transition.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/auth-transition.css') }}?v={{ asset_version('css/auth-transition.css') }}" rel="stylesheet">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -149,13 +149,13 @@
 </main>
 
 <script>window.NAPIQ_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono-blue.png') }}";</script>
-{% if current_user and current_user.role != 'user' %}<script>window.NAPIQ_STAFF_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono.png') }}"; window.NAPIQ_STAFF_SCENE_URL = "{{ url_for('static', filename='img/auth-scene-staff.svg') }}";</script>{% endif %}
+{% if current_user and current_user.role != 'user' %}<script>window.NAPIQ_STAFF_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono-gold-p.png') }}?v={{ asset_version('img/pg-networks-logo-mono-gold-p.png') }}"; window.NAPIQ_STAFF_SCENE_URL = "{{ url_for('static', filename='img/auth-scene-staff.svg') }}?v={{ asset_version('img/auth-scene-staff.svg') }}";</script>{% endif %}
 <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/flash-toast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/naps.js') }}"></script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
-<script src="{{ url_for('static', filename='js/auth-transition.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth-transition.js') }}?v={{ asset_version('js/auth-transition.js') }}"></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>
