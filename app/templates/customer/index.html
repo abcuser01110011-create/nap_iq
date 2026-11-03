@@ -186,6 +186,50 @@
 </div>
 {% endif %}
 
+{% if payment_notice and notice_payment %}
+{# One-time popup: an administrator (or HitPay) confirmed the customer's payment. #}
+<div class="modal fade" id="paymentConfirmedModal" tabindex="-1" aria-labelledby="paymentConfirmedTitle" aria-hidden="true"
+     data-dismiss-url="{{ url_for('customer.dismiss_payment_notice', notification_id=payment_notice.id) }}">
+    <div class="modal-dialog modal-dialog-centered modal-sm-down">
+        <div class="modal-content napiq-pending-modal">
+            <div class="modal-body text-center">
+                <button type="button" class="btn-close napiq-pending-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <span class="napiq-pending-icon napiq-pending-icon--ok"><i class="bi bi-check-lg"></i></span>
+                <h5 class="napiq-pending-title" id="paymentConfirmedTitle">Payment confirmed</h5>
+                <p class="napiq-pending-text">
+                    Thank you. Your payment has been verified and applied to your account.
+                    {% if due and due.due_date %}Your next due date is <strong>{{ due.due_date.strftime('%B') }} {{ due.due_date.day }}, {{ due.due_date.year }}</strong>.{% endif %}
+                </p>
+                <dl class="napiq-pending-details">
+                    <div><dt>Amount paid</dt><dd>&#8369;{{ '{:,.2f}'.format(notice_payment.amount) }}</dd></div>
+                    <div><dt>Payment date</dt><dd>{{ notice_payment.payment_date.strftime('%b %d, %Y') }}</dd></div>
+                    {% if notice_payment.reference_number %}
+                    <div><dt>Reference</dt><dd class="napiq-pending-ref">{{ notice_payment.reference_number if notice_payment.reference_number|length <= 14 else notice_payment.reference_number[:6] ~ '…' ~ notice_payment.reference_number[-4:] }}</dd></div>
+                    {% endif %}
+                    <div><dt>Status</dt><dd><span class="napiq-pending-chip napiq-pending-chip--ok"><i class="bi bi-check-circle-fill"></i>Confirmed</span></dd></div>
+                </dl>
+                <button type="button" class="napiq-pay-btn napiq-pending-ok" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('paymentConfirmedModal');
+    if (!el || !window.bootstrap) return;
+    var url = el.getAttribute('data-dismiss-url');
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var sent = false;
+    function dismiss() {
+        if (sent) return; sent = true;
+        try { fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': meta ? meta.content : '' } }); } catch (e) {}
+    }
+    el.addEventListener('hidden.bs.modal', dismiss);
+    bootstrap.Modal.getOrCreateInstance(el).show();
+});
+</script>
+{% endif %}
+
 {% if app_progress %}
 {# New applicant: installation application tracker (replaces the issue history button). #}
 <div class="ip-home-wrap mb-3">

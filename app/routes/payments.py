@@ -62,7 +62,7 @@ from app.query_utils import filter_enum_eq
 from app.auth import role_required
 from app.models import Payment, Subscriber, Plan
 from app.forms import RecordPaymentForm
-from app.notifications_utils import notify_payment_overdue, notify_payment_pending_confirmation
+from app.notifications_utils import notify_payment_confirmed, notify_payment_overdue, notify_payment_pending_confirmation
 
 payments_bp = Blueprint("payments", __name__, url_prefix="/payments")
 
@@ -320,6 +320,8 @@ def edit_payment(payment_id):
         # edit that leaves a payment pending (never touching status)
         # doesn't re-notify, only one that newly sets it to 'pending'.
         became_pending = form.status.data == "pending" and payment.status != "pending"
+        # An admin confirming a pending/overdue payment: tell the subscriber.
+        became_confirmed = form.status.data == "confirmed" and payment.status in ("pending", "overdue")
 
         payment.subscriber_id = form.subscriber_id.data
         payment.amount = form.amount.data
@@ -333,6 +335,8 @@ def edit_payment(payment_id):
             notify_payment_overdue(payment)
         elif became_pending:
             notify_payment_pending_confirmation(payment)
+        elif became_confirmed:
+            notify_payment_confirmed(payment)
 
         db.session.commit()
         flash("Payment was updated successfully.", "success")

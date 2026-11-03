@@ -188,6 +188,27 @@ def notify_online_payment_received(payment):
     )
 
 
+def notify_payment_confirmed(payment):
+    """Customer-only notice: an administrator confirmed this payment (edit
+    form: pending/overdue -> confirmed). The subscriber sees it in the bell
+    and as a one-time popup on their dashboard (see customer.index). Online
+    payments confirmed by the HitPay webhook use notify_online_payment_received."""
+    subscriber = payment.subscriber
+    if not subscriber.user_id:
+        return
+    db.session.add(
+        Notification(
+            audience="customer",
+            user_id=subscriber.user_id,
+            category="payment",
+            title="Payment confirmed",
+            message=f"Your payment of \u20b1{payment.amount:,.2f} has been confirmed. Thank you!",
+            entity_type="payment",
+            entity_id=payment.id,
+        )
+    )
+
+
 def notify_online_payment_needs_review(payment):
     """Administrator-only alert for an online payment HitPay reports as
     completed but whose paid amount does not match what was requested

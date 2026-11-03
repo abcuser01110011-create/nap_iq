@@ -344,3 +344,10 @@ html[data-bs-theme="dark"] .napiq-pending-chip { color: #fec84b; background: rgb
 @keyframes napiq-pending-pulse { 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .napiq-pending-dot { animation: none; } }
 .napiq-pending-ok { width: 100%; }
+
+/* ---- Payment confirmed popup (reuses the pending popup layout) ---- */
+.napiq-pending-icon--ok { color: #067647; background: radial-gradient(circle at 30% 30%, #ecfdf3, #a6f4c5); box-shadow: 0 0 0 6px rgba(166, 244, 197, 0.35); }
+html[data-bs-theme="dark"] .napiq-pending-icon--ok { color: #75e0a7; background: rgba(18, 183, 106, 0.18); box-shadow: 0 0 0 6px rgba(18, 183, 106, 0.1); }
+.napiq-pending-chip--ok { color: #067647; background: #ecfdf3; border-color: #abefc6; }
+html[data-bs-theme="dark"] .napiq-pending-chip--ok { color: #75e0a7; background: rgba(18, 183, 106, 0.14); border-color: rgba(117, 224, 167, 0.35); }
+.napiq-pending-ref { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }

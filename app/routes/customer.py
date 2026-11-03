@@ -78,7 +78,7 @@ from flask import Blueprint, current_app, render_template, redirect, url_for, fl
 from app import hitpay
 from app.extensions import db, limiter
 from app.auth import role_required
-from app.models import Assignment, Payment, Plan, ServiceRequest, Subscriber, TechnicalIssue
+from app.models import Assignment, Notification, Payment, Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
 from app.billing_utils import monthly_due_info
 from app.subscriber_lookup import find_subscriber_for_link
@@ -156,6 +156,48 @@ def _recent_pending_payment(subscriber):
     )
 
 
+# Titles of the customer notifications that trigger the "payment confirmed"
+# popup: admin confirmation (notify_payment_confirmed) and HitPay webhook
+# confirmation (notify_online_payment_received).
+PAYMENT_NOTICE_TITLES = ("Payment confirmed", "Payment received")
+
+
+def _unseen_payment_notice(user):
+    """(notification, payment) for the newest confirmed-payment notice the
+    customer hasn't dismissed yet, else (None, None)."""
+    notice = (
+        Notification.query.filter(
+            Notification.audience == "customer",
+            Notification.user_id == user.id,
+            Notification.category == "payment",
+            Notification.entity_type == "payment",
+            Notification.title.in_(PAYMENT_NOTICE_TITLES),
+            Notification.is_read.is_(False),
+        )
+        .order_by(Notification.created_at.desc())
+        .first()
+    )
+    if notice is None:
+        return None, None
+    payment = db.session.get(Payment, notice.entity_id) if notice.entity_id else None
+    if payment is None or payment.status != "confirmed":
+        return None, None
+    return notice, payment
+
+
+@customer_bp.route("/payment-notice/<int:notification_id>/dismiss", methods=["POST"])
+@role_required("user")
+def dismiss_payment_notice(notification_id):
+    """Marks a confirmed-payment notice as read once the popup is closed."""
+    notice = Notification.query.filter_by(
+        id=notification_id, audience="customer", user_id=g.user.id
+    ).first()
+    if notice is not None and not notice.is_read:
+        notice.is_read = True
+        db.session.commit()
+    return "", 204
+
+
 @customer_bp.route("/")
 @role_required("user")
 def index():
@@ -164,9 +206,12 @@ def index():
     looked up via `subscribers.user_id`. Shows an explicit empty state
     if no subscriber record has been linked to this login yet."""
     subscriber = _own_subscriber_or_none()
+    notice, notice_payment = _unseen_payment_notice(g.user) if subscriber else (None, None)
 
     return render_template(
         "customer/index.html",
+        payment_notice=notice,
+        notice_payment=notice_payment,
         subscriber=subscriber,
         # subscriber.technical_issues / subscriber.service_requests /
         # subscriber.payments are already ordered newest-first by the
