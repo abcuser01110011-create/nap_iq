@@ -102,15 +102,12 @@
             .join("");
 
         var iconUrl = (isStaff && window.NAPIQ_STAFF_LOADER_ICON_URL) || window.NAPIQ_LOADER_ICON_URL || "";
-        // Staff theme: gold orbit arc that circles the logo ring.
-        var orbitHtml = isStaff ? '<span class="auth-transition-orbit"></span>' : "";
 
         overlay.innerHTML =
             '<div class="auth-transition-panel">' +
             '<div class="auth-transition-icon-ring">' +
             '<span class="auth-transition-ping"></span>' +
             '<span class="auth-transition-ping auth-transition-ping--delay"></span>' +
-            orbitHtml +
             '<div class="auth-transition-icon-box">' +
             '<img src="' + iconUrl + '" alt="" class="auth-transition-logo">' +
             "</div>" +
