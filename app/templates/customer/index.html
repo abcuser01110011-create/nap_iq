@@ -143,7 +143,13 @@
         <span class="napiq-pay-due">Due date is set one month after installation</span>
         {% endif %}
     </div>
-    {% if hitpay_enabled %}
+    {% if pending_payment %}
+    {# A payment is already awaiting confirmation: PAY NOW becomes PENDING and opens a status popup. #}
+    <button type="button" class="napiq-pay-btn napiq-pay-btn--pending" id="payNowBtn"
+            data-bs-toggle="modal" data-bs-target="#paymentPendingModal">
+        <i class="bi bi-hourglass-split me-1"></i>PENDING
+    </button>
+    {% elif hitpay_enabled %}
     {# HitPay online payment: the amount is recomputed on the server (see routes/hitpay.py). #}
     <form method="post" action="{{ url_for('hitpay.pay_online') }}" class="m-0">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -154,6 +160,31 @@
     <button type="button" class="napiq-pay-btn" id="payNowBtn"{% if not (due and due.can_pay) %} disabled aria-disabled="true"{% endif %}>PAY NOW</button>
     {% endif %}
 </div>
+
+{% if pending_payment %}
+<div class="modal fade" id="paymentPendingModal" tabindex="-1" aria-labelledby="paymentPendingTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm-down">
+        <div class="modal-content napiq-pending-modal">
+            <div class="modal-body text-center">
+                <button type="button" class="btn-close napiq-pending-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <span class="napiq-pending-icon"><i class="bi bi-hourglass-split"></i></span>
+                <h5 class="napiq-pending-title" id="paymentPendingTitle">Payment under review</h5>
+                <p class="napiq-pending-text">
+                    Thank you for settling your monthly dues. We&rsquo;ve received your payment and our
+                    billing team is verifying it. Your account will be updated and you&rsquo;ll be notified
+                    as soon as it&rsquo;s confirmed &mdash; no further action is needed.
+                </p>
+                <dl class="napiq-pending-details">
+                    <div><dt>Amount</dt><dd>&#8369;{{ '{:,.2f}'.format(pending_payment.amount) }}</dd></div>
+                    <div><dt>Submitted</dt><dd>{{ pending_payment.created_at.strftime('%b %d, %Y') }}</dd></div>
+                    <div><dt>Status</dt><dd><span class="napiq-pending-chip"><span class="napiq-pending-dot"></span>Awaiting confirmation</span></dd></div>
+                </dl>
+                <button type="button" class="napiq-pay-btn napiq-pending-ok" data-bs-dismiss="modal">Got it</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% if app_progress %}
 {# New applicant: installation application tracker (replaces the issue history button). #}

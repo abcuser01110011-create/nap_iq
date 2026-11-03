@@ -304,3 +304,43 @@ html[data-bs-theme="dark"] .napiq-pay-card--due .napiq-pay-due { color: #fda29b;
 .dash-theme-customer .app-prog-note--rejected { border-left-color: #dc3545; }
 .dash-theme-customer .app-prog-call,
 .dash-theme-customer .ip-d-value a { color: var(--napiq-primary); }
+
+
+/* ---- Pay card: payment already submitted -> PENDING button + status popup ---- */
+.napiq-pay-btn--pending {
+    background: #fff7e6;
+    color: #b54708;
+    border: 1px solid #fedf89;
+    box-shadow: none;
+}
+.napiq-pay-btn--pending:hover,
+.napiq-pay-btn--pending:focus-visible { background: #fef0c7; }
+html[data-bs-theme="dark"] .napiq-pay-btn--pending { background: rgba(247, 144, 9, 0.14); color: #fec84b; border-color: rgba(254, 200, 75, 0.35); }
+
+.napiq-pending-modal { border: 0; border-radius: 1.25rem; box-shadow: 0 24px 60px -20px rgba(16, 24, 40, 0.45); }
+.napiq-pending-modal .modal-body { padding: 2rem 1.5rem 1.5rem; position: relative; }
+.napiq-pending-close { position: absolute; top: 0.9rem; right: 0.9rem; }
+.napiq-pending-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 4rem; height: 4rem; margin-bottom: 1rem; border-radius: 50%;
+    font-size: 1.7rem; color: #b54708;
+    background: radial-gradient(circle at 30% 30%, #fffaeb, #fedf89);
+    box-shadow: 0 0 0 6px rgba(254, 223, 137, 0.35);
+}
+html[data-bs-theme="dark"] .napiq-pending-icon { color: #fec84b; background: rgba(247, 144, 9, 0.18); box-shadow: 0 0 0 6px rgba(247, 144, 9, 0.1); }
+.napiq-pending-title { font-weight: 700; letter-spacing: -0.01em; margin-bottom: 0.5rem; }
+.napiq-pending-text { font-size: 0.88rem; line-height: 1.55; color: var(--napiq-text-muted, #667085); margin-bottom: 1.1rem; }
+.napiq-pending-details {
+    margin: 0 0 1.25rem; padding: 0.35rem 1rem; text-align: left; font-size: 0.84rem;
+    border: 1px solid var(--bs-border-color); border-radius: 0.85rem; background: var(--bs-tertiary-bg, #f9fafb);
+}
+.napiq-pending-details > div { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.55rem 0; }
+.napiq-pending-details > div + div { border-top: 1px dashed var(--bs-border-color); }
+.napiq-pending-details dt { font-weight: 500; color: var(--napiq-text-muted, #667085); }
+.napiq-pending-details dd { margin: 0; font-weight: 700; }
+.napiq-pending-chip { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; font-weight: 600; color: #b54708; background: #fffaeb; border: 1px solid #fedf89; border-radius: 999px; padding: 0.15rem 0.6rem; }
+html[data-bs-theme="dark"] .napiq-pending-chip { color: #fec84b; background: rgba(247, 144, 9, 0.14); border-color: rgba(254, 200, 75, 0.35); }
+.napiq-pending-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: currentColor; animation: napiq-pending-pulse 1.6s ease-in-out infinite; }
+@keyframes napiq-pending-pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .napiq-pending-dot { animation: none; } }
+.napiq-pending-ok { width: 100%; }

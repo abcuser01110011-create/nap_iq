@@ -71,14 +71,14 @@ import uuid
 
 import cloudinary
 import cloudinary.uploader
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, current_app, render_template, redirect, url_for, flash, g, request, jsonify
 
 from app import hitpay
 from app.extensions import db, limiter
 from app.auth import role_required
-from app.models import Assignment, Plan, ServiceRequest, Subscriber, TechnicalIssue
+from app.models import Assignment, Payment, Plan, ServiceRequest, Subscriber, TechnicalIssue
 from app.forms import CustomerApplyForInstallationForm, CustomerIssueReportForm, CustomerLinkAccountForm
 from app.billing_utils import monthly_due_info
 from app.subscriber_lookup import find_subscriber_for_link
@@ -136,6 +136,26 @@ def _own_subscriber_or_none():
 _ACTIVE_ISSUE_STATUSES = ("pending", "assigned", "accepted", "in_progress")
 
 
+# A payment still "pending" this long after it was started is treated as an
+# abandoned checkout, so the customer gets the PAY NOW button back.
+PENDING_PAYMENT_WINDOW = timedelta(hours=24)
+
+
+def _recent_pending_payment(subscriber):
+    """The customer's newest payment still awaiting confirmation (or None)."""
+    if subscriber is None:
+        return None
+    return (
+        Payment.query.filter(
+            Payment.subscriber_id == subscriber.id,
+            Payment.status == "pending",
+            Payment.created_at >= datetime.utcnow() - PENDING_PAYMENT_WINDOW,
+        )
+        .order_by(Payment.created_at.desc())
+        .first()
+    )
+
+
 @customer_bp.route("/")
 @role_required("user")
 def index():
@@ -155,6 +175,7 @@ def index():
         service_requests=subscriber.service_requests if subscriber else [],
         payments=subscriber.payments if subscriber else [],
         due=monthly_due_info(subscriber) if subscriber else None,
+        pending_payment=_recent_pending_payment(subscriber),
         hitpay_enabled=hitpay.is_configured(),
         # Oldest open ticket: the home Report button shows a popup instead
         # of navigating when one exists (one open report at a time).
