@@ -142,3 +142,14 @@
     body.list-fit .disp-table.pay-billing thead th, body.list-fit .disp-table.pay-billing tbody td { padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
     .pay-bar { width: 90px; }
 }
+
+/* ---- Transactions popup ---- */
+.pay-hist-head { align-items: center; gap: 0.9rem; border-bottom: 1px solid var(--napiq-border); }
+.pay-hist-title { min-width: 0; flex: 1 1 auto; }
+.pay-hist-total { text-align: right; margin-right: 0.5rem; }
+.pay-hist-total strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.pay-hist-head .btn-close { margin: 0; }
+.pay-hist-body { padding: 0; }
+.pay-hist-table thead th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--napiq-text-muted); background: var(--napiq-surface); position: sticky; top: 0; z-index: 1; padding: 0.6rem 1rem; }
+.pay-hist-table td { padding: 0.6rem 1rem; font-size: 0.86rem; }
+.pay-remark { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

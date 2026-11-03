@@ -1,5 +1,5 @@
 {% extends "dashboard_base.html" %}
-{% block title %}Payments &middot; Subscribers{% endblock %}
+{% block title %}Payments{% endblock %}
 {% block body_class %}list-fit payments-page{% endblock %}
 {% block extra_head %}
 <link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
@@ -47,30 +47,25 @@
 </div>
 
 <div class="subs-filterbar">
-    <div class="subs-pill-group pay-view-switch" role="group" aria-label="View">
-        <a class="subs-pill" href="{{ url_for('payments.list_payments') }}"><i class="bi bi-receipt me-1"></i>Transactions</a>
-        <a class="subs-pill subs-pill-active" href="{{ url_for('payments.billing', month=month_value) }}"><i class="bi bi-people me-1"></i>Subscribers</a>
-    </div>
-
     <div class="subs-search-form">
         <i class="bi bi-search"></i>
         <input type="text" placeholder="Search subscriber, code, plan or NAP..." aria-label="Filter subscribers"
                autocomplete="off" data-lf-search onkeydown="if (event.key === 'Enter') event.preventDefault();">
     </div>
 
-    <form method="get" action="{{ url_for('payments.billing') }}" class="pay-month">
+    <form method="get" action="{{ url_for('payments.list_payments') }}" class="pay-month">
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
-        <a class="pay-month-nav" href="{{ url_for('payments.billing', month=prev_month, status=status_filter) }}" title="Previous month" aria-label="Previous month"><i class="bi bi-chevron-left"></i></a>
+        <a class="pay-month-nav" href="{{ url_for('payments.list_payments', month=prev_month, status=status_filter) }}" title="Previous month" aria-label="Previous month"><i class="bi bi-chevron-left"></i></a>
         <label class="pay-month-label"><i class="bi bi-calendar3"></i>
             <input type="month" name="month" value="{{ month_value }}" max="{{ current_month }}" onchange="this.form.submit()" aria-label="Billing month">
         </label>
-        <a class="pay-month-nav {{ 'is-disabled' if is_current_month else '' }}" href="{{ url_for('payments.billing', month=next_month, status=status_filter) }}" title="Next month" aria-label="Next month"><i class="bi bi-chevron-right"></i></a>
+        <a class="pay-month-nav {{ 'is-disabled' if is_current_month else '' }}" href="{{ url_for('payments.list_payments', month=next_month, status=status_filter) }}" title="Next month" aria-label="Next month"><i class="bi bi-chevron-right"></i></a>
     </form>
 
     <div class="subs-pill-group" role="group" aria-label="Filter by billing status">
         {% for key in pill_order %}
             <a class="subs-pill {{ 'subs-pill-active' if status_filter == key else '' }}"
-               href="{{ url_for('payments.billing', month=month_value, status=key) }}">{{ status_labels[key] }}<span class="pay-count">{{ counts[key] }}</span></a>
+               href="{{ url_for('payments.list_payments', month=month_value, status=key) }}">{{ status_labels[key] }}<span class="pay-count">{{ counts[key] }}</span></a>
         {% endfor %}
     </div>
 
@@ -101,7 +96,7 @@
                 {% set initials = (sub.full_name.split()|map('first')|list)[:2]|join|upper %}
                 <tr class="disp-row disp-row-clickable lf-row"
                     data-search="{{ [sub.full_name, sub.subscriber_code, sub.plan_type, sub.nap.nap_code if sub.nap else '', r.status]|select|join(' ')|lower }}"
-                    data-href="{{ url_for('payments.list_payments', q=sub.subscriber_code) }}">
+                    data-history="{{ url_for('payments.subscriber_history', subscriber_id=sub.id) }}">
                     <td>
                         <div class="pay-person">
                             <span class="pay-avatar pay-av-{{ sub.id % 5 }}">{{ initials }}</span>
@@ -135,8 +130,7 @@
                             <a href="{{ url_for('payments.add_payment', subscriber_id=sub.id, amount=r.balance) }}"
                                class="subs-edit-btn" title="Record payment" onclick="event.stopPropagation();"><i class="bi bi-plus-lg"></i></a>
                             {% endif %}
-                            <a href="{{ url_for('payments.list_payments', q=sub.subscriber_code) }}"
-                               class="subs-edit-btn" title="View payment history" onclick="event.stopPropagation();"><i class="bi bi-clock-history"></i></a>
+                            <button type="button" class="subs-edit-btn" title="View transactions" data-history-btn><i class="bi bi-clock-history"></i></button>
                             <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
                         </div>
                     </td>
@@ -146,7 +140,7 @@
                     <td colspan="9" class="disp-empty">
                         <i class="bi bi-people display-6 d-block mb-2"></i>
                         <div class="fw-semibold">No subscribers {% if status_filter %}marked {{ status_labels[status_filter]|lower }}{% else %}to bill{% endif %} for {{ month.strftime('%B %Y') }}</div>
-                        {% if status_filter %}<div class="small"><a href="{{ url_for('payments.billing', month=month_value) }}">Show all</a></div>{% endif %}
+                        {% if status_filter %}<div class="small"><a href="{{ url_for('payments.list_payments', month=month_value) }}">Show all</a></div>{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -170,17 +164,11 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<div class="modal fade" id="paymentHistoryModal" tabindex="-1" aria-label="Transactions" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content pay-receipt" id="paymentHistoryContent"></div>
+    </div>
+</div>
 <script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>
-<script>
-    // Row click -> that subscriber's payment history.
-    (function () {
-        var body = document.querySelector('[data-lf-body]');
-        if (!body) return;
-        body.addEventListener('click', function (e) {
-            if (e.target.closest('a, button')) return;
-            var row = e.target.closest('tr[data-href]');
-            if (row) window.location.href = row.getAttribute('data-href');
-        });
-    })();
-</script>
+<script src="{{ url_for('static', filename='js/payments.js') }}?v={{ asset_version('js/payments.js') }}"></script>
 {% endblock %}

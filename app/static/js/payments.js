@@ -1,15 +1,15 @@
-/* payments.js -- Payments page: row -> details popup, copy-reference buttons. */
+/* payments.js -- Payments page: row click -> transactions popup, copy-reference buttons. */
 (function () {
-    var tbody = document.getElementById('paymentsTableBody');
-    var modalEl = document.getElementById('paymentDetailModal');
-    if (!tbody || !modalEl) return;
+    var tbody = document.querySelector('[data-lf-body]');
+    var modalEl = document.getElementById('paymentHistoryModal');
+    var content = document.getElementById('paymentHistoryContent');
+    if (!tbody || !modalEl || !content) return;
     var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-    var $ = function (id) { return document.getElementById(id); };
+    var seq = 0;
 
     function copy(text, btn) {
         function done() {
-            if (!btn) return;
-            var icon = btn.querySelector('i');
+            var icon = btn && btn.querySelector('i');
             if (!icon) return;
             var old = icon.className;
             icon.className = 'bi bi-check2';
@@ -25,44 +25,29 @@
         }
     }
 
-    function initials(name) {
-        return name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase();
-    }
-
-    function open(row) {
-        var d = row.dataset;
-        $('pdAvatar').textContent = initials(d.name);
-        $('pdAmount').textContent = '₱' + d.amount;
-        var st = $('pdStatus');
-        st.className = 'disp-badge pay-status disp-badge-' + d.status;
-        st.innerHTML = '<span class="pay-dot"></span>' + d.status.charAt(0).toUpperCase() + d.status.slice(1);
-        $('pdName').textContent = d.name;
-        $('pdCode').textContent = d.code;
-        $('pdPlan').textContent = [d.plan, d.nap].filter(Boolean).join('  ·  ') || '—';
-        $('pdMethodIcon').className = 'bi ' + d.methodIcon;
-        $('pdMethod').textContent = d.method;
-        $('pdRef').textContent = d.ref || '—';
-        $('pdCopy').hidden = !d.ref;
-        $('pdCopy').setAttribute('data-copy', d.ref || '');
-        $('pdDate').textContent = d.date;
-        $('pdCollector').textContent = d.collector;
-        $('pdCreated').textContent = d.created;
-        $('pdUpdated').textContent = d.updated;
-        $('pdRemarks').textContent = d.remarks;
-        $('pdRemarks').hidden = $('pdRemarksLabel').hidden = !d.remarks;
-        $('pdEdit').href = d.edit;
-        var form = $('pdVoidForm');
-        form.hidden = !d.void;
-        if (d.void) form.action = d.void;
+    function openHistory(url) {
+        var mine = ++seq;
+        content.innerHTML = '<div class="modal-body text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2"></div>Loading transactions\u2026</div>';
         modal.show();
+        fetch(url, { headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+            .then(function (html) { if (mine === seq) content.innerHTML = html; })
+            .catch(function () {
+                if (mine !== seq) return;
+                content.innerHTML = '<div class="modal-header"><h5 class="modal-title">Transactions</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                    '<div class="modal-body text-center text-muted py-4">Could not load transactions. Please try again.</div>';
+            });
     }
 
     tbody.addEventListener('click', function (e) {
-        var copyBtn = e.target.closest('.pay-copy');
-        if (copyBtn) { e.stopPropagation(); copy(copyBtn.getAttribute('data-copy'), copyBtn); return; }
-        if (e.target.closest('a, button, form')) return;
-        var row = e.target.closest('tr.lf-row');
-        if (row) open(row);
+        var row = e.target.closest('tr[data-history]');
+        if (!row) return;
+        if (e.target.closest('a')) return;            // "record payment" link
+        openHistory(row.getAttribute('data-history'));
     });
-    $('pdCopy').addEventListener('click', function () { copy(this.getAttribute('data-copy'), this); });
+
+    content.addEventListener('click', function (e) {
+        var btn = e.target.closest('.pay-copy');
+        if (btn) copy(btn.getAttribute('data-copy'), btn);
+    });
 })();

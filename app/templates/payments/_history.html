@@ -1,0 +1,83 @@
+{# Transactions popup body: all payments of one subscriber. #}
+{% set method_meta = {
+    'cash': ('bi-cash-stack', 'Cash'),
+    'gcash': ('bi-phone', 'GCash'),
+    'bank_transfer': ('bi-bank', 'Bank Transfer'),
+    'other': ('bi-three-dots', 'Other'),
+} %}
+{% set initials = (sub.full_name.split()|map('first')|list)[:2]|join|upper %}
+<div class="modal-header pay-hist-head">
+    <span class="pay-avatar pay-av-{{ sub.id % 5 }} pay-avatar-lg">{{ initials }}</span>
+    <div class="pay-hist-title">
+        <h5 class="modal-title mb-0">{{ sub.full_name }}</h5>
+        <div class="disp-subtext">{{ sub.subscriber_code }}{% if sub.plan_type %} &middot; {{ sub.plan_type }}{% endif %}{% if sub.nap %} &middot; {{ sub.nap.nap_code }}{% endif %}</div>
+    </div>
+    <div class="pay-hist-total">
+        <div class="disp-subtext">Total confirmed</div>
+        <strong>&#8369;{{ '{:,.2f}'.format(total) }}</strong>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body pay-hist-body">
+    {% if payments %}
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 pay-hist-table">
+            <thead>
+                <tr><th>Paid on</th><th>Amount</th><th>Method</th><th>Reference</th><th>Collected by</th><th>Status</th><th class="text-end"></th></tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                {% set online = payment.id in online_ids %}
+                {% set method_icon, method_label = method_meta.get(payment.payment_method, ('bi-three-dots', 'Other')) %}
+                {% if online %}{% set method_icon = 'bi-credit-card-2-front' %}{% set method_label = 'Online (HitPay)' %}{% endif %}
+                {% set ref = payment.reference_number or '' %}
+                <tr>
+                    <td>
+                        <div>{{ payment.payment_date.strftime('%b %d, %Y') }}</div>
+                        {% if payment.remarks %}<div class="disp-subtext pay-remark" title="{{ payment.remarks }}">{{ payment.remarks }}</div>{% endif %}
+                    </td>
+                    <td class="lf-amount"><span class="pay-peso">&#8369;</span>{{ '{:,.2f}'.format(payment.amount) }}</td>
+                    <td><span class="pay-method"><i class="bi {{ method_icon }}"></i>{{ method_label }}</span></td>
+                    <td>
+                        {% if ref %}
+                        <span class="pay-ref" title="{{ ref }}">
+                            <code>{{ ref if ref|length <= 14 else ref[:6] ~ '…' ~ ref[-4:] }}</code>
+                            <button type="button" class="pay-copy" data-copy="{{ ref }}" title="Copy reference" aria-label="Copy reference"><i class="bi bi-copy"></i></button>
+                        </span>
+                        {% else %}<span class="disp-subtext">&mdash;</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if payment.collector %}{{ payment.collector.full_name }}
+                        {% elif online %}<span class="pay-chip-online"><i class="bi bi-globe2"></i>Online</span>
+                        {% else %}<span class="disp-subtext">&mdash;</span>{% endif %}
+                    </td>
+                    <td><span class="disp-badge pay-status disp-badge-{{ payment.status }}"><span class="pay-dot"></span>{{ payment.status|capitalize }}</span></td>
+                    <td class="text-end">
+                        <div class="subs-row-actions">
+                            {% if payment.status in ('pending', 'overdue') %}
+                            <form method="post" action="{{ url_for('payments.void_payment', payment_id=payment.id) }}" class="lf-inline-form"
+                                  onsubmit="return confirm('Void this payment?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="subs-edit-btn" title="Void"><i class="bi bi-slash-circle"></i></button>
+                            </form>
+                            {% endif %}
+                            <a href="{{ url_for('payments.edit_payment', payment_id=payment.id) }}" class="subs-edit-btn" title="Edit"><i class="bi bi-pencil"></i></a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="disp-empty text-center py-4">
+        <i class="bi bi-receipt display-6 d-block mb-2"></i>
+        <div class="fw-semibold">No transactions yet</div>
+        <div class="small">Payments recorded for {{ sub.full_name }} will show up here.</div>
+    </div>
+    {% endif %}
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+    <a href="{{ url_for('payments.add_payment', subscriber_id=sub.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Payment</a>
+</div>
