@@ -20,7 +20,7 @@
 // the overlay the bright ISP-network look (see the STAFF THEME section
 // of auth-transition.css). Without it the original dark overlay is used,
 // so customer-facing pages are unaffected. Staff pages supply:
-//   window.NAPIQ_STAFF_LOADER_ICON_URL -- navy logo that reads on a light background
+//   window.NAPIQ_STAFF_LOADER_ICON_URL -- navy logo with gold "P" (pg-networks-logo-mono-gold-p.png)
 //   window.NAPIQ_STAFF_SCENE_URL       -- background scene SVG (preloaded
 //                                         here so it's already cached the
 //                                         moment the overlay appears)

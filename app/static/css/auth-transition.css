@@ -309,9 +309,12 @@
     margin-bottom: 1.5rem;
 }
 
-/* The dark theme's blue "ping" rings aren't used here. */
+/* Pulse: the same two expanding "ping" rings as the dark overlay (same
+   0.6s critical-alert rhythm, second ring offset by half a cycle), just
+   recoloured for the light background. They sit above the frosted disc
+   and fade fully out each cycle, so nothing lingers between pulses. */
 .auth-transition-overlay--staff .auth-transition-ping {
-    display: none;
+    border: 2.5px solid rgba(47, 109, 240, 0.5);
 }
 
 /* Static pale-gold ring + frosted disc behind the mark. */
