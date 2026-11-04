@@ -195,14 +195,20 @@ def index():
 @collector_bp.route("/collections")
 @role_required("payment_collector")
 def collections():
-    """My Collections: the record-a-payment form (recent collections and the
-    coverage area now live on the Dashboard)."""
+    """My Collections: the coverage subscribers list (top) and the
+    record-a-payment form. Recent collections live on the Dashboard."""
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
+    coverage_barangays = _coverage_barangays()
+    coverage_subscribers = (
+        _coverage_subscribers_query(coverage_barangays).order_by(Subscriber.full_name).all()
+        if coverage_barangays else []
+    )
     return render_template(
         "collector/collections.html",
         form=form,
-        coverage_barangays=_coverage_barangays(),
+        coverage_barangays=coverage_barangays,
+        coverage_subscribers=coverage_subscribers,
     )
 
 

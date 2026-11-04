@@ -16,6 +16,59 @@
 {# ---------------- RECORD / RECENT ---------------- #}
 <div class="row g-3 mb-3 justify-content-center">
     <div class="col-lg-8 col-xl-6">
+        {# ---------------- COVERAGE SUBSCRIBERS (upper part) ---------------- #}
+        <div class="cx-card mb-3">
+            <div class="cx-card__head">
+                <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-people-fill"></i></span>My Coverage Subscribers</h3>
+                {% if coverage_barangays %}
+                    <span class="cx-card__meta">{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
+                {% endif %}
+            </div>
+
+            {% if not coverage_barangays %}
+            <div class="cx-empty">
+                <i class="bi bi-geo"></i>
+                <div class="fw-semibold">No coverage area assigned</div>
+                <div class="small">Ask an administrator to set one from the Collectors tab.</div>
+            </div>
+            {% elif not coverage_subscribers %}
+            <div class="cx-empty">
+                <i class="bi bi-people"></i>
+                <div class="fw-semibold">No subscribers yet</div>
+                <div class="small">No active subscribers found in your assigned barangay(s).</div>
+            </div>
+            {% else %}
+            <div class="px-4 pt-3 pb-2">
+                <div class="input-group input-group-sm cx-search" style="max-width:none">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="coverageRosterSearch" placeholder="Filter subscribers..." autocomplete="off">
+                </div>
+            </div>
+            <div class="table-responsive cx-scroll" style="max-height:320px">
+                <table class="table cx-table align-middle" id="coverageRosterTable">
+                    <thead><tr><th>Subscriber</th><th>Address</th><th>Contact</th></tr></thead>
+                    <tbody>
+                        {% for subscriber in coverage_subscribers %}
+                        <tr>
+                            <td>
+                                <div class="cx-person">
+                                    <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
+                                    <div class="text-truncate">
+                                        <div class="cx-person__name text-truncate">{{ subscriber.full_name }}</div>
+                                        <div class="cx-person__sub">{{ subscriber.subscriber_code }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-muted small">{{ subscriber.address or "—" }}</td>
+                            <td class="small">{% if subscriber.contact_number %}<i class="bi bi-telephone me-1 text-muted"></i>{{ subscriber.contact_number }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+
         <div class="cx-card" id="recordPaymentCard">
             <div class="cx-card__head">
                 <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span>Record a Payment</h3>
@@ -152,4 +205,18 @@
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/collector-payment.js') }}"></script>
+<script>
+    // Client-side filter; the list is already scoped server-side to this collector's barangay(s).
+    (function () {
+        var input = document.getElementById('coverageRosterSearch');
+        var table = document.getElementById('coverageRosterTable');
+        if (!input || !table) return;
+        input.addEventListener('input', function () {
+            var term = input.value.trim().toLowerCase();
+            table.querySelectorAll('tbody tr').forEach(function (row) {
+                row.style.display = row.textContent.toLowerCase().indexOf(term) !== -1 ? '' : 'none';
+            });
+        });
+    })();
+</script>
 {% endblock %}
