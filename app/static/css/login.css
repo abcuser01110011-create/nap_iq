@@ -534,3 +534,44 @@ html.login-theme-fade, html.login-theme-fade * {
 @media (prefers-reduced-motion: reduce) {
     .login-theme-toggle, .login-theme-toggle__icon { transition: none; }
 }
+
+
+/* =====================================================================
+   STAFF SIGN-IN BACKGROUND
+   ---------------------------------------------------------------------
+   Staff login only (body.login-body--staff, set in auth/login.html when
+   portal != 'customer'); the customer login keeps its plain background.
+
+   Uses the same network/ISP scene as the staff loading screen
+   (auth-transition.css), so the page and the loader that appears on
+   submit read as one continuous surface. Light and dark scenes follow
+   the page's theme toggle via html[data-bs-theme].
+   ===================================================================== */
+
+body.login-body.login-body--staff {
+    background: #f3f7ff url("../img/auth-scene-staff.svg") center / cover no-repeat fixed;
+}
+
+html[data-bs-theme="dark"] body.login-body.login-body--staff {
+    background: #0c1022 url("../img/auth-scene-staff-dark.svg") center / cover no-repeat fixed;
+}
+
+/* Slightly frosted card so the scene shows through softly. Falls back to
+   the normal solid panel where backdrop-filter isn't supported. */
+.login-body--staff .login-card {
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    backdrop-filter: blur(14px) saturate(1.15);
+    border-color: rgba(220, 230, 248, 0.9);
+    box-shadow: 0 24px 60px -28px rgba(16, 70, 184, 0.35);
+}
+
+html[data-bs-theme="dark"] .login-body--staff .login-card {
+    background: rgba(21, 23, 29, 0.78);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 30px 70px -36px rgba(0, 0, 0, 0.85);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .login-body--staff .login-card { background: var(--login-panel); }
+}

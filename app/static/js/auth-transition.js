@@ -24,6 +24,11 @@
 //   window.NAPIQ_STAFF_SCENE_URL       -- background scene SVG (preloaded
 //                                         here so it's already cached the
 //                                         moment the overlay appears)
+// Dark mode: if <html data-bs-theme="dark"> when the form is submitted,
+// the overlay also gets .auth-transition-overlay--dark. Its dark assets
+// are found by convention -- the same file name with "-dark" before the
+// extension (auth-scene-staff-dark.svg, <logo>-dark.png) -- so no extra
+// template variables are needed.
 //
 // Duration + a live "connection" readout come from network-speed.js
 // (window.NAPIQNetworkSpeed), which must be loaded first. If it isn't
@@ -50,6 +55,15 @@
             steps: ["Reserving your username", "Setting up your account", "Signing you in"],
         },
     };
+
+    // "foo.png?v=1" -> "foo-dark.png?v=1"
+    function darkVariant(url) {
+        return url ? url.replace(/(\.(?:png|svg))(\?|$)/, "-dark$1$2") : url;
+    }
+
+    function isDarkTheme() {
+        return document.documentElement.getAttribute("data-bs-theme") === "dark";
+    }
 
     function networkSpeed() {
         return window.NAPIQNetworkSpeed || null;
@@ -84,8 +98,12 @@
 
     function buildOverlay(config, netState, theme) {
         var isStaff = theme === "staff";
+        var isDark = isStaff && isDarkTheme();
         var overlay = document.createElement("div");
-        overlay.className = "auth-transition-overlay" + (isStaff ? " auth-transition-overlay--staff" : "");
+        overlay.className =
+            "auth-transition-overlay" +
+            (isStaff ? " auth-transition-overlay--staff" : "") +
+            (isDark ? " auth-transition-overlay--dark" : "");
 
         var stepsHtml = config.steps
             .map(function (label, index) {
@@ -101,7 +119,8 @@
             })
             .join("");
 
-        var iconUrl = (isStaff && window.NAPIQ_STAFF_LOADER_ICON_URL) || window.NAPIQ_LOADER_ICON_URL || "";
+        var staffIcon = isStaff ? window.NAPIQ_STAFF_LOADER_ICON_URL : "";
+        var iconUrl = (isDark ? darkVariant(staffIcon) : staffIcon) || window.NAPIQ_LOADER_ICON_URL || "";
 
         overlay.innerHTML =
             '<div class="auth-transition-panel">' +
@@ -211,7 +230,17 @@
     // blank background while the SVG downloads.
     if (window.NAPIQ_STAFF_SCENE_URL && document.querySelector('form[data-auth-theme="staff"]')) {
         try {
-            new Image().src = window.NAPIQ_STAFF_SCENE_URL;
+            // Plain URL (no ?v=) on purpose: the stylesheets reference the
+            // scene without a query string, so only that exact URL will
+            // actually be served from the cache they hit. Both themes are
+            // warmed because the login page can toggle between them.
+            var sceneUrl = window.NAPIQ_STAFF_SCENE_URL.split("?")[0];
+            new Image().src = sceneUrl;
+            new Image().src = darkVariant(sceneUrl);
+            if (window.NAPIQ_STAFF_LOADER_ICON_URL) {
+                new Image().src = window.NAPIQ_STAFF_LOADER_ICON_URL;
+                new Image().src = darkVariant(window.NAPIQ_STAFF_LOADER_ICON_URL);
+            }
         } catch (e) {}
     }
 

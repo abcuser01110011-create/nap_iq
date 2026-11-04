@@ -469,3 +469,82 @@
     border-radius: 4px;
     background: linear-gradient(90deg, #1558e6, #3d86ff);
 }
+
+
+/* =====================================================================
+   STAFF THEME -- DARK VARIANT
+   ---------------------------------------------------------------------
+   auth-transition.js adds .auth-transition-overlay--dark (on top of
+   --staff) when <html data-bs-theme="dark"> at the moment of submit, so
+   a dark staff login page / dashboard fades into a dark loader instead
+   of flashing bright. Same layout and animation; only colours change.
+   Uses the dark scene (auth-scene-staff-dark.svg) and the light-blue
+   logo with the gold P (pg-networks-logo-mono-gold-p-dark.png).
+   ===================================================================== */
+
+.auth-transition-overlay--staff.auth-transition-overlay--dark {
+    background: #0c1022 url("../img/auth-scene-staff-dark.svg") center / cover no-repeat;
+    color: #e8eefc;
+}
+
+.auth-transition-overlay--dark .auth-transition-panel::before {
+    background: radial-gradient(closest-side, rgba(12, 16, 34, 0.88), rgba(12, 16, 34, 0));
+}
+
+.auth-transition-overlay--dark .auth-transition-icon-ring::before {
+    background: rgba(21, 26, 43, 0.82);
+    border-color: rgba(91, 140, 255, 0.28);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.auth-transition-overlay--dark .auth-transition-ping {
+    border-color: #4f86ff;
+}
+
+.auth-transition-overlay--dark .auth-transition-title {
+    color: #ffffff;
+}
+
+.auth-transition-overlay--dark .auth-transition-network {
+    color: rgba(226, 232, 255, 0.72);
+}
+
+.auth-transition-overlay--dark .auth-transition-network[data-quality="moderate"] .auth-transition-network-dot {
+    background: #4f86ff;
+    box-shadow: 0 0 0 3px rgba(79, 134, 255, 0.22);
+}
+
+.auth-transition-overlay--dark .auth-transition-step-label {
+    color: #e8eefc;
+}
+
+.auth-transition-overlay--dark .auth-transition-step-icon {
+    border-color: rgba(79, 134, 255, 0.85);
+    background: rgba(14, 18, 32, 0.7);
+}
+
+.auth-transition-overlay--dark .auth-transition-step[data-state="pending"] .auth-transition-step-icon {
+    border-color: rgba(79, 134, 255, 0.55);
+}
+
+.auth-transition-overlay--dark .auth-transition-step[data-state="active"] .auth-transition-step-icon,
+.auth-transition-overlay--dark .auth-transition-step[data-state="done"] .auth-transition-step-icon {
+    border-color: #4f86ff;
+}
+
+.auth-transition-overlay--dark .auth-transition-step[data-state="done"] .auth-transition-step-icon {
+    background: #1684ff;
+    border-color: #1684ff;
+}
+
+.auth-transition-overlay--dark .auth-transition-step-dot {
+    background: #4f86ff;
+}
+
+.auth-transition-overlay--dark .auth-transition-progress {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.auth-transition-overlay--dark .auth-transition-progress-bar {
+    background: linear-gradient(90deg, #1684ff, #6a9dff);
+}

@@ -29,7 +29,7 @@
     <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/auth-transition.css') }}?v={{ asset_version('css/auth-transition.css') }}" rel="stylesheet">
 </head>
-<body class="login-body">
+<body class="login-body{% if portal != 'customer' %} login-body--staff{% endif %}">
 
 <button type="button" class="login-theme-toggle" data-login-theme-toggle aria-pressed="false" aria-label="Toggle light / dark mode">
     <i class="bi bi-moon-stars-fill login-theme-toggle__icon login-theme-toggle__icon--moon" aria-hidden="true"></i>
