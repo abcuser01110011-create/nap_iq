@@ -79,7 +79,7 @@
 </button>
 </div>
 
-<div class="row g-3 mb-3">
+<div class="row g-3 mb-3 cx-stat-row">
     <div class="col-6 col-lg-3">
         <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
             <span class="dash-stat-icon stat-icon-green"><i class="bi bi-cash-coin"></i></span>
@@ -95,24 +95,6 @@
             <div class="dash-stat-body">
                 <span class="dash-stat-value">₱{{ "{:,.2f}".format(collected_this_month) }}</span>
                 <span class="dash-stat-label">Collected This Month</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-lg-3">
-        <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
-            <span class="dash-stat-icon stat-icon-orange"><i class="bi bi-hourglass-split"></i></span>
-            <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ pending_count }}</span>
-                <span class="dash-stat-label">Pending Confirmation</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-lg-3">
-        <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
-            <span class="dash-stat-icon stat-icon-purple"><i class="bi bi-people-fill"></i></span>
-            <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ subscriber_count }}</span>
-                <span class="dash-stat-label">Subscribers in My Area</span>
             </div>
         </a>
     </div>
