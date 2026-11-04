@@ -232,6 +232,13 @@ def public_account_login():
         subscriber.user_id = user.id
         db.session.commit()
 
+    # Save the theme the landing page was showing as the account's theme,
+    # so the dashboard opens in the same light/dark mode.
+    chosen_theme = data.get("theme")
+    if chosen_theme in ("light", "dark") and user.theme_preference != chosen_theme:
+        user.theme_preference = chosen_theme
+        db.session.commit()
+
     session.clear()
     session["user_id"] = user.id
     session.permanent = True

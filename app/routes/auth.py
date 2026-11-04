@@ -20,7 +20,7 @@ Routes:
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, g, current_app
 
 from app.forms import LoginForm, SelfRegisterForm
-from app.models import User
+from app.models import User, USER_THEME_PREFERENCES
 from app.auth import login_required, ROLE_HOME_ENDPOINT
 from app.extensions import db, limiter
 from sqlalchemy import func
@@ -112,6 +112,15 @@ def _login_limits(view):
     return limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"], methods=["POST"])(view)
 
 
+def _apply_login_theme(user, theme):
+    """If the sign-in page was in a theme the visitor picked (light/dark),
+    save it as the account's theme so the dashboard opens in the same mode.
+    Ignored when absent or invalid (e.g. a brand-new browser)."""
+    if theme in USER_THEME_PREFERENCES and user.theme_preference != theme:
+        user.theme_preference = theme
+        db.session.commit()
+
+
 def _handle_login(portal):
     """Shared sign-in handler. `portal` is "staff" (administrator, staff,
     technician, collector... every role except 'user') or "customer"
@@ -141,6 +150,7 @@ def _handle_login(portal):
             else:
                 flash("This sign-in is for subscribers only. Staff, please use the staff login.", "danger")
         else:
+            _apply_login_theme(user, request.form.get("theme"))
             session.clear()
             session["user_id"] = user.id
             session.permanent = True  # subject to PERMANENT_SESSION_LIFETIME

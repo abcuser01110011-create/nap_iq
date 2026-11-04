@@ -61,6 +61,7 @@
 
         <form method="post" action="{{ url_for('auth.customer_login' if portal == 'customer' else 'auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin"{% if portal != 'customer' %} data-auth-theme="staff"{% endif %}>
             {{ form.hidden_tag() }}
+            <input type="hidden" name="theme" id="loginThemeInput" value="">
 
             <div class="login-field">
                 {{ form.username.label(class="login-field__label") }}

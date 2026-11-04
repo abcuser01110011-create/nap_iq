@@ -23,6 +23,14 @@
         });
     }
 
+    // Send the visible theme with the sign-in form so the account (and so the
+    // dashboard) adopts it. Skipped on a brand-new browser that never chose one.
+    document.addEventListener("submit", function (e) {
+        var input = e.target && e.target.querySelector && e.target.querySelector("#loginThemeInput");
+        if (!input) return;
+        try { input.value = (localStorage.getItem(KEY) || localStorage.getItem("napiq-theme")) ? current() : ""; } catch (err) { input.value = ""; }
+    }, true);
+
     document.addEventListener("DOMContentLoaded", function () {
         var btn = document.querySelector("[data-login-theme-toggle]");
         if (!btn) return;
