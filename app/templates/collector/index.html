@@ -2,46 +2,47 @@
 {% block title %}My Collections{% endblock %}
 {% block page_title %}My Collections{% endblock %}
 {% block page_subtitle %}
-<p class="text-muted small mb-0">
-    Welcome back, {{ current_user.full_name }}
-    <span class="badge text-bg-light border ms-1">
-        <i class="bi bi-person-badge me-1"></i>Payment Collector
-    </span>
-</p>
+<p class="text-muted small mb-0">Record payments and manage your collection route</p>
 {% endblock %}
 
 {% block extra_head %}
 <link href="{{ url_for('static', filename='css/ticket_form.css') }}" rel="stylesheet">
-<style>
-    /* Amount input's peso-sign prefix -- matches the look of a proper
-       currency field rather than a bare number box. */
-    .collector-amount-group .input-group-text {
-        font-weight: 600;
-        background: var(--napiq-bg);
-    }
-    /* Quiet, in-card filter box for the coverage roster -- same shape
-       as .subs-search-form elsewhere but scaled down for a card body. */
-    .collector-roster-search {
-        max-width: 260px;
-    }
-    .collector-roster-search .input-group-text {
-        background: var(--napiq-surface);
-    }
-    /* Auto-fill panel shown under the Subscriber search box once a
-       match is picked (Plan / Address / Est. Due Date) -- read-only,
-       informational, not part of the submitted payment. */
-    #collectorSubscriberInfo dt {
-        font-weight: 400;
-        color: var(--napiq-text-muted);
-    }
-</style>
+<link href="{{ url_for('static', filename='css/collector-theme.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
+<div class="cx">
 
-{# ------------------------------------------------------------------ #}
-{# ROW: KPI SUMMARY STRIP                                              #}
-{# ------------------------------------------------------------------ #}
+{# ---------------- HERO ---------------- #}
+<section class="cx-hero">
+    <div class="row align-items-center g-3 position-relative" style="z-index:1">
+        <div class="col-md-7">
+            <div class="cx-hero__eyebrow"><span id="cxToday">Collections</span></div>
+            <h2 class="cx-hero__title">Welcome back, {{ current_user.full_name }}</h2>
+            <p class="cx-hero__sub">Payment Collector &middot; keep every peso accounted for.</p>
+            <div class="cx-hero__chips">
+                {% if coverage_barangays %}
+                    {% for barangay in coverage_barangays[:4] %}<span class="cx-chip"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>{% endfor %}
+                    {% if coverage_barangays|length > 4 %}<span class="cx-chip">+{{ coverage_barangays|length - 4 }} more</span>{% endif %}
+                {% else %}
+                    <span class="cx-chip"><i class="bi bi-exclamation-triangle-fill"></i>No coverage area assigned yet</span>
+                {% endif %}
+                <span class="cx-chip"><i class="bi bi-people-fill"></i>{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="d-flex flex-md-column align-items-md-end justify-content-between gap-3">
+                <div class="cx-hero__total">
+                    <small>Collected today</small>
+                    <strong>₱{{ "{:,.2f}".format(collected_today) }}</strong>
+                </div>
+                <a href="#recordPaymentCard" class="cx-hero__cta"><i class="bi bi-plus-lg"></i>Record a payment</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ---------------- KPI STRIP ---------------- #}
 <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3">
         <div class="dash-stat-card">
@@ -81,19 +82,18 @@
     </div>
 </div>
 
-{# ------------------------------------------------------------------ #}
-{# ROW: RECORD A PAYMENT  /  RECENT COLLECTIONS                        #}
-{# ------------------------------------------------------------------ #}
-<div class="row g-3 mb-3 align-items-stretch">
+{# ---------------- RECORD / RECENT ---------------- #}
+<div class="row g-3 mb-3 align-items-start">
     <div class="col-lg-5">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white">
-                <i class="bi bi-cash-coin me-1"></i>Record a Payment
+        <div class="cx-card" id="recordPaymentCard">
+            <div class="cx-card__head">
+                <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span>Record a Payment</h3>
             </div>
-            <div class="card-body">
-                <form method="post" action="{{ url_for('collector.record_payment') }}" novalidate>
+            <div class="cx-card__body">
+                <form class="cx-form" method="post" action="{{ url_for('collector.record_payment') }}" novalidate>
                     {{ form.hidden_tag() }}
 
+                    <div class="cx-step"><span>1</span>Subscriber</div>
                     <div class="mb-3 position-relative" id="collectorSubscriberWrapper">
                         <label class="form-label">{{ form.subscriber_id.label }}</label>
                         <div class="subs-search-form">
@@ -123,7 +123,7 @@
                            is estimated from it -- see collector.py's
                            _plan_monthly_fee()/_current_balance() -- both show
                            "—" for a plan an administrator hasn't priced yet). #}
-                        <dl class="row mb-0 mt-2 small d-none" id="collectorSubscriberInfo">
+                        <dl class="row mb-0 small d-none cx-info" id="collectorSubscriberInfo">
                             <dt class="col-4 col-sm-3">Plan</dt>
                             <dd class="col-8 col-sm-9" id="collectorSubInfoPlan">—</dd>
                             <dt class="col-4 col-sm-3">Monthly Fee</dt>
@@ -135,6 +135,7 @@
                         </dl>
                     </div>
 
+                    <div class="cx-step mt-4"><span>2</span>Payment details</div>
                     <div class="row g-2">
                         <div class="col-sm-6 mb-3">
                             <label class="form-label">{{ form.amount.label }}</label>
@@ -182,10 +183,11 @@
                        next to it to generate a new one on demand. The real
                        value submitted with the payment still travels in this
                        hidden field -- only how it's presented changed. #}
+                    <div class="cx-step mt-4"><span>3</span>Reference &amp; notes</div>
                     <div class="mb-3">
                         <label class="form-label">Reference No.</label>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="form-control-plaintext py-1 fw-semibold" id="collectorSubInfoReference">—</span>
+                        <div class="cx-ref">
+                            <span id="collectorSubInfoReference">—</span>
                             <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" id="collectorRefRegenerateBtn" title="Generate a new reference number">
                                 <i class="bi bi-arrow-clockwise"></i>
                             </button>
@@ -204,7 +206,7 @@
                         {% endfor %}
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100">
+                    <button type="submit" class="btn cx-submit">
                         <i class="bi bi-check-lg me-1"></i>Record Payment
                     </button>
                 </form>
@@ -213,85 +215,75 @@
     </div>
 
     <div class="col-lg-7">
-        <div class="card shadow-sm h-100">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-clock-history me-1"></i>My Recent Collections</span>
-                <span class="text-muted small">Last {{ recent_payments|length }}</span>
+        <div class="cx-card">
+            <div class="cx-card__head">
+                <h3 class="cx-card__title"><span class="cx-card__icon cx-card__icon--gold"><i class="bi bi-clock-history"></i></span>My Recent Collections</h3>
+                <span class="cx-card__meta">Last {{ recent_payments|length }}</span>
             </div>
-            <div class="card-body p-0">
-                {% if recent_payments %}
-                <div class="table-responsive">
-                    <table class="table disp-table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Subscriber</th>
-                                <th class="text-end">Amount</th>
-                                <th>Method</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% set payment_status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
-                            {% for payment in recent_payments %}
-                            <tr class="disp-row">
-                                <td class="disp-subtext">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
-                                <td>
-                                    {% if payment.subscriber %}
-                                        <span class="disp-primary-link">{{ payment.subscriber.subscriber_code }} — {{ payment.subscriber.full_name }}</span>
-                                    {% else %}
-                                        <span class="disp-subtext">—</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-end fw-semibold">₱{{ "{:,.2f}".format(payment.amount) }}</td>
-                                <td class="disp-subtext text-capitalize">{{ payment.payment_method|replace('_', ' ') }}</td>
-                                <td>
-                                    <span class="badge {{ payment_status_classes.get(payment.status, 'text-bg-secondary') }}">
-                                        {{ payment.status|capitalize }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="disp-empty">
-                    <i class="bi bi-cash display-6 d-block mb-2"></i>
-                    You haven't recorded any payments yet.
-                </div>
-                {% endif %}
+            {% if recent_payments %}
+            <div class="table-responsive cx-scroll">
+                <table class="table cx-table align-middle">
+                    <thead>
+                        <tr><th>Subscriber</th><th>Date</th><th class="text-end">Amount</th><th>Method</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in recent_payments %}
+                        <tr>
+                            <td>
+                                {% if payment.subscriber %}
+                                <div class="cx-person">
+                                    <span class="cx-avatar">{{ payment.subscriber.full_name[:1]|upper }}</span>
+                                    <div class="text-truncate">
+                                        <div class="cx-person__name text-truncate">{{ payment.subscriber.full_name }}</div>
+                                        <div class="cx-person__sub">{{ payment.subscriber.subscriber_code }}</div>
+                                    </div>
+                                </div>
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                            <td class="text-muted small">{{ payment.payment_date.strftime('%b %d, %Y') }}</td>
+                            <td class="text-end cx-amount">₱{{ "{:,.2f}".format(payment.amount) }}</td>
+                            <td><span class="cx-method">{{ payment.payment_method|replace('_', ' ') }}</span></td>
+                            <td><span class="cx-pill cx-pill--{{ payment.status if payment.status in ('confirmed','pending','overdue','voided') else 'pending' }}">{{ payment.status|capitalize }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            {% else %}
+            <div class="cx-empty">
+                <i class="bi bi-cash-stack"></i>
+                <div class="fw-semibold">No collections yet</div>
+                <div class="small">Payments you record will show up here.</div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-{# ------------------------------------------------------------------ #}
-{# ROW: MY COVERAGE AREA                                               #}
-{# ------------------------------------------------------------------ #}
-<div class="disp-table-card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <span><i class="bi bi-geo-alt me-1"></i>My Coverage Area</span>
+{# ---------------- COVERAGE ---------------- #}
+<div class="cx-card">
+    <div class="cx-card__head">
+        <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-geo-alt-fill"></i></span>My Coverage Area</h3>
         {% if coverage_barangays %}
-            <span class="text-muted small">{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
+            <span class="cx-card__meta">{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
         {% endif %}
     </div>
 
     {% if not coverage_barangays %}
-    <div class="disp-empty">
-        <i class="bi bi-geo display-6 d-block mb-2"></i>
-        No coverage area has been assigned to your account yet.<br>
-        Ask an administrator to set one from the Collectors tab.
+    <div class="cx-empty">
+        <i class="bi bi-geo"></i>
+        <div class="fw-semibold">No coverage area assigned</div>
+        <div class="small">Ask an administrator to set one from the Collectors tab.</div>
     </div>
     {% else %}
-    <div class="p-3 pt-3 pb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="d-flex flex-wrap gap-1">
+    <div class="px-4 pt-3 pb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex flex-wrap gap-2">
             {% for barangay in coverage_barangays %}
-                <span class="badge text-bg-light border"><i class="bi bi-geo-alt-fill me-1 text-primary"></i>{{ barangay }}</span>
+                <span class="cx-brgy"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>
             {% endfor %}
         </div>
         {% if coverage_subscribers %}
-        <div class="input-group input-group-sm collector-roster-search">
+        <div class="input-group input-group-sm cx-search">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" id="coverageRosterSearch" placeholder="Filter subscribers..." autocomplete="off">
         </div>
@@ -299,38 +291,49 @@
     </div>
 
     {% if coverage_subscribers %}
-    <div class="table-responsive">
-        <table class="table disp-table align-middle mb-0" id="coverageRosterTable">
-            <thead>
-                <tr>
-                    <th>Subscriber</th>
-                    <th>Address</th>
-                    <th>Contact</th>
-                </tr>
-            </thead>
+    <div class="table-responsive cx-scroll">
+        <table class="table cx-table align-middle" id="coverageRosterTable">
+            <thead><tr><th>Subscriber</th><th>Address</th><th>Contact</th></tr></thead>
             <tbody>
                 {% for subscriber in coverage_subscribers %}
-                <tr class="disp-row">
-                    <td><span class="disp-primary-link">{{ subscriber.subscriber_code }} — {{ subscriber.full_name }}</span></td>
-                    <td class="disp-subtext">{{ subscriber.address or "—" }}</td>
-                    <td class="disp-subtext">{{ subscriber.contact_number or "—" }}</td>
+                <tr>
+                    <td>
+                        <div class="cx-person">
+                            <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
+                            <div class="text-truncate">
+                                <div class="cx-person__name text-truncate">{{ subscriber.full_name }}</div>
+                                <div class="cx-person__sub">{{ subscriber.subscriber_code }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-muted small">{{ subscriber.address or "—" }}</td>
+                    <td class="small">{% if subscriber.contact_number %}<i class="bi bi-telephone me-1 text-muted"></i>{{ subscriber.contact_number }}{% else %}—{% endif %}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% else %}
-    <div class="disp-empty">
-        <i class="bi bi-people display-6 d-block mb-2"></i>
-        No active subscribers found in your assigned barangay(s) yet.
+    <div class="cx-empty">
+        <i class="bi bi-people"></i>
+        <div class="fw-semibold">No subscribers yet</div>
+        <div class="small">No active subscribers found in your assigned barangay(s).</div>
     </div>
     {% endif %}
     {% endif %}
+</div>
+
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/collector-payment.js') }}"></script>
+<script>
+    (function () {
+        var el = document.getElementById('cxToday');
+        if (el) el.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    })();
+</script>
 <script>
     // Lightweight client-side filter for the coverage roster table --
     // no round trip needed since the whole list is already scoped
