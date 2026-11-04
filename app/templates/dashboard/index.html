@@ -119,24 +119,6 @@
             </div>
         </a>
     </div>
-    <div class="col-6 col-lg">
-        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('technicians.list_technicians', status='available') }}">
-            <span class="dash-stat-icon stat-icon-purple"><i class="bi bi-person-badge-fill"></i></span>
-            <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ available_technicians }}</span>
-                <span class="dash-stat-label">Available Technicians</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-lg">
-        <a class="dash-stat-card dash-stat-card-link" href="{{ url_for('service_requests.list_requests', status='pending') }}">
-            <span class="dash-stat-icon stat-icon-gold"><i class="bi bi-clipboard-check-fill"></i></span>
-            <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ pending_service_requests }}</span>
-                <span class="dash-stat-label">Pending Service Requests</span>
-            </div>
-        </a>
-    </div>
 </div>
 
 {# ------------------------------------------------------------------ #}
