@@ -2,29 +2,18 @@
 {% block title %}My Collections{% endblock %}
 {% block page_title %}My Collections{% endblock %}
 {% block page_subtitle %}
-<p class="text-muted small mb-0">Record payments and manage your collection route</p>
+<p class="text-muted small mb-0">Subscribers in your coverage area</p>
 {% endblock %}
 
 {% block extra_head %}
-<link href="{{ url_for('static', filename='css/ticket_form.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/collector-theme.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
 <div class="cx">
-
-{# ---------------- RECORD / RECENT ---------------- #}
-<div class="row g-3 mb-3 justify-content-center">
+<div class="row justify-content-center">
     <div class="col-lg-8 col-xl-6">
-        {# ---------------- COVERAGE SUBSCRIBERS (upper part) ---------------- #}
-        <div class="cx-card mb-3">
-            <div class="cx-card__head">
-                <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-people-fill"></i></span>My Coverage Subscribers</h3>
-                {% if coverage_barangays %}
-                    <span class="cx-card__meta">{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
-                {% endif %}
-            </div>
-
+        <div class="cx-card">
             {% if not coverage_barangays %}
             <div class="cx-empty">
                 <i class="bi bi-geo"></i>
@@ -38,184 +27,89 @@
                 <div class="small">No active subscribers found in your assigned barangay(s).</div>
             </div>
             {% else %}
-            <div class="px-4 pt-3 pb-2">
+            <div class="px-3 pt-3 pb-2">
                 <div class="input-group input-group-sm cx-search" style="max-width:none">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" id="coverageRosterSearch" placeholder="Filter subscribers..." autocomplete="off">
+                    <input type="text" class="form-control" id="subSearch" placeholder="Filter subscribers..." autocomplete="off">
                 </div>
             </div>
-            <div class="table-responsive cx-scroll" style="max-height:320px">
-                <table class="table cx-table align-middle" id="coverageRosterTable">
-                    <thead><tr><th>Subscriber</th><th>Address</th><th>Contact</th></tr></thead>
-                    <tbody>
-                        {% for subscriber in coverage_subscribers %}
-                        <tr>
-                            <td>
-                                <div class="cx-person">
-                                    <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
-                                    <div class="text-truncate">
-                                        <div class="cx-person__name text-truncate">{{ subscriber.full_name }}</div>
-                                        <div class="cx-person__sub">{{ subscriber.subscriber_code }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="text-muted small">{{ subscriber.address or "—" }}</td>
-                            <td class="small">{% if subscriber.contact_number %}<i class="bi bi-telephone me-1 text-muted"></i>{{ subscriber.contact_number }}{% else %}—{% endif %}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <ul class="cx-roster cx-names" id="subList">
+                {% for subscriber in coverage_subscribers %}
+                <li>
+                    <button type="button" class="cx-name"
+                            data-bs-toggle="modal" data-bs-target="#subDetailModal"
+                            data-name="{{ subscriber.full_name }}"
+                            data-code="{{ subscriber.subscriber_code }}"
+                            data-address="{{ subscriber.address or '' }}"
+                            data-contact="{{ subscriber.contact_number or '' }}"
+                            data-email="{{ subscriber.email or '' }}"
+                            data-plan="{{ subscriber.plan_type or '' }}"
+                            data-status="{{ subscriber.status or '' }}"
+                            data-installed="{{ subscriber.installed_at.strftime('%b %d, %Y') if subscriber.installed_at else '' }}">
+                        <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
+                        <span class="cx-person__name text-truncate">{{ subscriber.full_name }}</span>
+                        <i class="bi bi-chevron-right ms-auto cx-cover__chev"></i>
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="cx-empty d-none" id="subEmpty"><i class="bi bi-search"></i><div class="small">No subscribers match your filter.</div></div>
             {% endif %}
         </div>
+    </div>
+</div>
+</div>
 
-        <div class="cx-card" id="recordPaymentCard">
-            <div class="cx-card__head">
-                <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span>Record a Payment</h3>
+{# ---------------- SUBSCRIBER DETAIL POPUP (fixed size) ---------------- #}
+<div class="modal fade cx-modal" id="subDetailModal" tabindex="-1" aria-labelledby="subDetailName" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cx">
+            <div class="cx-modal__head">
+                <h3 class="cx-card__title"><span class="cx-avatar" id="subDetailAvatar">?</span><span id="subDetailName" class="text-truncate">Subscriber</span></h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="cx-card__body">
-                <form class="cx-form" method="post" action="{{ url_for('collector.record_payment') }}" novalidate>
-                    {{ form.hidden_tag() }}
-
-                    <div class="cx-step"><span>1</span>Subscriber</div>
-                    <div class="mb-3 position-relative" id="collectorSubscriberWrapper">
-                        <label class="form-label">{{ form.subscriber_id.label }}</label>
-                        <div class="subs-search-form">
-                            <i class="bi bi-search"></i>
-                            <input
-                                type="text" id="collectorSubscriberInput"
-                                placeholder="Search by name, code, or address..."
-                                autocomplete="off"
-                            >
-                        </div>
-                        <div id="collectorSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
-                        {{ form.subscriber_id(class="d-none" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
-                        <div id="collectorSubscriberHelp" class="form-text"></div>
-                        {% for error in form.subscriber_id.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                        {% if coverage_barangays %}
-                            <div class="form-text"><i class="bi bi-geo-alt"></i> Scoped to your coverage: {{ coverage_barangays|join(', ') }}</div>
-                        {% else %}
-                            <div class="form-text text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> No coverage area set — showing all active subscribers.</div>
-                        {% endif %}
-
-                        {# Auto-filled the moment a subscriber is picked above.
-                           Plan/Monthly Fee/Current Balance/Due Date are all
-                           informational only (Monthly Fee comes from the
-                           admin-priced Settings > Plans list; Current Balance
-                           is estimated from it -- see collector.py's
-                           _plan_monthly_fee()/_current_balance() -- both show
-                           "—" for a plan an administrator hasn't priced yet). #}
-                        <dl class="row mb-0 small d-none cx-info" id="collectorSubscriberInfo">
-                            <dt class="col-4 col-sm-3">Plan</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoPlan">—</dd>
-                            <dt class="col-4 col-sm-3">Monthly Fee</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoFee">—</dd>
-                            <dt class="col-4 col-sm-3">Current Balance</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoBalance">—</dd>
-                            <dt class="col-4 col-sm-3">Due Date</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoDueDate">—</dd>
-                        </dl>
-                    </div>
-
-                    <div class="cx-step mt-4"><span>2</span>Payment details</div>
-                    <div class="row g-2">
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.amount.label }}</label>
-                            <div class="input-group collector-amount-group">
-                                <span class="input-group-text">₱</span>
-                                {{ form.amount(class="form-control" ~ (" is-invalid" if form.amount.errors else ""), placeholder="0.00") }}
-                            </div>
-                            {% for error in form.amount.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.payment_method.label }}</label>
-                            {{ form.payment_method(class="form-select" ~ (" is-invalid" if form.payment_method.errors else "")) }}
-                            {% for error in form.payment_method.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div class="row g-2">
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.payment_date.label }}</label>
-                            {{ form.payment_date(class="form-control" ~ (" is-invalid" if form.payment_date.errors else ""), placeholder="YYYY-MM-DD", type="date", id="collectorPaymentDateInput") }}
-                            {% for error in form.payment_date.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.status.label }} <span class="text-muted small">(automatic)</span></label>
-                            <div>
-                                <span class="badge fs-6 text-bg-secondary" id="collectorStatusBadge">Select subscriber &amp; date</span>
-                            </div>
-                            {{ form.status(class="d-none", id="collectorStatusSelect") }}
-                            <div class="form-text" id="collectorStatusHelp"></div>
-                            {% for error in form.status.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    {# Reference Number -- auto-generated the moment a
-                       subscriber is picked above (see collector-payment.js),
-                       shown as plain read-only text with a refresh button
-                       next to it to generate a new one on demand. The real
-                       value submitted with the payment still travels in this
-                       hidden field -- only how it's presented changed. #}
-                    <div class="cx-step mt-4"><span>3</span>Reference &amp; notes</div>
-                    <div class="mb-3">
-                        <label class="form-label">Reference No.</label>
-                        <div class="cx-ref">
-                            <span id="collectorSubInfoReference">—</span>
-                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" id="collectorRefRegenerateBtn" title="Generate a new reference number">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                        </div>
-                        {{ form.reference_number(class="d-none", id="collectorReferenceNumberInput") }}
-                        {% for error in form.reference_number.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">{{ form.remarks.label }} <span class="text-muted small">(optional)</span></label>
-                        {{ form.remarks(class="form-control" ~ (" is-invalid" if form.remarks.errors else ""), rows=2, placeholder="Any notes about this payment...") }}
-                        {% for error in form.remarks.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <button type="submit" class="btn cx-submit">
-                        <i class="bi bi-check-lg me-1"></i>Record Payment
-                    </button>
-                </form>
+            <div class="cx-modal__body">
+                <dl class="cx-detail">
+                    <div><dt>Subscriber Code</dt><dd data-f="code"></dd></div>
+                    <div><dt>Address</dt><dd data-f="address"></dd></div>
+                    <div><dt>Contact Number</dt><dd data-f="contact"></dd></div>
+                    <div><dt>Email</dt><dd data-f="email"></dd></div>
+                    <div><dt>Plan</dt><dd data-f="plan"></dd></div>
+                    <div><dt>Status</dt><dd data-f="status" class="text-capitalize"></dd></div>
+                    <div><dt>Installed</dt><dd data-f="installed"></dd></div>
+                </dl>
             </div>
         </div>
     </div>
-
-</div>
-
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/collector-payment.js') }}"></script>
 <script>
-    // Client-side filter; the list is already scoped server-side to this collector's barangay(s).
     (function () {
-        var input = document.getElementById('coverageRosterSearch');
-        var table = document.getElementById('coverageRosterTable');
-        if (!input || !table) return;
-        input.addEventListener('input', function () {
-            var term = input.value.trim().toLowerCase();
-            table.querySelectorAll('tbody tr').forEach(function (row) {
-                row.style.display = row.textContent.toLowerCase().indexOf(term) !== -1 ? '' : 'none';
+        var modal = document.getElementById('subDetailModal');
+        if (modal) {
+            modal.addEventListener('show.bs.modal', function (e) {
+                var d = e.relatedTarget ? e.relatedTarget.dataset : {};
+                document.getElementById('subDetailName').textContent = d.name || 'Subscriber';
+                document.getElementById('subDetailAvatar').textContent = (d.name || '?').charAt(0).toUpperCase();
+                modal.querySelectorAll('[data-f]').forEach(function (el) {
+                    el.textContent = d[el.getAttribute('data-f')] || '\u2014';
+                });
             });
+        }
+        var input = document.getElementById('subSearch');
+        var list = document.getElementById('subList');
+        var empty = document.getElementById('subEmpty');
+        if (!input || !list) return;
+        input.addEventListener('input', function () {
+            var term = input.value.trim().toLowerCase(), shown = 0;
+            list.querySelectorAll('li').forEach(function (li) {
+                var hit = li.textContent.toLowerCase().indexOf(term) !== -1;
+                li.style.display = hit ? '' : 'none';
+                if (hit) shown++;
+            });
+            if (empty) empty.classList.toggle('d-none', shown !== 0);
         });
     })();
 </script>

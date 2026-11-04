@@ -112,3 +112,16 @@
 .cx-roster__tel { flex:0 0 auto; font-size:.78rem; color:var(--cx-muted); white-space:nowrap; }
 .cx-roster__tel i { margin-right:.3rem; }
 @media (max-width:575.98px){ .cx-roster__tel { display:none; } }
+
+/* ---------- Collections: names list + subscriber detail popup ---------- */
+.cx-names { border-top:1px solid var(--cx-line); }
+.cx-names li { border-bottom:1px solid var(--cx-line); }
+.cx-names li:last-child { border-bottom:0; }
+.cx-name { width:100%; display:flex; align-items:center; gap:.75rem; padding:.8rem 1.1rem; background:transparent; border:0; color:inherit; text-align:left; transition:background .12s; }
+.cx-name:hover, .cx-name:focus-visible { background:rgba(22,132,255,.07); outline:0; }
+.cx-modal__head .cx-card__title { min-width:0; }
+.cx-detail { margin:0; }
+.cx-detail > div { padding:.7rem 0; border-bottom:1px solid var(--cx-line); }
+.cx-detail > div:last-child { border-bottom:0; }
+.cx-detail dt { font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--cx-muted); margin-bottom:.15rem; }
+.cx-detail dd { margin:0; font-weight:600; word-break:break-word; }
