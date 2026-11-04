@@ -18,6 +18,9 @@ collected today, see your own recent history.
 Routes:
     GET  /collector/                -> index        (own recent payments + record form)
     POST /collector/record          -> record_payment
+    GET  /collector/subscriber/<id>/payment.json -> subscriber_payment_json
+                                         (read-only popup on the Dashboard's
+                                         My Recent Collections list)
     GET  /collector/subscribers.json -> subscribers_json (search feed for the
                                          Record a Payment form's searchable
                                          Subscriber field)
@@ -38,43 +41,11 @@ from app.notifications_utils import notify_payment_confirmed
 collector_bp = Blueprint("collector", __name__, url_prefix="/collector")
 
 
-def _estimate_next_due_date(subscriber):
-    """Rough "next due" estimate for the Record a Payment form's
-    auto-fill panel only -- purely informational, never stored
-    anywhere. The schema has no dedicated due-date column at all
-    (see notifications_utils.py's notify_payment_overdue() docstring:
-    a payment's `status` becoming 'overdue' is the only due/overdue
-    signal that exists), so this estimates a 30-day billing cycle from
-    the subscriber's most recent *confirmed* payment, falling back to
-    their install date if they have no confirmed payment yet. Returns
-    None if neither is on file, so the form can show "—" instead of a
-    made-up date.
-    """
-    last_confirmed = (
-        Payment.query.filter_by(subscriber_id=subscriber.id, status="confirmed")
-        .order_by(Payment.payment_date.desc())
-        .first()
-    )
-    anchor = last_confirmed.payment_date if last_confirmed else subscriber.installed_at
-    if anchor is None:
-        return None
-    return anchor + timedelta(days=30)
-
-
-def _payment_status(due_date):
-    """Status shown on the subscriber page's Payment Details popup, worked
-    out on the server from the estimated due date so it updates the moment
-    a payment is recorded (a recorded payment moves the due date 30 days
-    ahead -- see _estimate_next_due_date). Returns the same keys the badge
-    CSS uses: 'confirmed' (Paid), 'pending' (Due today), 'overdue'."""
-    if due_date is None:
-        return "confirmed"
-    if isinstance(due_date, datetime):
-        due_date = due_date.date()
-    today = date.today()
-    if due_date > today:
-        return "confirmed"
-    return "pending" if due_date == today else "overdue"
+def _as_date(value):
+    """date | datetime | None -> date | None."""
+    if isinstance(value, datetime):
+        return value.date()
+    return value
 
 
 def _plan_monthly_fee(plan_type):
@@ -85,8 +56,8 @@ def _plan_monthly_fee(plan_type):
     so this is a case-insensitive name match rather than a join.
     Returns None -- never 0 -- when the subscriber has no plan_type,
     or when it doesn't match a plan an administrator has priced yet
-    (e.g. a legacy free-text value), so the Record a Payment form can
-    show "—" instead of a made-up fee.
+    (e.g. a legacy free-text value), so the popups can show "—"
+    instead of a made-up fee.
     """
     if not plan_type:
         return None
@@ -94,24 +65,86 @@ def _plan_monthly_fee(plan_type):
     return plan.monthly_fee if plan and plan.monthly_fee is not None else None
 
 
-def _current_balance(subscriber, monthly_fee):
-    """Rough "amount currently owed" for the Record a Payment form's
-    auto-fill panel only -- purely informational, same "never stored"
-    scope as `_estimate_next_due_date()` above. The schema has no
-    dedicated dues/invoice ledger, so a subscriber is treated as owing
-    one full billing cycle's fee once that cycle's estimated due date
-    has arrived (today or earlier), and owing nothing while still
-    inside a cycle they've already paid for. Returns None when there's
-    no priced plan to base this on at all.
+def _billing_state(subscriber):
+    """Works out where a subscriber stands in their current 30-day billing
+    cycle, from their confirmed payments. Purely derived -- nothing here
+    is stored (the schema has no invoice/ledger table).
+
+    How it works: confirmed payments are replayed oldest -> newest and
+    added up toward the plan's monthly fee. Once the running total reaches
+    the fee, that cycle is *settled* and the next due date becomes
+    (settling payment's date + 30 days) -- the same rule as before.
+    Anything less than the full fee is a PARTIAL payment: it does NOT move
+    the due date, it just reduces the balance still owed. Extra money
+    beyond one fee carries over (and pre-pays further 30-day cycles).
+
+    If the plan has no priced monthly fee, there's nothing to measure a
+    partial against, so any confirmed payment settles the cycle (the
+    previous behaviour).
+
+    Returns a dict:
+        monthly_fee   Decimal | None
+        due_date      date | None   (None = no payment/install date to anchor to)
+        paid_in_cycle Decimal       paid so far toward the current cycle
+        balance       Decimal | None  still owed right now (None = unpriced plan)
+        status        'confirmed' (Paid) | 'pending' (Due today) |
+                      'overdue' | 'partial'
+        last_payment  Payment | None  (most recent confirmed payment)
     """
-    if monthly_fee is None:
-        return None
-    due_date = _estimate_next_due_date(subscriber)
-    if due_date is None:
-        # No payment/install history to anchor a cycle to yet --
-        # treat as a fresh, currently-unpaid cycle.
-        return monthly_fee
-    return monthly_fee if due_date <= date.today() else Decimal("0.00")
+    fee = _plan_monthly_fee(subscriber.plan_type)
+    payments = (
+        Payment.query.filter_by(subscriber_id=subscriber.id, status="confirmed")
+        .order_by(Payment.payment_date.asc(), Payment.id.asc())
+        .all()
+    )
+
+    anchor = _as_date(subscriber.installed_at)
+    paid = Decimal("0.00")
+    for payment in payments:
+        pay_date = _as_date(payment.payment_date)
+        if fee is None or fee <= 0:
+            anchor, paid = pay_date, Decimal("0.00")
+            continue
+        paid += payment.amount
+        if paid >= fee:
+            anchor = pay_date
+            paid -= fee
+            while paid >= fee:  # a big payment pre-pays further cycles
+                anchor += timedelta(days=30)
+                paid -= fee
+
+    due_date = anchor + timedelta(days=30) if anchor else None
+    today = date.today()
+
+    if fee is None:
+        balance = None
+    elif due_date is None or due_date <= today:
+        balance = max(fee - paid, Decimal("0.00"))
+    else:
+        balance = Decimal("0.00")  # still inside a cycle that is already paid for
+
+    if due_date is None or due_date > today:
+        status = "confirmed"
+    elif paid > 0:
+        status = "partial"
+    else:
+        status = "pending" if due_date == today else "overdue"
+
+    return {
+        "monthly_fee": fee,
+        "due_date": due_date,
+        "paid_in_cycle": paid,
+        "balance": balance,
+        "status": status,
+        "last_payment": payments[-1] if payments else None,
+    }
+
+
+def _estimate_next_due_date(subscriber):
+    """Next due date (see _billing_state). Used by the Collections page's
+    "Due Today" list. None if there is no payment/install date on file, so
+    screens can show "—" instead of a made-up date."""
+    return _billing_state(subscriber)["due_date"]
 
 
 def _coverage_barangays():
@@ -275,19 +308,77 @@ def subscriber_detail(subscriber_id):
     # local date when the popup opens / submits).
     form.payment_date.data = date.today().isoformat()
 
-    due_date = _estimate_next_due_date(subscriber)
-    monthly_fee = _plan_monthly_fee(subscriber.plan_type)
-    current_balance = _current_balance(subscriber, monthly_fee)
+    state = _billing_state(subscriber)
+    due_date = state["due_date"]
     return render_template(
         "collector/subscriber.html",
         subscriber=subscriber,
         form=form,
         due_date_iso=due_date.isoformat() if due_date else "",
         due_date=due_date,
-        monthly_fee=monthly_fee,
-        current_balance=current_balance,
-        pay_status=_payment_status(due_date),
+        monthly_fee=state["monthly_fee"],
+        current_balance=state["balance"],
+        paid_in_cycle=state["paid_in_cycle"],
+        pay_status=state["status"],
     )
+
+
+_STATUS_LABELS = {
+    "confirmed": "Paid",
+    "pending": "Due",
+    "overdue": "Overdue",
+    "partial": "Partial",
+}
+
+
+@collector_bp.route("/subscriber/<int:subscriber_id>/payment.json")
+@role_required("payment_collector")
+def subscriber_payment_json(subscriber_id):
+    """Read-only payment summary shown in the popup that opens when a
+    collector taps a name on the Dashboard's "My Recent Collections" list.
+    Computed fresh on every tap, so a payment (or partial payment) that was
+    just recorded is reflected immediately. Same coverage-area limit as the
+    subscriber page."""
+    barangays = _coverage_barangays()
+    if not barangays:
+        abort(404)
+    subscriber = (
+        _coverage_subscribers_query(barangays).filter(Subscriber.id == subscriber_id).first_or_404()
+    )
+    state = _billing_state(subscriber)
+    last = state["last_payment"]
+    due_date = state["due_date"]
+
+    def money(value):
+        return f"{value:,.2f}" if value is not None else None
+
+    resp = jsonify(
+        {
+            "id": subscriber.id,
+            "full_name": subscriber.full_name,
+            "subscriber_code": subscriber.subscriber_code,
+            "plan_type": subscriber.plan_type,
+            "status": state["status"],
+            "status_label": _STATUS_LABELS[state["status"]],
+            "monthly_fee": money(state["monthly_fee"]),
+            "balance": money(state["balance"]),
+            # Shown only while a partial payment is outstanding.
+            "paid_so_far": money(state["paid_in_cycle"]) if state["status"] == "partial" else None,
+            "due_date": due_date.strftime("%b %d, %Y") if due_date else None,
+            "last_payment": (
+                {
+                    "amount": money(last.amount),
+                    "date": _as_date(last.payment_date).strftime("%b %d, %Y"),
+                    "method": (last.payment_method or "").replace("_", " ").title(),
+                }
+                if last
+                else None
+            ),
+            "detail_url": url_for("collector.subscriber_detail", subscriber_id=subscriber.id),
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @collector_bp.route("/record", methods=["POST"])
@@ -371,9 +462,8 @@ def subscribers_json():
     subscribers = _coverage_subscribers_query(barangays).order_by(Subscriber.full_name).all()
     data = []
     for s in subscribers:
-        due_date = _estimate_next_due_date(s)
-        monthly_fee = _plan_monthly_fee(s.plan_type)
-        current_balance = _current_balance(s, monthly_fee)
+        state = _billing_state(s)
+        due_date, monthly_fee, current_balance = state["due_date"], state["monthly_fee"], state["balance"]
         data.append(
             {
                 "id": s.id,

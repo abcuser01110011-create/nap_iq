@@ -144,3 +144,28 @@
 .cx-names--due { max-height:240px; overflow-y:auto; }
 .cx-brgy-select { min-height:44px; border-radius:14px; border-color:var(--cx-line); font-weight:600; background-color:var(--cx-surface); }
 .cx-brgy-select:focus { border-color:var(--cx-sky); box-shadow:0 0 0 .22rem rgba(22,132,255,.16); }
+
+/* Payment status pill + payment info rows (subscriber page popup AND the
+   read-only popup on the Dashboard's My Recent Collections list). */
+.cx-status { display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .75rem; border-radius:999px;
+             font-size:.85rem; font-weight:600; background:#e9ecef; color:#495057; }
+.cx-status::before { content:""; width:.6rem; height:.6rem; border-radius:50%; background:currentColor; }
+.cx-status--confirmed { background:#e3f6ec; color:#15803d; }
+.cx-status--pending   { background:#fff4d6; color:#a16207; }
+.cx-status--overdue   { background:#fde4e4; color:#c62828; }
+.cx-status--partial   { background:#e3efff; color:#1046B8; }
+[data-bs-theme="dark"] .cx-status { background:#2b3138; color:#c7ccd1; }
+[data-bs-theme="dark"] .cx-status--confirmed { background:#12351f; color:#5fd68a; }
+[data-bs-theme="dark"] .cx-status--pending   { background:#3b300f; color:#f2c555; }
+[data-bs-theme="dark"] .cx-status--overdue   { background:#3d1717; color:#ff8a8a; }
+[data-bs-theme="dark"] .cx-status--partial   { background:#14284d; color:#7FB4FF; }
+
+.cx-pay-info > div { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.55rem 0; border-bottom:1px solid var(--cx-line, #e5e7eb); }
+.cx-pay-info > div:last-child { border-bottom:0; }
+.cx-pay-info .k { color:var(--cx-muted, #6c757d); font-size:.85rem; }
+.cx-pay-info .v { font-weight:600; text-align:right; }
+
+/* Read-only payment popup (Dashboard) */
+.cx-modal--info .modal-content { height:min(470px, calc(100vh - 2rem)); }
+.cx-modal--info .cx-modal__foot .btn { text-decoration:none; }
+.cx-modal--info .cx-modal__sub { font-size:.78rem; color:var(--cx-muted); }

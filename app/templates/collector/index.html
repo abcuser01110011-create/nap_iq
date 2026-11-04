@@ -130,11 +130,13 @@
         {% for subscriber in recent_subscribers %}
         <li>
             {% if subscriber.id in linkable_ids %}
-            <a class="cx-name text-decoration-none" href="{{ url_for('collector.subscriber_detail', subscriber_id=subscriber.id) }}">
+            <button type="button" class="cx-name js-payment-popup"
+                    data-payment-url="{{ url_for('collector.subscriber_payment_json', subscriber_id=subscriber.id) }}"
+                    data-name="{{ subscriber.full_name }}" aria-haspopup="dialog">
                 <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
                 <span class="cx-person__name text-truncate">{{ subscriber.full_name }}</span>
                 <i class="bi bi-chevron-right ms-auto cx-cover__chev"></i>
-            </a>
+            </button>
             {% else %}
             <div class="cx-name">
                 <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
@@ -185,5 +187,38 @@
         </div>
     </div>
 </div>
+
+{# ---------------- PAYMENT DETAILS POPUP (read-only) ---------------- #}
+<div class="modal fade cx-modal cx-modal--info" id="recentPaymentModal" tabindex="-1" aria-labelledby="recentPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cx">
+            <div class="cx-modal__head">
+                <h3 class="cx-card__title" id="recentPaymentModalLabel"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span><span class="text-truncate" id="rpmName">Payment Details</span></h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="cx-modal__body pt-3">
+                <div class="cx-empty py-4 d-none" id="rpmError"><i class="bi bi-exclamation-triangle"></i><div class="small">Couldn&rsquo;t load the payment details. Please try again.</div></div>
+                <div id="rpmLoading" class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading&hellip;</div>
+                <div id="rpmContent" class="d-none">
+                    <div class="mb-1"><span class="cx-status" id="rpmStatus"></span></div>
+                    <div class="cx-modal__sub mb-2" id="rpmSub"></div>
+                    <div class="cx-pay-info">
+                        <div><span class="k">Monthly fee</span><span class="v" id="rpmFee">&mdash;</span></div>
+                        <div class="d-none" id="rpmPaidRow"><span class="k">Paid so far</span><span class="v" id="rpmPaid">&mdash;</span></div>
+                        <div><span class="k">Balance</span><span class="v" id="rpmBalance">&mdash;</span></div>
+                        <div><span class="k">Due date</span><span class="v" id="rpmDue">&mdash;</span></div>
+                        <div><span class="k">Last payment</span><span class="v" id="rpmLast">&mdash;</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="cx-modal__foot">
+                <a class="btn cx-submit d-none" id="rpmOpen" href="#"><i class="bi bi-plus-lg me-1"></i>Add payment</a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/collector-recent-popup.js') }}"></script>
+{% endblock %}

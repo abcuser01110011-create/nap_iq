@@ -7,23 +7,6 @@
 
 {% block extra_head %}
 <link href="{{ url_for('static', filename='css/collector-theme.css') }}" rel="stylesheet">
-<style>
-    /* Simple status pill: coloured dot + label (matches the Subscribers list). */
-    .cx-status { display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .75rem; border-radius:999px;
-                 font-size:.85rem; font-weight:600; background:#e9ecef; color:#495057; }
-    .cx-status::before { content:""; width:.6rem; height:.6rem; border-radius:50%; background:currentColor; }
-    .cx-status--confirmed { background:#e3f6ec; color:#15803d; }
-    .cx-status--pending   { background:#fff4d6; color:#a16207; }
-    .cx-status--overdue   { background:#fde4e4; color:#c62828; }
-    .cx-pay-info > div { display:flex; justify-content:space-between; align-items:center; padding:.45rem 0; border-bottom:1px solid var(--cx-line, #e5e7eb); }
-    .cx-pay-info > div:last-child { border-bottom:0; }
-    .cx-pay-info .k { color:var(--cx-muted, #6c757d); font-size:.85rem; }
-    .cx-pay-info .v { font-weight:600; }
-    [data-bs-theme="dark"] .cx-status { background:#2b3138; color:#c7ccd1; }
-    [data-bs-theme="dark"] .cx-status--confirmed { background:#12351f; color:#5fd68a; }
-    [data-bs-theme="dark"] .cx-status--pending   { background:#3b300f; color:#f2c555; }
-    [data-bs-theme="dark"] .cx-status--overdue   { background:#3d1717; color:#ff8a8a; }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -72,11 +55,12 @@
 
                 <div class="cx-modal__body pt-3">
                     <div class="mb-3">
-                        <span class="cx-status cx-status--{{ pay_status }}" id="collectorStatusBadge">{{ {'confirmed': 'Paid', 'pending': 'Due', 'overdue': 'Overdue'}[pay_status] }}</span>
+                        <span class="cx-status cx-status--{{ pay_status }}" id="collectorStatusBadge">{{ {'confirmed': 'Paid', 'pending': 'Due', 'overdue': 'Overdue', 'partial': 'Partial'}[pay_status] }}</span>
                     </div>
 
                     <div class="cx-pay-info mb-3">
                         <div><span class="k">Monthly fee</span><span class="v">{% if monthly_fee is not none %}&#8369;{{ '{:,.2f}'.format(monthly_fee) }}{% else %}&mdash;{% endif %}</span></div>
+                        {% if pay_status == 'partial' %}<div><span class="k">Paid so far</span><span class="v">&#8369;{{ '{:,.2f}'.format(paid_in_cycle) }}</span></div>{% endif %}
                         <div><span class="k">Balance</span><span class="v">{% if current_balance is not none %}&#8369;{{ '{:,.2f}'.format(current_balance) }}{% else %}&mdash;{% endif %}</span></div>
                         <div><span class="k">Due date</span><span class="v">{{ due_date.strftime('%b %d, %Y') if due_date else '—' }}</span></div>
                     </div>
