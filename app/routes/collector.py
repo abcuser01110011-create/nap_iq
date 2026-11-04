@@ -180,15 +180,10 @@ def index():
         .limit(20)
         .all()
     )
-    coverage_subscribers = (
-        _coverage_subscribers_query(coverage_barangays).order_by(Subscriber.full_name).all()
-        if coverage_barangays else []
-    )
 
     return render_template(
         "collector/index.html",
         coverage_barangays=coverage_barangays,
-        coverage_subscribers=coverage_subscribers,
         recent_payments=recent_payments,
         collected_today=collected_today,
         collected_this_month=collected_this_month,

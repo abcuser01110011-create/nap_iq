@@ -75,14 +75,6 @@
     <span class="cx-card__icon"><i class="bi bi-geo-alt-fill"></i></span>
     <span class="cx-cover__body">
         <span class="cx-cover__title">My Coverage Area</span>
-        {% if coverage_barangays %}
-        <span class="cx-cover__chips">
-            {% for barangay in coverage_barangays[:3] %}<span class="cx-brgy"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>{% endfor %}
-            {% if coverage_barangays|length > 3 %}<span class="cx-brgy">+{{ coverage_barangays|length - 3 }} more</span>{% endif %}
-        </span>
-        {% else %}
-        <span class="cx-cover__sub text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-1"></i>No coverage area assigned yet</span>
-        {% endif %}
     </span>
     <span class="cx-cover__count">{{ subscriber_count }}<small>subscriber{{ '' if subscriber_count == 1 else 's' }}</small></span>
     <i class="bi bi-chevron-right cx-cover__chev"></i>
@@ -183,78 +175,27 @@
                 <h3 class="cx-card__title" id="coverageModalLabel"><span class="cx-card__icon"><i class="bi bi-geo-alt-fill"></i></span>My Coverage Area</h3>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-
-            {% if not coverage_barangays %}
-            <div class="cx-modal__body d-flex align-items-center justify-content-center">
+            <div class="cx-modal__body">
+                {% if coverage_barangays %}
+                <p class="cx-card__meta mb-2">Assigned barangay{{ '' if coverage_barangays|length == 1 else 's' }}</p>
+                <ul class="cx-roster">
+                    {% for barangay in coverage_barangays %}
+                    <li class="cx-roster__item">
+                        <span class="cx-avatar"><i class="bi bi-geo-alt-fill"></i></span>
+                        <div class="cx-roster__info"><div class="cx-person__name text-truncate">{{ barangay }}</div></div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
                 <div class="cx-empty">
                     <i class="bi bi-geo"></i>
                     <div class="fw-semibold">No coverage area assigned</div>
                     <div class="small">Ask an administrator to set one from the Collectors tab.</div>
                 </div>
-            </div>
-            {% else %}
-            <div class="cx-modal__top">
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                    {% for barangay in coverage_barangays %}
-                        <span class="cx-brgy"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>
-                    {% endfor %}
-                </div>
-                <div class="d-flex align-items-center justify-content-between gap-2">
-                    <span class="cx-card__meta">{{ subscriber_count }} subscriber{{ '' if subscriber_count == 1 else 's' }}</span>
-                    {% if coverage_subscribers %}
-                    <div class="input-group input-group-sm cx-search">
-                        <span class="input-group-text"><i class="bi bi-search"></i></span>
-                        <input type="text" class="form-control" id="coverageRosterSearch" placeholder="Filter subscribers..." autocomplete="off">
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="cx-modal__body">
-                {% if coverage_subscribers %}
-                <ul class="cx-roster" id="coverageRoster">
-                    {% for subscriber in coverage_subscribers %}
-                    <li class="cx-roster__item">
-                        <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
-                        <div class="cx-roster__info">
-                            <div class="cx-person__name text-truncate">{{ subscriber.full_name }}</div>
-                            <div class="cx-person__sub text-truncate">{{ subscriber.subscriber_code }}{% if subscriber.address %} &middot; {{ subscriber.address }}{% endif %}</div>
-                        </div>
-                        {% if subscriber.contact_number %}<span class="cx-roster__tel"><i class="bi bi-telephone"></i>{{ subscriber.contact_number }}</span>{% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
-                <div class="cx-empty d-none" id="coverageRosterEmpty"><i class="bi bi-search"></i><div class="small">No subscribers match your filter.</div></div>
-                {% else %}
-                <div class="cx-empty">
-                    <i class="bi bi-people"></i>
-                    <div class="fw-semibold">No subscribers yet</div>
-                    <div class="small">No active subscribers found in your assigned barangay(s).</div>
-                </div>
                 {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_scripts %}
-<script>
-    (function () {
-        var input = document.getElementById('coverageRosterSearch');
-        var list = document.getElementById('coverageRoster');
-        var empty = document.getElementById('coverageRosterEmpty');
-        if (!input || !list) return;
-        input.addEventListener('input', function () {
-            var term = input.value.trim().toLowerCase(), shown = 0;
-            list.querySelectorAll('.cx-roster__item').forEach(function (li) {
-                var hit = li.textContent.toLowerCase().indexOf(term) !== -1;
-                li.style.display = hit ? '' : 'none';
-                if (hit) shown++;
-            });
-            if (empty) empty.classList.toggle('d-none', shown !== 0);
-        });
-    })();
-</script>
-{% endblock %}

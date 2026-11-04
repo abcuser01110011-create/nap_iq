@@ -98,8 +98,8 @@
 @media (max-width:575.98px){ .cx-cover { gap:.65rem; padding:.8rem .9rem; } .cx-cover__count small { display:none; } }
 
 /* ---------- Coverage popup: fixed size ---------- */
-.cx-modal .modal-dialog { width:min(540px, calc(100vw - 1.5rem)); max-width:none; margin-left:auto; margin-right:auto; }
-.cx-modal .modal-content { height:min(620px, calc(100vh - 2rem)); display:flex; flex-direction:column; overflow:hidden;
+.cx-modal .modal-dialog { width:min(400px, calc(100vw - 1.5rem)); max-width:none; margin-left:auto; margin-right:auto; }
+.cx-modal .modal-content { height:min(380px, calc(100vh - 2rem)); display:flex; flex-direction:column; overflow:hidden;
     background:var(--cx-surface); border:1px solid var(--cx-line); border-radius:20px; box-shadow:0 30px 70px -25px rgba(6,23,71,.6); }
 .cx-modal__head { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:1rem 1.25rem; border-bottom:1px solid var(--cx-line); }
 .cx-modal__top { flex:0 0 auto; padding:.9rem 1.25rem; border-bottom:1px solid var(--cx-line); }
