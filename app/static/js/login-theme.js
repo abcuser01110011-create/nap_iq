@@ -30,7 +30,7 @@
         btn.addEventListener("click", function () {
             var next = current() === "dark" ? "light" : "dark";
             apply(next);
-            try { localStorage.setItem(KEY, next); } catch (e) { /* private mode: just don't remember */ }
+            try { localStorage.setItem(KEY, next); localStorage.setItem("napiq-theme", next); } catch (e) { /* private mode: just don't remember */ }
         });
     });
 })();

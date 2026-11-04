@@ -23,6 +23,11 @@
         })();
     </script>
 
+        <script>
+        /* Remember the signed-in theme in this browser so the public landing
+           page and the login page match it after logout. */
+        try { localStorage.setItem("napiq-theme", document.documentElement.getAttribute("data-bs-theme") === "dark" ? "dark" : "light"); } catch (e) {}
+    </script>
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
     <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48.png') }}">

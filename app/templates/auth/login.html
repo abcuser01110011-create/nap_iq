@@ -15,10 +15,10 @@
 
     <link href="{{ url_for('static', filename='vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <script>
-        /* Apply the saved (or device-preferred) theme before first paint -- no flash. */
+        /* Apply the remembered theme (last signed-in/chosen) before first paint -- no flash. */
         (function () {
             try {
-                var t = localStorage.getItem("napiq-login-theme");
+                var t = localStorage.getItem("napiq-theme") || localStorage.getItem("napiq-login-theme");
                 if (t !== "dark" && t !== "light") {
                     t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
                 }

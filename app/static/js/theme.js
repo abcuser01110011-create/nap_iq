@@ -53,6 +53,8 @@
         }, FADE_DURATION_MS);
 
         root.setAttribute("data-bs-theme", theme);
+        // Remember it in this browser so the landing/login pages match after logout.
+        try { localStorage.setItem("napiq-theme", theme); } catch (e) {}
         syncToggleControls(theme);
         window.dispatchEvent(
             new CustomEvent("napiq:theme-changed", { detail: { theme: theme } })
