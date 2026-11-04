@@ -314,9 +314,12 @@
    recoloured for the light background. They sit above the frosted disc
    and fade fully out each cycle, so nothing lingers between pulses. */
 .auth-transition-overlay--staff .auth-transition-ping {
+    /* Same 2.5px line as the customer overlay's rings -- no glow/shadow,
+       so the visible thickness matches too. Solid colour (rather than
+       the customer ring's translucent blue) keeps it readable on the
+       light background. */
     border: 2.5px solid #1f5fe8;
-    /* Thin line, so the glow does the work of keeping it visible. */
-    box-shadow: 0 0 6px rgba(31, 95, 232, 0.85), 0 0 20px rgba(47, 109, 240, 0.55), inset 0 0 12px rgba(47, 109, 240, 0.35);
+    box-shadow: none;
     animation: authTransitionPingStaff 0.6s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
 }
 
