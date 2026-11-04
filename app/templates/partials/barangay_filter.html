@@ -16,7 +16,7 @@
                    aria-label="Search barangay" autocomplete="off">
         </div>
         <div class="brgy-list" role="listbox">
-            <button type="button" class="dropdown-item brgy-item {{ 'active' if not barangay_filter else '' }}" data-value="">All Barangays</button>
+            <button type="button" class="dropdown-item brgy-item {{ 'active' if not barangay_filter else '' }}" data-value="">All</button>
             {% for name in barangays %}
             <button type="button" class="dropdown-item brgy-item {{ 'active' if barangay_filter == name else '' }}" data-value="{{ name }}">{{ name }}</button>
             {% endfor %}
