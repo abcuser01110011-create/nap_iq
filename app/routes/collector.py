@@ -202,10 +202,24 @@ def collections():
         _coverage_subscribers_query(coverage_barangays).order_by(Subscriber.full_name).all()
         if coverage_barangays else []
     )
+
+    # "Due Today": subscribers whose estimated next due date (30 days after
+    # their last confirmed payment, or after install -- see
+    # _estimate_next_due_date) is today.
+    today = date.today()
+    due_today = []
+    for subscriber in coverage_subscribers:
+        due = _estimate_next_due_date(subscriber)
+        if isinstance(due, datetime):
+            due = due.date()
+        if due == today:
+            due_today.append(subscriber)
+
     return render_template(
         "collector/collections.html",
         coverage_barangays=coverage_barangays,
         coverage_subscribers=coverage_subscribers,
+        due_today=due_today,
     )
 
 

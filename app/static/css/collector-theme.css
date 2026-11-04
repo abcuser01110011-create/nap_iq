@@ -139,3 +139,8 @@
 .cx-actions .btn { flex:1 1 0; min-height:46px; border-radius:999px; font-weight:650; display:inline-flex; align-items:center; justify-content:center; width:auto; }
 .cx-modal--form .modal-content { height:min(560px, calc(100vh - 2rem)); }
 .cx-modal--form form { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+
+/* Collections: Due Today list + barangay filter */
+.cx-names--due { max-height:240px; overflow-y:auto; }
+.cx-brgy-select { min-height:44px; border-radius:14px; border-color:var(--cx-line); font-weight:600; background-color:var(--cx-surface); }
+.cx-brgy-select:focus { border-color:var(--cx-sky); box-shadow:0 0 0 .22rem rgba(22,132,255,.16); }
