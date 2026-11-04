@@ -59,6 +59,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 
 from app.extensions import db
 from app.query_utils import filter_enum_eq
+from app.barangay_utils import barangay_options, extract_barangay
 from app.auth import role_required
 from app.models import Payment, Subscriber, Plan
 from app.forms import RecordPaymentForm
@@ -136,6 +137,7 @@ def list_payments():
     status_filter = request.args.get("status", "").strip()
     if status_filter not in BILLING_STATUS_LABELS:
         status_filter = ""
+    barangay_filter = request.args.get("barangay", "").strip()
 
     fees = {
         (p.name or "").strip().lower(): float(p.monthly_fee)
@@ -165,6 +167,7 @@ def list_payments():
     )
 
     subscribers = Subscriber.query.options(joinedload(Subscriber.nap)).order_by(Subscriber.full_name).all()
+    barangays = barangay_options(s.address for s in subscribers)
     rows = []
     for sub in subscribers:
         has_activity = sub.id in paid_by or sub.id in pending_by
@@ -197,6 +200,7 @@ def list_payments():
 
         rows.append({
             "sub": sub,
+            "barangay": extract_barangay(sub.address),
             "fee": fee,
             "paid": paid,
             "pending": pending,
@@ -235,6 +239,8 @@ def list_payments():
         counts=counts,
         status_labels=BILLING_STATUS_LABELS,
         status_filter=status_filter,
+        barangays=barangays,
+        barangay_filter=barangay_filter,
         month=first,
         month_value=_month_key(first),
         prev_month=_month_key(prev_month),

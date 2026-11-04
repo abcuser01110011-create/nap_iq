@@ -1,0 +1,26 @@
+{# Barangay dropdown with a built-in search box.
+   Shared by Subscribers and Payments. Expects:
+     barangays        list of barangay names
+     barangay_filter  currently selected barangay ('' = All)
+   Rows being filtered must carry data-barangay="<name>".
+   Behaviour lives in static/js/barangay-filter.js. #}
+<div class="dropdown brgy-filter" id="barangayFilter" data-selected="{{ barangay_filter or '' }}">
+    <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle brgy-btn"
+            id="barangayFilterBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+        <i class="bi bi-geo-alt me-1"></i><span class="brgy-label">{{ barangay_filter or 'All Barangays' }}</span>
+    </button>
+    <div class="dropdown-menu brgy-menu" aria-labelledby="barangayFilterBtn">
+        <div class="brgy-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="barangayFilterSearch" placeholder="Search barangay..."
+                   aria-label="Search barangay" autocomplete="off">
+        </div>
+        <div class="brgy-list" role="listbox">
+            <button type="button" class="dropdown-item brgy-item {{ 'active' if not barangay_filter else '' }}" data-value="">All Barangays</button>
+            {% for name in barangays %}
+            <button type="button" class="dropdown-item brgy-item {{ 'active' if barangay_filter == name else '' }}" data-value="{{ name }}">{{ name }}</button>
+            {% endfor %}
+            <div class="brgy-empty d-none">No barangay found</div>
+        </div>
+    </div>
+</div>

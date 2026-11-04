@@ -41,6 +41,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 
 from app.extensions import db
 from app.query_utils import filter_enum_eq
+from app.barangay_utils import barangay_options, extract_barangay
 from app.auth import role_required
 from app.models import Subscriber, Nap, Plan, ServiceRequest
 from app.forms import SubscriberForm, MapQuickInstallSubscriberForm
@@ -87,6 +88,7 @@ def list_subscribers():
     (?q=...&status=...)."""
     search_term = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
+    barangay_filter = request.args.get("barangay", "").strip()
 
     query = Subscriber.query
 
@@ -104,6 +106,10 @@ def list_subscribers():
         query = filter_enum_eq(query, Subscriber.status, status_filter)
 
     subscribers = query.order_by(Subscriber.full_name.asc()).all()
+
+    # Barangay dropdown options come from every subscriber's address, so the
+    # list doesn't shrink when a search/status filter is active.
+    barangays = barangay_options(a for (a,) in db.session.query(Subscriber.address).all())
 
     # "Installation Request" dropdown: surfaces new_installation
     # requests still sitting in 'pending' -- i.e. an applicant who
@@ -135,6 +141,9 @@ def list_subscribers():
         subscribers=subscribers,
         search_term=search_term,
         status_filter=status_filter,
+        barangays=barangays,
+        barangay_of={s.id: extract_barangay(s.address) for s in subscribers},
+        barangay_filter=barangay_filter,
         pending_installation_requests=pending_installation_requests,
     )
 

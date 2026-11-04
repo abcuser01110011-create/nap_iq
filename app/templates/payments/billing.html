@@ -4,6 +4,7 @@
 {% block extra_head %}
 <link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/payments.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/barangay-filter.css') }}" rel="stylesheet">
 {% endblock %}
 {% block page_title %}Payments{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0" id="paymentsRecordCount" data-lf-count data-lf-noun="subscriber">{{ rows|length }} subscriber{{ '' if rows|length == 1 else 's' }} &middot; {{ month.strftime('%B %Y') }}</p>{% endblock %}
@@ -53,19 +54,23 @@
                autocomplete="off" data-lf-search onkeydown="if (event.key === 'Enter') event.preventDefault();">
     </div>
 
+    {# Barangay dropdown (All by default) -- filters the rows client-side #}
+    {% include "partials/barangay_filter.html" %}
+
     <form method="get" action="{{ url_for('payments.list_payments') }}" class="pay-month">
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
-        <a class="pay-month-nav" href="{{ url_for('payments.list_payments', month=prev_month, status=status_filter) }}" title="Previous month" aria-label="Previous month"><i class="bi bi-chevron-left"></i></a>
+        {% if barangay_filter %}<input type="hidden" name="barangay" value="{{ barangay_filter }}">{% endif %}
+        <a class="pay-month-nav" href="{{ url_for('payments.list_payments', month=prev_month, status=status_filter, barangay=barangay_filter or None) }}" title="Previous month" aria-label="Previous month"><i class="bi bi-chevron-left"></i></a>
         <label class="pay-month-label"><i class="bi bi-calendar3"></i>
             <input type="month" name="month" value="{{ month_value }}" max="{{ current_month }}" onchange="this.form.submit()" aria-label="Billing month">
         </label>
-        <a class="pay-month-nav {{ 'is-disabled' if is_current_month else '' }}" href="{{ url_for('payments.list_payments', month=next_month, status=status_filter) }}" title="Next month" aria-label="Next month"><i class="bi bi-chevron-right"></i></a>
+        <a class="pay-month-nav {{ 'is-disabled' if is_current_month else '' }}" href="{{ url_for('payments.list_payments', month=next_month, status=status_filter, barangay=barangay_filter or None) }}" title="Next month" aria-label="Next month"><i class="bi bi-chevron-right"></i></a>
     </form>
 
     <div class="subs-pill-group" role="group" aria-label="Filter by billing status">
         {% for key in pill_order %}
             <a class="subs-pill {{ 'subs-pill-active' if status_filter == key else '' }}"
-               href="{{ url_for('payments.list_payments', month=month_value, status=key) }}">{{ status_labels[key] }}<span class="pay-count">{{ counts[key] }}</span></a>
+               href="{{ url_for('payments.list_payments', month=month_value, status=key, barangay=barangay_filter or None) }}">{{ status_labels[key] }}<span class="pay-count">{{ counts[key] }}</span></a>
         {% endfor %}
     </div>
 
@@ -95,6 +100,7 @@
                 {% set sub = r.sub %}
                 {% set initials = (sub.full_name.split()|map('first')|list)[:2]|join|upper %}
                 <tr class="disp-row disp-row-clickable lf-row"
+                    data-barangay="{{ r.barangay }}"
                     data-search="{{ [sub.full_name, sub.subscriber_code, sub.plan_type, sub.nap.nap_code if sub.nap else '', r.status]|select|join(' ')|lower }}"
                     data-history="{{ url_for('payments.subscriber_history', subscriber_id=sub.id) }}">
                     <td>
@@ -169,6 +175,7 @@
         <div class="modal-content pay-receipt" id="paymentHistoryContent"></div>
     </div>
 </div>
+<script src="{{ url_for('static', filename='js/barangay-filter.js') }}?v={{ asset_version('js/barangay-filter.js') }}"></script>
 <script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>
 <script src="{{ url_for('static', filename='js/payments.js') }}?v={{ asset_version('js/payments.js') }}"></script>
 {% endblock %}

@@ -71,7 +71,7 @@
         matches.slice(start, end).forEach(function (row) { row.classList.remove('d-none'); });
 
         if (counter) {
-            var term = input ? input.value.trim() : '';
+            var term = (input ? input.value.trim() : '') || (window.NapiqBarangay ? window.NapiqBarangay.value() : '');
             counter.textContent = term
                 ? total + ' ' + noun + (total === 1 ? '' : 's') + ' shown'
                 : originalCount;
@@ -107,19 +107,22 @@
 
     function applyFilter() {
         var term = input ? input.value.trim().toLowerCase() : '';
+        var brgy = window.NapiqBarangay;
         matches = rows.filter(function (row) {
-            return !term || (row.dataset.search || row.textContent.toLowerCase()).indexOf(term) !== -1;
+            return (!term || (row.dataset.search || row.textContent.toLowerCase()).indexOf(term) !== -1)
+                && (!brgy || brgy.matches(row));
         });
         page = 1;
         if (noMatchRow) {
-            var showEmpty = term && matches.length === 0;
+            var showEmpty = matches.length === 0 && (term || (brgy && brgy.value()));
             noMatchRow.classList.toggle('d-none', !showEmpty);
-            if (showEmpty && noMatchQuery) noMatchQuery.textContent = input.value.trim();
+            if (showEmpty && noMatchQuery) noMatchQuery.textContent = (input ? input.value.trim() : '') || (brgy ? brgy.value() : '');
         }
         render();
     }
 
     if (input) input.addEventListener('input', applyFilter);
+    document.addEventListener('barangay:change', applyFilter);
     applyFilter();
 
     // ---- Fit-to-screen row height ----

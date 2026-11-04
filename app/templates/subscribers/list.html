@@ -3,6 +3,7 @@
 {% block body_class %}subs-fit{% endblock %}
 {% block extra_head %}
 <link href="{{ url_for('static', filename='css/subscribers-fit.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/barangay-filter.css') }}" rel="stylesheet">
 {% endblock %}
 {% block page_title %}Subscribers{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0" id="subsRecordCount">{{ subscribers|length }} record{{ '' if subscribers|length == 1 else 's' }}</p>{% endblock %}
@@ -19,6 +20,7 @@
 <div class="subs-filterbar">
     <form method="get" action="{{ url_for('subscribers.list_subscribers') }}" class="subs-search-form" id="subsSearchForm">
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        {% if barangay_filter %}<input type="hidden" name="barangay" value="{{ barangay_filter }}">{% endif %}
         <i class="bi bi-search"></i>
         <input
             type="text" name="q" id="subsSearchInput"
@@ -28,6 +30,9 @@
             autocomplete="off"
         >
     </form>
+
+    {# Barangay dropdown (All by default) -- filters the rows client-side, #}
+    {% include "partials/barangay_filter.html" %}
 
     {# "Installation Request" dropdown -- surfaces new_installation
        requests still in 'pending' (an applicant who applied via the
@@ -63,7 +68,7 @@
         {% for value, label in status_options %}
             <a
                 class="subs-pill {{ 'subs-pill-active' if status_filter == value else '' }}"
-                href="{{ url_for('subscribers.list_subscribers', q=search_term, status=value) }}"
+                href="{{ url_for('subscribers.list_subscribers', q=search_term, status=value, barangay=barangay_filter or None) }}"
             >{{ label }}</a>
         {% endfor %}
     </div>
@@ -94,7 +99,7 @@
                     subscriber.user.username if subscriber.user else "",
                     subscriber.status|replace('_', ' '),
                 ]|select|join(' ')|lower %}
-                <tr class="subs-row" data-search="{{ search_blob }}" data-detail-url="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id, partial=1) }}" style="cursor: pointer;">
+                <tr class="subs-row" data-search="{{ search_blob }}" data-barangay="{{ barangay_of.get(subscriber.id, '') }}" data-detail-url="{{ url_for('subscribers.view_subscriber', subscriber_id=subscriber.id, partial=1) }}" style="cursor: pointer;">
                     <td>
                         <div class="subs-name">{{ subscriber.full_name }}</div>
                         <div class="subs-subtext">{{ subscriber.address or "No address on file" }}</div>
@@ -244,6 +249,7 @@
     })();
 </script>
 
+<script src="{{ url_for('static', filename='js/barangay-filter.js') }}?v={{ asset_version('js/barangay-filter.js') }}"></script>
 <script>
     // Instant client-side filtering as the admin types — filters the
     // rows already on the page (name, address, code, connected NAP,
@@ -338,21 +344,23 @@
         function applyFilter() {
             var term = input.value.trim().toLowerCase();
             matches = rows.filter(function (row) {
-                return !term || (row.dataset.search || '').indexOf(term) !== -1;
+                return (!term || (row.dataset.search || '').indexOf(term) !== -1)
+                    && (!window.NapiqBarangay || window.NapiqBarangay.matches(row));
             });
             page = 1;
 
             if (noMatchRow) {
-                var showEmpty = term && matches.length === 0;
+                var showEmpty = matches.length === 0;
                 noMatchRow.classList.toggle('d-none', !showEmpty);
                 if (showEmpty && noMatchQuery) {
-                    noMatchQuery.textContent = input.value.trim();
+                    noMatchQuery.textContent = input.value.trim() || (window.NapiqBarangay ? window.NapiqBarangay.value() : '');
                 }
             }
             render();
         }
 
         input.addEventListener('input', applyFilter);
+        document.addEventListener('barangay:change', applyFilter);
         applyFilter();
 
         // No-JS / slow-typist fallback: Enter still submits a real
