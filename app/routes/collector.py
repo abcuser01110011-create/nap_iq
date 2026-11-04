@@ -169,12 +169,27 @@ def _kpis(coverage_barangays):
 @collector_bp.route("/")
 @role_required("payment_collector")
 def index():
-    """Collector home (Dashboard): greeting card + the four KPI cards."""
+    """Collector home (Dashboard): greeting card, My Coverage Area (opens a
+    popup), the four KPI cards and the collector's own recent collections."""
     coverage_barangays = _coverage_barangays()
     collected_today, collected_this_month, pending_count, subscriber_count = _kpis(coverage_barangays)
+
+    recent_payments = (
+        Payment.query.filter_by(collector_id=g.user.id)
+        .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    coverage_subscribers = (
+        _coverage_subscribers_query(coverage_barangays).order_by(Subscriber.full_name).all()
+        if coverage_barangays else []
+    )
+
     return render_template(
         "collector/index.html",
         coverage_barangays=coverage_barangays,
+        coverage_subscribers=coverage_subscribers,
+        recent_payments=recent_payments,
         collected_today=collected_today,
         collected_this_month=collected_this_month,
         pending_count=pending_count,
@@ -185,31 +200,14 @@ def index():
 @collector_bp.route("/collections")
 @role_required("payment_collector")
 def collections():
-    """My Collections: the record-a-payment form, the signed-in collector's
-    own recent payments, and the subscriber roster for their assigned
-    Coverage Area (see _coverage_barangays() above)."""
+    """My Collections: the record-a-payment form (recent collections and the
+    coverage area now live on the Dashboard)."""
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
-
-    recent_payments = (
-        Payment.query.filter_by(collector_id=g.user.id)
-        .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
-        .limit(20)
-        .all()
-    )
-
-    coverage_barangays = _coverage_barangays()
-    coverage_subscribers = (
-        _coverage_subscribers_query(coverage_barangays).order_by(Subscriber.full_name).all()
-        if coverage_barangays else []
-    )
-
     return render_template(
         "collector/collections.html",
         form=form,
-        recent_payments=recent_payments,
-        coverage_barangays=coverage_barangays,
-        coverage_subscribers=coverage_subscribers,
+        coverage_barangays=_coverage_barangays(),
     )
 
 

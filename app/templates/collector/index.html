@@ -69,12 +69,25 @@
 })();
 </script>
 
-{% if not coverage_barangays %}
-<div class="alert alert-warning mb-3">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-    No coverage area has been assigned to your account yet. Ask an administrator to set one from the Collectors tab.
+{# ---------------- MY COVERAGE AREA (opens popup) ---------------- #}
+<div class="cx">
+<button type="button" class="cx-cover" data-bs-toggle="modal" data-bs-target="#coverageModal" aria-haspopup="dialog">
+    <span class="cx-card__icon"><i class="bi bi-geo-alt-fill"></i></span>
+    <span class="cx-cover__body">
+        <span class="cx-cover__title">My Coverage Area</span>
+        {% if coverage_barangays %}
+        <span class="cx-cover__chips">
+            {% for barangay in coverage_barangays[:3] %}<span class="cx-brgy"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>{% endfor %}
+            {% if coverage_barangays|length > 3 %}<span class="cx-brgy">+{{ coverage_barangays|length - 3 }} more</span>{% endif %}
+        </span>
+        {% else %}
+        <span class="cx-cover__sub text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-1"></i>No coverage area assigned yet</span>
+        {% endif %}
+    </span>
+    <span class="cx-cover__count">{{ subscriber_count }}<small>subscriber{{ '' if subscriber_count == 1 else 's' }}</small></span>
+    <i class="bi bi-chevron-right cx-cover__chev"></i>
+</button>
 </div>
-{% endif %}
 
 <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3">
@@ -114,4 +127,134 @@
         </a>
     </div>
 </div>
+
+<div class="cx">
+<div class="mb-3">
+<div class="cx-card">
+            <div class="cx-card__head">
+                <h3 class="cx-card__title"><span class="cx-card__icon cx-card__icon--gold"><i class="bi bi-clock-history"></i></span>My Recent Collections</h3>
+                <span class="cx-card__meta">Last {{ recent_payments|length }}</span>
+            </div>
+            {% if recent_payments %}
+            <div class="table-responsive cx-scroll">
+                <table class="table cx-table align-middle">
+                    <thead>
+                        <tr><th>Subscriber</th><th>Date</th><th class="text-end">Amount</th><th>Method</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in recent_payments %}
+                        <tr>
+                            <td>
+                                {% if payment.subscriber %}
+                                <div class="cx-person">
+                                    <span class="cx-avatar">{{ payment.subscriber.full_name[:1]|upper }}</span>
+                                    <div class="text-truncate">
+                                        <div class="cx-person__name text-truncate">{{ payment.subscriber.full_name }}</div>
+                                        <div class="cx-person__sub">{{ payment.subscriber.subscriber_code }}</div>
+                                    </div>
+                                </div>
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                            <td class="text-muted small">{{ payment.payment_date.strftime('%b %d, %Y') }}</td>
+                            <td class="text-end cx-amount">₱{{ "{:,.2f}".format(payment.amount) }}</td>
+                            <td><span class="cx-method">{{ payment.payment_method|replace('_', ' ') }}</span></td>
+                            <td><span class="cx-pill cx-pill--{{ payment.status if payment.status in ('confirmed','pending','overdue','voided') else 'pending' }}">{{ payment.status|capitalize }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="cx-empty">
+                <i class="bi bi-cash-stack"></i>
+                <div class="fw-semibold">No collections yet</div>
+                <div class="small">Payments you record will show up here.</div>
+            </div>
+            {% endif %}
+        </div>
+</div>
+</div>
+
+{# ---------------- COVERAGE POPUP (fixed size) ---------------- #}
+<div class="modal fade cx-modal" id="coverageModal" tabindex="-1" aria-labelledby="coverageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cx">
+            <div class="cx-modal__head">
+                <h3 class="cx-card__title" id="coverageModalLabel"><span class="cx-card__icon"><i class="bi bi-geo-alt-fill"></i></span>My Coverage Area</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            {% if not coverage_barangays %}
+            <div class="cx-modal__body d-flex align-items-center justify-content-center">
+                <div class="cx-empty">
+                    <i class="bi bi-geo"></i>
+                    <div class="fw-semibold">No coverage area assigned</div>
+                    <div class="small">Ask an administrator to set one from the Collectors tab.</div>
+                </div>
+            </div>
+            {% else %}
+            <div class="cx-modal__top">
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    {% for barangay in coverage_barangays %}
+                        <span class="cx-brgy"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>
+                    {% endfor %}
+                </div>
+                <div class="d-flex align-items-center justify-content-between gap-2">
+                    <span class="cx-card__meta">{{ subscriber_count }} subscriber{{ '' if subscriber_count == 1 else 's' }}</span>
+                    {% if coverage_subscribers %}
+                    <div class="input-group input-group-sm cx-search">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="coverageRosterSearch" placeholder="Filter subscribers..." autocomplete="off">
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="cx-modal__body">
+                {% if coverage_subscribers %}
+                <ul class="cx-roster" id="coverageRoster">
+                    {% for subscriber in coverage_subscribers %}
+                    <li class="cx-roster__item">
+                        <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
+                        <div class="cx-roster__info">
+                            <div class="cx-person__name text-truncate">{{ subscriber.full_name }}</div>
+                            <div class="cx-person__sub text-truncate">{{ subscriber.subscriber_code }}{% if subscriber.address %} &middot; {{ subscriber.address }}{% endif %}</div>
+                        </div>
+                        {% if subscriber.contact_number %}<span class="cx-roster__tel"><i class="bi bi-telephone"></i>{{ subscriber.contact_number }}</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="cx-empty d-none" id="coverageRosterEmpty"><i class="bi bi-search"></i><div class="small">No subscribers match your filter.</div></div>
+                {% else %}
+                <div class="cx-empty">
+                    <i class="bi bi-people"></i>
+                    <div class="fw-semibold">No subscribers yet</div>
+                    <div class="small">No active subscribers found in your assigned barangay(s).</div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    (function () {
+        var input = document.getElementById('coverageRosterSearch');
+        var list = document.getElementById('coverageRoster');
+        var empty = document.getElementById('coverageRosterEmpty');
+        if (!input || !list) return;
+        input.addEventListener('input', function () {
+            var term = input.value.trim().toLowerCase(), shown = 0;
+            list.querySelectorAll('.cx-roster__item').forEach(function (li) {
+                var hit = li.textContent.toLowerCase().indexOf(term) !== -1;
+                li.style.display = hit ? '' : 'none';
+                if (hit) shown++;
+            });
+            if (empty) empty.classList.toggle('d-none', shown !== 0);
+        });
+    })();
+</script>
 {% endblock %}
