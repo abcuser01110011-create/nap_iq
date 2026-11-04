@@ -1,354 +1,117 @@
 {% extends "dashboard_base.html" %}
-{% block title %}My Collections{% endblock %}
-{% block page_title %}My Collections{% endblock %}
-{% block page_subtitle %}
-<p class="text-muted small mb-0">Record payments and manage your collection route</p>
-{% endblock %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Your collections at a glance</p>{% endblock %}
+
+{# The standard top bar is replaced by the greeting card below (same card the
+   technician and administrator dashboards use), which carries the date/time
+   and theme toggle. #}
+{% block topbar %}{% endblock %}
 
 {% block extra_head %}
-<link href="{{ url_for('static', filename='css/ticket_form.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/collector-theme.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="cx">
-
-{# ---------------- HERO ---------------- #}
-<section class="cx-hero">
-    <div class="row align-items-center g-3 position-relative" style="z-index:1">
-        <div class="col-md-7">
-            <div class="cx-hero__eyebrow"><span id="cxToday">Collections</span></div>
-            <h2 class="cx-hero__title">Welcome back, {{ current_user.full_name }}</h2>
-            <p class="cx-hero__sub">Payment Collector &middot; keep every peso accounted for.</p>
-            <div class="cx-hero__chips">
-                {% if coverage_barangays %}
-                    {% for barangay in coverage_barangays[:4] %}<span class="cx-chip"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>{% endfor %}
-                    {% if coverage_barangays|length > 4 %}<span class="cx-chip">+{{ coverage_barangays|length - 4 }} more</span>{% endif %}
-                {% else %}
-                    <span class="cx-chip"><i class="bi bi-exclamation-triangle-fill"></i>No coverage area assigned yet</span>
-                {% endif %}
-                <span class="cx-chip"><i class="bi bi-people-fill"></i>{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
-            </div>
+{% set first_name = (current_user.full_name or current_user.username).split(' ')[0] if current_user else 'there' %}
+<style>
+    /* Phones / small screens: date stacked over the time on the left, a smaller
+       light/dark toggle on the same row at the right; the (inactive) bell moves
+       to the bottom navigation. */
+    @media (max-width: 991.98px) {
+        .tech-greeting .dash-greeting-top { flex-wrap: nowrap; gap: .5rem; }
+        .tech-greeting .dash-greeting-clock { flex-direction: column; align-items: flex-start; gap: 2px; font-size: .72rem; }
+        .tech-greeting .dash-greeting-clock .dash-greeting-dot { display: none; }
+        .tech-greeting .dash-greeting-tools { flex-wrap: nowrap; gap: 0; flex: 0 0 auto; }
+        .tech-greeting .dash-topbar-actions .dash-icon-btn { display: none !important; }
+        .tech-greeting .napiq-theme-toggle { width: 44px; height: 28px; border-radius: 14px; }
+        .tech-greeting .napiq-theme-toggle .napiq-theme-toggle__icon { font-size: .9rem; }
+    }
+</style>
+<section class="dash-greeting tech-greeting" aria-label="Welcome">
+    <div class="dash-greeting-top">
+        <div class="dash-greeting-clock">
+            <button type="button" class="dash-sidebar-toggle" id="dashSidebarToggle" aria-label="Toggle navigation">
+                <i class="bi bi-list"></i>
+            </button>
+            <span id="dashGreetingDate">&nbsp;</span>
+            <span class="dash-greeting-dot">&middot;</span>
+            <span id="dashGreetingTime" class="dash-greeting-time">&nbsp;</span>
         </div>
-        <div class="col-md-5">
-            <div class="d-flex flex-md-column align-items-md-end justify-content-between gap-3">
-                <div class="cx-hero__total">
-                    <small>Collected today</small>
-                    <strong>₱{{ "{:,.2f}".format(collected_today) }}</strong>
-                </div>
-                <a href="#recordPaymentCard" class="cx-hero__cta"><i class="bi bi-plus-lg"></i>Record a payment</a>
+
+        <div class="dash-greeting-tools">
+            <div class="dash-topbar-actions">
+                {{ self.topbar_actions() }}
             </div>
         </div>
     </div>
+
+    <div class="dash-greeting-body">
+        <h2 class="dash-greeting-title"><span id="dashGreetingWord">Welcome</span>, <span class="dash-greeting-name">{{ first_name }}</span></h2>
+    </div>
+    <div class="dash-greeting-art" aria-hidden="true"><i class="bi bi-wallet2"></i></div>
 </section>
 
-{# ---------------- KPI STRIP ---------------- #}
+<script>
+(function () {
+    var dateEl = document.getElementById('dashGreetingDate');
+    var timeEl = document.getElementById('dashGreetingTime');
+    var wordEl = document.getElementById('dashGreetingWord');
+    function tick() {
+        var now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+        timeEl.textContent = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+        var h = now.getHours();
+        wordEl.textContent = h < 12 ? 'Good morning' : (h < 18 ? 'Good afternoon' : 'Good evening');
+    }
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>
+
+{% if not coverage_barangays %}
+<div class="alert alert-warning mb-3">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    No coverage area has been assigned to your account yet. Ask an administrator to set one from the Collectors tab.
+</div>
+{% endif %}
+
 <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
             <span class="dash-stat-icon stat-icon-green"><i class="bi bi-cash-coin"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">₱{{ "{:,.2f}".format(collected_today) }}</span>
                 <span class="dash-stat-label">Collected Today</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg-3">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
             <span class="dash-stat-icon stat-icon-blue"><i class="bi bi-calendar3"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">₱{{ "{:,.2f}".format(collected_this_month) }}</span>
                 <span class="dash-stat-label">Collected This Month</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg-3">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
             <span class="dash-stat-icon stat-icon-orange"><i class="bi bi-hourglass-split"></i></span>
             <div class="dash-stat-body">
                 <span class="dash-stat-value">{{ pending_count }}</span>
                 <span class="dash-stat-label">Pending Confirmation</span>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg-3">
-        <div class="dash-stat-card">
+        <a class="dash-stat-card dash-stat-card-link text-decoration-none" href="{{ url_for('collector.collections') }}">
             <span class="dash-stat-icon stat-icon-purple"><i class="bi bi-people-fill"></i></span>
             <div class="dash-stat-body">
-                <span class="dash-stat-value">{{ coverage_subscribers|length }}</span>
+                <span class="dash-stat-value">{{ subscriber_count }}</span>
                 <span class="dash-stat-label">Subscribers in My Area</span>
             </div>
-        </div>
+        </a>
     </div>
 </div>
-
-{# ---------------- RECORD / RECENT ---------------- #}
-<div class="row g-3 mb-3 align-items-start">
-    <div class="col-lg-5">
-        <div class="cx-card" id="recordPaymentCard">
-            <div class="cx-card__head">
-                <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span>Record a Payment</h3>
-            </div>
-            <div class="cx-card__body">
-                <form class="cx-form" method="post" action="{{ url_for('collector.record_payment') }}" novalidate>
-                    {{ form.hidden_tag() }}
-
-                    <div class="cx-step"><span>1</span>Subscriber</div>
-                    <div class="mb-3 position-relative" id="collectorSubscriberWrapper">
-                        <label class="form-label">{{ form.subscriber_id.label }}</label>
-                        <div class="subs-search-form">
-                            <i class="bi bi-search"></i>
-                            <input
-                                type="text" id="collectorSubscriberInput"
-                                placeholder="Search by name, code, or address..."
-                                autocomplete="off"
-                            >
-                        </div>
-                        <div id="collectorSubscriberResults" class="list-group shadow-sm ticket-subscriber-dropdown d-none"></div>
-                        {{ form.subscriber_id(class="d-none" ~ (" is-invalid" if form.subscriber_id.errors else "")) }}
-                        <div id="collectorSubscriberHelp" class="form-text"></div>
-                        {% for error in form.subscriber_id.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                        {% if coverage_barangays %}
-                            <div class="form-text"><i class="bi bi-geo-alt"></i> Scoped to your coverage: {{ coverage_barangays|join(', ') }}</div>
-                        {% else %}
-                            <div class="form-text text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> No coverage area set — showing all active subscribers.</div>
-                        {% endif %}
-
-                        {# Auto-filled the moment a subscriber is picked above.
-                           Plan/Monthly Fee/Current Balance/Due Date are all
-                           informational only (Monthly Fee comes from the
-                           admin-priced Settings > Plans list; Current Balance
-                           is estimated from it -- see collector.py's
-                           _plan_monthly_fee()/_current_balance() -- both show
-                           "—" for a plan an administrator hasn't priced yet). #}
-                        <dl class="row mb-0 small d-none cx-info" id="collectorSubscriberInfo">
-                            <dt class="col-4 col-sm-3">Plan</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoPlan">—</dd>
-                            <dt class="col-4 col-sm-3">Monthly Fee</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoFee">—</dd>
-                            <dt class="col-4 col-sm-3">Current Balance</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoBalance">—</dd>
-                            <dt class="col-4 col-sm-3">Due Date</dt>
-                            <dd class="col-8 col-sm-9" id="collectorSubInfoDueDate">—</dd>
-                        </dl>
-                    </div>
-
-                    <div class="cx-step mt-4"><span>2</span>Payment details</div>
-                    <div class="row g-2">
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.amount.label }}</label>
-                            <div class="input-group collector-amount-group">
-                                <span class="input-group-text">₱</span>
-                                {{ form.amount(class="form-control" ~ (" is-invalid" if form.amount.errors else ""), placeholder="0.00") }}
-                            </div>
-                            {% for error in form.amount.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.payment_method.label }}</label>
-                            {{ form.payment_method(class="form-select" ~ (" is-invalid" if form.payment_method.errors else "")) }}
-                            {% for error in form.payment_method.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    <div class="row g-2">
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.payment_date.label }}</label>
-                            {{ form.payment_date(class="form-control" ~ (" is-invalid" if form.payment_date.errors else ""), placeholder="YYYY-MM-DD", type="date", id="collectorPaymentDateInput") }}
-                            {% for error in form.payment_date.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                        <div class="col-sm-6 mb-3">
-                            <label class="form-label">{{ form.status.label }} <span class="text-muted small">(automatic)</span></label>
-                            <div>
-                                <span class="badge fs-6 text-bg-secondary" id="collectorStatusBadge">Select subscriber &amp; date</span>
-                            </div>
-                            {{ form.status(class="d-none", id="collectorStatusSelect") }}
-                            <div class="form-text" id="collectorStatusHelp"></div>
-                            {% for error in form.status.errors %}
-                                <div class="invalid-feedback d-block">{{ error }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    {# Reference Number -- auto-generated the moment a
-                       subscriber is picked above (see collector-payment.js),
-                       shown as plain read-only text with a refresh button
-                       next to it to generate a new one on demand. The real
-                       value submitted with the payment still travels in this
-                       hidden field -- only how it's presented changed. #}
-                    <div class="cx-step mt-4"><span>3</span>Reference &amp; notes</div>
-                    <div class="mb-3">
-                        <label class="form-label">Reference No.</label>
-                        <div class="cx-ref">
-                            <span id="collectorSubInfoReference">—</span>
-                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" id="collectorRefRegenerateBtn" title="Generate a new reference number">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                        </div>
-                        {{ form.reference_number(class="d-none", id="collectorReferenceNumberInput") }}
-                        {% for error in form.reference_number.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">{{ form.remarks.label }} <span class="text-muted small">(optional)</span></label>
-                        {{ form.remarks(class="form-control" ~ (" is-invalid" if form.remarks.errors else ""), rows=2, placeholder="Any notes about this payment...") }}
-                        {% for error in form.remarks.errors %}
-                            <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <button type="submit" class="btn cx-submit">
-                        <i class="bi bi-check-lg me-1"></i>Record Payment
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-7">
-        <div class="cx-card">
-            <div class="cx-card__head">
-                <h3 class="cx-card__title"><span class="cx-card__icon cx-card__icon--gold"><i class="bi bi-clock-history"></i></span>My Recent Collections</h3>
-                <span class="cx-card__meta">Last {{ recent_payments|length }}</span>
-            </div>
-            {% if recent_payments %}
-            <div class="table-responsive cx-scroll">
-                <table class="table cx-table align-middle">
-                    <thead>
-                        <tr><th>Subscriber</th><th>Date</th><th class="text-end">Amount</th><th>Method</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for payment in recent_payments %}
-                        <tr>
-                            <td>
-                                {% if payment.subscriber %}
-                                <div class="cx-person">
-                                    <span class="cx-avatar">{{ payment.subscriber.full_name[:1]|upper }}</span>
-                                    <div class="text-truncate">
-                                        <div class="cx-person__name text-truncate">{{ payment.subscriber.full_name }}</div>
-                                        <div class="cx-person__sub">{{ payment.subscriber.subscriber_code }}</div>
-                                    </div>
-                                </div>
-                                {% else %}<span class="text-muted">—</span>{% endif %}
-                            </td>
-                            <td class="text-muted small">{{ payment.payment_date.strftime('%b %d, %Y') }}</td>
-                            <td class="text-end cx-amount">₱{{ "{:,.2f}".format(payment.amount) }}</td>
-                            <td><span class="cx-method">{{ payment.payment_method|replace('_', ' ') }}</span></td>
-                            <td><span class="cx-pill cx-pill--{{ payment.status if payment.status in ('confirmed','pending','overdue','voided') else 'pending' }}">{{ payment.status|capitalize }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="cx-empty">
-                <i class="bi bi-cash-stack"></i>
-                <div class="fw-semibold">No collections yet</div>
-                <div class="small">Payments you record will show up here.</div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-{# ---------------- COVERAGE ---------------- #}
-<div class="cx-card">
-    <div class="cx-card__head">
-        <h3 class="cx-card__title"><span class="cx-card__icon"><i class="bi bi-geo-alt-fill"></i></span>My Coverage Area</h3>
-        {% if coverage_barangays %}
-            <span class="cx-card__meta">{{ coverage_subscribers|length }} subscriber{{ '' if coverage_subscribers|length == 1 else 's' }}</span>
-        {% endif %}
-    </div>
-
-    {% if not coverage_barangays %}
-    <div class="cx-empty">
-        <i class="bi bi-geo"></i>
-        <div class="fw-semibold">No coverage area assigned</div>
-        <div class="small">Ask an administrator to set one from the Collectors tab.</div>
-    </div>
-    {% else %}
-    <div class="px-4 pt-3 pb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="d-flex flex-wrap gap-2">
-            {% for barangay in coverage_barangays %}
-                <span class="cx-brgy"><i class="bi bi-geo-alt-fill"></i>{{ barangay }}</span>
-            {% endfor %}
-        </div>
-        {% if coverage_subscribers %}
-        <div class="input-group input-group-sm cx-search">
-            <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control" id="coverageRosterSearch" placeholder="Filter subscribers..." autocomplete="off">
-        </div>
-        {% endif %}
-    </div>
-
-    {% if coverage_subscribers %}
-    <div class="table-responsive cx-scroll">
-        <table class="table cx-table align-middle" id="coverageRosterTable">
-            <thead><tr><th>Subscriber</th><th>Address</th><th>Contact</th></tr></thead>
-            <tbody>
-                {% for subscriber in coverage_subscribers %}
-                <tr>
-                    <td>
-                        <div class="cx-person">
-                            <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
-                            <div class="text-truncate">
-                                <div class="cx-person__name text-truncate">{{ subscriber.full_name }}</div>
-                                <div class="cx-person__sub">{{ subscriber.subscriber_code }}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-muted small">{{ subscriber.address or "—" }}</td>
-                    <td class="small">{% if subscriber.contact_number %}<i class="bi bi-telephone me-1 text-muted"></i>{{ subscriber.contact_number }}{% else %}—{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="cx-empty">
-        <i class="bi bi-people"></i>
-        <div class="fw-semibold">No subscribers yet</div>
-        <div class="small">No active subscribers found in your assigned barangay(s).</div>
-    </div>
-    {% endif %}
-    {% endif %}
-</div>
-
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/collector-payment.js') }}"></script>
-<script>
-    (function () {
-        var el = document.getElementById('cxToday');
-        if (el) el.textContent = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    })();
-</script>
-<script>
-    // Lightweight client-side filter for the coverage roster table --
-    // no round trip needed since the whole list is already scoped
-    // server-side to this collector's own barangay(s).
-    (function () {
-        const searchInput = document.getElementById('coverageRosterSearch');
-        const table = document.getElementById('coverageRosterTable');
-        if (!searchInput || !table) return;
-
-        searchInput.addEventListener('input', function () {
-            const term = searchInput.value.trim().toLowerCase();
-            table.querySelectorAll('tbody tr').forEach(function (row) {
-                row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
-            });
-        });
-    })();
-</script>
 {% endblock %}

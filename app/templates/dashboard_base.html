@@ -118,7 +118,7 @@
                    (Dashboard AND My Collections highlighted together). Same
                    "no redundant path to the same place" reasoning already
                    applied to field_assistant/administrator/user below. #}
-                {% if not current_user or current_user.role != 'payment_collector' %}
+                {% if true %}
                 <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint == role_home_endpoint else '' }}"
                        href="{{ url_for(role_home_endpoint) }}">
@@ -217,8 +217,8 @@
                 </li>
                 {% elif current_user and current_user.role == 'payment_collector' %}
                 <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('collector.') else '' }}"
-                       href="{{ url_for('collector.index') }}">
+                    <a class="dash-nav-link {{ 'active' if request.endpoint in ['collector.collections', 'collector.record_payment'] else '' }}"
+                       href="{{ url_for('collector.collections') }}">
                         <i class="bi bi-cash-coin"></i><span>My Collections</span>
                     </a>
                 </li>
@@ -303,7 +303,7 @@
     {% set _role = current_user.role %}
     {% set _ep = request.endpoint or '' %}
     {% set mbn = [] %}
-    {% if _role != 'payment_collector' %}
+    {% if true %}
         {% set _ = mbn.append({'href': url_for(role_home_endpoint), 'icon': 'bi-speedometer2', 'label': 'Dashboard', 'bar': true,
             'active': _ep == role_home_endpoint,
             'badge': (sidebar_badges.get('technician_dashboard') if _role == 'field_assistant' else 0)}) %}
@@ -322,7 +322,7 @@
     {% elif _role in ('technician', 'field_assistant') %}
         {% set _ = mbn.append({'href': url_for('technician.tickets'), 'icon': 'bi-ticket-perforated', 'label': 'Tickets', 'bar': true, 'active': _ep in ['technician.tickets', 'technician.history', 'technician.ticket_detail']}) %}
     {% elif _role == 'payment_collector' %}
-        {% set _ = mbn.append({'href': url_for('collector.index'), 'icon': 'bi-cash-coin', 'label': 'Collections', 'bar': true, 'active': _ep.startswith('collector.')}) %}
+        {% set _ = mbn.append({'href': url_for('collector.collections'), 'icon': 'bi-cash-coin', 'label': 'Collections', 'bar': true, 'active': _ep in ['collector.collections', 'collector.record_payment']}) %}
     {% elif _role == 'user' %}
         {% set _ = mbn.append({'href': url_for('customer.my_payments'), 'icon': 'bi-cash-coin', 'label': 'Payments', 'bar': true, 'active': _ep == 'customer.my_payments', 'badge': sidebar_badges.get('customer_payments')}) %}
         {% set _ = mbn.append({'href': url_for('customer.my_issues'), 'icon': 'bi-ticket-perforated', 'label': 'Issues', 'bar': true, 'active': _ep in ['customer.my_issues', 'customer.my_issue_detail', 'customer.report_issue'], 'badge': sidebar_badges.get('customer_issues')}) %}

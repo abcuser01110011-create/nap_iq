@@ -143,13 +143,51 @@ def _populate_subscriber_choices(form):
     ]
 
 
+def _kpis(coverage_barangays):
+    """KPI numbers for the dashboard -- all scoped to this collector's own
+    `collector_id`, never anyone else's."""
+    today = date.today()
+    own_payments = Payment.query.filter_by(collector_id=g.user.id)
+
+    collected_today = own_payments.filter(
+        Payment.payment_date == today, Payment.status == "confirmed"
+    ).with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
+
+    collected_this_month = own_payments.filter(
+        extract("year", Payment.payment_date) == today.year,
+        extract("month", Payment.payment_date) == today.month,
+        Payment.status == "confirmed",
+    ).with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
+
+    pending_count = own_payments.filter(Payment.status == "pending").count()
+    subscriber_count = (
+        _coverage_subscribers_query(coverage_barangays).count() if coverage_barangays else 0
+    )
+    return collected_today, collected_this_month, pending_count, subscriber_count
+
+
 @collector_bp.route("/")
 @role_required("payment_collector")
 def index():
-    """Landing page: KPI summary, the record-a-payment form, the
-    signed-in collector's own recent payments, and the subscriber
-    roster for their assigned Coverage Area (see _coverage_barangays()
-    above)."""
+    """Collector home (Dashboard): greeting card + the four KPI cards."""
+    coverage_barangays = _coverage_barangays()
+    collected_today, collected_this_month, pending_count, subscriber_count = _kpis(coverage_barangays)
+    return render_template(
+        "collector/index.html",
+        coverage_barangays=coverage_barangays,
+        collected_today=collected_today,
+        collected_this_month=collected_this_month,
+        pending_count=pending_count,
+        subscriber_count=subscriber_count,
+    )
+
+
+@collector_bp.route("/collections")
+@role_required("payment_collector")
+def collections():
+    """My Collections: the record-a-payment form, the signed-in collector's
+    own recent payments, and the subscriber roster for their assigned
+    Coverage Area (see _coverage_barangays() above)."""
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
 
@@ -166,34 +204,12 @@ def index():
         if coverage_barangays else []
     )
 
-    # ---- KPI summary strip -------------------------------------------------
-    # All scoped to this collector's own `collector_id`, never anyone
-    # else's -- same "record and see your own work only" boundary the
-    # rest of this blueprint keeps (see module docstring above).
-    today = date.today()
-    own_payments = Payment.query.filter_by(collector_id=g.user.id)
-
-    collected_today = own_payments.filter(
-        Payment.payment_date == today, Payment.status == "confirmed"
-    ).with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
-
-    collected_this_month = own_payments.filter(
-        extract("year", Payment.payment_date) == today.year,
-        extract("month", Payment.payment_date) == today.month,
-        Payment.status == "confirmed",
-    ).with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
-
-    pending_count = own_payments.filter(Payment.status == "pending").count()
-
     return render_template(
-        "collector/index.html",
+        "collector/collections.html",
         form=form,
         recent_payments=recent_payments,
         coverage_barangays=coverage_barangays,
         coverage_subscribers=coverage_subscribers,
-        collected_today=collected_today,
-        collected_this_month=collected_this_month,
-        pending_count=pending_count,
     )
 
 
@@ -245,12 +261,12 @@ def record_payment():
             db.session.commit()
 
         flash(f"Payment of {payment.amount} recorded successfully.", "success")
-        return redirect(url_for("collector.index"))
+        return redirect(url_for("collector.collections"))
 
     for field_errors in form.errors.values():
         for message in field_errors:
             flash(message, "danger")
-    return redirect(url_for("collector.index"))
+    return redirect(url_for("collector.collections"))
 
 
 @collector_bp.route("/subscribers.json")
