@@ -36,19 +36,11 @@
             <ul class="cx-roster cx-names" id="subList">
                 {% for subscriber in coverage_subscribers %}
                 <li>
-                    <button type="button" class="cx-name"
-                            data-bs-toggle="modal" data-bs-target="#subDetailModal"
-                            data-id="{{ subscriber.id }}"
-                            data-name="{{ subscriber.full_name }}"
-                            data-address="{{ subscriber.address or '' }}"
-                            data-contact="{{ subscriber.contact_number or '' }}"
-                            data-plan="{{ subscriber.plan_type or '' }}"
-                            data-lat="{{ subscriber.latitude if subscriber.latitude is not none else '' }}"
-                            data-lng="{{ subscriber.longitude if subscriber.longitude is not none else '' }}">
+                    <a class="cx-name text-decoration-none" href="{{ url_for('collector.subscriber_detail', subscriber_id=subscriber.id) }}">
                         <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
                         <span class="cx-person__name text-truncate">{{ subscriber.full_name }}</span>
                         <i class="bi bi-chevron-right ms-auto cx-cover__chev"></i>
-                    </button>
+                    </a>
                 </li>
                 {% endfor %}
             </ul>
@@ -58,50 +50,11 @@
     </div>
 </div>
 </div>
-
-{# ---------------- SUBSCRIBER DETAIL POPUP (fixed size) ---------------- #}
-<div class="modal fade cx-modal" id="subDetailModal" tabindex="-1" aria-labelledby="subDetailName" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content cx">
-            <div class="cx-modal__head">
-                <h3 class="cx-card__title"><span class="cx-avatar" id="subDetailAvatar">?</span><span id="subDetailName" class="text-truncate">Subscriber</span></h3>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="cx-modal__body">
-                <dl class="cx-detail">
-                    <div><dt>Address</dt><dd data-f="address"></dd></div>
-                    <div><dt>Contact Number</dt><dd data-f="contact"></dd></div>
-                    <div><dt>Plan</dt><dd data-f="plan"></dd></div>
-                </dl>
-            </div>
-            <div class="cx-modal__foot">
-                <a class="btn cx-btn-outline" id="subNavigateBtn" href="#" target="_blank" rel="noopener"><i class="bi bi-cursor-fill me-1"></i>Navigate</a>
-                <a class="btn cx-submit" id="subPayBtn" href="#" data-base="{{ url_for('collector.payment') }}"><i class="bi bi-plus-lg me-1"></i>Add payment</a>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
     (function () {
-        var modal = document.getElementById('subDetailModal');
-        if (modal) {
-            modal.addEventListener('show.bs.modal', function (e) {
-                var d = e.relatedTarget ? e.relatedTarget.dataset : {};
-                document.getElementById('subDetailName').textContent = d.name || 'Subscriber';
-                document.getElementById('subDetailAvatar').textContent = (d.name || '?').charAt(0).toUpperCase();
-                var dest = (d.lat && d.lng) ? d.lat + ',' + d.lng : (d.address || d.name || '');
-                document.getElementById('subNavigateBtn').href =
-                    'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest);
-                var pay = document.getElementById('subPayBtn');
-                pay.href = pay.getAttribute('data-base') + '?subscriber=' + encodeURIComponent(d.id || '');
-                modal.querySelectorAll('[data-f]').forEach(function (el) {
-                    el.textContent = d[el.getAttribute('data-f')] || '\u2014';
-                });
-            });
-        }
         var input = document.getElementById('subSearch');
         var list = document.getElementById('subList');
         var empty = document.getElementById('subEmpty');

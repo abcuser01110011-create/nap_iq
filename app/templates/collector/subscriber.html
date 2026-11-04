@@ -1,0 +1,93 @@
+{% extends "dashboard_base.html" %}
+{% block title %}{{ subscriber.full_name }}{% endblock %}
+{% block page_title %}Subscriber{% endblock %}
+{% block page_subtitle %}
+<p class="text-muted small mb-0">Details and payment</p>
+{% endblock %}
+
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/collector-theme.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+{% set dest = (subscriber.latitude|string ~ ',' ~ subscriber.longitude|string) if (subscriber.latitude is not none and subscriber.longitude is not none) else (subscriber.address or subscriber.full_name) %}
+<div class="cx">
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+        <a href="{{ url_for('collector.collections') }}" class="btn btn-sm btn-link text-decoration-none px-0 mb-2"><i class="bi bi-arrow-left me-1"></i>Back to subscribers</a>
+
+        <div class="cx-card">
+            <div class="cx-card__head">
+                <h3 class="cx-card__title"><span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span><span class="text-truncate">{{ subscriber.full_name }}</span></h3>
+            </div>
+            <div class="cx-card__body">
+                <dl class="cx-detail">
+                    <div><dt>Address</dt><dd>{{ subscriber.address or "—" }}</dd></div>
+                    <div><dt>Contact Number</dt><dd>{{ subscriber.contact_number or "—" }}</dd></div>
+                    <div><dt>Plan</dt><dd>{{ subscriber.plan_type or "—" }}</dd></div>
+                </dl>
+                <div class="cx-actions">
+                    <a class="btn cx-btn-outline" target="_blank" rel="noopener"
+                       href="https://www.google.com/maps/dir/?api=1&destination={{ dest|urlencode }}"><i class="bi bi-cursor-fill me-1"></i>Navigate</a>
+                    <button type="button" class="btn cx-submit" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg me-1"></i>Add payment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+{# ---------------- PAYMENT DETAILS POPUP ---------------- #}
+<div class="modal fade cx-modal cx-modal--form" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cx">
+            <form class="cx-form" method="post" action="{{ url_for('collector.record_payment') }}" novalidate
+                  id="collectorPaymentForm" data-due-date="{{ due_date_iso }}" data-code="{{ subscriber.subscriber_code }}">
+                {{ form.hidden_tag() }}
+                {{ form.subscriber_id(class="d-none") }}
+                {{ form.reference_number(class="d-none", id="collectorReferenceNumberInput") }}
+                {{ form.status(class="d-none", id="collectorStatusSelect") }}
+
+                <div class="cx-modal__head">
+                    <h3 class="cx-card__title" id="paymentModalLabel"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span>Payment Details</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="cx-modal__body pt-3">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.amount.label }}</label>
+                        <div class="input-group">
+                            <span class="input-group-text">₱</span>
+                            {{ form.amount(class="form-control" ~ (" is-invalid" if form.amount.errors else ""), placeholder="0.00") }}
+                        </div>
+                        {% for error in form.amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.payment_method.label }}</label>
+                        {{ form.payment_method(class="form-select" ~ (" is-invalid" if form.payment_method.errors else "")) }}
+                        {% for error in form.payment_method.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.payment_date.label }}</label>
+                        {{ form.payment_date(class="form-control" ~ (" is-invalid" if form.payment_date.errors else ""), placeholder="YYYY-MM-DD", type="date", id="collectorPaymentDateInput") }}
+                        {% for error in form.payment_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label">{{ form.status.label }} <span class="text-muted small">(automatic)</span></label>
+                        <div><span class="badge fs-6 text-bg-secondary" id="collectorStatusBadge">Enter a payment date</span></div>
+                        <div class="form-text" id="collectorStatusHelp"></div>
+                    </div>
+                </div>
+
+                <div class="cx-modal__foot">
+                    <button type="submit" class="btn cx-submit"><i class="bi bi-check-lg me-1"></i>Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/collector-subscriber.js') }}"></script>
+{% endblock %}

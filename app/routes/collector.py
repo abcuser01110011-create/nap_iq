@@ -26,7 +26,7 @@ Routes:
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
-from flask import Blueprint, render_template, redirect, url_for, flash, g, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, g, jsonify, request, abort
 from sqlalchemy import func, extract
 
 from app.extensions import db
@@ -209,14 +209,30 @@ def collections():
     )
 
 
-@collector_bp.route("/payment")
+@collector_bp.route("/subscriber/<int:subscriber_id>")
 @role_required("payment_collector")
-def payment():
-    """Record Payment page (opened from a subscriber's popup; the optional
-    ?subscriber=<id> query string pre-selects that subscriber)."""
+def subscriber_detail(subscriber_id):
+    """Subscriber page opened from My Collections: their address, contact
+    and plan, a Navigate button, and an Add payment button that opens the
+    Payment Details popup. Limited to subscribers inside this collector's
+    own coverage area."""
+    barangays = _coverage_barangays()
+    if not barangays:
+        abort(404)
+    subscriber = (
+        _coverage_subscribers_query(barangays).filter(Subscriber.id == subscriber_id).first_or_404()
+    )
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
-    return render_template("collector/payment.html", form=form)
+    form.subscriber_id.data = subscriber.id
+
+    due_date = _estimate_next_due_date(subscriber)
+    return render_template(
+        "collector/subscriber.html",
+        subscriber=subscriber,
+        form=form,
+        due_date_iso=due_date.isoformat() if due_date else "",
+    )
 
 
 @collector_bp.route("/record", methods=["POST"])
@@ -272,7 +288,10 @@ def record_payment():
     for field_errors in form.errors.values():
         for message in field_errors:
             flash(message, "danger")
-    return redirect(url_for("collector.payment"))
+    posted_id = request.form.get("subscriber_id", type=int)
+    if posted_id:
+        return redirect(url_for("collector.subscriber_detail", subscriber_id=posted_id))
+    return redirect(url_for("collector.collections"))
 
 
 @collector_bp.route("/subscribers.json")
