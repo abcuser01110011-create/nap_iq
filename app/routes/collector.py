@@ -209,6 +209,16 @@ def collections():
     )
 
 
+@collector_bp.route("/payment")
+@role_required("payment_collector")
+def payment():
+    """Record Payment page (opened from a subscriber's popup; the optional
+    ?subscriber=<id> query string pre-selects that subscriber)."""
+    form = RecordPaymentForm()
+    _populate_subscriber_choices(form)
+    return render_template("collector/payment.html", form=form)
+
+
 @collector_bp.route("/record", methods=["POST"])
 @role_required("payment_collector")
 def record_payment():
@@ -262,7 +272,7 @@ def record_payment():
     for field_errors in form.errors.values():
         for message in field_errors:
             flash(message, "danger")
-    return redirect(url_for("collector.collections"))
+    return redirect(url_for("collector.payment"))
 
 
 @collector_bp.route("/subscribers.json")

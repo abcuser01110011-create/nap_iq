@@ -38,14 +38,13 @@
                 <li>
                     <button type="button" class="cx-name"
                             data-bs-toggle="modal" data-bs-target="#subDetailModal"
+                            data-id="{{ subscriber.id }}"
                             data-name="{{ subscriber.full_name }}"
-                            data-code="{{ subscriber.subscriber_code }}"
                             data-address="{{ subscriber.address or '' }}"
                             data-contact="{{ subscriber.contact_number or '' }}"
-                            data-email="{{ subscriber.email or '' }}"
                             data-plan="{{ subscriber.plan_type or '' }}"
-                            data-status="{{ subscriber.status or '' }}"
-                            data-installed="{{ subscriber.installed_at.strftime('%b %d, %Y') if subscriber.installed_at else '' }}">
+                            data-lat="{{ subscriber.latitude if subscriber.latitude is not none else '' }}"
+                            data-lng="{{ subscriber.longitude if subscriber.longitude is not none else '' }}">
                         <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
                         <span class="cx-person__name text-truncate">{{ subscriber.full_name }}</span>
                         <i class="bi bi-chevron-right ms-auto cx-cover__chev"></i>
@@ -70,14 +69,14 @@
             </div>
             <div class="cx-modal__body">
                 <dl class="cx-detail">
-                    <div><dt>Subscriber Code</dt><dd data-f="code"></dd></div>
                     <div><dt>Address</dt><dd data-f="address"></dd></div>
                     <div><dt>Contact Number</dt><dd data-f="contact"></dd></div>
-                    <div><dt>Email</dt><dd data-f="email"></dd></div>
                     <div><dt>Plan</dt><dd data-f="plan"></dd></div>
-                    <div><dt>Status</dt><dd data-f="status" class="text-capitalize"></dd></div>
-                    <div><dt>Installed</dt><dd data-f="installed"></dd></div>
                 </dl>
+            </div>
+            <div class="cx-modal__foot">
+                <a class="btn cx-btn-outline" id="subNavigateBtn" href="#" target="_blank" rel="noopener"><i class="bi bi-cursor-fill me-1"></i>Navigate</a>
+                <a class="btn cx-submit" id="subPayBtn" href="#" data-base="{{ url_for('collector.payment') }}"><i class="bi bi-plus-lg me-1"></i>Add payment</a>
             </div>
         </div>
     </div>
@@ -93,6 +92,11 @@
                 var d = e.relatedTarget ? e.relatedTarget.dataset : {};
                 document.getElementById('subDetailName').textContent = d.name || 'Subscriber';
                 document.getElementById('subDetailAvatar').textContent = (d.name || '?').charAt(0).toUpperCase();
+                var dest = (d.lat && d.lng) ? d.lat + ',' + d.lng : (d.address || d.name || '');
+                document.getElementById('subNavigateBtn').href =
+                    'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest);
+                var pay = document.getElementById('subPayBtn');
+                pay.href = pay.getAttribute('data-base') + '?subscriber=' + encodeURIComponent(d.id || '');
                 modal.querySelectorAll('[data-f]').forEach(function (el) {
                     el.textContent = d[el.getAttribute('data-f')] || '\u2014';
                 });

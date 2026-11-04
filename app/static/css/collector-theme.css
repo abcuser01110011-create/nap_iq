@@ -125,3 +125,11 @@
 .cx-detail > div:last-child { border-bottom:0; }
 .cx-detail dt { font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--cx-muted); margin-bottom:.15rem; }
 .cx-detail dd { margin:0; font-weight:600; word-break:break-word; }
+
+/* Subscriber popup footer: Navigate + Add payment */
+.cx-modal__foot { flex:0 0 auto; display:flex; gap:.6rem; padding:.85rem 1.25rem; border-top:1px solid var(--cx-line); }
+.cx-modal__foot .btn { flex:1 1 0; min-height:44px; border-radius:999px; font-weight:650; display:inline-flex; align-items:center; justify-content:center; width:auto; }
+.cx-btn-outline { color:var(--cx-royal); border:1.5px solid var(--cx-royal); background:transparent; }
+.cx-btn-outline:hover { background:rgba(22,132,255,.1); color:var(--cx-royal); }
+[data-bs-theme="dark"] .cx-btn-outline { color:#7FB4FF; border-color:#4C86E0; }
+[data-bs-theme="dark"] .cx-btn-outline:hover { color:#9CC6FF; }

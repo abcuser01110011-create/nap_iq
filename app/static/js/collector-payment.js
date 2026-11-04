@@ -287,4 +287,13 @@
     // subscriber is picked.
     setReferenceNumber(generateReferenceNumber(null));
     refreshStatus();
+
+    // Opened from a subscriber popup (?subscriber=<id>): pre-select that subscriber.
+    var preselectId = new URLSearchParams(window.location.search).get("subscriber");
+    if (preselectId) {
+        loadSubscribers().then(function () {
+            var sub = allSubscribers.find(function (s) { return String(s.id) === preselectId; });
+            if (sub) selectSubscriber(sub);
+        });
+    }
 })();
