@@ -55,6 +55,27 @@
 
                 <div class="cx-modal__body pt-3">
                     <div class="mb-3">
+                        <label class="form-label">{{ form.status.label }} <span class="text-muted small">(automatic)</span></label>
+                        <div><span class="badge fs-6 text-bg-secondary" id="collectorStatusBadge">&hellip;</span></div>
+                        <div class="form-text" id="collectorStatusHelp"></div>
+                    </div>
+
+                    <div class="row g-2 mb-3 text-center">
+                        <div class="col-4">
+                            <div class="small text-muted">Monthly fee</div>
+                            <div class="fw-semibold">{% if monthly_fee is not none %}&#8369;{{ '{:,.2f}'.format(monthly_fee) }}{% else %}&mdash;{% endif %}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted">Balance</div>
+                            <div class="fw-semibold">{% if current_balance is not none %}&#8369;{{ '{:,.2f}'.format(current_balance) }}{% else %}&mdash;{% endif %}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted">Due date</div>
+                            <div class="fw-semibold">{{ due_date.strftime('%b %d, %Y') if due_date else '—' }}</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">{{ form.amount.label }}</label>
                         <div class="input-group">
                             <span class="input-group-text">₱</span>
@@ -67,16 +88,9 @@
                         {{ form.payment_method(class="form-select" ~ (" is-invalid" if form.payment_method.errors else "")) }}
                         {% for error in form.payment_method.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">{{ form.payment_date.label }}</label>
-                        {{ form.payment_date(class="form-control" ~ (" is-invalid" if form.payment_date.errors else ""), placeholder="YYYY-MM-DD", type="date", id="collectorPaymentDateInput") }}
-                        {% for error in form.payment_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                    </div>
-                    <div class="mb-1">
-                        <label class="form-label">{{ form.status.label }} <span class="text-muted small">(automatic)</span></label>
-                        <div><span class="badge fs-6 text-bg-secondary" id="collectorStatusBadge">Enter a payment date</span></div>
-                        <div class="form-text" id="collectorStatusHelp"></div>
-                    </div>
+                    {# Payment date = the day the payment is recorded (hidden, set automatically). #}
+                    {{ form.payment_date(class="d-none", type="hidden", id="collectorPaymentDateInput") }}
+                    {% for error in form.payment_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                 </div>
 
                 <div class="cx-modal__foot">

@@ -239,13 +239,22 @@ def subscriber_detail(subscriber_id):
     form = RecordPaymentForm()
     _populate_subscriber_choices(form)
     form.subscriber_id.data = subscriber.id
+    # Payment date is no longer asked for: it is always the day the
+    # payment is recorded (the browser re-stamps it with the collector's
+    # local date when the popup opens / submits).
+    form.payment_date.data = date.today().isoformat()
 
     due_date = _estimate_next_due_date(subscriber)
+    monthly_fee = _plan_monthly_fee(subscriber.plan_type)
+    current_balance = _current_balance(subscriber, monthly_fee)
     return render_template(
         "collector/subscriber.html",
         subscriber=subscriber,
         form=form,
         due_date_iso=due_date.isoformat() if due_date else "",
+        due_date=due_date,
+        monthly_fee=monthly_fee,
+        current_balance=current_balance,
     )
 
 

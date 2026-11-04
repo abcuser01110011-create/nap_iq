@@ -6,7 +6,9 @@
  *  - Reference number is generated automatically (RCPT-<code>-<timestamp>)
  *    each time the popup opens and travels in a hidden field -- nothing to
  *    show or refresh.
- *  - Status is automatic: Payment Date before the subscriber's estimated
+ *  - Payment Date is not asked for: it is always today's date (the day
+ *    the payment is recorded), kept in a hidden field.
+ *  - Status is automatic: today before the subscriber's estimated
  *    due date -> Paid (confirmed), on it -> Due (pending), after it ->
  *    Overdue (overdue). Same rule as the old Record a Payment form.
  */
@@ -34,6 +36,13 @@
 
     function pad(n) { return String(n).padStart(2, "0"); }
 
+    function todayIso() {
+        var d = new Date();
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    }
+
+    function stampToday() { if (dateInput) dateInput.value = todayIso(); }
+
     function generateReference() {
         var d = new Date();
         return "RCPT-" + code + "-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
@@ -59,7 +68,7 @@
         var status = computeStatus(dateStr);
         if (!status) {
             badge.className = "badge fs-6 text-bg-secondary";
-            badge.textContent = !dateStr ? "Enter a payment date" : "No due date on file \u2014 defaults to Paid";
+            badge.textContent = "No due date on file \u2014 defaults to Paid";
             statusSelect.value = "confirmed";
             help.textContent = "";
             return;
@@ -67,15 +76,15 @@
         statusSelect.value = status;
         badge.className = CLASSES[status];
         badge.textContent = LABELS[status];
-        help.textContent = "Based on the payment date vs. the estimated due date (" + formatDue(dueIso) + ").";
+        help.textContent = "Based on today vs. the estimated due date (" + formatDue(dueIso) + ").";
     }
 
     function newReference() { if (refInput) refInput.value = generateReference(); }
 
-    if (dateInput) dateInput.addEventListener("change", refreshStatus);
-    if (modal) modal.addEventListener("show.bs.modal", newReference);
-    form.addEventListener("submit", newReference);
+    function onOpen() { newReference(); stampToday(); refreshStatus(); }
 
-    newReference();
-    refreshStatus();
+    if (modal) modal.addEventListener("show.bs.modal", onOpen);
+    form.addEventListener("submit", function () { newReference(); stampToday(); });
+
+    onOpen();
 })();
