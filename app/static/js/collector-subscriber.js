@@ -23,15 +23,14 @@
     var refInput = document.getElementById("collectorReferenceNumberInput");
     var statusSelect = document.getElementById("collectorStatusSelect");
     var badge = document.getElementById("collectorStatusBadge");
-    var help = document.getElementById("collectorStatusHelp");
     var dueIso = form.getAttribute("data-due-date") || "";
     var code = (form.getAttribute("data-code") || "GEN").replace(/[^A-Za-z0-9]/g, "");
 
     var LABELS = { confirmed: "Paid", pending: "Due", overdue: "Overdue" };
     var CLASSES = {
-        confirmed: "badge fs-6 text-bg-success",
-        pending: "badge fs-6 text-bg-warning",
-        overdue: "badge fs-6 text-bg-danger",
+        confirmed: "cx-status cx-status--confirmed",
+        pending: "cx-status cx-status--pending",
+        overdue: "cx-status cx-status--overdue",
     };
 
     function pad(n) { return String(n).padStart(2, "0"); }
@@ -67,16 +66,14 @@
         var dateStr = dateInput ? dateInput.value : "";
         var status = computeStatus(dateStr);
         if (!status) {
-            badge.className = "badge fs-6 text-bg-secondary";
-            badge.textContent = "No due date on file \u2014 defaults to Paid";
+            badge.className = CLASSES.confirmed;
+            badge.textContent = "Paid";
             statusSelect.value = "confirmed";
-            help.textContent = "";
             return;
         }
         statusSelect.value = status;
         badge.className = CLASSES[status];
         badge.textContent = LABELS[status];
-        help.textContent = "Based on today vs. the estimated due date (" + formatDue(dueIso) + ").";
     }
 
     function newReference() { if (refInput) refInput.value = generateReference(); }
