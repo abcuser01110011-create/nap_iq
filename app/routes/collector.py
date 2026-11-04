@@ -33,7 +33,7 @@ from app.extensions import db
 from app.auth import role_required
 from app.models import Payment, Plan, Subscriber
 from app.forms import RecordPaymentForm
-from app.notifications_utils import notify_payment_overdue, notify_payment_pending_confirmation
+from app.notifications_utils import notify_payment_confirmed
 
 collector_bp = Blueprint("collector", __name__, url_prefix="/collector")
 
@@ -59,6 +59,22 @@ def _estimate_next_due_date(subscriber):
     if anchor is None:
         return None
     return anchor + timedelta(days=30)
+
+
+def _payment_status(due_date):
+    """Status shown on the subscriber page's Payment Details popup, worked
+    out on the server from the estimated due date so it updates the moment
+    a payment is recorded (a recorded payment moves the due date 30 days
+    ahead -- see _estimate_next_due_date). Returns the same keys the badge
+    CSS uses: 'confirmed' (Paid), 'pending' (Due today), 'overdue'."""
+    if due_date is None:
+        return "confirmed"
+    if isinstance(due_date, datetime):
+        due_date = due_date.date()
+    today = date.today()
+    if due_date > today:
+        return "confirmed"
+    return "pending" if due_date == today else "overdue"
 
 
 def _plan_monthly_fee(plan_type):
@@ -174,17 +190,32 @@ def index():
     coverage_barangays = _coverage_barangays()
     collected_today, collected_this_month, pending_count, subscriber_count = _kpis(coverage_barangays)
 
-    recent_payments = (
+    # My Recent Collections: just the subscriber names (one row per
+    # subscriber, most recently collected first), like the Collections tab.
+    recent_rows = (
         Payment.query.filter_by(collector_id=g.user.id)
         .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
-        .limit(20)
+        .limit(100)
         .all()
+    )
+    recent_subscribers, seen = [], set()
+    for payment in recent_rows:
+        if payment.subscriber and payment.subscriber_id not in seen:
+            seen.add(payment.subscriber_id)
+            recent_subscribers.append(payment.subscriber)
+        if len(recent_subscribers) >= 20:
+            break
+    # Only subscribers inside this collector's coverage area have a detail page.
+    linkable_ids = (
+        {s.id for s in _coverage_subscribers_query(coverage_barangays).all()}
+        if coverage_barangays else set()
     )
 
     return render_template(
         "collector/index.html",
         coverage_barangays=coverage_barangays,
-        recent_payments=recent_payments,
+        recent_subscribers=recent_subscribers,
+        linkable_ids=linkable_ids,
         collected_today=collected_today,
         collected_this_month=collected_this_month,
         pending_count=pending_count,
@@ -255,6 +286,7 @@ def subscriber_detail(subscriber_id):
         due_date=due_date,
         monthly_fee=monthly_fee,
         current_balance=current_balance,
+        pay_status=_payment_status(due_date),
     )
 
 
@@ -285,6 +317,10 @@ def record_payment():
     _populate_subscriber_choices(form)
 
     if form.validate_on_submit():
+        # Money handed to the collector counts as collected right away, so it
+        # is always saved as 'confirmed' (the browser-sent status is ignored).
+        # That updates the subscriber's status on the collector side and
+        # shows the payment on the Administrator's Payments tab.
         payment = Payment(
             subscriber_id=form.subscriber_id.data,
             collector_id=g.user.id,
@@ -293,20 +329,16 @@ def record_payment():
             payment_date=datetime.strptime(form.payment_date.data.strip(), "%Y-%m-%d").date(),
             reference_number=(form.reference_number.data or "").strip() or None,
             remarks=(form.remarks.data or "").strip() or None,
-            status=form.status.data,
+            status="confirmed",
         )
         db.session.add(payment)
         db.session.commit()  # payment.id (and payment.subscriber) needed below
 
-        if payment.status == "overdue":
-            notify_payment_overdue(payment)
-            db.session.commit()
-        elif payment.status == "pending":
-            notify_payment_pending_confirmation(payment)
-            db.session.commit()
+        notify_payment_confirmed(payment)
+        db.session.commit()
 
         flash(f"Payment of {payment.amount} recorded successfully.", "success")
-        return redirect(url_for("collector.collections"))
+        return redirect(url_for("collector.subscriber_detail", subscriber_id=payment.subscriber_id))
 
     for field_errors in form.errors.values():
         for message in field_errors:

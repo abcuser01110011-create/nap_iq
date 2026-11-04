@@ -72,7 +72,7 @@
 
                 <div class="cx-modal__body pt-3">
                     <div class="mb-3">
-                        <span class="cx-status" id="collectorStatusBadge">&hellip;</span>
+                        <span class="cx-status cx-status--{{ pay_status }}" id="collectorStatusBadge">{{ {'confirmed': 'Paid', 'pending': 'Due', 'overdue': 'Overdue'}[pay_status] }}</span>
                     </div>
 
                     <div class="cx-pay-info mb-3">
