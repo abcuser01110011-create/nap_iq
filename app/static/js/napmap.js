@@ -436,6 +436,7 @@
     document.addEventListener("DOMContentLoaded", init);
     document.addEventListener("DOMContentLoaded", setupLegendCollapse);
     document.addEventListener("DOMContentLoaded", setupRedrawLinesButton);
+    document.addEventListener("DOMContentLoaded", setupRelocateButton);
 
     /**
      * "Redraw lines" (top-right, beside + Tickets) -- manual redraw of ONE
@@ -676,6 +677,7 @@
 
         btn.addEventListener("click", function () {
             redrawMode = !redrawMode;
+            if (redrawMode && relocateMode) document.getElementById("relocateBtn").click();
             btn.classList.toggle("btn-primary", redrawMode);
             btn.classList.toggle("btn-outline-primary", !redrawMode);
             btn.classList.toggle("bg-body", !redrawMode);
@@ -694,6 +696,162 @@
                 toggle.dispatchEvent(new Event("change", { bubbles: true }));
             }
             setRedrawPanel("Redraw mode: click a cable line to redraw it.", false);
+        });
+    }
+
+    /**
+     * "Relocate" (top-right, beside Redraw lines) -- move a NAP or
+     * subscriber icon.
+     *
+     *   1. Click Relocate: relocate mode turns on (click again to leave).
+     *   2. Click a NAP or subscriber icon: it becomes draggable.
+     *   3. Drag it to the new spot, then Save (POST /api/naps/<id>/location
+     *      or /api/subscribers/<id>/location). Cancel (or Esc) puts it back.
+     */
+    let relocateMode = false;
+    let relocateSession = null;
+
+    function relocatePanelEl() {
+        let el = document.getElementById("relocatePanel");
+        if (el) return el;
+        el = document.createElement("div");
+        el.id = "relocatePanel";
+        el.className = "napmap-float d-flex align-items-center gap-2 bg-body border rounded shadow-sm px-2 py-1";
+        el.style.cssText = "position:absolute;top:56px;right:12px;z-index:1000;display:none;";
+        el.innerHTML =
+            '<span class="small" id="relocateText"></span>' +
+            '<button type="button" class="btn btn-sm btn-success" id="relocateSaveBtn">Save</button>' +
+            '<button type="button" class="btn btn-sm btn-outline-danger" id="relocateCancelBtn">Cancel</button>';
+        map.getContainer().parentNode.appendChild(el);
+        L.DomEvent.disableClickPropagation(el);
+        document.getElementById("relocateSaveBtn").addEventListener("click", saveRelocate);
+        document.getElementById("relocateCancelBtn").addEventListener("click", cancelRelocate);
+        return el;
+    }
+
+    function setRelocatePanel(text, withControls) {
+        const el = relocatePanelEl();
+        document.getElementById("relocateText").textContent = text;
+        document.getElementById("relocateSaveBtn").style.display = withControls ? "" : "none";
+        document.getElementById("relocateCancelBtn").style.display = withControls ? "" : "none";
+        el.style.display = text ? "flex" : "none";
+    }
+
+    function startRelocate(kind, record, marker) {
+        if (relocateSession) cancelRelocate();
+        const origin = marker.getLatLng();
+        const s = (relocateSession = {
+            kind: kind, record: record, marker: marker,
+            origin: origin, moved: false,
+            onKey: function (e) { if (e.key === "Escape") cancelRelocate(); },
+        });
+        marker.dragging.enable();
+        marker.closePopup();
+        marker.on("dragend", function () {
+            if (relocateSession !== s) return;
+            s.moved = true;
+            setRelocatePanel("Drag as needed, then Save.", true);
+        });
+        document.addEventListener("keydown", s.onKey);
+        const name = kind === "nap" ? (record.nap_code || record.name) : (record.subscriber_code || record.full_name);
+        setRelocatePanel("Drag " + name + " to its new location.", true);
+    }
+
+    function endRelocate(restore) {
+        const s = relocateSession;
+        if (!s) return;
+        s.marker.off("dragend");
+        if (s.marker.dragging) s.marker.dragging.disable();
+        if (restore) s.marker.setLatLng(s.origin);
+        document.removeEventListener("keydown", s.onKey);
+        relocateSession = null;
+    }
+
+    function cancelRelocate() {
+        if (!relocateSession) return;
+        endRelocate(true);
+        setRelocatePanel(relocateMode ? "Relocate mode: click a NAP or subscriber icon." : "", false);
+    }
+
+    function saveRelocate() {
+        const s = relocateSession;
+        if (!s) return;
+        if (!s.moved) { setRelocatePanel("Drag the icon to a new spot first.", true); return; }
+        const ll = s.marker.getLatLng();
+        const url = (s.kind === "nap" ? "/api/naps/" : "/api/subscribers/") + s.record.id + "/location";
+        const saveBtn = document.getElementById("relocateSaveBtn");
+        saveBtn.disabled = true;
+        fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": CSRF_TOKEN,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify({ latitude: ll.lat, longitude: ll.lng }),
+        }).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) throw new Error(data.error || "Could not save the new location.");
+            });
+        }).then(function () {
+            const list = s.kind === "nap" ? allNaps : allSubscribers;
+            list.forEach(function (r) {
+                if (String(r.id) === String(s.record.id)) {
+                    r.latitude = ll.lat;
+                    r.longitude = ll.lng;
+                    // keep a saved cable line attached to the moved icon
+                    if (s.kind === "subscriber" && Array.isArray(r.cable_path) && r.cable_path.length >= 2) {
+                        r.cable_path[r.cable_path.length - 1].latitude = ll.lat;
+                        r.cable_path[r.cable_path.length - 1].longitude = ll.lng;
+                    }
+                }
+            });
+            if (s.kind === "nap") {
+                allSubscribers.forEach(function (sub) {
+                    if (String(sub.nap_id) === String(s.record.id) && Array.isArray(sub.cable_path) && sub.cable_path.length >= 2) {
+                        sub.cable_path[0].latitude = ll.lat;
+                        sub.cable_path[0].longitude = ll.lng;
+                    }
+                });
+            }
+            endRelocate(false);
+            renderAll();
+            setRelocatePanel("Location saved. Click another icon to move it, or press Relocate to finish.", false);
+        }).catch(function (err) {
+            setRelocatePanel(err.message || "Could not save the new location.", true);
+        }).then(function () {
+            saveBtn.disabled = false;
+        });
+    }
+
+    function setupRelocateButton() {
+        const btn = document.getElementById("relocateBtn");
+        if (!btn) return;
+        const label = btn.querySelector(".relocate-label");
+        btn.addEventListener("click", function () {
+            relocateMode = !relocateMode;
+            btn.classList.toggle("btn-primary", relocateMode);
+            btn.classList.toggle("btn-outline-primary", !relocateMode);
+            btn.classList.toggle("bg-body", !relocateMode);
+            if (label) label.textContent = relocateMode ? "Done" : "Relocate";
+            map.getContainer().classList.toggle("relocate-mode", relocateMode);
+            if (!relocateMode) {
+                cancelRelocate();
+                setRelocatePanel("", false);
+                return;
+            }
+            // Turn off Redraw lines so clicks don't clash.
+            const redrawBtn = document.getElementById("redrawLinesBtn");
+            if (redrawMode && redrawBtn) redrawBtn.click();
+            ["showNapsToggle", "showSubscribersToggle"].forEach(function (id) {
+                const t = document.getElementById(id);
+                if (t && !t.checked) {
+                    t.checked = true;
+                    t.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+            });
+            setRelocatePanel("Relocate mode: click a NAP or subscriber icon.", false);
         });
     }
 
@@ -970,6 +1128,7 @@
     async function refreshLiveData(force) {
         if (!force) {
             if (document.hidden) return;
+            if (relocateSession) return; // don't rebuild the markers under one being moved
             if (redrawSession) return; // don't rebuild the lines under a line being drawn
             if (addModeActive || issueModeActive) return;
             const quickAddModalEl = document.getElementById("quickAddModal");
@@ -1084,7 +1243,7 @@
             // openNapDetailPanel() below) -- clicking one flies the
             // map in to focus on it (see focusNapOnMap() below) and
             // opens/re-populates the right-side slide-in detail panel.
-            marker.on("click", () => focusNapOnMap(nap));
+            marker.on("click", () => { if (relocateMode) { startRelocate("nap", nap, marker); return; } focusNapOnMap(nap); });
             markerLayer.addLayer(marker);
             markersById[nap.id] = marker;
             shown += 1;
@@ -2489,7 +2648,7 @@
             // snapping open at whatever zoom level the user was
             // already at.
             marker.off("click");
-            marker.on("click", () => focusSubscriberOnMap(subscriber, marker));
+            marker.on("click", () => { if (relocateMode) { startRelocate("subscriber", subscriber, marker); return; } focusSubscriberOnMap(subscriber, marker); });
             subscriberMarkerLayer.addLayer(marker);
             subscriberMarkersById[subscriber.id] = marker;
 

@@ -111,12 +111,20 @@
            app/static/js/tickets.js. #}
         <style>
             .redraw-lines-mode .leaflet-interactive { cursor: crosshair; }
+            .relocate-mode .leaflet-marker-icon { cursor: pointer; }
+            .relocate-mode .leaflet-marker-draggable { cursor: move; outline: 2px dashed #fd7e14; outline-offset: 2px; border-radius: 50%; }
         </style>
         {# Redraw Lines: re-fetches/redraws every subscriber -> NAP cable line
            (see napmap.js, setupRedrawLinesButton()). #}
         <button type="button" id="redrawLinesBtn" class="btn btn-outline-primary btn-sm shadow-sm bg-body"
                 title="Click a cable line, then draw its new route on the map">
             <i class="bi bi-bezier2 me-1"></i><span class="redraw-lines-label">Redraw lines</span>
+        </button>
+        {# Relocate: click it, click a NAP or subscriber icon, drag it to its
+           new spot, then Save (see napmap.js, setupRelocateButton()). #}
+        <button type="button" id="relocateBtn" class="btn btn-outline-primary btn-sm shadow-sm bg-body"
+                title="Click a NAP or subscriber icon, then drag it to its new location">
+            <i class="bi bi-arrows-move me-1"></i><span class="relocate-label">Relocate</span>
         </button>
         <div class="dropdown">
             <button type="button" id="ticketsDropdownBtn" class="btn btn-primary btn-sm shadow-sm dropdown-toggle"

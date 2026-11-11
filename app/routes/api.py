@@ -411,6 +411,69 @@ def save_subscriber_cable_path(subscriber_id):
     return jsonify({"status": "success", "point_count": len(cleaned)})
 
 
+def _parse_lat_lng(data):
+    try:
+        lat = float(data["latitude"])
+        lng = float(data["longitude"])
+    except (TypeError, KeyError, ValueError):
+        return None
+    if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+        return None
+    return lat, lng
+
+
+def _move_cable_endpoint(path, lat, lng, first):
+    """Keeps a saved cable line attached to a relocated NAP (first point)
+    or subscriber (last point)."""
+    try:
+        pts = json.loads(path.points or "[]")
+    except ValueError:
+        return
+    if not isinstance(pts, list) or len(pts) < 2:
+        return
+    idx = 0 if first else -1
+    pts[idx]["latitude"] = lat
+    pts[idx]["longitude"] = lng
+    path.points = json.dumps(pts)
+
+
+@api_bp.route("/naps/<int:nap_id>/location", methods=["POST"])
+@role_required("administrator")
+def update_nap_location(nap_id):
+    """Relocate a NAP (GeoMap "Relocate" mode in napmap.js).
+    Body: {"latitude": .., "longitude": ..}"""
+    nap = Nap.query.get_or_404(nap_id)
+    coords = _parse_lat_lng(request.get_json(silent=True) or {})
+    if coords is None:
+        return jsonify({"error": "Valid numeric latitude and longitude are required."}), 400
+    lat, lng = coords
+    nap.latitude = round(lat, 7)
+    nap.longitude = round(lng, 7)
+    for path in CablePath.query.filter_by(nap_id=nap.id).all():
+        _move_cable_endpoint(path, lat, lng, first=True)
+    db.session.commit()
+    return jsonify({"status": "success", "latitude": lat, "longitude": lng})
+
+
+@api_bp.route("/subscribers/<int:subscriber_id>/location", methods=["POST"])
+@role_required("administrator")
+def update_subscriber_location(subscriber_id):
+    """Relocate a subscriber (GeoMap "Relocate" mode in napmap.js).
+    Body: {"latitude": .., "longitude": ..}"""
+    subscriber = Subscriber.query.get_or_404(subscriber_id)
+    coords = _parse_lat_lng(request.get_json(silent=True) or {})
+    if coords is None:
+        return jsonify({"error": "Valid numeric latitude and longitude are required."}), 400
+    lat, lng = coords
+    subscriber.latitude = round(lat, 7)
+    subscriber.longitude = round(lng, 7)
+    path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
+    if path is not None:
+        _move_cable_endpoint(path, lat, lng, first=False)
+    db.session.commit()
+    return jsonify({"status": "success", "latitude": lat, "longitude": lng})
+
+
 @api_bp.route("/personnel")
 @role_required("administrator")
 def personnel_json():
