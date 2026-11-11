@@ -565,7 +565,12 @@
             // Capture phase, so a click on the NAP/subscriber marker (or on
             // another line) adds a point instead of opening its popup.
             onClick: function (e) {
-                if (!e.target.closest || !e.target.closest(".leaflet-map-pane")) return; // panel / controls
+                // Only ignore the panel / map controls / popups. (Do NOT require the
+                // target to be inside .leaflet-map-pane: Leaflet tiles have
+                // pointer-events:none, so a click on bare map lands on the
+                // .leaflet-container itself and used to be silently ignored.)
+                const t = e.target;
+                if (!t || !t.closest || t.closest(".leaflet-control, .leaflet-popup, #redrawLinesPanel, .napmap-float")) return;
                 if (map.dragging && map.dragging.moved()) return;                      // end of a map drag
                 e.stopPropagation();
                 e.preventDefault();
@@ -597,6 +602,7 @@
         map.removeLayer(s.preview);
         map.removeLayer(s.vertexLayer);
         map.removeLayer(s.snapLayer);
+        try { s.line.setStyle({ opacity: 0.85 }); } catch (err) { /* line already removed */ }
         redrawSession = null;
     }
 
@@ -647,6 +653,12 @@
             });
         }).then(function () {
             s.subscriber.cable_path = pts;
+            // A background refresh can swap allSubscribers for fresh objects while
+            // you draw; store the new path on the live record too, otherwise the
+            // re-render below would draw the OLD line again.
+            allSubscribers.forEach(function (sub) {
+                if (String(sub.id) === String(s.subscriber.id)) sub.cable_path = pts;
+            });
             endRedrawSession();
             renderSubscriberMarkers();
             setRedrawPanel("Cable line saved. Click another cable line to redraw it, or press Redraw lines to finish.", false);
@@ -958,6 +970,7 @@
     async function refreshLiveData(force) {
         if (!force) {
             if (document.hidden) return;
+            if (redrawSession) return; // don't rebuild the lines under a line being drawn
             if (addModeActive || issueModeActive) return;
             const quickAddModalEl = document.getElementById("quickAddModal");
             const reportIssueModalEl = document.getElementById("reportIssueModal");
