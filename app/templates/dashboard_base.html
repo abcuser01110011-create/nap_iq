@@ -421,7 +421,28 @@
     {% endif %}
     {% endif %}
 
-    <!-- Logout confirmation modal. Triggered instead of submitting
+        {# Notification detail popup: opened by clicking a notification in the bell
+       dropdown or on the Notifications page (static/js/notifications-popover.js). #}
+    <div class="modal fade" id="notifDetailModal" tabindex="-1" aria-labelledby="notifDetailTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notifDetailTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2" id="notifDetailTime"></p>
+                    <p class="mb-0" id="notifDetailMessage" style="white-space: pre-line;"></p>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" class="btn btn-primary d-none" id="notifDetailOpen">View details</a>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Logout confirmation modal. Triggered instead of submitting
          #logoutForm directly (the Logout button is now type="button"
          with data-bs-toggle/target pointing here); the real submit is
          fired from #logoutConfirmBtn below via requestSubmit() so the
@@ -537,7 +558,11 @@
                                class="notif-dropdown-item d-flex gap-2 px-3 py-2 text-decoration-none {{ 'notif-unread' if not n.is_read else '' }}"
                                {% if not n.is_read %}
                                data-mark-read-url="{{ url_for('notifications.mark_read', notification_id=n.id) }}"
-                               {% endif %}>
+                               {% endif %}
+                               data-notif-title="{{ n.title }}"
+                               data-notif-message="{{ n.message }}"
+                               data-notif-time="{{ n.created_at.strftime('%b %d, %Y, %H:%M') }}"
+                               data-notif-link="{{ n.link or '' }}">
                                 <i class="bi {{ notif_category_icons.get(n.category, 'bi-bell') }} mt-1 text-muted"></i>
                                 <span class="flex-grow-1 min-w-0">
                                     <span class="d-block small fw-semibold text-truncate">{{ n.title }}</span>

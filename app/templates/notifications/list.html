@@ -45,20 +45,18 @@
     {% for n in notifications %}
     {% set link = links.get(n.id) %}
     {% set mark_url = url_for('notifications.mark_read', notification_id=n.id) %}
-    {% if link %}
-    <a href="{{ link }}" class="notif-item{{ ' notif-item--unread' if not n.is_read }}"
-       {% if not n.is_read %}data-mark-read-url="{{ mark_url }}"{% endif %}>
-    {% else %}
+    {# Clicking opens the detail popup (notifications-popover.js) instead of navigating. #}
     <button type="button" class="notif-item{{ ' notif-item--unread' if not n.is_read }}"
-            {% if not n.is_read %}data-mark-read-url="{{ mark_url }}" data-reload="1"{% endif %}>
-    {% endif %}
+            {% if not n.is_read %}data-mark-read-url="{{ mark_url }}"{% endif %}
+            data-notif-title="{{ n.title }}" data-notif-message="{{ n.message }}"
+            data-notif-time="{{ n.created_at.strftime('%b %d, %Y, %H:%M') }}" data-notif-link="{{ link or '' }}">
         <span class="notif-dot" aria-hidden="true"></span>
         <span class="notif-body">
             <span class="notif-title">{{ n.title }}</span>
             <span class="notif-msg">{{ n.message }}</span>
         </span>
         {% if link %}<i class="bi bi-chevron-right notif-chevron"></i>{% endif %}
-    {% if link %}</a>{% else %}</button>{% endif %}
+    </button>
     {% else %}
     <div class="p-4 text-center text-muted">
         <i class="bi bi-bell-slash display-6 d-block mb-2"></i>
@@ -66,22 +64,6 @@
     </div>
     {% endfor %}
 </div>
-<script>
-(function () {
-    var CSRF = "{{ csrf_token() }}";
-    document.querySelectorAll(".notif-item[data-mark-read-url]").forEach(function (item) {
-        item.addEventListener("click", function () {
-            var done = fetch(item.getAttribute("data-mark-read-url"), {
-                method: "POST", credentials: "same-origin", keepalive: true,
-                headers: { "X-CSRFToken": CSRF, "X-Requested-With": "XMLHttpRequest" }
-            }).catch(function () {});
-            // Links navigate on their own; items with no target page just
-            // refresh so the unread dot and badges update.
-            if (item.getAttribute("data-reload")) done.then(function () { window.location.reload(); });
-        });
-    });
-})();
-</script>
 {% else %}
 <div class="disp-table-card">
     <div class="table-responsive">
@@ -102,10 +84,12 @@
                     'issue': 'bi-life-preserver'
                 } %}
                 {% for n in notifications %}
-                <tr class="disp-row {{ 'disp-row-clickable' if links.get(n.id) else '' }}"
-                    {% if links.get(n.id) %}onclick="window.location='{{ links[n.id] }}';"{% endif %}>
+                <tr class="disp-row disp-row-clickable" style="cursor:pointer;"
+                    {% if not n.is_read %}data-mark-read-url="{{ url_for('notifications.mark_read', notification_id=n.id) }}"{% endif %}
+                    data-notif-title="{{ n.title }}" data-notif-message="{{ n.message }}"
+                    data-notif-time="{{ n.created_at.strftime('%b %d, %Y, %H:%M') }}" data-notif-link="{{ links.get(n.id) or '' }}">
                     <td>
-                        <a {% if links.get(n.id) %}href="{{ links[n.id] }}" class="disp-primary-link"{% else %}class="fw-semibold"{% endif %}>
+                        <a href="#" class="disp-primary-link">
                             {{ n.title }}
                         </a>
                         <div class="disp-subtext">{{ n.message }}</div>
@@ -130,9 +114,7 @@
                                 </button>
                             </form>
                             {% endif %}
-                            {% if links.get(n.id) %}
                             <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
-                            {% endif %}
                         </div>
                     </td>
                 </tr>
