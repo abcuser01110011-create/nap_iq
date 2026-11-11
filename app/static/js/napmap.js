@@ -435,6 +435,55 @@
 
     document.addEventListener("DOMContentLoaded", init);
     document.addEventListener("DOMContentLoaded", setupLegendCollapse);
+    document.addEventListener("DOMContentLoaded", setupRedrawLinesButton);
+
+    /**
+     * "Redraw lines" button (top-right, beside + Tickets).
+     *
+     * Redraws every subscriber -> NAP cable line from scratch:
+     *   1. forgets all cached *estimated* street routes (in memory and in
+     *      localStorage) and drops any route lookups still queued, so a
+     *      line that got stuck on a bad/fallback path is fetched again;
+     *   2. turns the Subscribers layer on if it was off (the lines live
+     *      on that layer);
+     *   3. clears and re-renders all subscriber markers and lines.
+     * Technician-recorded cable paths are real data, so they are never
+     * discarded -- they are simply drawn again from the loaded data.
+     */
+    function setupRedrawLinesButton() {
+        const btn = document.getElementById("redrawLinesBtn");
+        if (!btn) return;
+        const label = btn.querySelector(".redraw-lines-label");
+        const icon = btn.querySelector("i");
+
+        btn.addEventListener("click", function () {
+            if (btn.disabled || !subscriberConnectionLayer) return;
+            btn.disabled = true;
+            if (label) label.textContent = "Redrawing...";
+            if (icon) icon.classList.add("redraw-spin");
+
+            // 1) forget cached estimated routes + pending lookups
+            Object.keys(estRouteMemory).forEach(function (k) { delete estRouteMemory[k]; });
+            estRouteWaiting.length = 0;
+            try { window.localStorage.removeItem(EST_ROUTE_CACHE_KEY); } catch (e) { /* ignore */ }
+            estRouteCacheLoaded = true;
+
+            // 2) make sure the subscriber layer is on, 3) re-render
+            const toggle = document.getElementById("showSubscribersToggle");
+            if (toggle && !toggle.checked) {
+                toggle.checked = true;
+                toggle.dispatchEvent(new Event("change", { bubbles: true }));
+            } else {
+                renderSubscriberMarkers();
+            }
+
+            setTimeout(function () {
+                btn.disabled = false;
+                if (label) label.textContent = "Redraw lines";
+                if (icon) icon.classList.remove("redraw-spin");
+            }, 1200);
+        });
+    }
 
     // ------------------------------------------------------------------
     // Legend collapse/expand (small collapsible card, bottom-left of the

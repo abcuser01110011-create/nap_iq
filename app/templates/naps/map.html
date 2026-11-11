@@ -109,6 +109,16 @@
            Trouble Ticket (TN) opens the same modal in its TN
            configuration (Fiber Break / Repair). See
            app/static/js/tickets.js. #}
+        <style>
+            @keyframes redrawLinesSpin { to { transform: rotate(360deg); } }
+            #redrawLinesBtn .redraw-spin { display: inline-block; animation: redrawLinesSpin .8s linear infinite; }
+        </style>
+        {# Redraw Lines: re-fetches/redraws every subscriber -> NAP cable line
+           (see napmap.js, setupRedrawLinesButton()). #}
+        <button type="button" id="redrawLinesBtn" class="btn btn-outline-primary btn-sm shadow-sm bg-body"
+                title="Redraw the cable lines from every subscriber to their NAP">
+            <i class="bi bi-bezier2 me-1"></i><span class="redraw-lines-label">Redraw lines</span>
+        </button>
         <div class="dropdown">
             <button type="button" id="ticketsDropdownBtn" class="btn btn-primary btn-sm shadow-sm dropdown-toggle"
                     data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
