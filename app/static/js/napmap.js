@@ -502,10 +502,11 @@
         const s = redrawSession;
         if (!s) return null;
         const here = map.latLngToContainerPoint(latlng);
-        const candidates = [
-            { ll: s.napLL, label: "Snap to NAP " + (s.nap.nap_code || "") },
-            { ll: s.subLL, label: "Snap to " + s.subscriber.subscriber_code },
-        ];
+        // The subscriber is the end of the line, so it always snaps. The NAP
+        // is the start, so it only snaps before the first point is placed --
+        // after that, clicks near it are ordinary cable points.
+        const candidates = [{ ll: s.subLL, label: "Snap to " + s.subscriber.subscriber_code }];
+        if (!s.points.length) candidates.push({ ll: s.napLL, label: "Snap to NAP " + (s.nap.nap_code || "") });
         let best = null;
         let bestDist = REDRAW_SNAP_PX;
         candidates.forEach(function (c) {
@@ -540,7 +541,7 @@
         });
         setRedrawPanel(
             "Drawing " + s.subscriber.subscriber_code + " \u2192 " + (s.nap.nap_code || "NAP") +
-            ": click the map to add points (" + s.points.length + " added). Points snap to the NAP and the subscriber.",
+            ": click the map to add as many cable points as you need (" + s.points.length + " so far). The line end snaps to the subscriber.",
             true
         );
     }
@@ -552,7 +553,12 @@
         const container = map.getContainer();
         const s = (redrawSession = {
             subscriber: subscriber, nap: nap, line: line,
-            napLL: napLL, subLL: subLL, points: [], container: container,
+            napLL: napLL, subLL: subLL, container: container,
+            // Editing a hand-drawn line starts from its existing cable points
+            // (everything between the NAP and the subscriber).
+            points: (Array.isArray(subscriber.cable_path) && subscriber.cable_path[0] && subscriber.cable_path[0].manual)
+                ? subscriber.cable_path.slice(1, -1).map(function (p) { return L.latLng(p.latitude, p.longitude); })
+                : [],
             preview: L.polyline([napLL], { color: "#fd7e14", weight: 4, dashArray: "6,6", interactive: false }).addTo(map),
             vertexLayer: L.layerGroup().addTo(map),
             snapLayer: L.layerGroup().addTo(map),
