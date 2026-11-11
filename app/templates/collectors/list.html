@@ -21,12 +21,21 @@
                     <th class="text-end">Collected Today</th>
                     <th class="text-end">Collection Rate</th>
                     <th>Status</th>
-                    <th class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for row in collectors %}
-                <tr class="disp-row">
+                <tr class="disp-row disp-row-clickable collector-row" style="cursor: pointer;" tabindex="0" role="button"
+                    data-name="{{ row.user.full_name }}"
+                    data-username="{{ row.user.username }}"
+                    data-email="{{ row.user.email or '' }}"
+                    data-phone="{{ row.user.phone_number or '' }}"
+                    data-coverage="{{ row.user.coverage_area or '' }}"
+                    data-subscribers="{{ row.subscribers }}"
+                    data-collected="₱{{ '{:,.2f}'.format(row.collected_today) }}"
+                    data-rate="{% if row.rate is not none %}{{ row.rate }}%{% endif %}"
+                    data-status="{{ {'active': 'Active', 'behind': 'Behind', 'no_activity': 'No Activity'}.get(row.status, row.status|capitalize) }}"
+                    data-edit-url="{{ url_for('users.edit_user', user_id=row.user.id, next='collectors') }}">
                     <td><span class="disp-primary-link">{{ row.user.full_name }}</span></td>
                     <td class="disp-subtext">{{ row.user.coverage_area or "—" }}</td>
                     <td class="text-end">{{ row.subscribers }}</td>
@@ -49,18 +58,10 @@
                             {{ collector_status_labels.get(row.status, row.status|capitalize) }}
                         </span>
                     </td>
-                    <td class="text-end">
-                        <div class="subs-row-actions">
-                            <a href="{{ url_for('users.edit_user', user_id=row.user.id, next='collectors') }}"
-                               class="subs-edit-btn" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                        </div>
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="disp-empty">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-cash-coin display-6 d-block mb-2"></i>
                         No collector accounts found. Create one from Manage Users with the
                         "Payment Collector" role.
@@ -71,4 +72,53 @@
         </table>
     </div>
 </div>
+
+<div class="modal fade" id="collectorModal" tabindex="-1" aria-labelledby="collectorModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="collectorModalTitle">Collector</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-5 text-muted">Username</dt><dd class="col-7" data-f="username"></dd>
+                    <dt class="col-5 text-muted">Email</dt><dd class="col-7" data-f="email"></dd>
+                    <dt class="col-5 text-muted">Phone</dt><dd class="col-7" data-f="phone"></dd>
+                    <dt class="col-5 text-muted">Coverage</dt><dd class="col-7" data-f="coverage"></dd>
+                    <dt class="col-5 text-muted">Subscribers</dt><dd class="col-7" data-f="subscribers"></dd>
+                    <dt class="col-5 text-muted">Collected today</dt><dd class="col-7" data-f="collected"></dd>
+                    <dt class="col-5 text-muted">Collection rate</dt><dd class="col-7" data-f="rate"></dd>
+                    <dt class="col-5 text-muted">Status</dt><dd class="col-7" data-f="status"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="collectorEditLink" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modalEl = document.getElementById("collectorModal");
+    if (!modalEl) return;
+    function open(row) {
+        var d = row.dataset;
+        modalEl.querySelector("#collectorModalTitle").textContent = d.name;
+        modalEl.querySelectorAll("[data-f]").forEach(function (el) {
+            el.textContent = d[el.getAttribute("data-f")] || "\u2014";
+        });
+        document.getElementById("collectorEditLink").href = d.editUrl;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+    document.querySelectorAll(".collector-row").forEach(function (row) {
+        row.addEventListener("click", function () { open(row); });
+        row.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(row); }
+        });
+    });
+})();
+</script>
 {% endblock %}

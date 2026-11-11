@@ -2300,13 +2300,30 @@
      * flow).
      */
     function focusSubscriberOnMap(subscriber, marker) {
+        // Same behaviour as focusNapOnMap(): the subscriber ends up exactly
+        // in the center of the map. The old NAP side panel is closed so it
+        // doesn't cover the right side of the map, and the popup is opened
+        // only AFTER the move finishes with autoPan off -- otherwise
+        // Leaflet's popup auto-pan fights the fly/pan and leaves the
+        // subscriber off-center.
+        closeNapDetailPanel();
+        let opened = false;
+        const openPopupOnce = function () {
+            if (opened) return;
+            opened = true;
+            if (marker) marker.openPopup();
+        };
+        if (marker && marker.getPopup()) marker.getPopup().options.autoPan = false;
+        map.invalidateSize();
+        map.once("moveend", openPopupOnce);
         focusMapOn(
             [subscriber.latitude, subscriber.longitude],
             SUBSCRIBER_FOCUS_ZOOM,
             SUBSCRIBER_FOCUS_FLY_DURATION,
             SUBSCRIBER_FOCUS_PAN_DURATION
         );
-        if (marker) marker.openPopup();
+        // Already centered => no move happens, so no "moveend": open anyway.
+        window.setTimeout(openPopupOnce, 900);
     }
 
     /**
