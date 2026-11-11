@@ -42,7 +42,16 @@
 
 <div class="disp-table-card">
     <div class="table-responsive">
-        <table class="table disp-table align-middle mb-0" data-lf-table>
+        <table class="table disp-table align-middle mb-0" data-lf-table style="table-layout: fixed; width: 100%;">
+            {# Fixed column widths so the columns stay put on every page #}
+            <colgroup>
+                <col style="width: 24%;">
+                <col style="width: 30%;">
+                <col style="width: 11%;">
+                <col style="width: 13%;">
+                <col style="width: 11%;">
+                <col style="width: 11%;">
+            </colgroup>
             <thead>
                 <tr>
                     <th>NAP</th>
