@@ -212,6 +212,7 @@
     let allSubscribers = [];       // active subscribers, for the Report Issue form
     const markersById = {};        // rebuilt on every renderNapMarkers() call
     const issueMarkersById = {};   // rebuilt on every renderIssueMarkers() call
+    const subscriberLinesById = {};   // cable line per subscriber, so Relocate can move it live
     const subscriberMarkersById = {}; // rebuilt on every renderSubscriberMarkers() call
 
     /** Looks up a NAP's in-memory record (with lat/lng) by id from the
@@ -747,6 +748,7 @@
         });
         marker.dragging.enable();
         marker.closePopup();
+        marker.on("drag", function (e) { if (relocateSession === s) followRelocateLines(s, e.latlng || marker.getLatLng()); });
         marker.on("dragend", function () {
             if (relocateSession !== s) return;
             s.moved = true;
@@ -760,6 +762,7 @@
     function endRelocate(restore) {
         const s = relocateSession;
         if (!s) return;
+        s.marker.off("drag");
         s.marker.off("dragend");
         if (s.marker.dragging) s.marker.dragging.disable();
         if (restore) s.marker.setLatLng(s.origin);
@@ -767,9 +770,31 @@
         relocateSession = null;
     }
 
+    /** Live-updates the cable line(s) attached to the icon being dragged. */
+    function followRelocateLines(s, ll) {
+        function stretch(sub, napLL, subLL) {
+            const line = subscriberLinesById[sub.id];
+            if (!line) return;
+            line.setLatLngs([subLL, napLL]);
+            line.setStyle({ dashArray: "4,4" });
+        }
+        if (s.kind === "nap") {
+            allSubscribers.forEach(function (sub) {
+                if (String(sub.nap_id) !== String(s.record.id)) return;
+                if (sub.latitude == null || sub.longitude == null) return;
+                stretch(sub, ll, L.latLng(sub.latitude, sub.longitude));
+            });
+        } else {
+            const nap = findNapById(s.record.nap_id);
+            if (nap) stretch(s.record, L.latLng(nap.latitude, nap.longitude), ll);
+        }
+    }
+
     function cancelRelocate() {
         if (!relocateSession) return;
+        const hadMoved = relocateSession.moved;
         endRelocate(true);
+        if (hadMoved) renderSubscriberMarkers(); // snap the lines back too
         setRelocatePanel(relocateMode ? "Relocate mode: click a NAP or subscriber icon." : "", false);
     }
 
@@ -2595,6 +2620,7 @@
         subscriberMarkerLayer.clearLayers();
         subscriberConnectionLayer.clearLayers();
         Object.keys(subscriberMarkersById).forEach((key) => delete subscriberMarkersById[key]);
+        Object.keys(subscriberLinesById).forEach((key) => delete subscriberLinesById[key]);
 
         const toggle = document.getElementById("showSubscribersToggle");
         const showSubscribers = toggle ? toggle.checked : false;
@@ -2701,6 +2727,7 @@
                     interactive: true,
                 });
                 attachRedrawHandler(line, subscriber, nap);
+                subscriberLinesById[subscriber.id] = line;
                 if (recordedPath) {
                     line.bindTooltip("Recorded cable path (" + recordedPath.length + " GPS points)", {
                         sticky: true,
