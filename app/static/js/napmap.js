@@ -438,50 +438,191 @@
     document.addEventListener("DOMContentLoaded", setupRedrawLinesButton);
 
     /**
-     * "Redraw lines" button (top-right, beside + Tickets).
+     * "Redraw lines" (top-right, beside + Tickets) -- manual redraw of ONE
+     * subscriber -> NAP cable line.
      *
-     * Redraws every subscriber -> NAP cable line from scratch:
-     *   1. forgets all cached *estimated* street routes (in memory and in
-     *      localStorage) and drops any route lookups still queued, so a
-     *      line that got stuck on a bad/fallback path is fetched again;
-     *   2. turns the Subscribers layer on if it was off (the lines live
-     *      on that layer);
-     *   3. clears and re-renders all subscriber markers and lines.
-     * Technician-recorded cable paths are real data, so they are never
-     * discarded -- they are simply drawn again from the loaded data.
+     *   1. Click the button: redraw mode turns on (click it again to leave).
+     *   2. Click any cable line on the map: that line is selected.
+     *   3. Click the map to place the points of the new route, in order,
+     *      starting from the NAP and heading to the subscriber (a dashed
+     *      orange guide follows the cursor). Undo removes the last point.
+     *   4. Save stores the line (POST /api/subscribers/<id>/cable-path) and
+     *      draws it; Cancel (or Esc) keeps the old line.
+     *
+     * Nothing is redrawn automatically -- only the line you pick, only when
+     * you save.
      */
+    let redrawMode = false;
+    let redrawSession = null;
+
+    function attachRedrawHandler(line, subscriber, nap) {
+        line.on("click", function (e) {
+            if (!redrawMode || redrawSession) return;
+            L.DomEvent.stop(e);
+            startRedrawSession(subscriber, nap, line);
+        });
+    }
+
+    function redrawPanelEl() {
+        let el = document.getElementById("redrawLinesPanel");
+        if (el) return el;
+        el = document.createElement("div");
+        el.id = "redrawLinesPanel";
+        el.className = "card shadow-sm";
+        el.style.cssText = "position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:1200;" +
+            "max-width:calc(100% - 24px);display:none;";
+        el.innerHTML = '<div class="card-body py-2 px-3 d-flex align-items-center gap-2 flex-wrap">' +
+            '<span class="small" id="redrawPanelText"></span>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary" id="redrawUndoBtn">Undo</button>' +
+            '<button type="button" class="btn btn-sm btn-success" id="redrawSaveBtn">Save</button>' +
+            '<button type="button" class="btn btn-sm btn-outline-danger" id="redrawCancelBtn">Cancel</button>' +
+            "</div>";
+        map.getContainer().appendChild(el);
+        L.DomEvent.disableClickPropagation(el);
+        document.getElementById("redrawUndoBtn").addEventListener("click", undoRedrawPoint);
+        document.getElementById("redrawSaveBtn").addEventListener("click", saveRedrawSession);
+        document.getElementById("redrawCancelBtn").addEventListener("click", cancelRedrawSession);
+        return el;
+    }
+
+    function setRedrawPanel(text, withControls) {
+        const el = redrawPanelEl();
+        document.getElementById("redrawPanelText").textContent = text;
+        ["redrawUndoBtn", "redrawSaveBtn", "redrawCancelBtn"].forEach(function (id) {
+            document.getElementById(id).style.display = withControls ? "" : "none";
+        });
+        el.style.display = text ? "" : "none";
+    }
+
+    function updateRedrawPreview(cursorLatLng) {
+        const s = redrawSession;
+        if (!s) return;
+        const pts = [s.napLL].concat(s.points);
+        if (cursorLatLng) pts.push(cursorLatLng);
+        s.preview.setLatLngs(pts);
+        s.vertexLayer.clearLayers();
+        s.points.forEach(function (ll) {
+            L.circleMarker(ll, { radius: 4, color: "#fd7e14", fillColor: "#fff", fillOpacity: 1, weight: 2, interactive: false })
+                .addTo(s.vertexLayer);
+        });
+        setRedrawPanel(
+            "Drawing " + s.subscriber.subscriber_code + " \u2192 " + (s.nap.nap_code || "NAP") +
+            ": click the map to add points from the NAP to the subscriber (" + s.points.length + " added).",
+            true
+        );
+    }
+
+    function startRedrawSession(subscriber, nap, line) {
+        line.setStyle({ opacity: 0.25 });
+        const napLL = L.latLng(nap.latitude, nap.longitude);
+        const subLL = L.latLng(subscriber.latitude, subscriber.longitude);
+        const s = (redrawSession = {
+            subscriber: subscriber, nap: nap, line: line,
+            napLL: napLL, subLL: subLL, points: [],
+            preview: L.polyline([napLL], { color: "#fd7e14", weight: 4, dashArray: "6,6", interactive: false }).addTo(map),
+            vertexLayer: L.layerGroup().addTo(map),
+            onClick: function (e) { s.points.push(e.latlng); updateRedrawPreview(); },
+            onMove: function (e) { updateRedrawPreview(e.latlng); },
+            onKey: function (e) { if (e.key === "Escape") cancelRedrawSession(); },
+        });
+        // Added on the next tick so the click that selected the line
+        // doesn't also drop the first point.
+        setTimeout(function () {
+            if (redrawSession !== s) return;
+            map.on("click", s.onClick);
+            map.on("mousemove", s.onMove);
+            document.addEventListener("keydown", s.onKey);
+        }, 0);
+        updateRedrawPreview();
+    }
+
+    function endRedrawSession() {
+        const s = redrawSession;
+        if (!s) return;
+        map.off("click", s.onClick);
+        map.off("mousemove", s.onMove);
+        document.removeEventListener("keydown", s.onKey);
+        map.removeLayer(s.preview);
+        map.removeLayer(s.vertexLayer);
+        redrawSession = null;
+    }
+
+    function undoRedrawPoint() {
+        if (!redrawSession) return;
+        redrawSession.points.pop();
+        updateRedrawPreview();
+    }
+
+    function cancelRedrawSession() {
+        const s = redrawSession;
+        if (!s) return;
+        s.line.setStyle({ opacity: 0.85 });
+        endRedrawSession();
+        setRedrawPanel(redrawMode ? "Redraw mode: click a cable line to redraw it." : "", false);
+    }
+
+    function saveRedrawSession() {
+        const s = redrawSession;
+        if (!s) return;
+        if (!s.points.length) {
+            setRedrawPanel("Click the map to add at least one point first.", true);
+            return;
+        }
+        const pts = [s.napLL].concat(s.points).concat([s.subLL]).map(function (ll) {
+            return { latitude: ll.lat, longitude: ll.lng };
+        });
+        const saveBtn = document.getElementById("redrawSaveBtn");
+        saveBtn.disabled = true;
+        fetch("/api/subscribers/" + s.subscriber.id + "/cable-path", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": CSRF_TOKEN,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify({ points: pts }),
+        }).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) throw new Error(data.error || "Could not save the cable line.");
+            });
+        }).then(function () {
+            s.subscriber.cable_path = pts;
+            endRedrawSession();
+            renderSubscriberMarkers();
+            setRedrawPanel("Cable line saved. Click another cable line to redraw it, or press Redraw lines to finish.", false);
+        }).catch(function (err) {
+            setRedrawPanel(err.message || "Could not save the cable line.", true);
+        }).then(function () {
+            saveBtn.disabled = false;
+        });
+    }
+
     function setupRedrawLinesButton() {
         const btn = document.getElementById("redrawLinesBtn");
         if (!btn) return;
         const label = btn.querySelector(".redraw-lines-label");
-        const icon = btn.querySelector("i");
 
         btn.addEventListener("click", function () {
-            if (btn.disabled || !subscriberConnectionLayer) return;
-            btn.disabled = true;
-            if (label) label.textContent = "Redrawing...";
-            if (icon) icon.classList.add("redraw-spin");
+            redrawMode = !redrawMode;
+            btn.classList.toggle("btn-primary", redrawMode);
+            btn.classList.toggle("btn-outline-primary", !redrawMode);
+            btn.classList.toggle("bg-body", !redrawMode);
+            if (label) label.textContent = redrawMode ? "Done" : "Redraw lines";
+            map.getContainer().classList.toggle("redraw-lines-mode", redrawMode);
 
-            // 1) forget cached estimated routes + pending lookups
-            Object.keys(estRouteMemory).forEach(function (k) { delete estRouteMemory[k]; });
-            estRouteWaiting.length = 0;
-            try { window.localStorage.removeItem(EST_ROUTE_CACHE_KEY); } catch (e) { /* ignore */ }
-            estRouteCacheLoaded = true;
-
-            // 2) make sure the subscriber layer is on, 3) re-render
+            if (!redrawMode) {
+                cancelRedrawSession();
+                setRedrawPanel("", false);
+                return;
+            }
+            // The lines live on the Subscribers layer: make sure it is on.
             const toggle = document.getElementById("showSubscribersToggle");
             if (toggle && !toggle.checked) {
                 toggle.checked = true;
                 toggle.dispatchEvent(new Event("change", { bubbles: true }));
-            } else {
-                renderSubscriberMarkers();
             }
-
-            setTimeout(function () {
-                btn.disabled = false;
-                if (label) label.textContent = "Redraw lines";
-                if (icon) icon.classList.remove("redraw-spin");
-            }, 1200);
+            setRedrawPanel("Redraw mode: click a cable line to redraw it.", false);
         });
     }
 
@@ -2322,8 +2463,9 @@
                     // hoverable -- the straight-line guess has nothing
                     // extra to say beyond what the subscriber marker's
                     // own popup already covers.
-                    interactive: !!recordedPath,
+                    interactive: true,
                 });
+                attachRedrawHandler(line, subscriber, nap);
                 if (recordedPath) {
                     line.bindTooltip("Recorded cable path (" + recordedPath.length + " GPS points)", {
                         sticky: true,
@@ -2532,6 +2674,8 @@
             // The map may have been re-rendered (filters, toggles) while
             // we waited; only touch the line if it is still on the map.
             if (!route || !layer.hasLayer(placeholderLine)) return;
+            // A line being redrawn by hand must not be swapped underneath the user.
+            if (redrawSession && redrawSession.subscriber.id === subscriber.id) return;
             // Join the street route to the exact NAP and house positions.
             const latlngs = [[nap.latitude, nap.longitude]]
                 .concat(route)
@@ -2546,6 +2690,7 @@
                 lineCap: "round",
                 interactive: true,
             });
+            attachRedrawHandler(line, subscriber, nap);
             line.bindTooltip("Cable route (" + latlngs.length + " points)", { sticky: true });
             layer.addLayer(line);
             line.bringToFront();

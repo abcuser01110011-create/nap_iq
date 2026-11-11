@@ -47,6 +47,7 @@ from flask import Blueprint, jsonify, g, abort, request
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.auth import role_required
+from app.extensions import db
 from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, CablePath
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
@@ -361,6 +362,51 @@ def subscribers_json():
         for s in subscribers
     ]
     return jsonify(data)
+
+
+@api_bp.route("/subscribers/<int:subscriber_id>/cable-path", methods=["POST"])
+@role_required("administrator")
+def save_subscriber_cable_path(subscriber_id):
+    """Saves a cable line an administrator drew by hand on the GeoMap
+    ("Redraw lines" mode in napmap.js) for one subscriber.
+
+    Body: {"points": [{"latitude": .., "longitude": ..}, ...]} in order
+    from the NAP to the subscriber (at least 2). Replaces the
+    subscriber's CablePath row (one row per subscriber), so
+    GET /api/subscribers returns it as `cable_path` and the map draws it
+    instead of any estimated street route.
+    """
+    subscriber = Subscriber.query.get_or_404(subscriber_id)
+    if subscriber.nap_id is None:
+        return jsonify({"error": "This subscriber isn't connected to a NAP yet."}), 409
+
+    data = request.get_json(silent=True) or {}
+    points = data.get("points")
+    if not isinstance(points, list) or len(points) < 2:
+        return jsonify({"error": "points must be a list of at least 2 coordinates."}), 400
+    if len(points) > 500:
+        return jsonify({"error": "points cannot exceed 500 coordinates."}), 400
+
+    cleaned = []
+    for point in points:
+        try:
+            lat = float(point["latitude"])
+            lng = float(point["longitude"])
+        except (TypeError, KeyError, ValueError):
+            return jsonify({"error": "Each point needs numeric latitude and longitude."}), 400
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return jsonify({"error": "latitude/longitude are out of range."}), 400
+        cleaned.append({"latitude": lat, "longitude": lng})
+
+    path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
+    if path is None:
+        path = CablePath(subscriber_id=subscriber.id)
+        db.session.add(path)
+    path.nap_id = subscriber.nap_id
+    path.points = json.dumps(cleaned)
+    db.session.commit()
+
+    return jsonify({"status": "success", "point_count": len(cleaned)})
 
 
 @api_bp.route("/personnel")
