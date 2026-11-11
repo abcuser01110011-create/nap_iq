@@ -494,11 +494,44 @@
         el.style.display = text ? "" : "none";
     }
 
+    const REDRAW_SNAP_PX = 22;
+
+    /** The NAP or subscriber end point near `latlng` (within
+     * REDRAW_SNAP_PX screen pixels), or null. */
+    function findRedrawSnap(latlng) {
+        const s = redrawSession;
+        if (!s) return null;
+        const here = map.latLngToContainerPoint(latlng);
+        const candidates = [
+            { ll: s.napLL, label: "Snap to NAP " + (s.nap.nap_code || "") },
+            { ll: s.subLL, label: "Snap to " + s.subscriber.subscriber_code },
+        ];
+        let best = null;
+        let bestDist = REDRAW_SNAP_PX;
+        candidates.forEach(function (c) {
+            const d = here.distanceTo(map.latLngToContainerPoint(c.ll));
+            if (d <= bestDist) { best = c; bestDist = d; }
+        });
+        return best;
+    }
+
+    function updateRedrawSnapIndicator(snap) {
+        const s = redrawSession;
+        if (!s) return;
+        s.snapLayer.clearLayers();
+        if (!snap) return;
+        L.circleMarker(snap.ll, {
+            radius: 15, color: "#198754", weight: 3, fillColor: "#198754", fillOpacity: 0.2, interactive: false,
+        }).bindTooltip(snap.label, { permanent: true, direction: "top", offset: [0, -12] }).addTo(s.snapLayer);
+    }
+
     function updateRedrawPreview(cursorLatLng) {
         const s = redrawSession;
         if (!s) return;
+        const snap = cursorLatLng ? findRedrawSnap(cursorLatLng) : null;
+        updateRedrawSnapIndicator(snap);
         const pts = [s.napLL].concat(s.points);
-        if (cursorLatLng) pts.push(cursorLatLng);
+        if (cursorLatLng) pts.push(snap ? snap.ll : cursorLatLng);
         s.preview.setLatLngs(pts);
         s.vertexLayer.clearLayers();
         s.points.forEach(function (ll) {
@@ -507,7 +540,7 @@
         });
         setRedrawPanel(
             "Drawing " + s.subscriber.subscriber_code + " \u2192 " + (s.nap.nap_code || "NAP") +
-            ": click the map to add points from the NAP to the subscriber (" + s.points.length + " added).",
+            ": click the map to add points (" + s.points.length + " added). Points snap to the NAP and the subscriber.",
             true
         );
     }
@@ -516,12 +549,25 @@
         line.setStyle({ opacity: 0.25 });
         const napLL = L.latLng(nap.latitude, nap.longitude);
         const subLL = L.latLng(subscriber.latitude, subscriber.longitude);
+        const container = map.getContainer();
         const s = (redrawSession = {
             subscriber: subscriber, nap: nap, line: line,
-            napLL: napLL, subLL: subLL, points: [],
+            napLL: napLL, subLL: subLL, points: [], container: container,
             preview: L.polyline([napLL], { color: "#fd7e14", weight: 4, dashArray: "6,6", interactive: false }).addTo(map),
             vertexLayer: L.layerGroup().addTo(map),
-            onClick: function (e) { s.points.push(e.latlng); updateRedrawPreview(); },
+            snapLayer: L.layerGroup().addTo(map),
+            // Capture phase, so a click on the NAP/subscriber marker (or on
+            // another line) adds a point instead of opening its popup.
+            onClick: function (e) {
+                if (!e.target.closest || !e.target.closest(".leaflet-map-pane")) return; // panel / controls
+                if (map.dragging && map.dragging.moved()) return;                      // end of a map drag
+                e.stopPropagation();
+                e.preventDefault();
+                const ll = map.mouseEventToLatLng(e);
+                const snap = findRedrawSnap(ll);
+                s.points.push(snap ? snap.ll : ll);
+                updateRedrawPreview(ll);
+            },
             onMove: function (e) { updateRedrawPreview(e.latlng); },
             onKey: function (e) { if (e.key === "Escape") cancelRedrawSession(); },
         });
@@ -529,7 +575,7 @@
         // doesn't also drop the first point.
         setTimeout(function () {
             if (redrawSession !== s) return;
-            map.on("click", s.onClick);
+            container.addEventListener("click", s.onClick, true);
             map.on("mousemove", s.onMove);
             document.addEventListener("keydown", s.onKey);
         }, 0);
@@ -539,11 +585,12 @@
     function endRedrawSession() {
         const s = redrawSession;
         if (!s) return;
-        map.off("click", s.onClick);
+        s.container.removeEventListener("click", s.onClick, true);
         map.off("mousemove", s.onMove);
         document.removeEventListener("keydown", s.onKey);
         map.removeLayer(s.preview);
         map.removeLayer(s.vertexLayer);
+        map.removeLayer(s.snapLayer);
         redrawSession = null;
     }
 
@@ -568,8 +615,14 @@
             setRedrawPanel("Click the map to add at least one point first.", true);
             return;
         }
-        const pts = [s.napLL].concat(s.points).concat([s.subLL]).map(function (ll) {
-            return { latitude: ll.lat, longitude: ll.lng };
+        const ordered = [s.napLL].concat(s.points).concat([s.subLL]).filter(function (ll, i, arr) {
+            return i === 0 || ll.lat !== arr[i - 1].lat || ll.lng !== arr[i - 1].lng; // drop repeats from snapping
+        });
+        // `manual` on the first point tells the map to draw the line exactly as drawn.
+        const pts = ordered.map(function (ll, i) {
+            const pt = { latitude: ll.lat, longitude: ll.lng };
+            if (i === 0) pt.manual = true;
+            return pt;
         });
         const saveBtn = document.getElementById("redrawSaveBtn");
         saveBtn.disabled = true;
@@ -2327,6 +2380,10 @@
      */
     function buildRecordedLatLngs(recordedPath, subscriberLatLng, napLatLng) {
         const raw = recordedPath.map((p) => [p.latitude, p.longitude]);
+        // A line an administrator drew by hand ("Redraw lines") is drawn
+        // exactly as saved -- no simplifying, smoothing or endpoint
+        // snapping, which exist to clean up noisy GPS breadcrumbs.
+        if (recordedPath[0] && recordedPath[0].manual) return raw;
         const geo = window.CablePathGeometry;
         if (!geo) {
             return snapCablePathEndpoints(

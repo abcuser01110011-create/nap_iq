@@ -397,6 +397,8 @@ def save_subscriber_cable_path(subscriber_id):
         if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
             return jsonify({"error": "latitude/longitude are out of range."}), 400
         cleaned.append({"latitude": lat, "longitude": lng})
+    # Flag hand-drawn lines so the map draws them exactly as drawn.
+    cleaned[0]["manual"] = True
 
     path = CablePath.query.filter_by(subscriber_id=subscriber.id).first()
     if path is None:
