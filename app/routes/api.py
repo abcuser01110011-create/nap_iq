@@ -42,13 +42,14 @@ service-request-scoped one.
 """
 
 import json
+import re
 
 from flask import Blueprint, jsonify, g, abort, request
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.auth import role_required
 from app.extensions import db
-from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, CablePath
+from app.models import Nap, TechnicalIssue, Subscriber, Technician, Assignment, ServiceRequest, CablePath, TechnicianTeam
 from app.nap_recommendation import recommend_naps
 from app.navigation_contract import technician_location_json
 from app.routes.naps import _nap_port_assignments, _recorded_ports
@@ -224,6 +225,7 @@ def issues_json():
     # (recommendation.auto_assign_recommended_technician()) and so never get
     # an "Assigned Team: ..." line written into their description.
     assignee_by_issue_id = {}
+    assignee_obj_by_issue_id = {}
     issue_ids = [issue.id for issue in issues]
     if issue_ids:
         rows = (
@@ -238,6 +240,7 @@ def issues_json():
         for row in rows:  # ascending, so the newest assignment wins
             if row.technician is not None:
                 assignee_by_issue_id[row.technical_issue_id] = row.technician.full_name
+                assignee_obj_by_issue_id[row.technical_issue_id] = row.technician
 
     # Tickets folded into a consolidated parent have no assignment of their
     # own -- show the parent's technician (fetched separately since the
@@ -254,18 +257,43 @@ def issues_json():
             .all()
         )
         assignee_by_parent_id = {}
+        assignee_obj_by_parent_id = {}
         for row in parent_rows:
             if row.technician is not None:
                 assignee_by_parent_id[row.technical_issue_id] = row.technician.full_name
+                assignee_obj_by_parent_id[row.technical_issue_id] = row.technician
         for issue in issues:
             if issue.id not in assignee_by_issue_id and issue.parent_issue_id in assignee_by_parent_id:
                 assignee_by_issue_id[issue.id] = assignee_by_parent_id[issue.parent_issue_id]
+                assignee_obj_by_issue_id[issue.id] = assignee_obj_by_parent_id.get(issue.parent_issue_id)
+
+    # Team + team lead for the ticket modal: the team named in an admin-made
+    # ticket's "Assigned Team: ..." line when it matches a real team,
+    # otherwise the team of the assigned technician (the one they lead, else
+    # their first team).
+    teams_by_name = {
+        t.name.strip().lower(): t
+        for t in TechnicianTeam.query.options(joinedload(TechnicianTeam.leader)).all()
+    }
+
+    def _team_info(issue):
+        m = re.search(r"Assigned Team:\s*([^\n|;]+)", issue.description or "", re.I)
+        team = teams_by_name.get(m.group(1).strip().lower()) if m else None
+        tech = assignee_obj_by_issue_id.get(issue.id)
+        if team is None and tech is not None:
+            mine = list(getattr(tech, "teams", []) or [])
+            team = next((t for t in mine if t.leader_id == tech.id), mine[0] if mine else None)
+        if team is None:
+            return None, None
+        return team.name, (team.leader.full_name if team.leader else None)
 
     data = [
         {
             "id": issue.id,
             "issue_code": issue.issue_code,
             "issue_type": issue.issue_type,
+            "assigned_team": _team_info(issue)[0],
+            "team_lead": _team_info(issue)[1],
             "description": issue.description,
             "priority": issue.priority,
             "status": issue.status,

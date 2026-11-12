@@ -2184,7 +2184,10 @@
         // ("Assigned Team: ..."); a customer-reported one is auto-assigned
         // and only has a real Assignment row, which /api/issues exposes as
         // assigned_technician -- fall back to that so it is never blank.
-        setText("ticketDetailsAssignedTeam", parsed.extras.assignedTeam || issue.assigned_technician);
+        const teamName = issue.assigned_team || parsed.extras.assignedTeam;
+        let teamText = teamName || issue.assigned_technician;
+        if (teamName && issue.team_lead) teamText = teamName + " (Lead: " + issue.team_lead + ")";
+        setText("ticketDetailsAssignedTeam", teamText);
         setText("ticketDetailsCreated", formatDateTime(issue.created_at));
         setText("ticketDetailsDescription", parsed.description);
 
