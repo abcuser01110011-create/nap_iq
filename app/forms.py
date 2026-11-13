@@ -58,6 +58,25 @@ def phone_11_digits(form, field):
 
 
 
+def validate_password_complexity(form, field):
+    """Server-side twin of static/js/password-complexity.js. Keep the two
+    rule sets in sync."""
+    value = field.data or ""
+    problems = []
+    if len(value) < 8:
+        problems.append("at least 8 characters")
+    if not re.search(r"[A-Z]", value):
+        problems.append("an uppercase letter")
+    if not re.search(r"[a-z]", value):
+        problems.append("a lowercase letter")
+    if not re.search(r"\d", value):
+        problems.append("a number")
+    if not re.search(r"[^A-Za-z0-9]", value):
+        problems.append("a special character")
+    if problems:
+        raise ValidationError("Password must contain " + ", ".join(problems) + ".")
+
+
 class LoginForm(FlaskForm):
     """Login form used by the single, role-aware NAP-IQ sign-in page.
 
@@ -106,6 +125,7 @@ class SelfRegisterForm(FlaskForm):
         validators=[
             DataRequired(message="Password is required."),
             Length(min=8, message="Password must be at least 8 characters."),
+            validate_password_complexity,
         ],
     )
 
@@ -505,6 +525,7 @@ class AddUserForm(UserForm):
         validators=[
             DataRequired(message="Password is required."),
             Length(min=8, message="Password must be at least 8 characters."),
+            validate_password_complexity,
         ],
     )
     confirm_password = PasswordField(
@@ -527,6 +548,7 @@ class ResetPasswordForm(FlaskForm):
         validators=[
             DataRequired(message="Password is required."),
             Length(min=8, message="Password must be at least 8 characters."),
+            validate_password_complexity,
         ],
     )
     confirm_password = PasswordField(
@@ -754,25 +776,6 @@ PASSWORD_REQUIREMENTS = (
     "At least one number (0-9)",
     "At least one special character (e.g. !@#$%^&*)",
 )
-
-
-def validate_password_complexity(form, field):
-    """Server-side twin of static/js/password-complexity.js. Keep the two
-    rule sets in sync."""
-    value = field.data or ""
-    problems = []
-    if len(value) < 8:
-        problems.append("at least 8 characters")
-    if not re.search(r"[A-Z]", value):
-        problems.append("an uppercase letter")
-    if not re.search(r"[a-z]", value):
-        problems.append("a lowercase letter")
-    if not re.search(r"\d", value):
-        problems.append("a number")
-    if not re.search(r"[^A-Za-z0-9]", value):
-        problems.append("a special character")
-    if problems:
-        raise ValidationError("Password must contain " + ", ".join(problems) + ".")
 
 
 class ChangePasswordForm(FlaskForm):
@@ -1126,7 +1129,7 @@ class TechnicianForm(FlaskForm):
     )
     password = PasswordField(
         "Password",
-        validators=[Optional(), Length(min=8, message="Password must be at least 8 characters.")],
+        validators=[Optional(), Length(min=8, message="Password must be at least 8 characters."), validate_password_complexity],
     )
     confirm_password = PasswordField(
         "Confirm Password",

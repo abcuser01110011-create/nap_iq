@@ -68,6 +68,7 @@
         confirm.type = 'text';
         pw.classList.remove('is-invalid');
         confirm.classList.remove('is-invalid');
+        pw.dispatchEvent(new Event('input', { bubbles: true }));
         if (msg) {
             msg.textContent = 'Generated from the name and contact number. Share it with the technician.';
             msg.className = 'form-text text-success';
