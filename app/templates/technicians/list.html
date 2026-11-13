@@ -185,6 +185,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/technician-password.js') }}"></script>
 <style>
     #techTeamModal { z-index: 1065; }
     /* Popup chrome: no header bar -- the card has its own header; just a close button. */

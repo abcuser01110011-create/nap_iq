@@ -7,6 +7,10 @@
 {% block title %}{{ 'Edit ' ~ noun if mode == 'edit' else 'Add ' ~ noun }}{% endblock %}
 {% block page_title %}{{ 'Edit ' ~ noun if mode == 'edit' else 'Add New ' ~ noun }}{% endblock %}
 
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/technician-password.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="history.back()" aria-label="Back">
