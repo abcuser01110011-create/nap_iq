@@ -5,8 +5,8 @@
 // (or its form has a confirm_password field) -- so the sign-in form's
 // password box is left alone.
 //
-// Shows the unmet requirements in red as soon as you type; each line
-// disappears once satisfied. Mirrors validate_password_complexity() in
+// Shows the next unmet requirement (one at a time) in red as soon as you
+// type; it moves on to the next one once fixed. Mirrors validate_password_complexity() in
 // app/forms.py (the server stays authoritative). Delegated, so it also
 // works for forms loaded into popups; a script that fills the field
 // programmatically (the Generate button) just dispatches an "input" event.
@@ -48,24 +48,49 @@
         return ul;
     }
 
-    // Returns true when the value is empty or meets every rule.
+    function styleList(list, reserve) {
+        list.style.listStyle = 'none';
+        list.style.padding = '0';
+        list.style.margin = '.35rem 0 0';
+        list.style.fontSize = '.75rem';
+        list.style.lineHeight = '1.2rem';
+        list.style.color = '#dc3545';
+        // Sign-in: always keep one line of space so the card never changes size.
+        if (reserve) list.style.minHeight = '1.2rem';
+    }
+
+    // Shows ONE unmet rule at a time (the next one to fix). Returns true when
+    // the value is empty or meets every rule.
     function render(input) {
         var list = listFor(input);
+        var reserve = input.hasAttribute('data-password-guide-only');
         var value = input.value;
+        styleList(list, reserve);
         list.innerHTML = '';
-        if (!value) { list.hidden = true; input.classList.remove('is-invalid'); return true; }
 
-        var unmet = rules.filter(function (r) { return !r.test(value); });
-        unmet.forEach(function (r) {
+        var unmet = value ? rules.filter(function (r) { return !r.test(value); }) : [];
+        if (unmet.length) {
             var li = document.createElement('li');
-            li.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i>';
-            li.appendChild(document.createTextNode(r.label));
+            li.innerHTML = '<i class="bi bi-x-circle-fill me-1" style="font-size:.7rem"></i>';
+            li.appendChild(document.createTextNode(unmet[0].label));
             list.appendChild(li);
-        });
-        list.hidden = unmet.length === 0;
+        }
+        if (reserve) {
+            list.hidden = false;
+            list.style.visibility = unmet.length ? 'visible' : 'hidden';
+        } else {
+            list.hidden = unmet.length === 0;
+        }
         input.classList.toggle('is-invalid', unmet.length > 0);
         return unmet.length === 0;
     }
+
+    // Reserve the sign-in slot up front so the card is already its final size.
+    function reserveSlots() {
+        document.querySelectorAll('input[data-password-guide-only]').forEach(render);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', reserveSlots);
+    else reserveSlots();
 
     document.addEventListener('input', function (e) {
         if (isNewPassword(e.target)) render(e.target);
