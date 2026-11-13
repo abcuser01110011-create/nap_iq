@@ -91,7 +91,11 @@
     var modalEl = document.getElementById("collectorAddModal");
     var bodyEl = document.getElementById("collectorAddBody");
     if (!btn || !modalEl || !bodyEl) return;
-    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    // Bootstrap loads after this block, so look the modal up lazily (on use).
+    var modal = {
+        show: function () { bootstrap.Modal.getOrCreateInstance(modalEl).show(); },
+        hide: function () { bootstrap.Modal.getOrCreateInstance(modalEl).hide(); }
+    };
     var SPINNER = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
     var HEADERS = { "X-Requested-With": "XMLHttpRequest" };
 
