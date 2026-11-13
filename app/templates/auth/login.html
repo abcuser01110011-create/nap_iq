@@ -81,7 +81,7 @@
                 </div>
                 <div class="login-field__wrap">
                     <i class="bi bi-lock login-field__icon"></i>
-                    {{ form.password(class="login-field__input login-field__input--icon" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password", placeholder="Enter your password") }}
+                    {{ form.password(class="login-field__input login-field__input--icon" + (" is-invalid" if form.password.errors else ""), autocomplete="current-password", id="password", placeholder="Enter your password", **({"data-password-guide-only": "1"} if portal != 'customer' else {})) }}
                     <button class="login-field__toggle" type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false" tabindex="-1">
                         <i class="bi bi-eye"></i>
                     </button>
@@ -113,6 +113,7 @@
 {% if portal != 'customer' %}<script>window.NAPIQ_STAFF_LOADER_ICON_URL = "{{ url_for('static', filename='img/pg-networks-logo-mono-gold-p.png') }}?v={{ asset_version('img/pg-networks-logo-mono-gold-p.png') }}"; window.NAPIQ_STAFF_SCENE_URL = "{{ url_for('static', filename='img/auth-scene-staff.svg') }}?v={{ asset_version('img/auth-scene-staff.svg') }}";</script>{% endif %}
 <script src="{{ url_for('static', filename='js/login-theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
+<script src="{{ url_for('static', filename='js/password-complexity.js') }}"></script>
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-transition.js') }}?v={{ asset_version('js/auth-transition.js') }}"></script>
 <script src="{{ url_for('static', filename='js/login-toast.js') }}"></script>

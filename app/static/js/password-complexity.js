@@ -25,6 +25,8 @@
     function isNewPassword(el) {
         if (!el || el.tagName !== 'INPUT') return false;
         if (el.name !== 'password' && el.name !== 'new_password') return false;
+        // Staff sign-in: show the guide while typing (opt-in attribute).
+        if (el.hasAttribute('data-password-guide-only')) return true;
         var form = el.form;
         if (el.getAttribute('autocomplete') === 'new-password') return true;
         return !!(form && form.querySelector('[name="confirm_password"], [name="confirm_new_password"]'));
@@ -76,6 +78,8 @@
         var bad = null;
         form.querySelectorAll('input[name="password"], input[name="new_password"]').forEach(function (input) {
             if (!isNewPassword(input)) return;
+            // Sign-in only shows the guide; the server decides if the password is right.
+            if (input.hasAttribute('data-password-guide-only')) return;
             if (!render(input) && !bad) bad = input;
         });
         if (bad) {
