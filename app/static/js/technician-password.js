@@ -18,7 +18,7 @@
             .map(function (w) { return w.replace(/[^A-Za-z]/g, ''); })
             .filter(Boolean);
         var digits = String(contact || '').replace(/\D/g, '');
-        if (!words.length || digits.length < 7) return null;
+        if (!words.length || digits.length !== 11) return null;
 
         var first = words[0].slice(0, 12);
         var namePart = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
@@ -55,7 +55,7 @@
         var result = build(name && name.value, contact && contact.value);
         if (!result) {
             if (msg) {
-                msg.textContent = 'Enter the full name and a contact number (at least 7 digits) first.';
+                msg.textContent = 'Enter the full name and an exact 11-digit contact number first.';
                 msg.className = 'form-text text-danger';
             }
             (name && !name.value.trim() ? name : contact).focus();

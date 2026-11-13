@@ -35,7 +35,7 @@ from app.models import Nap, Subscriber, Technician, User, Plan, USER_ROLES
 # Phone numbers: exactly 11 digits (e.g. 09171234567), digits only.
 # ---------------------------------------------------------------------------
 PHONE_DIGITS = 11
-PHONE_MESSAGE = "Phone number must be exactly 11 digits (numbers only)."
+PHONE_MESSAGE = "You should input an exact 11-digit number."
 PHONE_RENDER_KW = {
     "maxlength": PHONE_DIGITS,
     "minlength": PHONE_DIGITS,
