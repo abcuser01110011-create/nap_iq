@@ -28,14 +28,14 @@
 </style>
 <div class="tech-edit-pop">
 <div class="tep-head">
-    <div class="tep-icon"><i class="bi bi-pencil-square"></i></div>
+    <div class="tep-icon"><i class="bi {{ 'bi-pencil-square' if mode == 'edit' else 'bi-person-plus' }}"></i></div>
     <div>
         <div class="tep-eyebrow">{{ noun }}</div>
         <h4 class="tep-title">{{ 'Edit Profile' if mode == 'edit' else 'Add ' ~ noun }}</h4>
     </div>
 </div>
 {% endif %}
-<form method="post" novalidate id="techEditForm"{% if in_popup and technician %} action="{{ url_for('technicians.edit_technician', technician_id=technician.id, partial=1) }}"{% endif %}>
+<form method="post" novalidate id="techEditForm"{% if in_popup and technician %} action="{{ url_for('technicians.edit_technician', technician_id=technician.id, partial=1) }}"{% elif in_popup %} action="{{ url_for('technicians.add_technician', partial=1, type='technician') }}"{% endif %}>
     {{ form.hidden_tag() }}
 
     <div class="row g-3">

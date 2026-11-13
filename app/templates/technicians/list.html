@@ -9,9 +9,10 @@
             data-team-url="{{ url_for('technicians.create_team') }}">
         <i class="bi bi-people me-1"></i>Create Team
     </button>
-    <a href="{{ url_for('technicians.add_technician', type='technician') }}" class="btn btn-primary rounded-pill px-3">
+    <button type="button" id="addTechnicianBtn" class="btn btn-primary rounded-pill px-3"
+            data-add-url="{{ url_for('technicians.add_technician', type='technician', partial=1) }}">
         <i class="bi bi-person-plus me-1"></i>Add Technician
-    </a>
+    </button>
 </div>
 
 {# Team cards: sit directly above the technician table. #}
@@ -467,10 +468,25 @@
         editEl.addEventListener('hidden.bs.modal', function (e) {
             e.stopPropagation();
             editBody.innerHTML = '';
-            // Details popup is still open: keep the page behind it locked.
-            document.body.classList.add('modal-open');
-            document.body.style.overflow = 'hidden';
+            // Details popup may still be open: keep the page behind it locked.
+            if (document.querySelector('.modal.show')) {
+                document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
         });
+
+        // Add Technician: same popup as Edit, loaded with the blank add form.
+        var addBtn = document.getElementById('addTechnicianBtn');
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                editBody.innerHTML = SPINNER;
+                editModal.show();
+                fetch(addBtn.getAttribute('data-add-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
+                    .then(function (html) { editBody.innerHTML = html; })
+                    .catch(function () { editBody.innerHTML = ERROR; });
+            });
+        }
 
         bodyEl.addEventListener('click', function (e) {
             var edit = e.target.closest('a.tech-edit[data-edit-url]');

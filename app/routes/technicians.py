@@ -200,7 +200,20 @@ def add_technician():
 
         label = "Field assistant" if technician.personnel_type == "field_assistant" else "Technician"
         flash(f"{label} '{technician.full_name}' was added successfully.", "success")
+        if request.args.get("partial"):
+            # Add popup on the Technician list: it reloads the list itself.
+            return jsonify(ok=True)
         return redirect(url_for("technicians.list_technicians"))
+
+    # Add popup: only the form (with any validation errors) is returned.
+    if request.args.get("partial"):
+        return render_template(
+            "technicians/_form_body.html",
+            form=form,
+            mode="add",
+            technician=None,
+            needs_credentials=needs_credentials,
+        )
 
     return render_template("technicians/form.html", form=form, mode="add", technician=None)
 
