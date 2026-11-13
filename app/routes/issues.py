@@ -179,6 +179,24 @@ def _dedupe_fiber_break_tickets(issues):
     return others + representatives
 
 
+def _assigned_team_name(text, assignment):
+    """Team name for the tickets list's "Assigned Team" column: the team named
+    in the ticket's own "Assigned Team: ..." line when present, otherwise the
+    team of the assigned technician (the one they lead, else their first
+    team), otherwise the technician's own name so the cell is never blank."""
+    match = re.search(r"Assigned Team:\s*([^\n|;]+)", text or "", re.I)
+    if match and match.group(1).strip():
+        return match.group(1).strip()
+    tech = assignment.technician if assignment else None
+    if tech is None:
+        return None
+    teams = list(getattr(tech, "teams", []) or [])
+    if teams:
+        led = next((t for t in teams if t.leader_id == tech.id), None)
+        return (led or teams[0]).name
+    return tech.full_name
+
+
 def _ticket_row_from_issue(issue, assignment):
     """Normalizes a TechnicalIssue (+ its current open Assignment, if
     any) into the plain-dict "ticket row" shape issues/list.html loops
@@ -186,7 +204,7 @@ def _ticket_row_from_issue(issue, assignment):
     exists."""
     subscriber_name = issue.subscriber.full_name if issue.subscriber else ""
     subscriber_code = issue.subscriber.subscriber_code if issue.subscriber else ""
-    assigned_name = assignment.technician.full_name if assignment and assignment.technician else None
+    assigned_name = _assigned_team_name(issue.description, assignment)
 
     return {
         "kind": "trouble_ticket",
@@ -233,7 +251,7 @@ def _ticket_row_from_service_request(service_request, assignment):
         service_request.subscriber.full_name if service_request.subscriber else (service_request.full_name or "")
     )
     subscriber_code = service_request.subscriber.subscriber_code if service_request.subscriber else ""
-    assigned_name = assignment.technician.full_name if assignment and assignment.technician else None
+    assigned_name = _assigned_team_name(service_request.notes, assignment)
 
     return {
         "kind": "service_order",
