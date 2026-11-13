@@ -46,7 +46,7 @@
         if (!form) return;
 
         var name = form.querySelector('[name="full_name"]');
-        var contact = form.querySelector('[name="contact_number"]');
+        var contact = form.querySelector('[name="contact_number"], [name="phone_number"]');
         var pw = form.querySelector('[name="password"]');
         var confirm = form.querySelector('[name="confirm_password"]');
         var msg = form.querySelector('[data-generate-msg]');

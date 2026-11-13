@@ -26,7 +26,7 @@ Routes:
     POST /users/<id>/reset-password   -> reset_password   (process reset form)
 """
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, g
+from flask import Blueprint, render_template, redirect, url_for, request, flash, g, jsonify
 
 from app.extensions import db
 from app.query_utils import filter_enum_eq
@@ -156,9 +156,16 @@ def add_user():
                 db.session.commit()
 
         flash(f"Account '{user.username}' was created successfully.", "success")
+        if request.args.get("partial"):
+            # Add Collector popup: it reloads the list itself.
+            return jsonify(ok=True)
         if next_page == "collectors":
             return redirect(url_for("collectors.list_collectors"))
         return redirect(url_for("users.list_users"))
+
+    # Add Collector popup: only the form (with any validation errors).
+    if request.args.get("partial") and locked_role == "payment_collector":
+        return render_template("users/_collector_form_body.html", form=form)
 
     return render_template(
         "users/form.html", form=form, mode="add", user=None, next_page=next_page, locked_role=locked_role

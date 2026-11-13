@@ -22,6 +22,11 @@
 (function () {
     "use strict";
 
+    let documentClickBound = false;
+
+    // Re-runnable: the Add Collector popup loads this form after the page is
+    // ready and calls window.initCoverageArea() once its HTML is in place.
+    function init() {
     const input = document.getElementById("coverageAreaInput");
     const resultsBox = document.getElementById("coverageAreaResults");
     const chipsBox = document.getElementById("coverageAreaChips");
@@ -180,9 +185,17 @@
     });
 
     // Click-away closes the dropdown, same pattern as tickets.js.
-    document.addEventListener("click", (event) => {
-        if (!event.target.closest("#coverageAreaInput") && !event.target.closest("#coverageAreaResults")) {
-            renderResults([]);
-        }
-    });
+    if (!documentClickBound) {
+        documentClickBound = true;
+        document.addEventListener("click", (event) => {
+            if (!event.target.closest("#coverageAreaInput") && !event.target.closest("#coverageAreaResults")) {
+                const box = document.getElementById("coverageAreaResults");
+                if (box) { box.classList.add("d-none"); box.innerHTML = ""; }
+            }
+        });
+    }
+    }
+
+    window.initCoverageArea = init;
+    init();
 })();

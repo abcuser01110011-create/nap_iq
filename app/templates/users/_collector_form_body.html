@@ -1,0 +1,100 @@
+{# Add Collector popup form (Collectors list, ?partial=1). Same look as the
+   Add Technician popup; the Role field is intentionally left out -- the
+   account is always created as a Payment Collector. #}
+<style>
+    .tech-edit-pop .tep-head { display: flex; align-items: center; gap: .85rem; padding-bottom: 1rem; margin-bottom: 1.1rem; border-bottom: 1px solid var(--bs-border-color); }
+    .tech-edit-pop .tep-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; color: #fff; flex: 0 0 auto;
+        background: linear-gradient(160deg, #3b82f6, #1046B8); border: 2px solid #F4B41A; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    .tech-edit-pop .tep-eyebrow { font-size: .65rem; letter-spacing: .2em; text-transform: uppercase; color: var(--bs-secondary-color); font-weight: 600; }
+    .tech-edit-pop .tep-title { margin: 0; font-size: 1.3rem; font-weight: 800; line-height: 1.15; }
+    .tech-edit-pop .row > [class*="col-"] { flex: 0 0 100%; max-width: 100%; }
+    .tech-edit-pop .form-label { font-size: .8rem; font-weight: 600; color: var(--bs-secondary-color); margin-bottom: .25rem; }
+    .tech-edit-pop .form-control, .tech-edit-pop .form-select { border-radius: .6rem; padding: .55rem .8rem; }
+    .tech-edit-pop hr { margin: 1.1rem 0 !important; }
+    .tech-edit-pop .tep-actions { display: flex; flex-direction: row; gap: 0; }
+    .tech-edit-pop .tep-actions .btn { flex: 1 1 0; width: auto; padding: .6rem 1rem; font-weight: 700; }
+    .tech-edit-pop .tep-actions .btn-outline-secondary { border-radius: 999px 0 0 999px; border-right-width: 0; }
+    .tech-edit-pop .tep-actions .btn-primary { border-radius: 0 999px 999px 0; background: linear-gradient(180deg, #1d5fd8, #1046B8); border-color: #1046B8; box-shadow: 0 0 0 2px rgba(244,180,26,.6); }
+    .tech-edit-pop .coverage-area-dropdown { position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; z-index: 1080; border-radius: .4rem; }
+    .tech-edit-pop .coverage-area-dropdown .list-group-item { cursor: pointer; }
+    .tech-edit-pop #coverageAreaChips .badge { font-weight: 500; padding: .4rem .5rem; }
+</style>
+<div class="tech-edit-pop">
+<div class="tep-head">
+    <div class="tep-icon"><i class="bi bi-person-plus"></i></div>
+    <div>
+        <div class="tep-eyebrow">Payment Collector</div>
+        <h4 class="tep-title">Add Collector</h4>
+    </div>
+</div>
+<form method="post" novalidate id="collectorAddForm"
+      action="{{ url_for('users.add_user', partial=1, role='payment_collector', next='collectors') }}">
+    {{ form.hidden_tag() }}
+    <input type="hidden" name="role" value="payment_collector">
+    <input type="hidden" name="next" value="collectors">
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">{{ form.full_name.label.text }}</label>
+            {{ form.full_name(class="form-control" ~ (" is-invalid" if form.full_name.errors else ""), placeholder="e.g. Juan Dela Cruz") }}
+            {% for error in form.full_name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">{{ form.phone_number.label.text }} <span class="text-muted small">(needed to generate a password)</span></label>
+            {{ form.phone_number(class="form-control" ~ (" is-invalid" if form.phone_number.errors else "")) }}
+            {% for error in form.phone_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">{{ form.email.label.text }} <span class="text-muted small">(optional)</span></label>
+            {{ form.email(class="form-control" ~ (" is-invalid" if form.email.errors else ""), placeholder="[email protected]") }}
+            {% for error in form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">{{ form.coverage_area.label.text }}</label>
+            {{ form.coverage_area(type="hidden", id="coverageAreaValue", class=("is-invalid" if form.coverage_area.errors else "")) }}
+            <div class="position-relative">
+                <input type="text" class="form-control" id="coverageAreaInput"
+                       placeholder="Search barangay (Santa Cruz, Laguna)…" autocomplete="off">
+                <div id="coverageAreaResults" class="list-group shadow-sm coverage-area-dropdown d-none"></div>
+                <div id="coverageAreaChips" class="d-flex flex-wrap gap-1 mt-2"></div>
+            </div>
+            {% for error in form.coverage_area.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="col-12">
+            <hr class="my-2">
+            <p class="text-muted small mb-2"><i class="bi bi-key me-1"></i>Login for the collector account.</p>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.username.label.text }}</label>
+                    {{ form.username(class="form-control" ~ (" is-invalid" if form.username.errors else ""), placeholder="e.g. jdelacruz", autocomplete="off") }}
+                    {% for error in form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6"></div>
+                <div class="col-md-6">
+                    <label class="form-label d-flex justify-content-between align-items-center">
+                        <span>{{ form.password.label.text }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" data-generate-password>
+                            <i class="bi bi-magic me-1"></i>Generate
+                        </button>
+                    </label>
+                    {{ form.password(class="form-control" ~ (" is-invalid" if form.password.errors else ""), autocomplete="new-password") }}
+                    {% for error in form.password.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    <div class="form-text" data-generate-msg>At least 8 characters, with upper &amp; lower case, a number and a special character.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">{{ form.confirm_password.label.text }}</label>
+                    {{ form.confirm_password(class="form-control" ~ (" is-invalid" if form.confirm_password.errors else ""), autocomplete="new-password") }}
+                    {% for error in form.confirm_password.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+    <div class="tep-actions">
+        <a href="{{ url_for('collectors.list_collectors') }}" class="btn btn-outline-secondary" data-collector-cancel>Cancel</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Add Collector</button>
+    </div>
+</form>
+</div>
