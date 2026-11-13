@@ -179,6 +179,16 @@ def _dedupe_fiber_break_tickets(issues):
     return others + representatives
 
 
+def _live_team_names():
+    """Lower-cased names of all current teams, loaded once per request."""
+    cached = getattr(g, "_live_team_names", None)
+    if cached is None:
+        from app.models import TechnicianTeam
+        cached = {n.strip().lower() for (n,) in db.session.query(TechnicianTeam.name).all()}
+        g._live_team_names = cached
+    return cached
+
+
 def _assigned_team_name(text, assignment):
     """Team name for the tickets list's "Assigned Team" column: the team named
     in the ticket's own "Assigned Team: ..." line when present, otherwise the
@@ -186,7 +196,12 @@ def _assigned_team_name(text, assignment):
     team), otherwise the technician's own name so the cell is never blank."""
     match = re.search(r"Assigned Team:\s*([^\n|;]+)", text or "", re.I)
     if match and match.group(1).strip():
-        return match.group(1).strip()
+        named = match.group(1).strip()
+        # Only trust the stored name while a team with that name still
+        # exists (a renamed/deleted team's old text would be stale);
+        # otherwise fall through to the technician's current team.
+        if named.lower() in _live_team_names():
+            return named
     tech = assignment.technician if assignment else None
     if tech is None:
         return None

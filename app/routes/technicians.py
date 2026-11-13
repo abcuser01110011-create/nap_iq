@@ -50,7 +50,9 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import Assignment, Technician, TechnicianTeam, User
+import re
+
+from app.models import Assignment, Technician, TechnicianTeam, User, TechnicalIssue, ServiceRequest
 
 technicians_bp = Blueprint("technicians", __name__, url_prefix="/technicians")
 
@@ -371,6 +373,25 @@ def _team_candidates(team=None):
     ]
 
 
+def _propagate_team_rename(old_name, new_name):
+    """Tickets remember their team as text ("Assigned Team: <name>" inside
+    TechnicalIssue.description / ServiceRequest.notes). When a team is
+    renamed, rewrite that text so every ticket, popup and the mobile app
+    show the new name instead of the old one."""
+    if not old_name or old_name == new_name:
+        return
+    pattern = re.compile(
+        r"(Assigned Team:\s*)" + re.escape(old_name) + r"(?=\s*(?:\n|\r|$|[|;]))", re.I
+    )
+    like = f"%Assigned Team:%{old_name}%"
+    for model, column in ((TechnicalIssue, "description"), (ServiceRequest, "notes")):
+        col = getattr(model, column)
+        for row in model.query.filter(col.ilike(like)).all():
+            updated = pattern.sub(lambda m: m.group(1) + new_name, getattr(row, column) or "")
+            if updated != getattr(row, column):
+                setattr(row, column, updated)
+
+
 def _handle_team_form(team=None):
     """Shared by create_team() and edit_team(): `team` is None when
     creating. GET returns the form; POST validates and saves (JSON
@@ -439,7 +460,9 @@ def _handle_team_form(team=None):
             if creating:
                 team = TechnicianTeam()
                 db.session.add(team)
+            old_name = None if creating else team.name
             team.name = name
+            _propagate_team_rename(old_name, name)
             team.description = description or None
             team.leader_id = leader_id
             team.members = [by_id[i] for i in member_ids]
