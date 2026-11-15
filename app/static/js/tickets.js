@@ -718,9 +718,15 @@
         const statusSelect = document.getElementById("ticketFormStatus");
         statusSelect.disabled = category === "TN";
         if (category === "TN") statusSelect.value = "pending";
-        document.getElementById("ticketFormStatusCol").classList.toggle("d-none", isFiberBreak);
-        document.getElementById("ticketFormPriorityCol").classList.toggle("col-12", isFiberBreak);
-        document.getElementById("ticketFormPriorityCol").classList.toggle("col-6", !isFiberBreak);
+        // Status is no longer a choice on ANY ticket type: every new ticket
+        // is assigned to a team on creation and starts as "pending" under
+        // the hood (the hidden <select> keeps that value for the submit
+        // functions below), so the Status column is always hidden and
+        // Priority fills the row.
+        statusSelect.value = "pending";
+        document.getElementById("ticketFormStatusCol").classList.add("d-none");
+        document.getElementById("ticketFormPriorityCol").classList.add("col-12");
+        document.getElementById("ticketFormPriorityCol").classList.remove("col-6");
 
         // Was "field_assistant" only, which left this list empty for
         // any admin who'd only added personnel_type='technician' rows
