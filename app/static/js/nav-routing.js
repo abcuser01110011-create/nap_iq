@@ -300,6 +300,9 @@
 
     function fitRouteBounds(latlngs) {
         if (!window.NapIQMap || !window.L || latlngs.length < 2) return;
+        // One-shot: GeoMap sets this when arriving from Subscribers > Navigate
+        // so the map stays focused on the subscriber instead of re-fitting.
+        if (window.NapIQSkipNextRouteFit) { window.NapIQSkipNextRouteFit = false; return; }
         try {
             window.NapIQMap.fitBounds(window.L.latLngBounds(latlngs), {
                 padding: [72, 72],

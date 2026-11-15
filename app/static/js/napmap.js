@@ -2314,7 +2314,15 @@
         const openPopupOnce = function () {
             if (opened) return;
             opened = true;
-            if (marker) marker.openPopup();
+            // The map re-renders every marker layer when the zoom settles
+            // (map.on("zoomend", renderAll)), which replaces the marker we
+            // were handed -- so look the CURRENT marker up now instead of
+            // opening the popup on a stale one that is no longer on the map.
+            const current = (subscriber && subscriberMarkersById[subscriber.id]) || marker;
+            if (current && current.getPopup()) {
+                current.getPopup().options.autoPan = false;
+                current.openPopup();
+            }
         };
         if (marker && marker.getPopup()) marker.getPopup().options.autoPan = false;
         map.invalidateSize();
@@ -3234,6 +3242,11 @@
         } else if (navigateType === "subscriber") {
             const subscriber = allSubscribers.find((s) => s.id === entityId);
             if (subscriber && subscriber.latitude != null && subscriber.longitude != null) {
+                // Opened from Subscribers > Navigate: stay centered on the
+                // subscriber (with its popup, like a search result) instead
+                // of letting the first route draw re-fit the whole map.
+                window.NapIQSkipNextRouteFit = true;
+                window.setTimeout(function () { window.NapIQSkipNextRouteFit = false; }, 8000);
                 focusSubscriber(subscriber);
                 destination = buildDestinationFromSubscriber(subscriber);
             }
