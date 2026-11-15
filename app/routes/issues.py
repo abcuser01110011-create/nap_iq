@@ -212,6 +212,31 @@ def _assigned_team_name(text, assignment):
     return tech.full_name
 
 
+def _unified_ticket_status(raw_status, assignment, kind):
+    """One status vocabulary for the merged Tickets table and its filter
+    pills: assigned / in_progress / resolved / closed.
+
+    Every ticket is assigned to a team the moment it is created, so there
+    is no separate "pending" any more -- a ticket that has not been picked
+    up yet is simply "assigned". Service orders (New Installation, NAP
+    Installation, ...) have their own status column (pending / approved /
+    scheduled / completed / rejected / closed) that never says
+    "in progress", so their live progress comes from the technician's
+    assignment: once the technician starts the job it counts as
+    in progress."""
+    if kind == "service_order":
+        if raw_status in ("closed", "rejected"):
+            return "closed"
+        if raw_status == "completed":
+            return "resolved"
+        if assignment is not None and assignment.status == "in_progress":
+            return "in_progress"
+        return "assigned"
+    if raw_status == "pending":
+        return "assigned"
+    return raw_status
+
+
 def _ticket_row_from_issue(issue, assignment):
     """Normalizes a TechnicalIssue (+ its current open Assignment, if
     any) into the plain-dict "ticket row" shape issues/list.html loops
@@ -226,9 +251,10 @@ def _ticket_row_from_issue(issue, assignment):
         "code": issue.issue_code or f"#{issue.id}",
         "type_label": issue.issue_type,
         "priority": issue.priority,
-        "status": issue.status,
-        "status_label": issue.status.replace("_", " ").capitalize(),
-        "status_badge_class": f"disp-badge-{issue.status}",
+        "raw_status": issue.status,
+        "status": _unified_ticket_status(issue.status, assignment, "trouble_ticket"),
+        "status_label": _unified_ticket_status(issue.status, assignment, "trouble_ticket").replace("_", " ").capitalize(),
+        "status_badge_class": "disp-badge-" + _unified_ticket_status(issue.status, assignment, "trouble_ticket"),
         "assigned_name": assigned_name,
         "created_at": issue.created_at,
         "detail_url": url_for("issues.view_issue", issue_id=issue.id),
@@ -273,9 +299,10 @@ def _ticket_row_from_service_request(service_request, assignment):
         "code": f"SO-{service_request.id:04d}",
         "type_label": type_label,
         "priority": service_request.priority,
-        "status": service_request.status,
-        "status_label": service_request.status.capitalize(),
-        "status_badge_class": _SERVICE_REQUEST_STATUS_BADGE_CLASSES.get(service_request.status, "disp-badge-low"),
+        "raw_status": service_request.status,
+        "status": _unified_ticket_status(service_request.status, assignment, "service_order"),
+        "status_label": _unified_ticket_status(service_request.status, assignment, "service_order").replace("_", " ").capitalize(),
+        "status_badge_class": "disp-badge-" + _unified_ticket_status(service_request.status, assignment, "service_order"),
         "assigned_name": assigned_name,
         "created_at": service_request.created_at,
         "detail_url": url_for("issues.view_service_order", request_id=service_request.id),
@@ -409,13 +436,15 @@ def list_issues():
     # current filter selection.
     total_open_tickets = sum(
         1 for t in tickets
-        if t["status"] in _OPEN_ISSUE_STATUSES or t["status"] in _OPEN_SERVICE_REQUEST_STATUSES
+        if t["raw_status"] in _OPEN_ISSUE_STATUSES or t["raw_status"] in _OPEN_SERVICE_REQUEST_STATUSES
     )
 
     if search_term:
         term = search_term.lower()
         tickets = [t for t in tickets if term in t["search_blob"]]
 
+    if status_filter == "pending":
+        status_filter = "assigned"  # old bookmarks: "pending" is now part of "assigned"
     if status_filter:
         tickets = [t for t in tickets if t["status"] == status_filter]
 
