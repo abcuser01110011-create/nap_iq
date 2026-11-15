@@ -13,7 +13,6 @@
     ('', 'All'),
     ('active', 'Active'),
     ('inactive', 'Inactive'),
-    ('pending_review', 'Pending'),
     ('disconnected', 'Disconnected'),
 ] %}
 
@@ -53,9 +52,19 @@
             {% if pending_installation_requests %}
                 {% for req in pending_installation_requests %}
                     <li>
-                        <a class="dropdown-item" href="{{ url_for('service_requests.edit_request', request_id=req.id) }}">
+                        <button type="button" class="dropdown-item install-request-item"
+                                data-name="{{ req.applicant_name or 'Unnamed applicant' }}"
+                                data-contact="{{ req.contact or '' }}"
+                                data-address="{{ req.address or '' }}"
+                                data-plan="{{ req.plan or '' }}"
+                                data-priority="{{ (req.priority or '')|capitalize }}"
+                                data-schedule="{{ req.scheduled_date.strftime('%B %d, %Y') if req.scheduled_date else '' }}"
+                                data-nap="{{ req.requested_nap or '' }}"
+                                data-notes="{{ req.notes or '' }}"
+                                data-created="{{ req.created_at.strftime('%B %d, %Y %I:%M %p') }}"
+                                data-review-url="{{ url_for('service_requests.edit_request', request_id=req.id) }}">
                             <span class="fw-semibold">{{ req.applicant_name or "Unnamed applicant" }}</span>
-                        </a>
+                        </button>
                     </li>
                 {% endfor %}
             {% else %}
@@ -73,6 +82,54 @@
         {% endfor %}
     </div>
 </div>
+
+{# Installation Request popup (opened from the dropdown above) #}
+<div class="modal fade" id="installRequestModal" tabindex="-1" aria-labelledby="installRequestTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="text-muted small">Installation request</div>
+                    <h5 class="modal-title" id="installRequestTitle">Applicant</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0 small">
+                    <dt class="col-5 text-muted">Contact</dt><dd class="col-7" data-f="contact"></dd>
+                    <dt class="col-5 text-muted">Address</dt><dd class="col-7" data-f="address"></dd>
+                    <dt class="col-5 text-muted">Plan</dt><dd class="col-7" data-f="plan"></dd>
+                    <dt class="col-5 text-muted">Priority</dt><dd class="col-7" data-f="priority"></dd>
+                    <dt class="col-5 text-muted">Preferred schedule</dt><dd class="col-7" data-f="schedule"></dd>
+                    <dt class="col-5 text-muted">Requested NAP</dt><dd class="col-7" data-f="nap"></dd>
+                    <dt class="col-5 text-muted">Submitted</dt><dd class="col-7" data-f="created"></dd>
+                    <dt class="col-5 text-muted">Notes</dt><dd class="col-7" data-f="notes" style="white-space: pre-wrap;"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="installRequestReview" class="btn btn-primary"><i class="bi bi-clipboard-check me-1"></i>Review request</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modalEl = document.getElementById("installRequestModal");
+    if (!modalEl) return;
+    document.addEventListener("click", function (e) {
+        var item = e.target.closest(".install-request-item");
+        if (!item) return;
+        var d = item.dataset;
+        modalEl.querySelector("#installRequestTitle").textContent = d.name;
+        modalEl.querySelectorAll("[data-f]").forEach(function (el) {
+            el.textContent = d[el.getAttribute("data-f")] || "\u2014";
+        });
+        document.getElementById("installRequestReview").href = d.reviewUrl;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    });
+})();
+</script>
 
 <div class="subs-table-card">
     <div class="table-responsive">

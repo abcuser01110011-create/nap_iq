@@ -127,6 +127,14 @@ def list_subscribers():
                 "id": req.id,
                 "applicant_name": req.subscriber.full_name if req.subscriber else req.full_name,
                 "created_at": req.created_at,
+                # Shown in the Installation Request popup
+                "contact": (req.subscriber.contact_number if req.subscriber else None) or req.contact_number,
+                "address": (req.subscriber.address if req.subscriber else None) or req.address,
+                "plan": req.plan_label or (req.subscriber.plan_type if req.subscriber else None),
+                "priority": req.priority,
+                "scheduled_date": req.scheduled_date,
+                "requested_nap": req.requested_nap.nap_code if req.requested_nap else None,
+                "notes": req.notes,
             }
             for req in ServiceRequest.query.filter_by(
                 request_type="new_installation", status="pending"

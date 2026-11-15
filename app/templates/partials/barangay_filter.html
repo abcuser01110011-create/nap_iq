@@ -5,7 +5,7 @@
    Rows being filtered must carry data-barangay="<name>".
    Behaviour lives in static/js/barangay-filter.js. #}
 <div class="dropdown brgy-filter" id="barangayFilter" data-selected="{{ barangay_filter or '' }}">
-    <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle brgy-btn"
+    <button type="button" class="btn btn-primary btn-sm dropdown-toggle brgy-btn"
             id="barangayFilterBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
         <i class="bi bi-geo-alt me-1"></i><span class="brgy-label">{{ barangay_filter or 'Barangay' }}</span>
     </button>
