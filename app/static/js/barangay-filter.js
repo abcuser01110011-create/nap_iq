@@ -22,7 +22,7 @@
     function norm(s) { return (s || '').trim().toLowerCase(); }
 
     function paint() {
-        label.textContent = selected || 'All';
+        label.textContent = selected || 'Barangay';
         items.forEach(function (it) {
             it.classList.toggle('active', norm(it.getAttribute('data-value')) === norm(selected));
         });

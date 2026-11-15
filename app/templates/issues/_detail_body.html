@@ -61,7 +61,7 @@
        technician has actually been dispatched, so this falls
        back to "No Port" until then. #}
     <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
-    <dd class="col-sm-8">{{ assignment.port_number if assignment and assignment.port_number is not none else "No Port" }}</dd>
+    <dd class="col-sm-8">{{ port_number if port_number is not none else "No Port" }}</dd>
 
     <dt class="col-sm-4 text-muted fw-normal">Reported</dt>
     <dd class="col-sm-8">{{ issue.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>

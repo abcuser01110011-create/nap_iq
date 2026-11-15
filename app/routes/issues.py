@@ -1042,11 +1042,25 @@ def view_issue(issue_id):
         # Backs the "Create Ticket" button's "+ Tickets" modal.
         subscriber_plan_types = _subscriber_plan_types()
 
+    # Port Number: the subscriber's port on their NAP -- the same value the
+    # Subscribers tab shows (naps.py's _nap_port_assignments()). The
+    # technician-recorded Assignment.port_number, when there is one, wins.
+    port_number = None
+    if assignment is not None and assignment.port_number is not None:
+        port_number = assignment.port_number
+    elif issue.subscriber is not None and issue.subscriber.nap is not None:
+        from app.routes.naps import _nap_port_assignments
+        for port, sub in _nap_port_assignments(issue.subscriber.nap).items():
+            if sub.id == issue.subscriber.id:
+                port_number = port
+                break
+
     # The Tickets list opens this same detail view in a popup (fetched in
     # the background) -- it asks for just the card contents via ?partial=1.
     if request.args.get("partial"):
         return render_template(
             "issues/_detail_body.html",
+            port_number=port_number,
             issue=issue,
             assignment=assignment,
             technicians=technicians,
@@ -1056,6 +1070,7 @@ def view_issue(issue_id):
 
     return render_template(
         "issues/view.html",
+        port_number=port_number,
         issue=issue,
         assignment=assignment,
         technicians=technicians,
