@@ -4,7 +4,7 @@
 {% block page_subtitle %}<p class="text-muted small mb-0">{{ technicians|length }} {{ 'deactivated ' if show_deactivated else '' }}profile{{ '' if technicians|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">
+{% set action_buttons %}
     <button type="button" class="btn btn-outline-primary rounded-pill px-3" id="createTeamBtn"
             data-team-url="{{ url_for('technicians.create_team') }}">
         <i class="bi bi-people me-1"></i>Create Team
@@ -13,12 +13,17 @@
             data-add-url="{{ url_for('technicians.add_technician', type='technician', partial=1) }}">
         <i class="bi bi-person-plus me-1"></i>Add Technician
     </button>
-</div>
+{% endset %}
+
+{# Deactivated-accounts view has no Teams row, so the buttons keep their own row there. #}
+{% if show_deactivated %}
+<div class="d-flex justify-content-end flex-wrap gap-2 mb-3">{{ action_buttons }}</div>
+{% endif %}
 
 {# Team cards: sit directly above the technician table. #}
 {% if not show_deactivated %}
 <style>
-    .team-strip-head { display: flex; align-items: center; gap: .6rem; margin: 0 0 .6rem; }
+    .team-strip-head { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin: 0 0 .75rem; }
     .team-strip-title { font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: var(--bs-secondary-color); display: flex; align-items: center; gap: .6rem; }
     .team-strip-title::after { content: ""; width: 40px; height: 2px; background: #F4B41A; border-radius: 2px; }
     .team-strip-count { font-size: .75rem; color: var(--bs-secondary-color); }
@@ -62,6 +67,8 @@
 <div class="team-strip-head">
     <div class="team-strip-title">Teams</div>
     <span class="team-strip-count">{{ teams|length }} team{{ '' if teams|length == 1 else 's' }}</span>
+    {# Same row as the Teams heading, right-aligned above the team cards. #}
+    <div class="d-flex flex-wrap gap-2 ms-auto">{{ action_buttons }}</div>
 </div>
 
 {% if teams %}

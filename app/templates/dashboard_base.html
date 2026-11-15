@@ -179,19 +179,19 @@
                 </li>
 
                 <li>
-                    <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('reports.') else '' }}"
-                       href="{{ url_for('reports.index') }}">
-                        <i class="bi bi-bar-chart-line"></i><span>Reports</span>
-                    </a>
-                </li>
-
-                <li>
                     <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('payments.') else '' }}"
                        href="{{ url_for('payments.list_payments') }}">
                         <i class="bi bi-cash-coin"></i><span>Payments</span>
                         {% if sidebar_badges.get('payments') %}
                             <span class="dash-badge-count text-bg-danger">{{ sidebar_badges.payments }}</span>
                         {% endif %}
+                    </a>
+                </li>
+
+                <li>
+                    <a class="dash-nav-link {{ 'active' if request.endpoint and request.endpoint.startswith('reports.') else '' }}"
+                       href="{{ url_for('reports.index') }}">
+                        <i class="bi bi-bar-chart-line"></i><span>Reports</span>
                     </a>
                 </li>
 
@@ -315,10 +315,10 @@
     {% if _role == 'administrator' %}
         {% set _ = mbn.append({'href': url_for('issues.list_issues'), 'icon': 'bi-ticket-perforated', 'label': 'Tickets', 'bar': true, 'active': _ep.startswith('issues.'), 'badge': sidebar_badges.get('issues')}) %}
         {% set _ = mbn.append({'href': url_for('subscribers.list_subscribers'), 'icon': 'bi-person-vcard', 'label': 'Subscribers', 'bar': true, 'active': _ep.startswith('subscribers.'), 'badge': sidebar_badges.get('subscribers')}) %}
-        {% set _ = mbn.append({'href': url_for('payments.list_payments'), 'icon': 'bi-cash-coin', 'label': 'Payments', 'bar': true, 'active': _ep.startswith('payments.'), 'badge': sidebar_badges.get('payments')}) %}
         {% set _ = mbn.append({'href': url_for('technicians.list_technicians'), 'icon': 'bi-person-badge', 'label': 'Technician', 'bar': false, 'active': _ep.startswith('technicians.')}) %}
         {% set _ = mbn.append({'href': url_for('collectors.list_collectors'), 'icon': 'bi-wallet2', 'label': 'Collector', 'bar': false, 'active': _ep.startswith('collectors.')}) %}
         {% set _ = mbn.append({'href': url_for('reports.index'), 'icon': 'bi-bar-chart-line', 'label': 'Reports', 'bar': false, 'active': _ep.startswith('reports.')}) %}
+        {% set _ = mbn.append({'href': url_for('payments.list_payments'), 'icon': 'bi-cash-coin', 'label': 'Payments', 'bar': true, 'active': _ep.startswith('payments.'), 'badge': sidebar_badges.get('payments')}) %}
     {% elif _role in ('technician', 'field_assistant') %}
         {% set _ = mbn.append({'href': url_for('technician.tickets'), 'icon': 'bi-ticket-perforated', 'label': 'Tickets', 'bar': true, 'active': _ep in ['technician.tickets', 'technician.history', 'technician.ticket_detail']}) %}
     {% elif _role == 'payment_collector' %}
