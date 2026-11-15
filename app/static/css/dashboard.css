@@ -3036,3 +3036,38 @@ html:not([data-bs-theme="dark"]) .summary-panel-header h5 i {
 .port-util-fill {
     background: linear-gradient(90deg, #061747, #1684FF);
 }
+
+
+/* ---------------------------------------------------------------- */
+/* Notification dropdown on the dashboard greeting card               */
+/* The hero card clips its decorative stripe with overflow:hidden,   */
+/* which also cut the bell dropdown off (it showed as a tiny, clipped */
+/* box). The dropdown is now positioned with a fixed strategy (see    */
+/* static/js/notifications-popover.js) so it escapes that clipping    */
+/* and looks the same as on every other page.                         */
+/* ---------------------------------------------------------------- */
+
+.dash-greeting > .dash-greeting-top {
+    z-index: 1040;
+}
+
+.dash-greeting .notif-dropdown,
+.dash-greeting .notif-dropdown-wrap .dropdown-menu {
+    z-index: 1050;
+    color: var(--bs-body-color);
+    background-color: var(--bs-body-bg);
+    text-align: left;
+}
+
+.dash-greeting .notif-dropdown .text-muted {
+    color: var(--bs-secondary-color) !important;
+}
+
+.dash-greeting .notif-dropdown .notif-dropdown-header,
+.dash-greeting .notif-dropdown .notif-dropdown-footer a {
+    color: inherit;
+}
+
+.dash-greeting .notif-dropdown .notif-dropdown-footer a {
+    color: var(--napiq-primary);
+}

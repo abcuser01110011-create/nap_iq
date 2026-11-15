@@ -14,6 +14,17 @@
     var meta = document.querySelector('meta[name="csrf-token"]');
     var CSRF_TOKEN = meta ? meta.getAttribute("content") : "";
 
+    // Position the bell dropdown with a "fixed" strategy so it is never clipped
+    // by a parent with overflow:hidden (e.g. the dashboard greeting card).
+    var bellToggle = document.getElementById("notifBellToggle");
+    if (bellToggle && window.bootstrap) {
+        window.bootstrap.Dropdown.getOrCreateInstance(bellToggle, {
+            popperConfig: function (defaultConfig) {
+                return Object.assign({}, defaultConfig, { strategy: "fixed" });
+            }
+        });
+    }
+
     var modalEl = document.getElementById("notifDetailModal");
     if (!modalEl) return;
     var modal = window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
