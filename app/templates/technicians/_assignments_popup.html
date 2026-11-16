@@ -1,8 +1,8 @@
-{# "View All" popup: every assignment (open and finished) of one technician. #}
+{# "View All" popup: every open assignment (assigned / in progress) of one technician. #}
 <div class="d-flex align-items-center gap-2 mb-3 pe-4">
     <i class="bi bi-clipboard-check fs-4"></i>
     <div>
-        <h5 class="mb-0 fw-bold">{{ technician.full_name }} &mdash; Assigned Tickets</h5>
+        <h5 class="mb-0 fw-bold">{{ technician.full_name }} &mdash; Open Assignments</h5>
         <div class="small text-muted">{{ assignments|length }} total</div>
     </div>
 </div>
@@ -40,5 +40,5 @@
     </table>
 </div>
 {% else %}
-<div class="text-center text-muted py-5"><i class="bi bi-inbox d-block fs-2 mb-2"></i>No tickets assigned yet.</div>
+<div class="text-center text-muted py-5"><i class="bi bi-inbox d-block fs-2 mb-2"></i>No assigned or in-progress tickets right now.</div>
 {% endif %}

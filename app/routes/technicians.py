@@ -246,10 +246,11 @@ def view_technician(technician_id):
 @role_required("administrator")
 def technician_assignments(technician_id):
     """Popup body for "View All" on the technician details: every
-    ticket / service order ever assigned to this technician, newest first."""
+    currently open (assigned / in progress) ticket or service order of this
+    technician, newest first."""
     technician = Technician.query.get_or_404(technician_id)
     assignments = sorted(
-        technician.assignments,
+        [x for x in technician.assignments if x.status in ("assigned", "accepted", "in_progress")],
         key=lambda a: (a.assigned_at is not None, a.assigned_at, a.id),
         reverse=True,
     )
