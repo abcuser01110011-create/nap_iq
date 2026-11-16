@@ -14,38 +14,50 @@
 <div class="row justify-content-center">
     <div class="col-lg-8 col-xl-6">
         {% if coverage_barangays %}
-        {# ---------------- DUE TODAY ---------------- #}
+        {# ---------------- DUE THIS MONTH ---------------- #}
         <div class="cx-card mb-3">
             <div class="cx-card__head">
-                <h3 class="cx-card__title"><span class="cx-card__icon cx-card__icon--gold"><i class="bi bi-calendar-check"></i></span>Due Today</h3>
+                <h3 class="cx-card__title"><span class="cx-card__icon cx-card__icon--gold"><i class="bi bi-calendar-check"></i></span>Due This Month</h3>
             </div>
-            {% if due_today %}
+            {% if due_this_month %}
             <ul class="cx-roster cx-names cx-names--due">
-                {% for subscriber in due_today %}
+                {% for due_date, subscriber in due_this_month %}
                 <li>
                     <a class="cx-name text-decoration-none" href="{{ url_for('collector.subscriber_detail', subscriber_id=subscriber.id) }}">
                         <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
                         <span class="cx-person__name text-truncate">{{ subscriber.full_name }}</span>
-                        <i class="bi bi-chevron-right ms-auto cx-cover__chev"></i>
+                        <span class="ms-auto small text-muted flex-shrink-0">{{ due_date.strftime('%b') }} {{ due_date.day }}</span>
+                        <i class="bi bi-chevron-right cx-cover__chev"></i>
                     </a>
                 </li>
                 {% endfor %}
             </ul>
             {% else %}
             <div class="cx-empty py-4">
-                <div class="small">No subscribers due today.</div>
+                <div class="small">No subscribers due this month.</div>
             </div>
             {% endif %}
         </div>
 
-        {# ---------------- BARANGAY FILTER ---------------- #}
-        <div class="mb-3">
-            <select class="form-select cx-brgy-select" id="barangayFilter" aria-label="Filter subscribers by barangay">
-                <option value="" selected>All</option>
-                {% for barangay in coverage_barangays %}
-                <option value="{{ barangay|lower }}">{{ barangay }}</option>
-                {% endfor %}
-            </select>
+        {# ---------------- BARANGAY + STATUS FILTERS ---------------- #}
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <select class="form-select cx-brgy-select" id="barangayFilter" aria-label="Filter subscribers by barangay">
+                    <option value="" selected>All</option>
+                    {% for barangay in coverage_barangays %}
+                    <option value="{{ barangay|lower }}">{{ barangay }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6">
+                <select class="form-select cx-brgy-select" id="statusFilter" aria-label="Filter subscribers by payment status">
+                    <option value="" selected>All status</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                </select>
+            </div>
         </div>
         {% endif %}
 
@@ -71,7 +83,7 @@
             </div>
             <ul class="cx-roster cx-names" id="subList">
                 {% for subscriber in coverage_subscribers %}
-                <li data-address="{{ (subscriber.address or '')|lower }}">
+                <li data-address="{{ (subscriber.address or '')|lower }}" data-status="{{ status_tokens.get(subscriber.id, '') }}">
                     <a class="cx-name text-decoration-none" href="{{ url_for('collector.subscriber_detail', subscriber_id=subscriber.id) }}">
                         <span class="cx-avatar">{{ subscriber.full_name[:1]|upper }}</span>
                         <span class="cx-person__name text-truncate">{{ subscriber.full_name }}</span>
@@ -93,6 +105,7 @@
     (function () {
         var input = document.getElementById('subSearch');
         var select = document.getElementById('barangayFilter');
+        var statusSelect = document.getElementById('statusFilter');
         var list = document.getElementById('subList');
         var empty = document.getElementById('subEmpty');
         if (!list) return;
@@ -100,10 +113,12 @@
         function apply() {
             var term = input ? input.value.trim().toLowerCase() : '';
             var brgy = select ? select.value : '';
+            var status = statusSelect ? statusSelect.value : '';
             var shown = 0;
             list.querySelectorAll('li').forEach(function (li) {
                 var hit = li.textContent.toLowerCase().indexOf(term) !== -1 &&
-                          (!brgy || (li.getAttribute('data-address') || '').indexOf(brgy) !== -1);
+                          (!brgy || (li.getAttribute('data-address') || '').indexOf(brgy) !== -1) &&
+                          (!status || (li.getAttribute('data-status') || '').split(' ').indexOf(status) !== -1);
                 li.style.display = hit ? '' : 'none';
                 if (hit) shown++;
             });
@@ -111,6 +126,7 @@
         }
         if (input) input.addEventListener('input', apply);
         if (select) select.addEventListener('change', apply);
+        if (statusSelect) statusSelect.addEventListener('change', apply);
     })();
 </script>
 {% endblock %}

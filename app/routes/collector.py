@@ -267,23 +267,49 @@ def collections():
         if coverage_barangays else []
     )
 
-    # "Due Today": subscribers whose estimated next due date (30 days after
-    # their last confirmed payment, or after install -- see
-    # _estimate_next_due_date) is today.
+    # "Due This Month": subscribers whose next due date (see _billing_state)
+    # falls in the current calendar month, soonest first. Days already
+    # passed this month are included so nothing drops off the list the
+    # moment its due date goes by.
+    #
+    # The same pass tags every subscriber with filter tokens for the status
+    # dropdown on the page:
+    #   paid     -> current cycle fully paid
+    #   partial  -> something paid, balance still owed
+    #   unpaid   -> due now/past due with nothing paid yet
+    #   overdue  -> due date already passed with a balance still owed
+    #               (so a past-due partial is both "partial" and "overdue")
     today = date.today()
-    due_today = []
+    due_this_month = []
+    status_tokens = {}
     for subscriber in coverage_subscribers:
-        due = _estimate_next_due_date(subscriber)
-        if isinstance(due, datetime):
-            due = due.date()
-        if due == today:
-            due_today.append(subscriber)
+        state = _billing_state(subscriber)
+        due = _as_date(state["due_date"])
+
+        status = state["status"]
+        if status == "confirmed":
+            tokens = ["paid"]
+        elif status == "partial":
+            tokens = ["partial"]
+            if due and due < today:
+                tokens.append("overdue")
+        elif status == "overdue":
+            tokens = ["unpaid", "overdue"]
+        else:  # 'pending' = due today, nothing paid yet
+            tokens = ["unpaid"]
+        status_tokens[subscriber.id] = " ".join(tokens)
+
+        if due and due.year == today.year and due.month == today.month:
+            due_this_month.append((due, subscriber))
+
+    due_this_month.sort(key=lambda row: (row[0], row[1].full_name or ""))
 
     return render_template(
         "collector/collections.html",
         coverage_barangays=coverage_barangays,
         coverage_subscribers=coverage_subscribers,
-        due_today=due_today,
+        due_this_month=due_this_month,
+        status_tokens=status_tokens,
     )
 
 
