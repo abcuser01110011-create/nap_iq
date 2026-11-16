@@ -68,7 +68,11 @@ def create_app(config_class: type = Config) -> Flask:
         every @jwt_role_required view (app/jwt_auth.py) — the JWT
         equivalent of load_logged_in_user() populating `flask.g.user`
         below for the session-cookie side."""
-        return User.query.get(int(jwt_data["sub"]))
+        from app.auth import sync_technician_name
+
+        user = User.query.get(int(jwt_data["sub"]))
+        sync_technician_name(user)
+        return user
 
     @jwt.token_in_blocklist_loader
     def _check_if_token_revoked(_jwt_header, jwt_data):

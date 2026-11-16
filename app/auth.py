@@ -25,6 +25,7 @@ from functools import wraps
 
 from flask import g, session, redirect, url_for, flash, request, abort
 
+from app.extensions import db
 from app.models import User
 
 # Where each role lands after login / when it hits its own "home".
@@ -64,7 +65,27 @@ def load_logged_in_user() -> None:
         g.user = None
         return
 
+    sync_technician_name(user)
     g.user = user
+
+
+def sync_technician_name(user) -> None:
+    """Keeps a technician login's display name equal to its technician
+    profile's name.
+
+    The name lives in two places (`technicians.full_name`, which the admin
+    Technician tab edits, and `users.full_name`, which the technician's own
+    Profile page / mobile app show). Renaming only ever updated one side in
+    some paths, and rows renamed before the sync existed stayed different
+    forever. The technician profile is the source of truth, so whenever
+    the two differ we copy the profile's name onto the login.
+    """
+    if user is None or user.role not in ("technician", "field_assistant"):
+        return
+    profile = user.technician_profile
+    if profile is not None and profile.full_name and user.full_name != profile.full_name:
+        user.full_name = profile.full_name
+        db.session.commit()
 
 
 def db_get_user(user_id):

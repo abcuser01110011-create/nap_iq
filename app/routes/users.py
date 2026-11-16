@@ -213,6 +213,9 @@ def edit_user(user_id):
 
         user.username = form.username.data.strip()
         user.full_name = form.full_name.data.strip()
+        if user.technician_profile is not None:
+            # Keep the Technician tab's name in step with this login.
+            user.technician_profile.full_name = user.full_name
         user.email = (form.email.data or "").strip() or None
         user.phone_number = (form.phone_number.data or "").strip() or None
         user.role = form.role.data
