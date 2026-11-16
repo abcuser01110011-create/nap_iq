@@ -188,6 +188,24 @@ def notify_online_payment_received(payment):
     )
 
 
+def notify_collector_payment_recorded(payment, collector):
+    """Administrator-only alert: a field collector just recorded (and
+    auto-confirmed) a payment. The subscriber's own notice is still
+    sent separately by notify_payment_confirmed()."""
+    subscriber = payment.subscriber
+    amount = f"\u20b1{payment.amount:,.2f}"
+    method = (payment.payment_method or "").replace("_", " ")
+    collector_name = (collector.full_name if collector else None) or "A collector"
+    notify(
+        "payment",
+        f"Payment collected \u2014 {subscriber.subscriber_code}",
+        f"{collector_name} collected {amount}" + (f" ({method})" if method else "")
+        + f" from {subscriber.full_name} ({subscriber.subscriber_code}).",
+        entity_type="payment",
+        entity_id=payment.id,
+    )
+
+
 def notify_payment_confirmed(payment):
     """Customer-only notice: an administrator confirmed this payment (edit
     form: pending/overdue -> confirmed). The subscriber sees it in the bell

@@ -36,7 +36,7 @@ from app.extensions import db
 from app.auth import role_required
 from app.models import Payment, Plan, Subscriber
 from app.forms import RecordPaymentForm
-from app.notifications_utils import notify_payment_confirmed
+from app.notifications_utils import notify_collector_payment_recorded, notify_payment_confirmed
 
 collector_bp = Blueprint("collector", __name__, url_prefix="/collector")
 
@@ -426,6 +426,7 @@ def record_payment():
         db.session.commit()  # payment.id (and payment.subscriber) needed below
 
         notify_payment_confirmed(payment)
+        notify_collector_payment_recorded(payment, g.user)
         db.session.commit()
 
         flash(f"Payment of {payment.amount} recorded successfully.", "success")
