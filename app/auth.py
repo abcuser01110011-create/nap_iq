@@ -99,7 +99,9 @@ def _login_redirect():
     /portal pages -> account login, everything else -> staff login."""
     if request.path.startswith("/portal"):
         # Subscribers sign in from the landing page's Log in popup.
-        return redirect(url_for("main.index", login=1))
+        # `next` lets the popup send the subscriber back to the exact
+        # portal page they were trying to open (e.g. an email link).
+        return redirect(url_for("main.index", login=1, next=request.path))
     return redirect(url_for("auth.login", next=request.path))
 
 
@@ -135,6 +137,17 @@ def role_required(*roles):
                 flash("Please log in to continue.", "warning")
                 return _login_redirect()
             if g.user.role not in roles:
+                # A portal (subscriber) link opened while a NON-subscriber
+                # account is signed in on this browser (typically an
+                # email link "View my issues" clicked by staff testing, or
+                # on a shared PC). A 403 is a dead end for the subscriber,
+                # so end that session and send them to the subscriber
+                # login, which returns them to this same page afterwards.
+                if (request.method == "GET" and request.path.startswith("/portal")
+                        and "user" in roles):
+                    session.clear()
+                    flash("That page is for subscriber accounts. Please log in with your subscriber account.", "warning")
+                    return redirect(url_for("main.index", login=1, next=request.path))
                 abort(403)
             return view(*args, **kwargs)
 

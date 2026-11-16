@@ -116,6 +116,9 @@
     var loginAlert = document.getElementById("loginAlert");
     var loginSubmit = document.getElementById("loginSubmit");
 
+    // Portal page the subscriber was heading to (e.g. from an email link); sent with the login.
+    var loginNext = null;
+
     loginForm.addEventListener("submit", function (e) {
         e.preventDefault();
         clearErrors(loginForm);
@@ -125,6 +128,7 @@
             subscriber_code: loginForm.subscriber_code.value.trim(),
             contact_number: loginForm.contact_number.value.trim(),
         };
+        if (loginNext) body.next = loginNext;
         // Carry the page's current light/dark choice into the account (only if one was chosen/remembered).
         try { if (localStorage.getItem("napiq-theme")) body.theme = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "dark" : "light"; } catch (err) {}
         var local = {};
@@ -304,7 +308,10 @@
     var params = new URLSearchParams(window.location.search);
     if (params.get("login") === "1") {
         openModal(loginModal, null);
+        var nextParam = params.get("next");
+        if (nextParam && nextParam.indexOf("/portal") === 0 && nextParam.indexOf("//") !== 0) loginNext = nextParam;
         params.delete("login");
+        params.delete("next");
         var qs = params.toString();
         window.history.replaceState({}, "", window.location.pathname + (qs ? "?" + qs : "") + window.location.hash);
     }

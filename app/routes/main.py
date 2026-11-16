@@ -168,6 +168,16 @@ def public_csrf_token():
     return resp
 
 
+def _portal_next(value):
+    """Return `value` only if it is a safe in-app /portal path, else None.
+    Used to send a subscriber back to the portal page they came for."""
+    value = str(value or "").strip()
+    if (value.startswith("/portal") and not value.startswith("//")
+            and "\\" not in value and "://" not in value and len(value) <= 200):
+        return value
+    return None
+
+
 @main_bp.route("/public/account-login", methods=["POST"])
 @limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"])
 @_safe_json
@@ -184,7 +194,8 @@ def public_account_login():
       signed in.
     """
     if g.get("user") is not None:
-        return jsonify(ok=True, redirect=url_for("auth.home"))
+        nxt = _portal_next((_json_body() or {}).get("next")) if g.user.role == "user" else None
+        return jsonify(ok=True, redirect=nxt or url_for("auth.home"))
 
     data = _json_body()
     code = str(data.get("subscriber_code") or "").strip()  # account number only
@@ -243,7 +254,7 @@ def public_account_login():
     session["user_id"] = user.id
     session.permanent = True
     flash(f"Welcome back, {user.full_name}.", "success")
-    return jsonify(ok=True, redirect=url_for("auth.home"))
+    return jsonify(ok=True, redirect=_portal_next(data.get("next")) or url_for("auth.home"))
 
 
 @main_bp.route("/public/apply/coverage-check", methods=["GET"])
