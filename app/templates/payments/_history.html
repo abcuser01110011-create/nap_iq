@@ -79,5 +79,5 @@
 </div>
 <div class="modal-footer">
     <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-    <a href="{{ url_for('payments.add_payment', subscriber_id=sub.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Payment</a>
+    <a href="{{ url_for('payments.add_payment', subscriber_id=sub.id) }}" class="btn btn-primary btn-sm" data-add-payment data-subscriber-id="{{ sub.id }}"><i class="bi bi-plus-lg me-1"></i>Add Payment</a>
 </div>

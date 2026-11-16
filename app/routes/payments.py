@@ -44,8 +44,10 @@ shared form class.
 Routes:
     GET  /payments/               -> list_payments  (search + method/status filter)
     GET  /payments/billing        -> billing          (per-subscriber paid/partial/unpaid view)
-    GET  /payments/add            -> add_payment      (show add form)
-    POST /payments/add            -> add_payment      (process add form)
+    GET  /payments/add            -> add_payment      (redirects to the Payments page and opens the Add Payment popup)
+    POST /payments/add            -> add_payment      (process the Add Payment popup, same flow as the collector's)
+    GET  /payments/subscribers.json -> subscribers_json (search feed for the Add Payment popup)
+    GET  /payments/subscriber/<id>/billing.json -> subscriber_billing_json (fee / balance / due date / status shown in the popup)
     GET  /payments/<id>/edit      -> edit_payment     (show edit form)
     POST /payments/<id>/edit      -> edit_payment     (process edit form)
     POST /payments/<id>/void      -> void_payment     (quick action, pending/overdue -> voided)
@@ -55,7 +57,7 @@ import calendar
 from datetime import datetime, date, timedelta
 
 from sqlalchemy.orm import joinedload
-from flask import Blueprint, render_template, redirect, url_for, request, flash, g
+from flask import Blueprint, render_template, redirect, url_for, request, flash, g, jsonify
 
 from app.extensions import db
 from app.query_utils import filter_enum_eq
@@ -63,6 +65,7 @@ from app.barangay_utils import barangay_options, extract_barangay
 from app.auth import role_required
 from app.models import Payment, Subscriber, Plan
 from app.forms import RecordPaymentForm
+from app.routes.collector import _billing_state
 from app.notifications_utils import notify_payment_confirmed, notify_payment_overdue, notify_payment_pending_confirmation
 
 payments_bp = Blueprint("payments", __name__, url_prefix="/payments")
@@ -259,23 +262,29 @@ def list_payments():
 @payments_bp.route("/add", methods=["GET", "POST"])
 @role_required("administrator")
 def add_payment():
-    """Shows and processes the Add Payment form. `collector_id` is
-    always the signed-in administrator's own id — same rule
-    collector.record_payment() uses — never a value taken from the
-    submitted form."""
-    form = RecordPaymentForm()
-    form.status.choices = form.status.choices + [("voided", "Voided")]
-    _populate_subscriber_choices(form)
+    """Add Payment now works like the collector's Record Payment popup.
 
+    GET  -> there is no standalone page any more: bounce to the Payments
+            page with `?add=1` (plus an optional subscriber_id / amount
+            prefill) and the popup opens there. Keeps old links working.
+    POST -> processes the popup. Same rules as collector.record_payment():
+            `collector_id` is always the signed-in user, the payment is
+            always saved as 'confirmed' (the browser-sent status is
+            ignored), reference number and payment date are generated
+            by the popup.
+    """
     if request.method == "GET":
-        # Prefill from the Subscribers billing view's "Record payment"
-        # button (?subscriber_id=..&amount=..).
+        args = {"add": 1}
         pre_sub = request.args.get("subscriber_id", type=int)
         if pre_sub:
-            form.subscriber_id.data = pre_sub
+            args["subscriber_id"] = pre_sub
         pre_amount = request.args.get("amount", type=float)
         if pre_amount and pre_amount > 0:
-            form.amount.data = round(pre_amount, 2)
+            args["amount"] = round(pre_amount, 2)
+        return redirect(url_for("payments.list_payments", **args))
+
+    form = RecordPaymentForm()
+    _populate_subscriber_choices(form)
 
     if form.validate_on_submit():
         payment = Payment(
@@ -286,22 +295,84 @@ def add_payment():
             payment_date=datetime.strptime(form.payment_date.data.strip(), "%Y-%m-%d").date(),
             reference_number=(form.reference_number.data or "").strip() or None,
             remarks=(form.remarks.data or "").strip() or None,
-            status=form.status.data,
+            status="confirmed",
         )
         db.session.add(payment)
         db.session.commit()  # payment.id (and payment.subscriber) needed below
 
-        if payment.status == "overdue":
-            notify_payment_overdue(payment)
-            db.session.commit()
-        elif payment.status == "pending":
-            notify_payment_pending_confirmation(payment)
-            db.session.commit()
+        notify_payment_confirmed(payment)
+        db.session.commit()
 
         flash(f"Payment of {payment.amount} recorded successfully.", "success")
         return redirect(url_for("payments.list_payments"))
 
-    return render_template("payments/form.html", form=form, mode="add", payment=None)
+    for field_errors in form.errors.values():
+        for message in field_errors:
+            flash(message, "danger")
+    return redirect(url_for("payments.list_payments"))
+
+
+@payments_bp.route("/subscribers.json")
+@role_required("administrator")
+def subscribers_json():
+    """Search feed for the Add Payment popup: every subscriber (not just
+    active ones -- see _populate_subscriber_choices), lightweight only.
+    The per-subscriber billing numbers are fetched on pick, see below."""
+    subscribers = Subscriber.query.order_by(Subscriber.full_name).all()
+    resp = jsonify(
+        [
+            {
+                "id": s.id,
+                "subscriber_code": s.subscriber_code,
+                "full_name": s.full_name,
+                "address": s.address,
+                "plan_type": s.plan_type,
+            }
+            for s in subscribers
+        ]
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+_BILLING_STATUS_LABELS = {
+    "confirmed": "Paid",
+    "pending": "Due",
+    "overdue": "Overdue",
+    "partial": "Partial",
+}
+
+
+@payments_bp.route("/subscriber/<int:subscriber_id>/billing.json")
+@role_required("administrator")
+def subscriber_billing_json(subscriber_id):
+    """Monthly fee / balance / due date / status for the Add Payment popup.
+    Uses the exact same _billing_state() the collector's popup uses, so
+    both roles always see the same numbers."""
+    subscriber = Subscriber.query.get_or_404(subscriber_id)
+    state = _billing_state(subscriber)
+    due_date = state["due_date"]
+
+    def money(value):
+        return f"{value:,.2f}" if value is not None else None
+
+    resp = jsonify(
+        {
+            "id": subscriber.id,
+            "full_name": subscriber.full_name,
+            "subscriber_code": subscriber.subscriber_code,
+            "plan_type": subscriber.plan_type,
+            "status": state["status"],
+            "status_label": _BILLING_STATUS_LABELS[state["status"]],
+            "monthly_fee": money(state["monthly_fee"]),
+            "balance": money(state["balance"]),
+            "balance_raw": str(state["balance"]) if state["balance"] is not None else None,
+            "paid_so_far": money(state["paid_in_cycle"]) if state["status"] == "partial" else None,
+            "due_date": due_date.strftime("%b %d, %Y") if due_date else None,
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @payments_bp.route("/<int:payment_id>/edit", methods=["GET", "POST"])

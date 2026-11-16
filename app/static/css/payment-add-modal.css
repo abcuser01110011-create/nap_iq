@@ -1,0 +1,9 @@
+/* Admin "Add Payment" popup (templates/payments/_add_modal.html).
+   Builds on collector-theme.css (.cx-modal, .cx-form, .cx-status, .cx-pay-info, .cx-submit). */
+.cx-modal--admin .modal-content { height: min(640px, calc(100vh - 2rem)); }
+.cx-modal--admin form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.ap-results { margin-top: .4rem; max-height: 190px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--cx-line); }
+.ap-results .list-group-item { border-left: 0; border-right: 0; font-size: .9rem; }
+.ap-results .list-group-item:first-child { border-top: 0; }
+.ap-results .list-group-item:last-child { border-bottom: 0; }
+.cx-modal--admin .input-group > .input-group-text { background: rgba(22,132,255,.08); color: var(--cx-royal); }

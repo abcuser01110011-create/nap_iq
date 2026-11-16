@@ -5,6 +5,8 @@
 <link href="{{ url_for('static', filename='css/list-fit.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/payments.css') }}" rel="stylesheet">
 <link href="{{ url_for('static', filename='css/barangay-filter.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/collector-theme.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/payment-add-modal.css') }}" rel="stylesheet">
 {% endblock %}
 {% block page_title %}Payments{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0" id="paymentsRecordCount" data-lf-count data-lf-noun="subscriber">{{ rows|length }} subscriber{{ '' if rows|length == 1 else 's' }} &middot; {{ month.strftime('%B %Y') }}</p>{% endblock %}
@@ -74,7 +76,7 @@
         {% endfor %}
     </div>
 
-    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary btn-sm">
+    <a href="{{ url_for('payments.add_payment') }}" class="btn btn-primary btn-sm" data-add-payment>
         <i class="bi bi-plus-lg me-1"></i>Add Payment
     </a>
 </div>
@@ -134,7 +136,8 @@
                         <div class="subs-row-actions">
                             {% if r.balance %}
                             <a href="{{ url_for('payments.add_payment', subscriber_id=sub.id, amount=r.balance) }}"
-                               class="subs-edit-btn" title="Record payment" onclick="event.stopPropagation();"><i class="bi bi-plus-lg"></i></a>
+                               class="subs-edit-btn" title="Record payment" data-add-payment
+                               data-subscriber-id="{{ sub.id }}" data-amount="{{ '%.2f'|format(r.balance) }}" onclick="event.stopPropagation();"><i class="bi bi-plus-lg"></i></a>
                             {% endif %}
                             <button type="button" class="subs-edit-btn" title="View transactions" data-history-btn><i class="bi bi-clock-history"></i></button>
                             <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
@@ -177,5 +180,7 @@
 </div>
 <script src="{{ url_for('static', filename='js/barangay-filter.js') }}?v={{ asset_version('js/barangay-filter.js') }}"></script>
 <script src="{{ url_for('static', filename='js/list-fit.js') }}?v={{ asset_version('js/list-fit.js') }}"></script>
+{% include "payments/_add_modal.html" %}
 <script src="{{ url_for('static', filename='js/payments.js') }}?v={{ asset_version('js/payments.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payment-add-modal.js') }}?v={{ asset_version('js/payment-add-modal.js') }}"></script>
 {% endblock %}

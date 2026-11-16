@@ -1,0 +1,75 @@
+{# Add Payment popup (Administrator).
+   Mirrors the collector's Payment Details popup (collector/subscriber.html):
+   same look (cx-* styles from collector-theme.css) and same behaviour --
+   pick a subscriber, see their status / monthly fee / balance / due date,
+   enter Amount + Payment Method, press Record Payment.
+   Reference number and Payment date are generated automatically and the
+   payment is always saved as Confirmed (see payments.add_payment()).
+   Behaviour lives in static/js/payment-add-modal.js. Open it from anywhere with
+   an element carrying  data-add-payment  (optional: data-subscriber-id, data-amount). #}
+<div class="modal fade cx-modal cx-modal--form cx-modal--admin" id="addPaymentModal" tabindex="-1" aria-labelledby="addPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cx">
+            <form class="cx-form" method="post" action="{{ url_for('payments.add_payment') }}" novalidate id="adminPaymentForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="subscriber_id" id="apSubscriberId" value="0">
+                <input type="hidden" name="reference_number" id="apReference" value="">
+                <input type="hidden" name="payment_date" id="apPaymentDate" value="">
+                <input type="hidden" name="status" value="confirmed">
+
+                <div class="cx-modal__head">
+                    <h3 class="cx-card__title" id="addPaymentModalLabel"><span class="cx-card__icon"><i class="bi bi-receipt"></i></span>Payment Details</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="cx-modal__body pt-3">
+                    {# Step 1: subscriber (search, then it is locked in) #}
+                    <div class="mb-3">
+                        <label class="form-label" for="apSearch">Subscriber</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="apSearch" placeholder="Search by name, code, or address..." autocomplete="off">
+                        </div>
+                        <div id="apResults" class="list-group ap-results d-none"></div>
+                        <div class="form-text" id="apHelp"></div>
+                    </div>
+
+                    {# Filled in once a subscriber is picked #}
+                    <div id="apDetails" class="d-none">
+                        <div class="mb-3">
+                            <span class="cx-status" id="apStatus">&mdash;</span>
+                        </div>
+                        <div class="cx-pay-info mb-3">
+                            <div><span class="k">Monthly fee</span><span class="v" id="apFee">&mdash;</span></div>
+                            <div id="apPaidRow" class="d-none"><span class="k">Paid so far</span><span class="v" id="apPaid">&mdash;</span></div>
+                            <div><span class="k">Balance</span><span class="v" id="apBalance">&mdash;</span></div>
+                            <div><span class="k">Due date</span><span class="v" id="apDue">&mdash;</span></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="apAmount">Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">&#8369;</span>
+                            <input type="number" step="0.01" min="0.01" inputmode="decimal" class="form-control" name="amount" id="apAmount" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" for="apMethod">Payment Method</label>
+                        <select class="form-select" name="payment_method" id="apMethod">
+                            <option value="cash" selected>Cash</option>
+                            <option value="gcash">GCash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="text-danger small d-none" id="apError"></div>
+                </div>
+
+                <div class="cx-modal__foot">
+                    <button type="submit" class="btn cx-submit" id="apSubmit"><i class="bi bi-check-lg me-1"></i>Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

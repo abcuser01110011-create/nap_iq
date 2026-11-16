@@ -34,7 +34,6 @@ makes on every request.
 from app.models import (
     Assignment,
     Notification,
-    Payment,
     ServiceRequest,
     Technician,
     TechnicalIssue,
@@ -69,7 +68,6 @@ def _admin_badges():
       so the sidebar number and the dropdown number never disagree.
     - service_requests: newly submitted requests awaiting a decision
       ('pending' — not yet approved/scheduled/rejected).
-    - payments: payments recorded but not yet confirmed ('pending').
     """
     issues_pending = TechnicalIssue.query.filter_by(status="pending").count()
 
@@ -99,7 +97,6 @@ def _admin_badges():
         "dispatch": issues_pending + unassigned_requests,
         "subscribers": pending_installation_requests,
         "service_requests": ServiceRequest.query.filter_by(status="pending").count(),
-        "payments": Payment.query.filter_by(status="pending").count(),
     }
 
 
