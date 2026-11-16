@@ -856,6 +856,8 @@ def my_payments():
         "customer/payments.html",
         subscriber=subscriber,
         payments=subscriber.payments,
+        due=monthly_due_info(subscriber),
+        pending_payment=_recent_pending_payment(subscriber),
         hitpay_enabled=hitpay.is_configured(),
         hitpay_sandbox=hitpay.is_sandbox(),
         hitpay_currency=hitpay.currency(),

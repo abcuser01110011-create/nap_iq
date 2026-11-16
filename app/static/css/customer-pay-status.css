@@ -1,0 +1,20 @@
+/* Subscriber payment status (Paid / Partial / Unpaid / Overdue).
+   Used on the customer home "Amount To Pay" card and the Payments page summary. */
+.cps-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .2rem .7rem; border-radius: 999px;
+            font-size: .78rem; font-weight: 650; background: #e9ecef; color: #495057; }
+.cps-chip::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; }
+.cps-chip--paid    { background: #e3f6ec; color: #15803d; }
+.cps-chip--partial { background: #e3efff; color: #1046B8; }
+.cps-chip--unpaid  { background: #fff4d6; color: #a16207; }
+.cps-chip--overdue { background: #fde4e4; color: #c62828; }
+html[data-bs-theme="dark"] .cps-chip { background: #2b3138; color: #c7ccd1; }
+html[data-bs-theme="dark"] .cps-chip--paid    { background: #12351f; color: #5fd68a; }
+html[data-bs-theme="dark"] .cps-chip--partial { background: #14284d; color: #7FB4FF; }
+html[data-bs-theme="dark"] .cps-chip--unpaid  { background: #3b300f; color: #f2c555; }
+html[data-bs-theme="dark"] .cps-chip--overdue { background: #3d1717; color: #ff8a8a; }
+
+.cps-sub { display: block; margin-top: .35rem; font-size: .72rem; color: var(--bs-body-color); }
+
+.cps-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem 1.25rem; align-items: center; }
+.cps-summary .k { display: block; font-size: .72rem; color: var(--napiq-text-muted, #64748B); }
+.cps-summary .v { font-weight: 650; font-size: 1.05rem; }

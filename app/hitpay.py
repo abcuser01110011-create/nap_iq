@@ -119,6 +119,32 @@ def create_payment_request(*, amount: Decimal, name, email, purpose, reference_n
     return body
 
 
+def fetch_payment_request(request_id) -> dict:
+    """GET /v1/payment-requests/<id> -> HitPay's own record of the checkout
+    (`status`, `amount`, `payments`, ...). Used when the customer comes back
+    from checkout so the payment can be confirmed straight away instead of
+    waiting for the webhook. Asked of HitPay directly with our API key, so it
+    cannot be faked by editing the return URL."""
+    try:
+        response = requests.get(
+            f"{api_base()}/v1/payment-requests/{request_id}",
+            headers={
+                "X-BUSINESS-API-KEY": _cfg("HITPAY_API_KEY"),
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise HitPayError(f"Could not reach HitPay: {exc}") from exc
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    if response.status_code >= 400 or not isinstance(body, dict):
+        raise HitPayError(f"HitPay returned HTTP {response.status_code}.")
+    return body
+
+
 def verify_signature(raw_body: bytes, signature: str) -> bool:
     """HMAC-SHA256 of the JSON payload keyed with the account's salt,
     compared in constant time with the `Hitpay-Signature` header."""

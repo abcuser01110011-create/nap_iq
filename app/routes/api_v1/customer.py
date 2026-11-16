@@ -225,6 +225,9 @@ def _serialize_monthly_due(subscriber: Subscriber) -> dict:
         "days_until": info["days_until"],
         "monthly_fee": float(info["monthly_fee"]) if info["monthly_fee"] is not None else None,
         "amount_due": float(info["amount_due"]),
+        "paid_in_cycle": float(info["paid_in_cycle"]),
+        "status": info["status"],
+        "status_label": info["status_label"],
         "installed": info["installed"],
         "can_pay": info["can_pay"],
     }

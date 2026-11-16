@@ -3,9 +3,30 @@
 {% block body_class %}dash-theme-customer{% endblock %}
 {% block page_title %}Payments{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">Payment history on your account</p>{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-pay-status.css') }}">
+{% endblock %}
 
 {% block content %}
 {% set payment_status_classes = {'confirmed': 'text-bg-success', 'pending': 'text-bg-secondary', 'overdue': 'text-bg-danger', 'voided': 'text-bg-dark'} %}
+{# Current bill: updates by itself from confirmed payments (see billing_utils.monthly_due_info). #}
+{% if due and due.installed %}
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="cps-summary">
+            <div><span class="k">Status</span><span class="cps-chip cps-chip--{{ due.status }}">{{ due.status_label }}</span></div>
+            <div><span class="k">Monthly fee</span><span class="v">{% if due.monthly_fee is not none %}&#8369;{{ '{:,.2f}'.format(due.monthly_fee) }}{% else %}&mdash;{% endif %}</span></div>
+            {% if due.status == 'partial' %}<div><span class="k">Paid so far</span><span class="v">&#8369;{{ '{:,.2f}'.format(due.paid_in_cycle) }}</span></div>{% endif %}
+            <div><span class="k">Balance</span><span class="v">&#8369;{{ '{:,.2f}'.format(due.balance) }}</span></div>
+            <div><span class="k">Due date</span><span class="v">{{ due.due_date.strftime('%b %d, %Y') }}</span></div>
+        </div>
+        {% if pending_payment %}
+        <div class="small text-muted mt-3"><i class="bi bi-hourglass-split me-1"></i>A payment of &#8369;{{ '{:,.2f}'.format(pending_payment.amount) }} is being confirmed &mdash; this page will update by itself.</div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <span><i class="bi bi-cash-coin me-1"></i>My Payments</span>
@@ -19,6 +40,8 @@
                     <tr>
                         <th>Date</th>
                         <th>Reference #</th>
+                        <th class="text-end">Amount</th>
+                        <th>Status</th>
                         <th class="text-end" style="width: 1%;"></th>
                     </tr>
                 </thead>
@@ -35,6 +58,8 @@
                         data-remarks="{{ payment.remarks or '' }}">
                         <td class="text-nowrap">{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
                         <td class="text-break">{{ payment.reference_number or "—" }}</td>
+                        <td class="text-end text-nowrap">&#8369;{{ '{:,.2f}'.format(payment.amount) }}</td>
+                        <td><span class="badge {{ payment_status_classes.get(payment.status, 'text-bg-secondary') }}">{{ payment.status|capitalize }}</span></td>
                         <td class="text-end text-muted"><i class="bi bi-chevron-right"></i></td>
                     </tr>
                     {% endfor %}
@@ -82,6 +107,9 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{% if pending_payment %}
+<script src="{{ url_for('static', filename='js/payment-autorefresh.js') }}" data-url="{{ url_for('hitpay.status_json') }}"></script>
+{% endif %}
 <script>
 (function () {
     var modal = document.getElementById("paymentDetailModal");

@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-troubleshooting.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-application-progress.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/customer-pay-status.css') }}">
 {% endblock %}
 
 {# The standard top bar is replaced by the greeting card below (same card the
@@ -137,6 +138,10 @@
             <span class="napiq-pay-peso">&#8369;</span>
             {% if due %}{{ '%.2f'|format(due.amount_due) }}{% else %}0.00{% endif %}
         </div>
+        {% if due and due.status %}
+        <span class="cps-chip cps-chip--{{ due.status }}">{{ due.status_label }}</span>
+        {% if due.status == 'partial' %}<span class="cps-sub">Paid so far: &#8369;{{ '{:,.2f}'.format(due.paid_in_cycle) }}</span>{% endif %}
+        {% endif %}
         {% if due and due.due_date %}
         <span class="napiq-pay-due">Due Date: {{ due.due_date.strftime('%b') }} {{ due.due_date.day }}, {{ due.due_date.year }}</span>
         {% elif due and not due.installed %}
@@ -319,6 +324,9 @@ document.addEventListener('DOMContentLoaded', function () {
 {% endblock %}
 
 {% block extra_scripts %}
+{% if pending_payment %}
+<script src="{{ url_for('static', filename='js/payment-autorefresh.js') }}" data-url="{{ url_for('hitpay.status_json') }}"></script>
+{% endif %}
 {% if app_progress %}
 <script>window.APP_PROGRESS_INITIAL = {{ app_progress|tojson }};</script>
 <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>

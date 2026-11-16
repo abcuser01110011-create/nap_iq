@@ -5,8 +5,17 @@ Routes:
     POST /customer/payments/pay-online   -> pay_online     (customer; creates a pending
                                             Payment + HitPay payment request, redirects to checkout)
     GET  /customer/payments/online/return -> pay_return    (customer lands back here after checkout)
+    GET  /customer/payments/status.json   -> status_json   (polled by the customer pages so a
+                                            payment shows up as soon as it is confirmed)
     POST /webhooks/hitpay                 -> hitpay_webhook (called by HitPay, CSRF-exempt,
-                                            signature-verified; this is what confirms a payment)
+                                            signature-verified; confirms a payment)
+
+A payment is confirmed by whichever arrives first: the signed webhook, or the
+customer's return from checkout -- in which case the server asks HitPay
+directly for the checkout's status (hitpay.fetch_payment_request) and never
+trusts the browser redirect itself. Either way the customer's status
+(Paid / Partial / ...) is recomputed from confirmed payments, see
+app/billing_utils.py.
 
 No schema change: an online payment is a normal `payments` row with
 payment_method='other', status 'pending' until the webhook arrives, and
@@ -14,10 +23,10 @@ reference_number = the HitPay payment-request id (so it can be looked up in
 the HitPay dashboard).
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, current_app, flash, g, redirect, request, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, request, url_for
 
 from app import hitpay
 from app.auth import role_required
@@ -104,11 +113,53 @@ def pay_online():
     return redirect(request_data["url"])
 
 
+def _confirm_online_payment(payment, hitpay_id, method=""):
+    """Marks a pending online payment confirmed (shared by the webhook and
+    the return-from-checkout check) and notifies the customer."""
+    payment.status = "confirmed"
+    payment.payment_date = date.today()
+    payment.reference_number = str(hitpay_id or payment.reference_number or "")[:50] or None
+    payment.remarks = ("HitPay online payment" + (f" ({method})" if method else ""))[:500]
+    notify_online_payment_received(payment)
+
+
+def _try_confirm_from_hitpay(payment):
+    """Asks HitPay whether this pending payment's checkout was completed and,
+    if the amount matches, confirms it right now. Returns True when confirmed."""
+    if not hitpay.is_configured() or not payment.reference_number:
+        return False
+    try:
+        body = hitpay.fetch_payment_request(payment.reference_number)
+    except hitpay.HitPayError as exc:
+        current_app.logger.warning("HitPay status lookup failed for payment %s: %s", payment.id, exc)
+        return False
+    if str(body.get("status", "")).lower() != "completed":
+        return False
+    try:
+        paid = Decimal(str(body.get("amount", "0"))).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return False
+    if paid != Decimal(payment.amount).quantize(Decimal("0.01")):
+        current_app.logger.warning("HitPay amount mismatch on payment %s: got %s, expected %s", payment.id, paid, payment.amount)
+        return False        # leave pending -- the webhook path flags it for review
+    method, hitpay_id = "", None
+    payments = body.get("payments")
+    if isinstance(payments, list) and payments and isinstance(payments[0], dict):
+        method = str(payments[0].get("payment_type") or "")
+        hitpay_id = payments[0].get("id")
+    _confirm_online_payment(payment, hitpay_id, method)
+    db.session.commit()
+    return True
+
+
 @hitpay_bp.route("/online/return")
 @role_required("user")
 def pay_return():
-    """Where HitPay sends the customer back. Informational only -- a payment
-    is confirmed by the signed webhook, never by this redirect."""
+    """Where HitPay sends the customer back. The redirect itself is never
+    trusted: if the payment is still pending, HitPay is asked directly (server
+    to server) and, when it says completed, the payment is confirmed on the
+    spot -- so the customer's status flips to Paid / Partial immediately
+    instead of waiting for the webhook."""
     subscriber = _own_subscriber_or_none()
     if subscriber is None:
         return _no_subscriber_redirect()
@@ -119,10 +170,18 @@ def pay_return():
     if ref:
         payment = Payment.query.filter_by(reference_number=ref, subscriber_id=subscriber.id).first()
 
+    if payment is not None and payment.status == "pending" and status not in ("canceled", "cancelled", "failed"):
+        _try_confirm_from_hitpay(payment)
+
     if payment is not None and payment.status == "confirmed":
-        flash("Payment received - thank you! It now shows as Confirmed.", "success")
+        info = monthly_due_info(subscriber)
+        if info["status"] == "partial":
+            flash("Payment received - thank you! It shows as a Partial payment; "
+                  f"\u20b1{info['balance']:,.2f} is still due.", "success")
+        else:
+            flash("Payment received - thank you! Your account now shows as Paid.", "success")
     elif status == "completed":
-        flash("Payment received. It will show as Confirmed in a few moments - refresh this page.", "success")
+        flash("Payment received. It will show as Confirmed in a few moments.", "success")
     elif status in ("canceled", "cancelled", "failed"):
         if payment is not None and payment.status == "pending":
             payment.status = "voided"
@@ -132,6 +191,27 @@ def pay_return():
     else:
         flash("We're waiting for HitPay to confirm your payment.", "info")
     return _back_to_payments()
+
+
+@hitpay_bp.route("/status.json")
+@role_required("user")
+def status_json():
+    """Tiny status feed the customer pages poll while a payment is still
+    pending, so they refresh themselves the moment it is confirmed."""
+    subscriber = _own_subscriber_or_none()
+    if subscriber is None:
+        return jsonify({"pending": 0, "status": None}), 404
+    pending = Payment.query.filter_by(subscriber_id=subscriber.id, status="pending").all()
+    # Give a webhook-less environment a chance too: ask HitPay about each pending checkout.
+    for payment in pending:
+        recent = payment.created_at and payment.created_at >= datetime.utcnow() - timedelta(hours=24)
+        if recent and payment.remarks and "awaiting payment" in payment.remarks:
+            _try_confirm_from_hitpay(payment)
+    still_pending = Payment.query.filter_by(subscriber_id=subscriber.id, status="pending").count()
+    info = monthly_due_info(subscriber)
+    resp = jsonify({"pending": still_pending, "status": info["status"], "balance": float(info["balance"])})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @hitpay_webhook_bp.route("/webhooks/hitpay", methods=["POST"])
@@ -169,10 +249,6 @@ def hitpay_webhook():
     payments = data.get("payments")
     if isinstance(payments, list) and payments and isinstance(payments[0], dict):
         method = str(payments[0].get("payment_type") or "")
-    payment.status = "confirmed"
-    payment.payment_date = date.today()
-    payment.reference_number = str(data.get("id") or payment.reference_number or "")[:50] or None
-    payment.remarks = ("HitPay online payment" + (f" ({method})" if method else ""))[:500]
-    notify_online_payment_received(payment)
+    _confirm_online_payment(payment, data.get("id"), method)
     db.session.commit()
     return "ok", 200
