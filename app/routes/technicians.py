@@ -287,7 +287,12 @@ def edit_technician(technician_id):
             db.session.add(login)
             db.session.flush()
             technician.user_id = login.id
-        elif technician.user.role in ("technician", "field_assistant"):
+        elif technician.user is not None:
+            # Keep the login's display name in sync with the profile, so a
+            # rename here also shows on the technician's own account/app.
+            technician.user.full_name = technician.full_name
+
+        if not needs_credentials and technician.user is not None and technician.user.role in ("technician", "field_assistant"):
             # Existing login, type changed on this edit -- keep its
             # role (and therefore its mobile-app access) matching
             # what the page now shows. The `in (...)` guard leaves
