@@ -15,6 +15,7 @@ separate database round-trip, and not left half-committed if
 something later in the same request rolls back.
 """
 
+from app.email_utils import email_issue_merged, email_issue_reported, email_issue_status_changed
 from app.extensions import db
 from app.models import Notification
 
@@ -116,6 +117,9 @@ def notify_new_issue_reported(issue):
         entity_type="issue",
         entity_id=issue.id,
     )
+    # Email the subscriber that their report was received (sent after the
+    # caller's commit; see app/email_utils.py).
+    email_issue_reported(issue)
 
 
 def notify_issue_updated(issue):
@@ -139,6 +143,7 @@ def notify_issue_updated(issue):
         entity_type="issue",
         entity_id=issue.id,
     )
+    email_issue_merged(issue)
 
 
 def notify_payment_pending_confirmation(payment):
@@ -264,6 +269,8 @@ def notify_issue_status_change(issue):
         entity_type="issue",
         entity_id=issue.id,
     )
+    # Email the subscriber the new status (sent after the caller's commit).
+    email_issue_status_changed(issue)
 
 
 # Where a notification's "view record" link should point, keyed by

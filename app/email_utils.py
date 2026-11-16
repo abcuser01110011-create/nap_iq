@@ -33,14 +33,19 @@ Only the `requests` library is used to call Resend's API — no Resend-
 specific SDK dependency needed.
 """
 
+import html as _html
+import os
 import random
 import smtplib
+import threading
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import requests
-from flask import current_app
+from flask import current_app, has_app_context, url_for
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 from app.extensions import db
 from app.models import EmailVerification
@@ -357,3 +362,240 @@ def send_status_email(to_address: str, subject: str, heading: str, body_text: st
         </div>
     """
     return _send_email(to_address, subject, html_body, body_text)
+
+
+# =====================================================================
+# Subscriber technical-issue emails (Gmail / any provider above)
+# =====================================================================
+# Three emails go to the SUBSCRIBER who owns a technical issue:
+#   1. "We received your report"      -> email_issue_reported()
+#   2. "Your report was added to an   -> email_issue_merged()
+#       issue we're already handling"
+#   3. "Your issue is now <status>"   -> email_issue_status_changed()
+#
+# They are called from app/notifications_utils.py, right next to the
+# in-app Notification rows, so every place that already notifies about an
+# issue (customer portal, mobile API, staff GeoMap, dispatch, technician
+# web + mobile, admin close) also sends the email — no route changes.
+#
+# Emails are NOT sent immediately. `queue_email()` parks them on the DB
+# session and they are only sent in the session's `after_commit` hook:
+#   * if the request later rolls back, no email goes out for a change
+#     that never happened;
+#   * a slow/failing SMTP server can never break the transaction.
+# Nothing in here ever raises into the request.
+
+_PENDING_EMAILS_KEY = "pending_emails"
+_PENDING_APP_KEY = "pending_emails_app"
+
+
+def queue_email(to_address, subject, html_body, text_body=None, dedupe_key=None):
+    """Queues one email to be sent right after the current transaction
+    commits. `dedupe_key`: a later email with the same key in the same
+    transaction replaces the earlier one (e.g. an issue that goes
+    pending -> assigned within one request only emails the last status).
+    Silently ignores a missing/obviously invalid address."""
+    to_address = (to_address or "").strip()
+    if "@" not in to_address or not has_app_context():
+        return
+    info = db.session.info
+    pending = info.setdefault(_PENDING_EMAILS_KEY, [])
+    if dedupe_key is not None:
+        pending[:] = [p for p in pending if p["dedupe_key"] != dedupe_key]
+    pending.append(
+        {"to": to_address, "subject": subject, "html": html_body, "text": text_body, "dedupe_key": dedupe_key}
+    )
+    info[_PENDING_APP_KEY] = current_app._get_current_object()
+
+
+def _send_async_enabled(app) -> bool:
+    """Background thread by default (the request doesn't wait on SMTP).
+    Sent inline instead when EMAIL_SEND_ASYNC=false, under pytest, and on
+    Vercel — serverless freezes the process once the response is returned,
+    so a background thread would often never finish there."""
+    explicit = os.environ.get("EMAIL_SEND_ASYNC", "").strip().lower()
+    if explicit in ("1", "true", "yes"):
+        return True
+    if explicit in ("0", "false", "no"):
+        return False
+    return not (app.config.get("TESTING") or os.environ.get("VERCEL"))
+
+
+def _deliver(app, emails):
+    with app.app_context():
+        for item in emails:
+            try:
+                _send_email(item["to"], item["subject"], item["html"], item["text"])
+            except Exception:  # never let a mail problem escape
+                app.logger.exception("email_utils: unexpected error sending %r", item["subject"])
+
+
+@event.listens_for(Session, "after_commit")
+def _flush_queued_emails(session):
+    emails = session.info.pop(_PENDING_EMAILS_KEY, None)
+    app = session.info.pop(_PENDING_APP_KEY, None)
+    if not emails or app is None:
+        return
+    if _send_async_enabled(app):
+        threading.Thread(target=_deliver, args=(app, emails), daemon=True).start()
+    else:
+        _deliver(app, emails)
+
+
+@event.listens_for(Session, "after_rollback")
+def _discard_queued_emails(session):
+    session.info.pop(_PENDING_EMAILS_KEY, None)
+    session.info.pop(_PENDING_APP_KEY, None)
+
+
+# ---- issue email content ---------------------------------------------
+
+_ISSUE_STATUS_COPY = {
+    "pending": (
+        "Your issue is waiting for a technician",
+        "Your reported issue is in our queue and will be assigned to a technician shortly.",
+    ),
+    "assigned": (
+        "A technician has been assigned",
+        "Good news — a technician has been assigned to your reported issue and will "
+        "take care of it soon.",
+    ),
+    "in_progress": (
+        "A technician is working on your issue",
+        "Our technician has started working on your reported issue.",
+    ),
+    "resolved": (
+        "Your issue has been resolved",
+        "Our technician has marked your reported issue as resolved. If the problem "
+        "is still happening, please report it again or contact PG Networks support.",
+    ),
+    "closed": (
+        "Your issue has been closed",
+        "Your reported issue is now closed. Thank you for your patience — if you "
+        "need further help, you can always submit a new report.",
+    ),
+}
+
+
+def _issue_recipient(issue):
+    """The subscriber's own email, else the email of their linked portal
+    login. None if neither is on file."""
+    subscriber = issue.subscriber
+    if subscriber is None:
+        return None
+    if subscriber.email and "@" in subscriber.email:
+        return subscriber.email.strip()
+    user = subscriber.user
+    if user is not None and user.email and "@" in user.email:
+        return user.email.strip()
+    return None
+
+
+def _issue_link():
+    """Absolute link to the customer's issue list, or None outside a request."""
+    try:
+        return url_for("customer.my_issues", _external=True)
+    except Exception:
+        return None
+
+
+def _issue_email(heading, intro, issue, status_text, link):
+    """(html, text) for an issue email. Every dynamic value is escaped."""
+    esc = _html.escape
+    code = issue.issue_code or f"#{issue.id}"
+    issue_type = (issue.issue_type or "").replace("_", " ")
+    name = esc(issue.subscriber.full_name) if issue.subscriber else "there"
+    reported = ""
+    if issue.created_at:
+        # Stored in UTC; subscribers are in the Philippines (UTC+8).
+        reported = (issue.created_at + timedelta(hours=8)).strftime("%b %d, %Y %I:%M %p (PH time)")
+
+    rows = [("Ticket no.", code), ("Issue type", issue_type), ("Status", status_text)]
+    if reported:
+        rows.append(("Reported", reported))
+    rows_html = "".join(
+        f'<tr><td style="padding:6px 12px 6px 0;color:#64748B;">{esc(k)}</td>'
+        f'<td style="padding:6px 0;color:#0B1F3A;font-weight:bold;">{esc(v)}</td></tr>'
+        for k, v in rows
+    )
+    button = (
+        f'<p><a href="{esc(link)}" style="display:inline-block;background:#0B1F3A;color:#fff;'
+        f'padding:10px 18px;border-radius:6px;text-decoration:none;">View my issues</a></p>'
+        if link else ""
+    )
+    html_body = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #0B1F3A;">{esc(heading)}</h2>
+          <p>Hi {name},</p>
+          <p>{esc(intro)}</p>
+          <table style="border-collapse:collapse;margin:12px 0;">{rows_html}</table>
+          {button}
+          <p style="color: #64748B; font-size: 12px;">This is an automated message from PG Networks.</p>
+        </div>
+    """
+    text_body = (
+        f"Hi {issue.subscriber.full_name if issue.subscriber else 'there'},\n\n{intro}\n\n"
+        + "\n".join(f"{k}: {v}" for k, v in rows)
+        + (f"\n\nView your issues: {link}" if link else "")
+        + "\n\n— PG Networks (automated message)"
+    )
+    return html_body, text_body
+
+
+def _is_fiber_break(issue):
+    # A Fiber Break is logged by staff for a whole NAP and fanned out to
+    # every connected subscriber — those subscribers didn't report anything,
+    # so "we received your report" would be wrong. (Customers can't pick
+    # this type themselves.)
+    return issue.issue_type == "Fiber Break"
+
+
+def email_issue_reported(issue):
+    """'We received your report' — queued when an issue is first created."""
+    to = _issue_recipient(issue)
+    if not to or _is_fiber_break(issue):
+        return
+    code = issue.issue_code or f"#{issue.id}"
+    html_body, text_body = _issue_email(
+        "We received your report",
+        "Thank you for reporting your issue. Your report was successfully submitted "
+        "and our team is on it. We'll email you again whenever its status changes.",
+        issue, "Pending", _issue_link(),
+    )
+    queue_email(to, f"PG Networks — Report received ({code})", html_body, text_body,
+                dedupe_key=("issue-reported", issue.id))
+
+
+def email_issue_merged(issue):
+    """A new report was merged into the subscriber's already-open issue."""
+    to = _issue_recipient(issue)
+    if not to or _is_fiber_break(issue):
+        return
+    code = issue.issue_code or f"#{issue.id}"
+    status_text = (issue.status or "").replace("_", " ").capitalize()
+    html_body, text_body = _issue_email(
+        "Your report was added to an existing issue",
+        "We received your new report. You already have an open issue with us, so "
+        "we've added your report to it instead of opening a duplicate.",
+        issue, status_text, _issue_link(),
+    )
+    queue_email(to, f"PG Networks — Report received ({code})", html_body, text_body,
+                dedupe_key=("issue-merged", issue.id))
+
+
+def email_issue_status_changed(issue):
+    """'Your issue is now <status>' — queued on every status change."""
+    to = _issue_recipient(issue)
+    if not to or issue.status not in _ISSUE_STATUS_COPY:
+        return
+    code = issue.issue_code or f"#{issue.id}"
+    heading, intro = _ISSUE_STATUS_COPY[issue.status]
+    status_text = issue.status.replace("_", " ").capitalize()
+    if issue.status == "closed" and getattr(issue, "voided_at", None):
+        heading = "Your issue was closed by our team"
+        intro = ("Your reported issue was closed by our support team. If you still need "
+                 "help, please submit a new report or contact PG Networks support.")
+        status_text = "Closed"
+    html_body, text_body = _issue_email(heading, intro, issue, status_text, _issue_link())
+    queue_email(to, f"PG Networks — Issue {code}: {status_text}", html_body, text_body,
+                dedupe_key=("issue-status", issue.id))
