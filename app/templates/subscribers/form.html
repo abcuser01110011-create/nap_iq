@@ -123,28 +123,6 @@
                         </div>
                     </div>
 
-                    {% if mode == 'edit' %}
-                    <hr class="my-4">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 bg-light rounded p-3">
-                        <div>
-                            <div class="fw-semibold small">Linked Login Account</div>
-                            <div class="text-muted small">
-                                {% if subscriber.user %}
-                                    Currently linked to <strong>{{ subscriber.user.username }}</strong>.
-                                {% else %}
-                                    Not linked to a login account yet.
-                                {% endif %}
-                                Managed from Manage Users, not here.
-                            </div>
-                        </div>
-                        {% if current_user.role == 'administrator' %}
-                        <a href="{{ url_for('users.list_users') }}" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-people me-1"></i>Manage Users
-                        </a>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-
                     <hr class="my-4">
 
                     <div class="d-flex justify-content-end gap-2">
