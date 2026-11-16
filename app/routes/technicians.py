@@ -184,6 +184,7 @@ def add_technician():
         login = User(
             username=form.username.data.strip(),
             full_name=form.full_name.data.strip(),
+            email=(form.email.data or "").strip() or None,
             role=login_role,
         )
         login.set_password(form.password.data)

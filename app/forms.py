@@ -1127,6 +1127,15 @@ class TechnicianForm(FlaskForm):
         "Username",
         validators=[Optional(), Length(min=3, max=50, message="Username must be between 3 and 50 characters.")],
     )
+    # Optional, same as the Add Collector form. Saved on the new login account.
+    email = StringField(
+        "Email",
+        validators=[
+            Optional(),
+            Length(max=100, message="Email must be at most 100 characters."),
+            Email(message="Enter a valid email address."),
+        ],
+    )
     password = PasswordField(
         "Password",
         validators=[Optional(), Length(min=8, message="Password must be at least 8 characters."), validate_password_complexity],
@@ -1135,6 +1144,13 @@ class TechnicianForm(FlaskForm):
         "Confirm Password",
         validators=[Optional()],
     )
+
+    def validate_email(self, field):
+        """Unique across all accounts when provided (users.email is unique)."""
+        if not field.data:
+            return
+        if User.query.filter(func.lower(User.email) == field.data.strip().lower()).first() is not None:
+            raise ValidationError("This email address is already in use by another account.")
 
     def validate_credentials_if_needed(self, *, needs_credentials):
         """Manually invoked by the route (not a `validate_<field>`
