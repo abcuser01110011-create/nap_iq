@@ -1,7 +1,7 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Ticket History{% endblock %}
 {% block page_title %}Ticket History{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">Your completed and cancelled tickets</p>{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">Your completed, cancelled and voided tickets</p>{% endblock %}
 
 {# No top header on this page: the Ticket History heading below replaces it
    (same treatment as technician/tickets.html). #}
@@ -72,7 +72,7 @@
                         {% endif %}
                     </div>
                     <span class="badge {{ outcome_classes.get(a.status, 'text-bg-secondary') }}">
-                        {{ a.status|capitalize }}
+                        {{ 'Voided' if a.is_voided else a.status|capitalize }}
                     </span>
                 </div>
 

@@ -353,6 +353,8 @@ def _serialize_assignment(assignment: Assignment) -> dict:
     return {
         "id": assignment.id,
         "status": assignment.status,
+        # True when an administrator voided the ticket (status is then "cancelled").
+        "voided": assignment.is_voided,
         # Phase 28: "repair" for a technical_issue-sourced row,
         # "installation" for a service_request-sourced one — lets the
         # mobile app group/label jobs without inspecting which of

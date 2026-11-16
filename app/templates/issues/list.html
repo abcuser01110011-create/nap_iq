@@ -114,7 +114,6 @@
                     <th>Status</th>
                     <th>Assigned Team</th>
                     <th>Created</th>
-                    <th class="text-end">Action</th>
                 </tr>
             </thead>
             <tbody id="issuesTableBody" data-lf-body>
@@ -148,19 +147,10 @@
                         {% endif %}
                     </td>
                     <td class="disp-subtext">{{ ticket.created_at.strftime('%Y-%m-%d') }}</td>
-                    <td class="text-end">
-                        <div class="subs-row-actions">
-                            <a href="{{ ticket.detail_url }}"
-                               class="subs-edit-btn ticket-open" title="View">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            <span class="subs-chevron"><i class="bi bi-chevron-right"></i></span>
-                        </div>
-                    </td>
                 </tr>
                 {% else %}
                 <tr id="issuesEmptyRow">
-                    <td colspan="7" class="disp-empty">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-exclamation-triangle display-6 d-block mb-2"></i>
                         No tickets found{% if search_term or status_filter or priority_filter %} matching your filters{% endif %}.
                     </td>
@@ -168,7 +158,7 @@
                 {% endfor %}
                 {% if tickets %}
                 <tr id="issuesNoMatchRow" class="d-none" data-lf-nomatch>
-                    <td colspan="7" class="disp-empty">
+                    <td colspan="6" class="disp-empty">
                         <i class="bi bi-search display-6 d-block mb-2"></i>
                         No tickets match "<span id="issuesNoMatchQuery" data-lf-nomatch-q></span>".
                     </td>

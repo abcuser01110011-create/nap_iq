@@ -23,8 +23,8 @@
             'rejected': 'text-bg-danger',
             'closed': 'text-bg-dark'
         } %}
-        <span class="badge fs-6 {{ status_classes.get(service_request.status, 'text-bg-secondary') }}">
-            {{ service_request.status|capitalize }}
+        <span class="badge fs-6 {{ 'text-bg-secondary' if service_request.voided_at else status_classes.get(service_request.status, 'text-bg-secondary') }}">
+            {{ 'Voided' if service_request.voided_at else service_request.status|capitalize }}
         </span>
     </div>
 </div>
@@ -224,5 +224,22 @@
     <a href="{{ url_for('naps.geomap', navigate_type='service_request', navigate_id=service_request.id) }}" class="btn btn-outline-success">
         <i class="bi bi-signpost-split me-1"></i>Navigate
     </a>
+</div>
+{% endif %}
+
+{# Minimal "Void ticket" control: click -> inline confirmation -> POST. #}
+{% if current_user.role == 'administrator' and service_request.status not in ('completed', 'closed', 'rejected') and not service_request.voided_at %}
+<div class="mt-3 pt-3 border-top">
+    <button type="button" class="btn btn-link btn-sm text-danger text-decoration-none p-0"
+            onclick="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+        <i class="bi bi-slash-circle me-1"></i>Void ticket
+    </button>
+    <form method="post" action="{{ url_for('issues.void_service_order', request_id=service_request.id) }}" class="d-none d-flex flex-wrap align-items-center gap-2 small">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span>Void this ticket? It will be removed from the team's ticket list and kept in history as voided.</span>
+        <button type="submit" class="btn btn-danger btn-sm">Yes, void</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                onclick="var f=this.closest('form'); f.classList.add('d-none'); f.previousElementSibling.classList.remove('d-none');">Cancel</button>
+    </form>
 </div>
 {% endif %}

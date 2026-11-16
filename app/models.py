@@ -356,6 +356,11 @@ class TechnicalIssue(db.Model):
     # secure_url). Used by consolidated tickets, where one job covers several
     # subscribers and each house needs its own proof. NULL until uploaded.
     proof_photo = db.Column(db.String(255), nullable=True)
+    # Set when an administrator VOIDS the ticket (Tickets > ticket details >
+    # "Void ticket"). A voided ticket is stored as status "closed" with this
+    # timestamp, so every existing "open ticket" filter already ignores it,
+    # while the UI can still label it "Voided". NULL = not voided.
+    voided_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -455,6 +460,9 @@ class ServiceRequest(db.Model):
     address = db.Column(db.String(255), nullable=True)
     contact_number = db.Column(db.String(20), nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    # Set when an administrator VOIDS this service order (stored as status
+    # "closed" + this timestamp; see TechnicalIssue.voided_at). NULL = not voided.
+    voided_at = db.Column(db.DateTime, nullable=True)
     # Phase 35 (type-specific ticket detail view): fields the GeoMap
     # "+ Tickets" quick-create modal already collected but, until now,
     # only ever folded into `notes` as plain text (see
@@ -627,6 +635,14 @@ class Assignment(db.Model):
     # the reverse "all assignments for this request" collection yet.
     service_request = db.relationship("ServiceRequest")
     technician = db.relationship("Technician", back_populates="assignments")
+
+    @property
+    def is_voided(self):
+        """True when the ticket this assignment belongs to was voided by an
+        administrator (the assignment itself is then 'cancelled'), so
+        history screens can say "Voided" instead of "Cancelled"."""
+        source = self.technical_issue if self.technical_issue_id is not None else self.service_request
+        return bool(source is not None and getattr(source, "voided_at", None) is not None)
 
     @validates("technical_issue_id", "service_request_id")
     def _check_exactly_one_source(self, key, value):

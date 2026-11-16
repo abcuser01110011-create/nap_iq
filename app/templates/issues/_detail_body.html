@@ -24,9 +24,13 @@
             'resolved': 'text-bg-success',
             'closed': 'text-bg-dark'
         } %}
+        {% if issue.voided_at %}
+        <span class="badge fs-6 text-bg-secondary">Voided</span>
+        {% else %}
         <span class="badge fs-6 {{ status_classes.get(issue.status, 'text-bg-secondary') }}">
             {{ issue.status|replace('_', ' ')|capitalize }}
         </span>
+        {% endif %}
     </div>
 </div>
 
@@ -144,3 +148,20 @@
     </button>
     {% endif %}
 </div>
+
+{# Minimal "Void ticket" control: click -> inline confirmation -> POST. #}
+{% if current_user.role == 'administrator' and issue.status not in ('resolved', 'closed') and not issue.voided_at %}
+<div class="mt-3 pt-3 border-top">
+    <button type="button" class="btn btn-link btn-sm text-danger text-decoration-none p-0"
+            onclick="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+        <i class="bi bi-slash-circle me-1"></i>Void ticket
+    </button>
+    <form method="post" action="{{ url_for('issues.void_issue', issue_id=issue.id) }}" class="d-none d-flex flex-wrap align-items-center gap-2 small">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span>Void this ticket? It will be removed from the team's ticket list and kept in history as voided.</span>
+        <button type="submit" class="btn btn-danger btn-sm">Yes, void</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                onclick="var f=this.closest('form'); f.classList.add('d-none'); f.previousElementSibling.classList.remove('d-none');">Cancel</button>
+    </form>
+</div>
+{% endif %}

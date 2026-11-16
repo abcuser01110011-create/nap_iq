@@ -490,3 +490,58 @@ def sync_team_assignments(assignment, new_status):
         sibling.status = new_status
         if new_status == "in_progress" and sibling.technician is not None:
             sibling.technician.status = "busy"
+
+
+
+def void_ticket(ticket):
+    """Voids a TechnicalIssue or ServiceRequest (administrator action).
+
+    The ticket is stored as status "closed" with `voided_at` set, so every
+    existing "open ticket" query ignores it, and every still-open Assignment
+    for it (all team members' copies) is cancelled -- which removes it from
+    the assigned team's ticket list and moves it into their ticket history,
+    where it is labelled "Voided". Nothing is deleted. Call before commit."""
+    from datetime import datetime
+
+    now = datetime.utcnow()
+    open_statuses = ("assigned", "accepted", "in_progress")
+
+    if isinstance(ticket, TechnicalIssue):
+        issues = {ticket.id: ticket}
+        for child in ticket.child_issues:
+            issues[child.id] = child
+        # A Fiber Break fans out into one row per connected subscriber, all
+        # sharing one ticket code and shown as a single ticket: void them all.
+        if ticket.issue_type == "Fiber Break" and ticket.issue_code:
+            for sibling in TechnicalIssue.query.filter_by(issue_code=ticket.issue_code).all():
+                issues[sibling.id] = sibling
+        for issue in issues.values():
+            issue.status = "closed"
+            issue.voided_at = now
+        assignments = Assignment.query.filter(
+            Assignment.technical_issue_id.in_(list(issues)),
+            Assignment.status.in_(open_statuses),
+        ).all()
+    else:
+        ticket.status = "closed"
+        ticket.voided_at = now
+        assignments = Assignment.query.filter(
+            Assignment.service_request_id == ticket.id,
+            Assignment.status.in_(open_statuses),
+        ).all()
+
+    technicians = []
+    for assignment in assignments:
+        assignment.status = "cancelled"
+        if assignment.technician is not None:
+            technicians.append(assignment.technician)
+    db.session.flush()
+    # Free up technicians who have nothing else open.
+    for tech in set(technicians):
+        if tech.status == "busy":
+            still_open = Assignment.query.filter(
+                Assignment.technician_id == tech.id,
+                Assignment.status.in_(open_statuses),
+            ).count()
+            if still_open == 0:
+                tech.status = "available"

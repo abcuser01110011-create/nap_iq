@@ -77,7 +77,7 @@ from decimal import Decimal
 
 from app.extensions import db
 from app.auth import role_required
-from app.issue_utils import consolidate_nap_issues
+from app.issue_utils import consolidate_nap_issues, void_ticket
 from app.models import TechnicalIssue, Subscriber, Nap, Assignment, Technician, ServiceRequest, Plan
 from app.forms import IssueReportForm
 from app.notifications_utils import notify_issue_status_change, notify_new_issue_reported, notify_issue_updated
@@ -253,8 +253,8 @@ def _ticket_row_from_issue(issue, assignment):
         "priority": issue.priority,
         "raw_status": issue.status,
         "status": _unified_ticket_status(issue.status, assignment, "trouble_ticket"),
-        "status_label": _unified_ticket_status(issue.status, assignment, "trouble_ticket").replace("_", " ").capitalize(),
-        "status_badge_class": "disp-badge-" + _unified_ticket_status(issue.status, assignment, "trouble_ticket"),
+        "status_label": "Voided" if issue.voided_at else _unified_ticket_status(issue.status, assignment, "trouble_ticket").replace("_", " ").capitalize(),
+        "status_badge_class": "disp-badge-voided" if issue.voided_at else "disp-badge-" + _unified_ticket_status(issue.status, assignment, "trouble_ticket"),
         "assigned_name": assigned_name,
         "created_at": issue.created_at,
         "detail_url": url_for("issues.view_issue", issue_id=issue.id),
@@ -301,8 +301,8 @@ def _ticket_row_from_service_request(service_request, assignment):
         "priority": service_request.priority,
         "raw_status": service_request.status,
         "status": _unified_ticket_status(service_request.status, assignment, "service_order"),
-        "status_label": _unified_ticket_status(service_request.status, assignment, "service_order").replace("_", " ").capitalize(),
-        "status_badge_class": "disp-badge-" + _unified_ticket_status(service_request.status, assignment, "service_order"),
+        "status_label": "Voided" if service_request.voided_at else _unified_ticket_status(service_request.status, assignment, "service_order").replace("_", " ").capitalize(),
+        "status_badge_class": "disp-badge-voided" if service_request.voided_at else "disp-badge-" + _unified_ticket_status(service_request.status, assignment, "service_order"),
         "assigned_name": assigned_name,
         "created_at": service_request.created_at,
         "detail_url": url_for("issues.view_service_order", request_id=service_request.id),
@@ -1108,6 +1108,35 @@ def close_issue(issue_id):
     issue_label = issue.issue_code or f"#{issue.id}"
     flash(f"{issue_label} marked closed.", "success")
     return redirect(url_for("issues.view_issue", issue_id=issue.id))
+
+
+@issues_bp.route("/<int:issue_id>/void", methods=["POST"])
+@role_required("administrator")
+def void_issue(issue_id):
+    """Voids a trouble ticket: it is closed as 'Voided', leaves the assigned
+    team's ticket list, and shows up in their ticket history as voided."""
+    issue = TechnicalIssue.query.get_or_404(issue_id)
+    if issue.voided_at is not None or issue.status in ("resolved", "closed"):
+        flash("Only an unresolved ticket can be voided.", "warning")
+        return redirect(url_for("issues.list_issues"))
+    void_ticket(issue)
+    db.session.commit()
+    flash(f"{issue.issue_code or '#' + str(issue.id)} was voided.", "success")
+    return redirect(url_for("issues.list_issues"))
+
+
+@issues_bp.route("/service-order/<int:request_id>/void", methods=["POST"])
+@role_required("administrator")
+def void_service_order(request_id):
+    """Same as void_issue() above, for a Service Order ticket."""
+    service_request = ServiceRequest.query.get_or_404(request_id)
+    if service_request.voided_at is not None or service_request.status in ("completed", "closed", "rejected"):
+        flash("Only an unfinished ticket can be voided.", "warning")
+        return redirect(url_for("issues.list_issues"))
+    void_ticket(service_request)
+    db.session.commit()
+    flash(f"SO-{service_request.id:04d} was voided.", "success")
+    return redirect(url_for("issues.list_issues"))
 
 
 # Phase 36: kept in sync by hand with dispatch.py's own

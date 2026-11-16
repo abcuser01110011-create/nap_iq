@@ -1286,7 +1286,7 @@ def _serialize_job(assignment):
     return {
         "assignment": assignment,
         "ticket_code": _ticket_code(assignment),
-        "status_label": STATUS_LABELS.get(assignment.status, assignment.status),
+        "status_label": "Voided" if assignment.is_voided else STATUS_LABELS.get(assignment.status, assignment.status),
         "type_label": type_label,
         "address": address,
         "priority": priority,
