@@ -186,6 +186,18 @@ class Config:
     RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
     MAIL_DEFAULT_SENDER_NAME = os.environ.get("MAIL_DEFAULT_SENDER_NAME", "PG Networks")
 
+    # ---- Alternative mail providers (can email ANY address, unlike Resend's sandbox) ----
+    # EMAIL_PROVIDER: "resend" | "gmail" | "brevo". Leave blank to auto-pick whichever
+    # of the groups below has its credentials filled in (Gmail, then Brevo, then Resend).
+    EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
+    # Gmail SMTP: GMAIL_USER = the sending Gmail address, GMAIL_APP_PASSWORD = a 16-character
+    # Google "App Password" (Google Account > Security > 2-Step Verification > App passwords).
+    GMAIL_USER = os.environ.get("GMAIL_USER", "").strip()
+    GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
+    # Brevo: API key + one verified sender address (Brevo dashboard > Senders).
+    BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+    BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "").strip()
+
     # ---- HitPay online payments (see HITPAY_SETUP.md) ----
     # Leave HITPAY_API_KEY / HITPAY_SALT empty and the "Pay online" box simply
     # doesn't appear. HITPAY_ENV is "sandbox" (test money) or "production".

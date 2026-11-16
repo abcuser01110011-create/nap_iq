@@ -34,7 +34,10 @@ specific SDK dependency needed.
 """
 
 import random
+import smtplib
 from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import requests
 from flask import current_app
@@ -43,9 +46,106 @@ from app.extensions import db
 from app.models import EmailVerification
 
 _RESEND_API_URL = "https://api.resend.com/emails"
+_BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+
+
+def _pick_provider() -> str:
+    """Which mail provider to use: EMAIL_PROVIDER ("resend" | "gmail" |
+    "brevo") if set, otherwise whichever one has credentials configured
+    (Gmail, then Brevo, then Resend)."""
+    cfg = current_app.config
+    chosen = (cfg.get("EMAIL_PROVIDER") or "").strip().lower()
+    if chosen in ("resend", "gmail", "brevo"):
+        return chosen
+    if cfg.get("GMAIL_USER") and cfg.get("GMAIL_APP_PASSWORD"):
+        return "gmail"
+    if cfg.get("BREVO_API_KEY"):
+        return "brevo"
+    return "resend"
 
 
 def _send_email(to_address: str, subject: str, html_body: str, text_body: str | None = None) -> bool:
+    """Sends one email with the configured provider (see _pick_provider).
+    Resend's free sandbox can only deliver to the owner's own address;
+    Gmail SMTP and Brevo can deliver to any recipient, which is what you
+    want for testing with several inboxes. Returns False (never raises)
+    on any failure."""
+    provider = _pick_provider()
+    if provider == "gmail":
+        return _send_via_gmail(to_address, subject, html_body, text_body)
+    if provider == "brevo":
+        return _send_via_brevo(to_address, subject, html_body, text_body)
+    return _send_via_resend(to_address, subject, html_body, text_body)
+
+
+def _send_via_gmail(to_address, subject, html_body, text_body=None) -> bool:
+    """Gmail SMTP (smtp.gmail.com:465) using an App Password. Delivers to
+    any address (about 500 emails/day on a normal Gmail account)."""
+    user = current_app.config.get("GMAIL_USER")
+    app_password = (current_app.config.get("GMAIL_APP_PASSWORD") or "").replace(" ", "")
+    if not user or not app_password:
+        current_app.logger.warning(
+            "email_utils: GMAIL_USER/GMAIL_APP_PASSWORD not configured — skipping %r to %s.",
+            subject, to_address,
+        )
+        return False
+    sender_name = current_app.config.get("MAIL_DEFAULT_SENDER_NAME", "PG Networks")
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{sender_name} <{user}>"
+    msg["To"] = to_address
+    if text_body:
+        msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+            server.login(user, app_password)
+            server.sendmail(user, [to_address], msg.as_string())
+        return True
+    except (smtplib.SMTPException, OSError):
+        current_app.logger.exception("email_utils: Gmail SMTP failed sending %r to %s", subject, to_address)
+        return False
+
+
+def _send_via_brevo(to_address, subject, html_body, text_body=None) -> bool:
+    """Brevo (Sendinblue) HTTPS API. Free plan (~300 emails/day) can send to
+    any address once one sender email is verified in the Brevo dashboard."""
+    api_key = current_app.config.get("BREVO_API_KEY")
+    sender_email = current_app.config.get("BREVO_SENDER_EMAIL")
+    if not api_key or not sender_email:
+        current_app.logger.warning(
+            "email_utils: BREVO_API_KEY/BREVO_SENDER_EMAIL not configured — skipping %r to %s.",
+            subject, to_address,
+        )
+        return False
+    payload = {
+        "sender": {"name": current_app.config.get("MAIL_DEFAULT_SENDER_NAME", "PG Networks"), "email": sender_email},
+        "to": [{"email": to_address}],
+        "subject": subject,
+        "htmlContent": html_body,
+    }
+    if text_body:
+        payload["textContent"] = text_body
+    try:
+        response = requests.post(
+            _BREVO_API_URL,
+            headers={"api-key": api_key, "Content-Type": "application/json", "accept": "application/json"},
+            json=payload,
+            timeout=10,
+        )
+        if response.status_code >= 400:
+            current_app.logger.error(
+                "email_utils: Brevo rejected %r to %s (status %s): %s",
+                subject, to_address, response.status_code, response.text,
+            )
+            return False
+        return True
+    except requests.RequestException:
+        current_app.logger.exception("email_utils: failed to send %r to %s via Brevo", subject, to_address)
+        return False
+
+
+def _send_via_resend(to_address: str, subject: str, html_body: str, text_body: str | None = None) -> bool:
     """Sends one email through Resend's HTTPS API. Returns True on
     success, False on any failure (missing API key, network error,
     Resend rejecting the request, etc.) instead of raising, so a mail
