@@ -86,6 +86,7 @@ from app.models import TechnicalIssue, ServiceRequest, Technician, Assignment, T
 from app.forms import AssignTechnicianForm
 from app.notifications_utils import notify_issue_status_change
 from app.recommendation import get_recommendations
+from app.email_utils import email_team_assigned
 
 dispatch_bp = Blueprint("dispatch", __name__, url_prefix="/dispatch")
 
@@ -658,6 +659,7 @@ def assign_request_json(request_id):
             technician_id=member.id,
             status="assigned",
         ))
+    email_team_assigned(service_request, team.name)  # queued; sent after commit
     db.session.commit()
     return jsonify(ok=True, message=f"Team {team.name} was assigned.")
 

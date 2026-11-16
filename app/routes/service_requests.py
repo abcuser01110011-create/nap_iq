@@ -268,7 +268,7 @@ def _notify_status_change(service_request):
     # fails (see app/email_utils.py's send_status_email()) — the
     # in-app notification above always still gets recorded either way.
     subscriber_email = service_request.subscriber.email if service_request.subscriber else None
-    if subscriber_email and service_request.status in ("approved", "scheduled", "rejected"):
+    if subscriber_email and service_request.status in ("approved", "scheduled", "rejected", "closed"):
         status_copy = {
             "approved": (
                 "Your application has been approved!",
@@ -278,7 +278,12 @@ def _notify_status_change(service_request):
             "scheduled": (
                 "Your installation has been scheduled",
                 "Your service request has moved to 'scheduled'. "
-                "A technician will be assigned and dispatched soon.",
+                "A team will be assigned to your installation soon, and we will email you when it is.",
+            ),
+            "closed": (
+                "Your installation is complete",
+                "Your service request has been completed and closed. "
+                "Thank you for choosing PG Networks!",
             ),
             "rejected": (
                 "Update on your service application",

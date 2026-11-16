@@ -599,3 +599,56 @@ def email_issue_status_changed(issue):
     html_body, text_body = _issue_email(heading, intro, issue, status_text, _issue_link())
     queue_email(to, f"PG Networks — Issue {code}: {status_text}", html_body, text_body,
                 dedupe_key=("issue-status", issue.id))
+
+
+# =====================================================================
+# Online-application emails (optional email on the landing-page form)
+# =====================================================================
+
+def _simple_email(heading, paragraphs):
+    """(html, text) for a short status email. Every value is escaped."""
+    esc = _html.escape
+    body = "".join(f'<p style="color:#0B1F3A;">{esc(p)}</p>' for p in paragraphs)
+    html_body = (
+        '<div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">'
+        f'<h2 style="color: #0B1F3A;">{esc(heading)}</h2>{body}'
+        '<p style="color: #64748B; font-size: 12px;">This is an automated message from PG Networks.</p>'
+        "</div>"
+    )
+    return html_body, "\n\n".join([heading, *paragraphs])
+
+
+def email_application_received(subscriber):
+    """"We received your application" -- sent when an applicant who gave
+    an email submits the landing-page Apply form. Queued, never raises."""
+    if subscriber is None or not subscriber.email:
+        return
+    html_body, text_body = _simple_email(
+        "We received your application",
+        [
+            f"Hi {subscriber.full_name}, thank you for applying to PG Networks.",
+            f"Your application number is {subscriber.subscriber_code}. Keep it handy: "
+            "you can use it with your phone number to log in to your account.",
+            "We will email you here whenever the status of your application changes.",
+        ],
+    )
+    queue_email(subscriber.email, "PG Networks — We received your application", html_body, text_body)
+
+
+def email_team_assigned(service_request, team_name):
+    """"A team was assigned to your installation" -- sent when an
+    administrator assigns a team after approving the application."""
+    subscriber = service_request.subscriber
+    if subscriber is None or not subscriber.email:
+        return
+    html_body, text_body = _simple_email(
+        "A team has been assigned to your installation",
+        [
+            f"Hi {subscriber.full_name}, good news: {team_name} has been assigned to your installation.",
+            "They will contact you on the phone number you provided to arrange the visit.",
+        ],
+    )
+    queue_email(
+        subscriber.email, "PG Networks — Your installation team is assigned", html_body, text_body,
+        dedupe_key=f"team-assigned-{service_request.id}",
+    )

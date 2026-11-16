@@ -266,6 +266,7 @@
             full_name: detailsForm.full_name.value.trim(),
             address: detailsForm.address.value.trim(),
             contact_number: detailsForm.contact_number.value.trim(),
+            email: detailsForm.email.value.trim(),
             plan_name: detailsForm.plan_name.value,
             latitude: confirmedFix.lat,
             longitude: confirmedFix.lng,
@@ -274,6 +275,7 @@
         if (!body.full_name) local.full_name = "Full name is required.";
         if (!body.address) local.address = "Installation address is required.";
         if (!/^\d{11}$/.test(body.contact_number)) local.contact_number = "Phone number must be exactly 11 digits (numbers only).";
+        if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) local.email = "Please enter a valid email address, or leave it blank.";
         if (Object.keys(local).length) { showErrors(detailsForm, local); return; }
 
         applySubmit.disabled = true;

@@ -17,6 +17,7 @@ from flask import (
 
 from app.extensions import db, limiter
 from app import login_attempts
+from app.email_utils import email_application_received
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, User
 from app.nap_recommendation import recommend_naps
@@ -107,6 +108,7 @@ def database_test():
 # CSRF-protected through the X-CSRFToken header like every other POST.
 
 _PHONE_RE = re.compile(r"^\d{11}$")
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _GENERIC_LOGIN_ERROR = (
     "We couldn't find a subscriber record matching that account number "
     "and phone number. Please double-check both, or contact PG Networks "
@@ -311,8 +313,12 @@ def public_apply():
     address = str(data.get("address") or "").strip()
     phone = str(data.get("contact_number") or "").strip()
     plan_name = str(data.get("plan_name") or "").strip() or None
+    # Optional: when given, status updates for the application are emailed here.
+    email = str(data.get("email") or "").strip().lower() or None
 
     errors = {}
+    if email and (len(email) > 100 or not _EMAIL_RE.match(email)):
+        errors["email"] = "Please enter a valid email address, or leave it blank."
     if not full_name:
         errors["full_name"] = "Full name is required."
     elif len(full_name) > 100:
@@ -347,6 +353,7 @@ def public_apply():
         latitude=round(latitude, 7),
         longitude=round(longitude, 7),
         contact_number=phone,
+        email=email,
         plan_type=plan_name,
         nap_id=None,
         user_id=None,
@@ -371,6 +378,9 @@ def public_apply():
         plan_label=plan_name,
         notes="Self-registered via public landing page.",
     ))
+    if email:
+        # Queued: only sent once the commit below succeeds, never raises.
+        email_application_received(subscriber)
     db.session.commit()
 
     return jsonify(ok=True, subscriber_code=subscriber.subscriber_code), 201
