@@ -16,6 +16,7 @@ from flask import (
 )
 
 from app.extensions import db, limiter
+from app import login_attempts
 from app.auth import role_required
 from app.models import Plan, ServiceRequest, Subscriber, User
 from app.nap_recommendation import recommend_naps
@@ -213,14 +214,26 @@ def public_account_login():
     if errors:
         return jsonify(ok=False, errors=errors), 400
 
+    # Failed-attempt limiter (app/login_attempts.py): locked after too many wrong tries.
+    locked_for = login_attempts.seconds_locked("customer-popup", code)
+    if locked_for:
+        return jsonify(ok=False, message=login_attempts.locked_message(locked_for)), 429
+
+    def _failed_login():
+        left = login_attempts.register_failure("customer-popup", code)
+        if left <= 0:
+            return jsonify(ok=False, message=login_attempts.locked_message(
+                login_attempts.seconds_locked("customer-popup", code))), 429
+        return jsonify(ok=False, message=f"{_GENERIC_LOGIN_ERROR} {login_attempts.warning_message(left)}"), 401
+
     subscriber = find_subscriber_for_link(code, phone)
     if subscriber is None:
-        return jsonify(ok=False, message=_GENERIC_LOGIN_ERROR), 401
+        return _failed_login()
 
     user = subscriber.user
     if user is not None:
         if user.role != "user":
-            return jsonify(ok=False, message=_GENERIC_LOGIN_ERROR), 401
+            return _failed_login()
         if user.status != "active":
             return jsonify(
                 ok=False,
@@ -250,6 +263,7 @@ def public_account_login():
         user.theme_preference = chosen_theme
         db.session.commit()
 
+    login_attempts.reset("customer-popup", code)
     session.clear()
     session["user_id"] = user.id
     session.permanent = True

@@ -27,6 +27,7 @@ from app.forms import LoginForm, SelfRegisterForm, validate_password_complexity
 from app.models import User, USER_THEME_PREFERENCES
 from app.auth import login_required, ROLE_HOME_ENDPOINT
 from app.extensions import db, limiter
+from app import login_attempts
 from app.email_utils import send_verification_code, verify_code, consume_verification
 from sqlalchemy import func
 
@@ -135,15 +136,36 @@ def _handle_login(portal):
         return redirect(url_for("auth.home"))
 
     form = LoginForm()
+    lockout_seconds = 0
+    attempts_left = None
 
     if form.validate_on_submit():
         username = form.username.data.strip()
+
+        # Locked out after too many wrong attempts? Don't even check the
+        # password -- a locked account/IP can't be used to keep guessing.
+        lockout_seconds = login_attempts.seconds_locked(portal, username)
+        if lockout_seconds:
+            return render_template(
+                "auth/login.html", form=form, portal=portal,
+                lockout_seconds=lockout_seconds,
+                lockout_message=login_attempts.locked_message(lockout_seconds),
+            ), 429
+
         # Case-insensitive, like MySQL's default collation was (phone keyboards auto-capitalise).
         user = User.query.filter(func.lower(User.username) == username.lower()).first()
 
         # Same generic message whether the username doesn't exist or the
         # password is wrong (no username enumeration).
         if user is None or not user.check_password(form.password.data):
+            attempts_left = login_attempts.register_failure(portal, username)
+            if attempts_left <= 0:
+                lockout_seconds = login_attempts.seconds_locked(portal, username)
+                return render_template(
+                    "auth/login.html", form=form, portal=portal,
+                    lockout_seconds=lockout_seconds,
+                    lockout_message=login_attempts.locked_message(lockout_seconds),
+                ), 429
             flash("Invalid username or password.", "danger")
         elif user.status != "active":
             flash("This account has been deactivated. Please contact an administrator.", "danger")
@@ -155,6 +177,7 @@ def _handle_login(portal):
             else:
                 flash("This sign-in is for subscribers only. Staff, please use the staff login.", "danger")
         else:
+            login_attempts.reset(portal, username)
             _apply_login_theme(user, request.form.get("theme"))
             session.clear()
             session["user_id"] = user.id
@@ -170,7 +193,10 @@ def _handle_login(portal):
             # starts from the dashboard.
             return redirect(url_for("auth.home"))
 
-    return render_template("auth/login.html", form=form, portal=portal)
+    return render_template(
+        "auth/login.html", form=form, portal=portal,
+        attempts_left_message=login_attempts.warning_message(attempts_left) if attempts_left else "",
+    )
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])

@@ -28,6 +28,7 @@
     </script>
     <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/auth-transition.css') }}?v={{ asset_version('css/auth-transition.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/login-limiter.css') }}" rel="stylesheet">
 </head>
 <body class="login-body{% if portal != 'customer' %} login-body--staff{% endif %}">
 
@@ -57,6 +58,18 @@
                     </div>
                 {% endif %}
             {% endwith %}
+
+            {% if lockout_message %}
+                <div class="login-limiter login-limiter--locked" role="alert" data-lockout-seconds="{{ lockout_seconds }}">
+                    <i class="bi bi-lock-fill"></i>
+                    <span data-lockout-text>{{ lockout_message }}</span>
+                </div>
+            {% elif attempts_left_message %}
+                <div class="login-limiter login-limiter--warning" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>{{ attempts_left_message }}</span>
+                </div>
+            {% endif %}
         </div>
 
         <form method="post" action="{{ url_for('auth.customer_login' if portal == 'customer' else 'auth.login', next=request.args.get('next')) }}" novalidate data-auth-transition="signin"{% if portal != 'customer' %} data-auth-theme="staff"{% endif %}>
@@ -117,6 +130,7 @@
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-transition.js') }}?v={{ asset_version('js/auth-transition.js') }}"></script>
 <script src="{{ url_for('static', filename='js/login-toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/login-limiter.js') }}"></script>
 
 {% if portal != 'customer' %}
 <div class="fp-overlay" id="fpOverlay" hidden>

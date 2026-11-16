@@ -125,6 +125,11 @@ class Config:
     LOGIN_RATE_LIMIT_PER_IP = os.environ.get("LOGIN_RATE_LIMIT_PER_IP", "10 per minute")
     LOGIN_RATE_LIMIT_PER_USERNAME = os.environ.get("LOGIN_RATE_LIMIT_PER_USERNAME", "5 per minute")
     REGISTER_RATE_LIMIT_PER_IP = os.environ.get("REGISTER_RATE_LIMIT_PER_IP", "5 per hour")
+    # Failed-login lockout (app/login_attempts.py): wrong attempts allowed
+    # per account + IP before sign-in is locked, and for how long. The
+    # attempts value is never allowed below 5.
+    LOGIN_MAX_ATTEMPTS = max(5, int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5")))
+    LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))
 
     # ---- HTTPS enforcement (Phase 18) ----
     # SESSION_COOKIE_SECURE (above) only controls whether the session
