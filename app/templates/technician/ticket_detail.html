@@ -481,27 +481,7 @@
             <i class="bi bi-x-lg me-1"></i>Decline
         </button>
         {% endif %}
-        {# Notes can only be saved once work has started (or on a legacy
-           'accepted' job), so keep it hidden on a fresh 'assigned' job. #}
-        {% if not job.consolidated and not job.is_new_installation and job.assignment.status == 'accepted' %}
-        <button type="button" class="btn btn-outline-secondary"
-                data-bs-toggle="modal" data-bs-target="#notesModal"
-                data-notes-action="{{ url_for('technician.save_notes', assignment_id=job.assignment.id) }}"
-                data-notes-value="{{ job.assignment.resolution_notes or '' }}"
-                data-notes-mode="save">
-            <i class="bi bi-journal-plus me-1"></i>Notes
-        </button>
-        {% endif %}
     {% elif job.can_complete %}
-        {% if not job.consolidated %}
-        <button type="button" class="btn btn-outline-secondary"
-                data-bs-toggle="modal" data-bs-target="#notesModal"
-                data-notes-action="{{ url_for('technician.save_notes', assignment_id=job.assignment.id) }}"
-                data-notes-value="{{ job.assignment.resolution_notes or '' }}"
-                data-notes-mode="save">
-            <i class="bi bi-journal-plus me-1"></i>Notes
-        </button>
-        {% endif %}
         {% set pin_ready = (not job.is_installation) or (job.assignment.pin_latitude is not none and job.assignment.pin_longitude is not none) %}
         {% set nap_ready = (not job.is_new_installation) or (job.nap is not none) %}
         {% set photo_ready = job.assignment.photo_filename and (not job.consolidated or job.consolidated.missing_proofs == 0) %}
