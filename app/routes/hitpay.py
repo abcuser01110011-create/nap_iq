@@ -123,43 +123,54 @@ def _confirm_online_payment(payment, hitpay_id, method=""):
     notify_online_payment_received(payment)
 
 
-def _try_confirm_from_hitpay(payment):
-    """Asks HitPay whether this pending payment's checkout was completed and,
-    if the amount matches, confirms it right now. Returns True when confirmed."""
-    if not hitpay.is_configured() or not payment.reference_number:
-        return False
+def _check_with_hitpay(payment):
+    """Asks HitPay whether this pending payment's checkout was paid and, if
+    so (and the amount matches), confirms it right now.
+    Returns (confirmed: bool, reason: str) -- the reason says what HitPay
+    answered, so a payment that stays pending can be explained."""
+    if not hitpay.is_configured():
+        return False, "online payments aren't configured on the server"
+    if not payment.reference_number:
+        return False, "this payment has no HitPay checkout reference"
     try:
         body = hitpay.fetch_payment_request(payment.reference_number)
     except hitpay.HitPayError as exc:
         current_app.logger.warning("HitPay status lookup failed for payment %s: %s", payment.id, exc)
-        return False
-    if str(body.get("status", "")).lower() != "completed":
-        return False
+        return False, f"couldn't get an answer from HitPay ({exc})"
+
+    hp_status = str(body.get("status", "")).lower()
+    items = [x for x in (body.get("payments") or []) if isinstance(x, dict)]
+    succeeded = [x for x in items if str(x.get("status", "")).lower() in ("succeeded", "completed", "success")]
+    if hp_status != "completed" and not succeeded:
+        return False, f"HitPay reports this checkout as '{hp_status or 'unknown'}' - it hasn't been paid yet"
+
+    raw_amount = body.get("amount") or (succeeded[0].get("amount") if succeeded else None)
     try:
-        paid = Decimal(str(body.get("amount", "0"))).quantize(Decimal("0.01"))
-    except (InvalidOperation, ValueError):
-        return False
-    if paid != Decimal(payment.amount).quantize(Decimal("0.01")):
-        current_app.logger.warning("HitPay amount mismatch on payment %s: got %s, expected %s", payment.id, paid, payment.amount)
-        return False        # leave pending -- the webhook path flags it for review
-    method, hitpay_id = "", None
-    payments = body.get("payments")
-    if isinstance(payments, list) and payments and isinstance(payments[0], dict):
-        method = str(payments[0].get("payment_type") or "")
-        hitpay_id = payments[0].get("id")
-    _confirm_online_payment(payment, hitpay_id, method)
+        paid = Decimal(str(raw_amount)).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError, TypeError):
+        return False, "HitPay did not return a readable amount"
+    expected = Decimal(payment.amount).quantize(Decimal("0.01"))
+    if paid != expected:
+        current_app.logger.warning("HitPay amount mismatch on payment %s: got %s, expected %s", payment.id, paid, expected)
+        return False, f"HitPay shows {paid} but this payment is {expected}"
+
+    first = (succeeded or items or [{}])[0]
+    _confirm_online_payment(payment, first.get("id"), str(first.get("payment_type") or ""))
     db.session.commit()
-    return True
+    return True, "confirmed"
+
+
+def _try_confirm_from_hitpay(payment):
+    return _check_with_hitpay(payment)[0]
 
 
 @hitpay_bp.route("/online/return")
 @role_required("user")
 def pay_return():
-    """Where HitPay sends the customer back. The redirect itself is never
-    trusted: if the payment is still pending, HitPay is asked directly (server
-    to server) and, when it says completed, the payment is confirmed on the
-    spot -- so the customer's status flips to Paid / Partial immediately
-    instead of waiting for the webhook."""
+    """Where HitPay sends the customer back after checkout. A completed
+    payment is confirmed on the spot (see below), so the customer's status
+    flips to Paid / Partial immediately -- no webhook wait, no administrator
+    approval, exactly like a payment recorded by a collector."""
     subscriber = _own_subscriber_or_none()
     if subscriber is None:
         return _no_subscriber_redirect()
@@ -170,8 +181,15 @@ def pay_return():
     if ref:
         payment = Payment.query.filter_by(reference_number=ref, subscriber_id=subscriber.id).first()
 
-    if payment is not None and payment.status == "pending" and status not in ("canceled", "cancelled", "failed"):
-        _try_confirm_from_hitpay(payment)
+    if payment is not None and payment.status == "pending" and status == "completed":
+        # Same as a collector recording a payment: it counts as paid right
+        # away, no administrator step. HitPay is asked first (server to
+        # server); in SANDBOX mode (test money only) the completed return
+        # is accepted even if that lookup can't confirm it. In production
+        # a payment is only confirmed when HitPay itself says it was paid.
+        if not _try_confirm_from_hitpay(payment) and hitpay.is_sandbox():
+            _confirm_online_payment(payment, None, "sandbox")
+            db.session.commit()
 
     if payment is not None and payment.status == "confirmed":
         info = monthly_due_info(subscriber)
@@ -190,6 +208,34 @@ def pay_return():
         flash("The online payment wasn't completed. You haven't been charged.", "warning")
     else:
         flash("We're waiting for HitPay to confirm your payment.", "info")
+    return _back_to_payments()
+
+
+@hitpay_bp.route("/check", methods=["POST"])
+@role_required("user")
+def check_pending():
+    """\"Check payment status\" button: asks HitPay about every pending
+    payment right now and tells the customer what it said."""
+    subscriber = _own_subscriber_or_none()
+    if subscriber is None:
+        return _no_subscriber_redirect()
+    pending = (
+        Payment.query.filter_by(subscriber_id=subscriber.id, status="pending")
+        .order_by(Payment.created_at.desc())
+        .all()
+    )
+    if not pending:
+        flash("Nothing is waiting for confirmation.", "info")
+    for payment in pending:
+        ok, reason = _check_with_hitpay(payment)
+        if ok:
+            info = monthly_due_info(subscriber)
+            if info["status"] == "partial":
+                flash(f"Payment confirmed - it shows as Partial; \u20b1{info['balance']:,.2f} is still due.", "success")
+            else:
+                flash("Payment confirmed - your account now shows as Paid.", "success")
+        else:
+            flash(f"Not confirmed yet: {reason}.", "warning")
     return _back_to_payments()
 
 
