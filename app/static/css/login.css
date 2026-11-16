@@ -575,3 +575,20 @@ html[data-bs-theme="dark"] .login-body--staff .login-card {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .login-body--staff .login-card { background: var(--login-panel); }
 }
+
+/* ---- Forgot-password popup (staff sign-in) ---- */
+.fp-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(6, 23, 71, .55); backdrop-filter: blur(3px); }
+.fp-overlay[hidden] { display: none; }
+.fp-modal { position: relative; width: 100%; max-width: 420px; padding: 1.75rem; border-radius: 16px; background: var(--login-panel); border: 1px solid var(--login-panel-border); box-shadow: var(--login-card-shadow); color: var(--login-text); }
+.fp-close { position: absolute; top: .75rem; right: .75rem; border: 0; background: transparent; color: var(--login-text-muted); width: 2rem; height: 2rem; border-radius: 8px; cursor: pointer; }
+.fp-close:hover { background: var(--login-toggle-hover-bg); color: var(--login-toggle-hover-color); }
+.fp-step[hidden] { display: none; }
+.fp-title { font-size: 1.25rem; font-weight: 700; color: var(--login-title); margin: 0 0 .5rem; }
+.fp-text { font-size: .9rem; color: var(--login-text-muted); margin-bottom: 1rem; }
+.fp-modal .login-field__input { width: 100%; }
+.fp-modal .login-submit { width: 100%; margin-top: 1rem; }
+.fp-code { text-align: center; font-size: 1.6rem; letter-spacing: .5rem; font-weight: 700; }
+.fp-error { margin-top: .6rem; font-size: .85rem; color: var(--login-error); }
+.fp-error[hidden] { display: none; }
+.fp-link { display: block; margin: .75rem auto 0; border: 0; background: transparent; color: var(--login-link); font-size: .85rem; cursor: pointer; }
+.fp-link:disabled { opacity: .55; cursor: default; }

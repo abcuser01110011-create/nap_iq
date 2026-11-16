@@ -77,7 +77,7 @@
             <div class="login-field">
                 <div class="login-field__label-row">
                     {{ form.password.label(class="login-field__label") }}
-                    <button type="button" class="login-forgot" title="Contact an administrator to reset your password.">Forgot?</button>
+                    {% if portal != 'customer' %}<button type="button" class="login-forgot" data-forgot-open title="Reset your password with an emailed code">Forgot?</button>{% else %}<button type="button" class="login-forgot" title="Contact an administrator to reset your password.">Forgot?</button>{% endif %}
                 </div>
                 <div class="login-field__wrap">
                     <i class="bi bi-lock login-field__icon"></i>
@@ -117,5 +117,49 @@
 <script src="{{ url_for('static', filename='js/network-speed.js') }}"></script>
 <script src="{{ url_for('static', filename='js/auth-transition.js') }}?v={{ asset_version('js/auth-transition.js') }}"></script>
 <script src="{{ url_for('static', filename='js/login-toast.js') }}"></script>
+
+{% if portal != 'customer' %}
+<div class="fp-overlay" id="fpOverlay" hidden>
+    <div class="fp-modal" role="dialog" aria-modal="true" aria-labelledby="fpTitle">
+        <button type="button" class="fp-close" data-fp-close aria-label="Close"><i class="bi bi-x-lg"></i></button>
+
+        <div class="fp-step" data-fp-step="email">
+            <h2 class="fp-title" id="fpTitle">Forgot your password?</h2>
+            <p class="fp-text">Enter the email address on your staff account. We'll send a 6-digit code to your Gmail.</p>
+            <label class="login-field__label" for="fpEmail">Email address</label>
+            <input type="email" id="fpEmail" class="login-field__input" autocomplete="email" placeholder="you@gmail.com">
+            <div class="fp-error" data-fp-error hidden></div>
+            <button type="button" class="login-submit" data-fp-send>Send code</button>
+        </div>
+
+        <div class="fp-step" data-fp-step="code" hidden>
+            <h2 class="fp-title">Enter the 6-digit code</h2>
+            <p class="fp-text">We sent a 6-digit code to <strong data-fp-email></strong>. Enter it below. It expires in 10 minutes.</p>
+            <input type="text" id="fpCode" class="login-field__input fp-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+            <div class="fp-error" data-fp-error hidden></div>
+            <button type="button" class="login-submit" data-fp-verify>Verify code</button>
+            <button type="button" class="fp-link" data-fp-resend>Resend code</button>
+        </div>
+
+        <div class="fp-step" data-fp-step="password" hidden>
+            <h2 class="fp-title">Set a new password</h2>
+            <p class="fp-text">At least 8 characters, with an uppercase letter, a lowercase letter, a number and a special character.</p>
+            <label class="login-field__label" for="fpPass">New password</label>
+            <input type="password" id="fpPass" class="login-field__input" autocomplete="new-password">
+            <label class="login-field__label" for="fpPass2" style="margin-top:.75rem">Confirm new password</label>
+            <input type="password" id="fpPass2" class="login-field__input" autocomplete="new-password">
+            <div class="fp-error" data-fp-error hidden></div>
+            <button type="button" class="login-submit" data-fp-reset>Update password</button>
+        </div>
+
+        <div class="fp-step" data-fp-step="done" hidden>
+            <h2 class="fp-title">Password updated</h2>
+            <p class="fp-text">You can now sign in with your new password.</p>
+            <button type="button" class="login-submit" data-fp-close>Back to sign in</button>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/forgot-password.js') }}?v={{ asset_version('js/forgot-password.js') }}"></script>
+{% endif %}
 </body>
 </html>

@@ -17,12 +17,17 @@ Routes:
                                 to whichever page matches their role)
 """
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, g, current_app
+import re
+import time
 
-from app.forms import LoginForm, SelfRegisterForm
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, g, current_app, jsonify
+
+from wtforms.validators import ValidationError
+from app.forms import LoginForm, SelfRegisterForm, validate_password_complexity
 from app.models import User, USER_THEME_PREFERENCES
 from app.auth import login_required, ROLE_HOME_ENDPOINT
 from app.extensions import db, limiter
+from app.email_utils import send_verification_code, verify_code, consume_verification
 from sqlalchemy import func
 
 auth_bp = Blueprint("auth", __name__)
@@ -281,3 +286,119 @@ def home():
         session.clear()
         return redirect(url_for("auth.login"))
     return redirect(url_for(endpoint))
+
+
+# ---------------------------------------------------------------------
+# Forgot password (staff login) — emailed 6-digit code
+# ---------------------------------------------------------------------
+# Flow (all JSON, CSRF token sent in the X-CSRFToken header):
+#   1. POST /forgot-password/send    {email}                       -> emails a code
+#   2. POST /forgot-password/verify  {email, code}              -> unlocks step 3
+#   3. POST /forgot-password/reset   {password, confirm_password}  -> sets password
+# Codes live in `email_verifications` (purpose="password_reset"), 10-min
+# expiry and 5 attempts, via app/email_utils.py. Step 1 always returns the
+# same message so it can't be used to discover which emails exist.
+# Staff accounts only (role != 'user'); subscribers are not covered.
+
+_PW_RESET_PURPOSE = "password_reset"
+_PW_RESET_SESSION_KEY = "pw_reset"
+_PW_RESET_WINDOW_SECONDS = 10 * 60
+_GENERIC_SEND_MESSAGE = (
+    "If that email belongs to a staff account, we've sent a 6-digit code to it."
+)
+
+
+def _forgot_key() -> str:
+    data = request.get_json(silent=True) or {}
+    return (str(data.get("email") or "").strip().lower()) or "no-email-submitted"
+
+
+def _forgot_rate_limit(view):
+    view = limiter.limit(
+        lambda: current_app.config["EMAIL_VERIFICATION_SEND_RATE_LIMIT"],
+        key_func=_forgot_key,
+        methods=["POST"],
+    )(view)
+    return limiter.limit(
+        lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"], methods=["POST"]
+    )(view)
+
+
+def _find_reset_user(email: str):
+    """Active staff account with an email on file, or None."""
+    email = (email or "").strip()
+    if not email:
+        return None
+    user = User.query.filter(func.lower(User.email) == email.lower()).first()
+    if user is None or user.status != "active" or user.role == "user":
+        return None
+    return user
+
+
+@auth_bp.route("/forgot-password/send", methods=["POST"])
+@_forgot_rate_limit
+def forgot_password_send():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip()
+    if not email:
+        return jsonify(error="Enter your email address."), 400
+
+    user = _find_reset_user(email)
+    if user is not None:
+        send_verification_code(user.email, purpose=_PW_RESET_PURPOSE)
+    return jsonify(message=_GENERIC_SEND_MESSAGE), 200
+
+
+@auth_bp.route("/forgot-password/verify", methods=["POST"])
+@_forgot_rate_limit
+def forgot_password_verify():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip()
+    code = str(data.get("code") or "").strip()
+    if not email or not re.fullmatch(r"\d{6}", code):
+        return jsonify(error="Enter the 6-digit code."), 400
+
+    user = _find_reset_user(email)
+    if user is None:
+        return jsonify(error="Incorrect code. Please try again."), 400
+
+    ok, message = verify_code(user.email, code, purpose=_PW_RESET_PURPOSE)
+    if not ok:
+        return jsonify(error=message), 400
+
+    session[_PW_RESET_SESSION_KEY] = {"uid": user.id, "ts": int(time.time())}
+    return jsonify(message="Code verified. Enter your new password.", verified=True), 200
+
+
+@auth_bp.route("/forgot-password/reset", methods=["POST"])
+@limiter.limit(lambda: current_app.config["LOGIN_RATE_LIMIT_PER_IP"], methods=["POST"])
+def forgot_password_reset():
+    state = session.get(_PW_RESET_SESSION_KEY)
+    if not state or time.time() - state.get("ts", 0) > _PW_RESET_WINDOW_SECONDS:
+        session.pop(_PW_RESET_SESSION_KEY, None)
+        return jsonify(error="Your reset session expired. Please request a new code."), 400
+
+    user = db.session.get(User, state["uid"])
+    if user is None or user.status != "active" or user.role == "user" or not user.email:
+        session.pop(_PW_RESET_SESSION_KEY, None)
+        return jsonify(error="This account can't be reset. Contact an administrator."), 400
+
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password") or "")
+    confirm = str(data.get("confirm_password") or "")
+    if password != confirm:
+        return jsonify(error="Passwords do not match."), 400
+
+    class _Field:  # reuse the project's password rules (forms.py)
+        data = password
+
+    try:
+        validate_password_complexity(None, _Field)
+    except ValidationError as exc:
+        return jsonify(error=str(exc)), 400
+
+    user.set_password(password)
+    db.session.commit()
+    consume_verification(user.email, purpose=_PW_RESET_PURPOSE)
+    session.pop(_PW_RESET_SESSION_KEY, None)
+    return jsonify(message="Password updated. You can now sign in."), 200

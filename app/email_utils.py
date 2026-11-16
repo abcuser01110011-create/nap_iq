@@ -246,12 +246,20 @@ def send_verification_code(email: str, purpose: str = "registration") -> bool:
     db.session.add(record)
     db.session.commit()
 
-    subject = "Your PG Networks verification code"
+    if purpose == "password_reset":
+        subject = "Your PG Networks password reset code"
+        intro = ("Use the code below to reset your PG Networks staff password. "
+                 "Never share this code with anyone.")
+        heading = "Reset your password"
+    else:
+        subject = "Your PG Networks verification code"
+        intro = ("Use the code below to verify your email address and continue your "
+                 "PG Networks service application.")
+        heading = "Verify your email"
     html_body = f"""
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #0B1F3A;">Verify your email</h2>
-          <p>Use the code below to verify your email address and continue your
-          PG Networks service application.</p>
+          <h2 style="color: #0B1F3A;">{heading}</h2>
+          <p>{intro}</p>
           <p style="font-size: 32px; font-weight: bold; letter-spacing: 6px;
                     background: #F1F5F9; padding: 16px 24px; border-radius: 8px;
                     text-align: center; color: #0B1F3A;">{code}</p>
@@ -260,7 +268,7 @@ def send_verification_code(email: str, purpose: str = "registration") -> bool:
         </div>
     """
     text_body = (
-        f"Your PG Networks verification code is {code}. "
+        f"Your PG Networks code is {code}. "
         f"It expires in {ttl_minutes} minutes."
     )
     return _send_email(email, subject, html_body, text_body)
