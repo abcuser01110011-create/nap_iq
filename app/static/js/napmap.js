@@ -207,6 +207,10 @@
     // the map at once, and it moves to the newly clicked NAP instead
     // of adding another one alongside it.
     let focusedNapForRadius = null;
+    // id of the NAP whose connected subscribers are shown even while the
+    // "Show Subscribers" layer is unchecked (set when a NAP icon is clicked,
+    // released by clicking empty map / the panel's X). null = none.
+    let napSubsFocusId = null;
     let allNaps = [];              // full NAP dataset from the API
     let allIssues = [];            // full technical issue dataset from the API
     let allSubscribers = [];       // active subscribers, for the Report Issue form
@@ -1176,6 +1180,7 @@
                 populateNapDetailPanel(updatedNap);
             } else {
                 closeNapDetailPanel();
+                releaseNapSubsFocus();
             }
         }
     }
@@ -1539,7 +1544,29 @@
      * their current zoom level and just pans over to the new NAP
      * instead of pulling back out first (see focusMapOn() above).
      */
+    /** Reveals only `nap`'s own subscribers (works with the Show
+     * Subscribers layer unchecked). */
+    function setNapSubsFocus(nap) {
+        const changed = String(napSubsFocusId) !== String(nap ? nap.id : null);
+        napSubsFocusId = nap ? nap.id : null;
+        const toggle = document.getElementById("showSubscribersToggle");
+        if (changed && toggle && !toggle.checked) {
+            try { renderSubscriberMarkers(); } catch (err) { console.error(err); }
+        }
+    }
+
+    /** Hides the clicked NAP's subscribers again (layer still unchecked). */
+    function releaseNapSubsFocus() {
+        if (napSubsFocusId == null) return;
+        napSubsFocusId = null;
+        const toggle = document.getElementById("showSubscribersToggle");
+        if (toggle && !toggle.checked) {
+            try { renderSubscriberMarkers(); } catch (err) { console.error(err); }
+        }
+    }
+
     function focusNapOnMap(nap) {
+        setNapSubsFocus(nap);
         focusMapOn(
             [nap.latitude, nap.longitude],
             NAP_FOCUS_ZOOM,
@@ -1768,8 +1795,8 @@
      */
     function setupNapDetailPanel() {
         const closeBtn = document.getElementById("napDetailCloseBtn");
-        if (closeBtn) closeBtn.addEventListener("click", closeNapDetailPanel);
-        map.on("click", closeNapDetailPanel);
+        if (closeBtn) closeBtn.addEventListener("click", () => { closeNapDetailPanel(); releaseNapSubsFocus(); });
+        map.on("click", () => { closeNapDetailPanel(); releaseNapSubsFocus(); });
         setupTicketsDropdownPanelToggle();
     }
 
@@ -2662,7 +2689,12 @@
         const showIssuesToggle = document.getElementById("showIssuesToggle");
         const showIssuesEnabled = showIssuesToggle ? showIssuesToggle.checked : false;
 
-        if (showSubscribers) {
+        // "Show Subscribers" unchecked: normally every subscriber is hidden,
+        // but a clicked NAP still reveals ITS OWN subscribers (and only
+        // those) so you can see what is connected to it.
+        const onlyNapId = (!showSubscribers && napSubsFocusId != null) ? napSubsFocusId : null;
+
+        if (showSubscribers || onlyNapId != null) {
             if (!map.hasLayer(subscriberMarkerLayer)) subscriberMarkerLayer.addTo(map);
             if (!map.hasLayer(subscriberConnectionLayer)) subscriberConnectionLayer.addTo(map);
         } else {
@@ -2674,6 +2706,7 @@
 
         allSubscribers.forEach((subscriber) => {
             if (subscriber.latitude == null || subscriber.longitude == null) return;
+            if (onlyNapId != null && String(subscriber.nap_id) !== String(onlyNapId)) return;
 
             // Computed once per subscriber and reused for the marker
             // icon (person vs. pulsing alert badge) -- but only fed
@@ -3577,6 +3610,7 @@
         // already draws the ring for this NAP instead of the
         // previously-focused one.
         focusedNapForRadius = nap;
+        setNapSubsFocus(nap);
         if (filtersChanged || !markersById[nap.id]) {
             renderNapMarkers();
         } else {
@@ -3640,6 +3674,7 @@
         // See selectNap() above for why this is set before
         // renderNapMarkers() rather than after.
         focusedNapForRadius = nap;
+        setNapSubsFocus(nap);
         renderNapMarkers();
         openNapDetailPanel(nap);
     }
