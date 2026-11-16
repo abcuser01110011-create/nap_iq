@@ -1551,7 +1551,7 @@
         napSubsFocusId = nap ? nap.id : null;
         const toggle = document.getElementById("showSubscribersToggle");
         if (changed && toggle && !toggle.checked) {
-            try { renderSubscriberMarkers(); } catch (err) { console.error(err); }
+            try { renderSubscriberMarkers(); renderIssueMarkers(); } catch (err) { console.error(err); }
         }
     }
 
@@ -1561,7 +1561,7 @@
         napSubsFocusId = null;
         const toggle = document.getElementById("showSubscribersToggle");
         if (toggle && !toggle.checked) {
-            try { renderSubscriberMarkers(); } catch (err) { console.error(err); }
+            try { renderSubscriberMarkers(); renderIssueMarkers(); } catch (err) { console.error(err); }
         }
     }
 
@@ -1913,9 +1913,14 @@
         }
 
         const filters = getActiveIssueFilters();
+        // While a NAP is clicked and "Show Subscribers" is unchecked, only
+        // alert icons for issues connected to that NAP stay on the map.
+        const subsToggleEl = document.getElementById("showSubscribersToggle");
+        const onlyIssueNapId = (subsToggleEl && !subsToggleEl.checked && napSubsFocusId != null)
+            ? napSubsFocusId : null;
         const visibleIssues = pickOneIssuePerSubscriber(
             allIssues.filter((issue) => passesIssueFilters(issue, filters))
-        );
+        ).filter((issue) => onlyIssueNapId == null || String(issue.nap_id) === String(onlyIssueNapId));
         visibleIssues.forEach((issue) => {
             const marker = L.marker([issue.latitude, issue.longitude], {
                 icon: buildIssueIcon(issue.priority, issue.issue_type),
