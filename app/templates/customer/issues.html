@@ -4,40 +4,19 @@
 {% block page_title %}My Issues{% endblock %}
 {% block page_subtitle %}<p class="text-muted small mb-0">Technical issues reported on your account</p>{% endblock %}
 
+{# No top header on this page: the Issues heading below replaces it (same as the technician Tickets tab). #}
+{% block topbar %}{% endblock %}
+
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/customer-home-progress.css') }}">
 {% endblock %}
 
 {% block content %}
-{# Moved here from the home screen: live progress of issues still being worked on, then recent (finished) issues. #}
+{# Same layout as the technician "Tickets" tab: heading, a transparent "In Progress" box, then a fixed-height scrolling list. #}
 {% set active_issues = technical_issues|selectattr('status', 'in', ['pending', 'assigned', 'accepted', 'in_progress'])|list %}
 {% set active_ids = active_issues|map(attribute='id')|list %}
 {% set active_progress = progress_data|selectattr('id', 'in', active_ids)|list %}
-<div class="ip-home-wrap mb-3">
-    {% if active_progress %}
-    <div class="card shadow-sm napiq-account-card ip-home-card">
-        <div class="card-body">
-            <span class="napiq-account-label">Reported issue progress</span>
-            <div class="ip-home-list">
-                {% for p in active_progress %}
-                {% set issue = active_issues|selectattr('id', 'equalto', p.id)|first %}
-                <div class="ip-home-item" data-issue-id="{{ p.id }}">
-                    <div class="ip-home-head">
-                        <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
-                        <span class="text-muted small">{{ issue.issue_type }}</span>
-                        <span class="badge ms-auto issue-status-badge text-bg-secondary">{{ p.status_label }}</span>
-                    </div>
-                    <div class="issue-progress" data-issue-id="{{ p.id }}"></div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
-{# Recent reported issues: everything NOT still being worked on (those are in the progress card above). #}
 {% set recent_issues = technical_issues|rejectattr('id', 'in', active_ids)|list %}
 {% set issue_status_classes = {
     'pending': 'text-bg-secondary',
@@ -47,33 +26,136 @@
     'resolved': 'text-bg-success',
     'closed': 'text-bg-dark'
 } %}
-<div class="card shadow-sm" id="recentIssues">
-    <div class="card-header bg-white ip-list-header">
-        <span class="ip-list-title"><i class="bi bi-clock-history me-1"></i>Recent reported issues</span>
-    </div>
-    <div class="card-body p-0">
-        {% if recent_issues %}
-        <div class="list-group list-group-flush ip-hist-list">
-            {% for issue in recent_issues[:5] %}
-            <a href="{{ url_for('customer.my_issue_detail', issue_id=issue.id) }}"
-               class="list-group-item list-group-item-action ip-hist-row">
-                <span class="ip-hist-main">
-                    <span class="ip-hist-type">{{ issue.issue_type }}</span>
-                    <span class="ip-hist-sub text-muted small">{{ issue.issue_code or ('#' ~ issue.id) }} &middot; {{ issue.created_at.strftime('%Y-%m-%d') }}</span>
-                </span>
-                <span class="badge issue-status-badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">{{ issue.status|replace('_', ' ')|capitalize }}</span>
-                <i class="bi bi-chevron-right ip-hist-chevron"></i>
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="p-4 text-center text-muted">
-            <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
-            No recent issues.
-        </div>
-        {% endif %}
+
+<style>
+    .tech-tickets-card { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+    .tech-tickets-card .card-header { background: transparent !important; border: 0 !important; padding: .25rem .25rem .75rem; }
+    .tech-tickets-title { display: flex; align-items: center; gap: .6rem; margin: 0; font-size: 1.6rem; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; color: #061747; }
+    .tech-tickets-title i { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 1.2rem; color: #fff; background: linear-gradient(135deg, #1684FF, #1046B8); box-shadow: 0 6px 14px -6px rgba(16,70,184,.6); }
+    .tech-tickets-history { font-size: .75rem; color: #6b7280 !important; text-decoration: none; white-space: nowrap; }
+    .tech-tickets-history:hover { color: #374151 !important; text-decoration: underline; }
+    html[data-bs-theme="dark"] .tech-tickets-title { color: #fff; }
+    html[data-bs-theme="dark"] .tech-tickets-history { color: #9ca3af !important; }
+
+    .tt-wrap { display: flex; flex-direction: column; gap: .75rem; }
+    .tt-box { display: flex; flex-direction: column; min-height: 0; padding: .65rem .65rem .35rem; border-radius: 1.1rem;
+        background: var(--bs-body-bg, #fff); border: 1px solid var(--napiq-border, rgba(0,0,0,.1)); box-shadow: 0 8px 22px -16px rgba(6,23,71,.45); }
+    .tt-box-head { display: flex; align-items: center; justify-content: space-between; padding: 0 .25rem .5rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; flex: 0 0 auto; }
+    .tt-box-head .tt-count { min-width: 1.5rem; padding: .05rem .5rem; border-radius: 999px; text-align: center; font-size: .72rem; letter-spacing: 0; color: #fff; background: #6b7280; }
+    .tt-box.is-progress { background: transparent; border: 0; box-shadow: none; padding: 0 .1rem; }
+    .tt-box.is-progress .tt-box-head { color: #1046B8; }
+    .tt-live { display: inline-block; width: 8px; height: 8px; margin-right: .4rem; border-radius: 50%; background: #1684FF; box-shadow: 0 0 0 0 rgba(22,132,255,.6); animation: ttPulse 1.6s infinite; }
+    @keyframes ttPulse { 70% { box-shadow: 0 0 0 7px rgba(22,132,255,0); } 100% { box-shadow: 0 0 0 0 rgba(22,132,255,0); } }
+    .tt-scroll { min-height: 0; overflow-y: auto; padding-bottom: .35rem; -webkit-overflow-scrolling: touch; }
+    .tt-list { display: flex; flex-direction: column; }
+    .tt-item { display: flex; align-items: center; gap: .75rem; padding: .8rem .35rem; text-decoration: none; color: inherit;
+        border-bottom: 1px solid var(--napiq-border, rgba(0,0,0,.08)); border-radius: .6rem; transition: background .15s ease, transform .15s ease; }
+    .tt-item:last-child { border-bottom: 0; }
+    .tt-item:hover, .tt-item:focus-visible { background: rgba(22,132,255,.08); color: inherit; text-decoration: none; transform: translateX(2px); }
+    .tt-item-code { flex: 0 0 auto; min-width: 5.5rem; font-weight: 800; font-size: .95rem; color: #061747; }
+    .tt-item-type { flex: 1 1 auto; min-width: 0; font-size: .9rem; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tt-item-go { flex: 0 0 auto; font-size: .85rem; color: #94a3b8; transition: transform .15s ease, color .15s ease; }
+    .tt-item:hover .tt-item-go { transform: translateX(3px); color: #1684FF; }
+    html[data-bs-theme="dark"] .tt-item-code { color: #fff; }
+    html[data-bs-theme="dark"] .tt-item-type { color: #cbd5e1; }
+    .tt-empty { padding: 1rem .5rem 1.1rem; text-align: center; font-size: .85rem; color: #6b7280; }
+    .tt-empty i { display: block; margin-bottom: .25rem; font-size: 1.6rem; opacity: .6; }
+    html[data-bs-theme="dark"] .tt-box.is-progress .tt-box-head { color: #7db3ff; }
+
+    @media (max-width: 991.98px) {
+        html.tt-fit, html.tt-fit body { overflow: hidden !important; height: 100%; }
+        .tt-wrap { height: var(--tt-h, auto); }
+        .tt-box.is-progress { flex: 0 1 auto; max-height: 62%; }
+        .tt-box.is-assigned { flex: 1 1 0; }
+        .tech-tickets-card .card-header { padding-bottom: .5rem; }
+    }
+</style>
+
+<div class="card tech-tickets-card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h1 class="tech-tickets-title"><i class="bi bi-ticket-perforated"></i>Issues</h1>
+        <a href="{{ url_for('customer.report_issue') }}" class="tech-tickets-history">
+            <i class="bi bi-plus-circle me-1"></i>Report an issue
+        </a>
     </div>
 </div>
+
+<div class="tt-wrap" id="ttWrap">
+    <section class="tt-box is-progress" id="ttProgress">
+        <div class="tt-box-head"><span><span class="tt-live"></span>Reported issue progress</span></div>
+        <div class="tt-scroll">
+            {% if active_progress %}
+            <div class="card shadow-sm napiq-account-card ip-home-card">
+                <div class="card-body">
+                    <div class="ip-home-list mt-0">
+                        {% for p in active_progress %}
+                        {% set issue = active_issues|selectattr('id', 'equalto', p.id)|first %}
+                        <div class="ip-home-item" data-issue-id="{{ p.id }}">
+                            <div class="ip-home-head">
+                                <strong>{{ issue.issue_code or ('#' ~ issue.id) }}</strong>
+                                <span class="text-muted small">{{ issue.issue_type }}</span>
+                                <span class="badge ms-auto issue-status-badge text-bg-secondary">{{ p.status_label }}</span>
+                            </div>
+                            <div class="issue-progress" data-issue-id="{{ p.id }}"></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="tt-empty"><i class="bi bi-hourglass"></i>No issue in progress.<br>Reported issues being worked on will show here.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="tt-box is-assigned" id="recentIssues">
+        <div class="tt-box-head"><span>Recent reported issues</span><span class="tt-count">{{ recent_issues|length }}</span></div>
+        <div class="tt-scroll">
+            {% if recent_issues %}
+            <div class="tt-list">
+                {% for issue in recent_issues %}
+                <a class="tt-item" href="{{ url_for('customer.my_issue_detail', issue_id=issue.id) }}">
+                    <span class="tt-item-code">{{ issue.issue_code or ('#' ~ issue.id) }}</span>
+                    <span class="tt-item-type">{{ issue.issue_type }}</span>
+                    <span class="badge rounded-pill issue-status-badge {{ issue_status_classes.get(issue.status, 'text-bg-secondary') }}">{{ issue.status|replace('_', ' ')|capitalize }}</span>
+                    <i class="bi bi-chevron-right tt-item-go"></i>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="tt-empty"><i class="bi bi-inbox"></i>No reported issues.</div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<script>
+(function () {
+    var wrap = document.getElementById('ttWrap');
+    if (!wrap) return;
+    var root = document.documentElement;
+    var mq = window.matchMedia('(max-width: 991.98px)');
+    function fit() {
+        root.classList.remove('tt-fit');
+        wrap.style.removeProperty('--tt-h');
+        if (!mq.matches) return;
+        window.scrollTo(0, 0);
+        var top = wrap.getBoundingClientRect().top;
+        var content = wrap.closest('.dash-content'), main = wrap.closest('.dash-main');
+        var pads = (content ? parseFloat(getComputedStyle(content).paddingBottom) : 0) +
+                   (main ? parseFloat(getComputedStyle(main).paddingBottom) : 0);
+        var h = Math.floor(window.innerHeight - top - pads);
+        if (h < 320) return;   // tiny screen: fall back to normal page scrolling
+        wrap.style.setProperty('--tt-h', h + 'px');
+        root.classList.add('tt-fit');
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('load', fit);
+    if (mq.addEventListener) mq.addEventListener('change', fit);
+})();
+</script>
 {% endblock %}
 
 {% block extra_scripts %}
