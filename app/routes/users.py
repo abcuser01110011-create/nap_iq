@@ -33,6 +33,7 @@ from app.query_utils import filter_enum_eq
 from app.auth import role_required
 from app.models import User, Subscriber
 from app.forms import UserForm, AddUserForm, ResetPasswordForm, ROLE_CHOICES
+from app.barangay_utils import barangay_options
 
 users_bp = Blueprint("users", __name__, url_prefix="/users")
 
@@ -101,6 +102,18 @@ def list_users():
         role_choices=ROLE_CHOICES,
         role_labels=ROLE_LABELS,
     )
+
+
+@users_bp.route("/coverage-barangays.json")
+@role_required("administrator")
+def coverage_barangays_json():
+    """Barangays the Coverage Area picker (static/js/collector-coverage.js)
+    may offer: exactly the ones in the Payments tab's Barangay dropdown --
+    i.e. the barangays that actually appear in subscriber addresses -- not
+    every barangay in Santa Cruz. A collector can only ever be assigned
+    somewhere that has subscribers."""
+    addresses = (row[0] for row in db.session.query(Subscriber.address).all())
+    return jsonify(barangay_options(addresses))
 
 
 @users_bp.route("/add", methods=["GET", "POST"])

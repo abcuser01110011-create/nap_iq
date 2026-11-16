@@ -9,7 +9,12 @@
  * public PSGC-style API, same city/municipality code) so an admin can
  * add several barangays as removable chips. A barangay is added
  * automatically -- no separate "+ Add" button -- by picking a result
- * from the dropdown or by typing a name and pressing Enter.
+ * from the dropdown or by typing its exact name and pressing Enter.
+ *
+ * The choices are limited to the barangays in the Payments tab's
+ * Barangay dropdown (served by /users/coverage-barangays.json: the
+ * barangays that appear in subscriber addresses), NOT every barangay
+ * in Santa Cruz.
  *
  * The visible search input/button/chips are just UI -- the field
  * that's actually submitted is the hidden #coverageAreaValue input
@@ -36,10 +41,9 @@
     // quietly anywhere else this script might get bundled/loaded.
     if (!input || !resultsBox || !chipsBox || !hiddenField) return;
 
-    // Santa Cruz, Laguna's PSGC city/municipality code, same host and
-    // endpoint tickets.js's barangay picker uses -- see that file for
-    // the full history of why this particular URL was chosen.
-    const BARANGAY_API_URL = "https://psgc.cloud/api/cities-municipalities/0403426000/barangays";
+    // Same list as the Payments tab's Barangay dropdown (barangays found in
+    // subscriber addresses) -- see users.coverage_barangays_json.
+    const BARANGAY_API_URL = "/users/coverage-barangays.json";
 
     let barangaysLoaded = false;
     let barangaysLoading = false;
@@ -65,11 +69,9 @@
                 return r.json();
             })
             .then((payload) => {
-                // Accept either a bare array or `{ data: [...] }` --
-                // different PSGC-style hosts wrap the list differently.
-                const list = Array.isArray(payload) ? payload : (payload && Array.isArray(payload.data) ? payload.data : []);
+                const list = Array.isArray(payload) ? payload : [];
                 allBarangays = list
-                    .map((b) => b.name)
+                    .map((b) => (typeof b === "string" ? b : b && b.name))
                     .filter(Boolean)
                     .sort((a, b) => a.localeCompare(b));
                 barangaysLoaded = true;
@@ -107,7 +109,6 @@
             return;
         }
         resultsBox.innerHTML = matches
-            .slice(0, 8)
             .map((name) => '<button type="button" class="list-group-item list-group-item-action">' + escapeHtml(name) + "</button>")
             .join("");
         resultsBox.classList.remove("d-none");
@@ -115,24 +116,26 @@
 
     function onInput() {
         const term = input.value.trim().toLowerCase();
-        if (!term) {
-            renderResults([]);
-            return;
-        }
+        // An empty box lists every available barangay so the admin can browse.
         loadBarangays().then(() => {
-            const matches = allBarangays.filter((name) => name.toLowerCase().includes(term));
+            const matches = allBarangays.filter(
+                (name) => (!term || name.toLowerCase().includes(term)) &&
+                          !coverageBarangays.some((b) => b.toLowerCase() === name.toLowerCase())
+            );
             renderResults(matches);
         });
     }
 
-    // Adds a barangay chip, whether it came from picking a dropdown
-    // result or from typing a name and clicking "+ Add" / pressing
-    // Enter directly (the barangay list is a courtesy autocomplete,
-    // not an enforced whitelist -- same spirit as the ticket form's
-    // free-text Barangay field).
+    // Adds a barangay chip from a dropdown pick, or from typing a name and
+    // pressing Enter. Only names in the list are accepted (matched
+    // case-insensitively and stored with the list's spelling), so a
+    // collector can't be given a barangay that isn't selectable.
     function addBarangay(name) {
-        const clean = (name || "").trim();
-        if (!clean) return;
+        const typed = (name || "").trim();
+        if (!typed) return;
+        const official = allBarangays.find((b) => b.toLowerCase() === typed.toLowerCase());
+        if (!official) return; // not an available barangay
+        const clean = official;
         if (coverageBarangays.some((b) => b.toLowerCase() === clean.toLowerCase())) {
             input.value = "";
             renderResults([]);
@@ -164,12 +167,13 @@
     })();
 
     input.addEventListener("input", onInput);
+    input.addEventListener("focus", onInput);
     input.addEventListener("keydown", (event) => {
         // Enter adds the typed/highlighted barangay instead of
         // submitting the whole Add/Edit User form.
         if (event.key === "Enter") {
             event.preventDefault();
-            addBarangay(input.value);
+            loadBarangays().then(() => addBarangay(input.value));
         }
     });
     resultsBox.addEventListener("click", (event) => {
