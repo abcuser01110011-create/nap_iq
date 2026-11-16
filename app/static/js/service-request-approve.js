@@ -4,7 +4,7 @@
  * straight to 'scheduled' server-side (see approve_request()'s own
  * docstring in app/routes/service_requests.py) so it lands on the
  * Dispatch Board in one click -- but the admin still has to know
- * that happened and decide whether to go assign a field assistant
+ * that happened and decide whether to go assign a team
  * right now or leave it for later. Rather than a plain flash message
  * and a full-page redirect, this submits the same form over fetch()
  * and shows a decision toast in the same visual language as the
@@ -33,10 +33,10 @@
     }
 
     // ------------------------------------------------------------------
-    // Forced "assign a technician" flow: after approving, a modal popup
+    // Forced "assign a team" flow: after approving, a modal popup
     // appears over a full-screen overlay. Clicking outside it, Escape and
     // browser back do not dismiss it -- the only way out is to assign a
-    // technician (step 1: "Assign Now", step 2: pick from the list).
+    // team (step 1: "Assign Now", step 2: pick from the list).
     // ------------------------------------------------------------------
     function ensureStyles() {
         if (document.getElementById("napiqApproveToastStyles")) return;
@@ -144,17 +144,17 @@
         card.querySelector('[data-toast-action="assign"]').addEventListener("click", onAssignNow);
     }
 
-    /** Step 2: list every technician (Recommended / Available / Busy / Offline). */
+    /** Step 2: list every team (Recommended / Available / Busy). */
     function showTechnicianStep() {
         const card = getOverlay();
         card.classList.add("napiq-wide");
         card.innerHTML =
-            "<div><h3 class=\"napiq-tl-title\">Assign a technician</h3>" +
-            "<p class=\"napiq-tl-sub\">Choose who will handle this installation.</p></div>" +
-            '<div class="napiq-tl-list" data-tl-list><div class="napiq-tl-sub">Loading technicians\u2026</div></div>' +
+            "<div><h3 class=\"napiq-tl-title\">Assign a team</h3>" +
+            "<p class=\"napiq-tl-sub\">Choose the team that will handle this installation.</p></div>" +
+            '<div class="napiq-tl-list" data-tl-list><div class="napiq-tl-sub">Loading teams\u2026</div></div>' +
             '<div class="napiq-tl-error" data-tl-error hidden></div>' +
             '<div class="napiq-tl-footer">' +
-                '<button type="button" class="napiq-toast-btn napiq-toast-btn-primary" data-tl-assign disabled>Assign Technician</button>' +
+                '<button type="button" class="napiq-toast-btn napiq-toast-btn-primary" data-tl-assign disabled>Assign Team</button>' +
             "</div>";
 
         const listEl = card.querySelector("[data-tl-list]");
@@ -179,21 +179,22 @@
             .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
             .then(({ ok, data }) => {
                 if (!ok) throw new Error();
-                const techs = data.technicians || [];
+                const techs = data.teams || [];
                 if (data.already_assigned) {
                     window.location.reload();
                     return;
                 }
                 if (!techs.length) {
-                    listEl.innerHTML = '<div class="napiq-tl-sub">No technicians are set up yet. Add a technician first, then assign one from the Dispatch Board.</div>';
-                    showError("There is no technician to assign right now.");
+                    listEl.innerHTML = '<div class="napiq-tl-sub">No teams are set up yet. Create a team in the Technician tab first, then assign it from the Dispatch Board.</div>';
+                    showError("There is no team to assign right now.");
                     return;
                 }
                 listEl.innerHTML = techs.map((t) => {
                     const bits = [];
+                    bits.push(t.member_count + " member" + (t.member_count === 1 ? "" : "s"));
+                    if (t.leader) bits.push("Leader: " + t.leader);
                     bits.push(t.open_jobs + " open job" + (t.open_jobs === 1 ? "" : "s"));
                     if (t.distance_km != null) bits.push(t.distance_km + " km away");
-                    if (t.phone) bits.push(t.phone);
                     return '<button type="button" class="napiq-tl-item" data-id="' + t.id + '">' +
                         '<span class="napiq-tl-avatar">' + escapeHtml((t.name || "?").trim().charAt(0).toUpperCase()) + "</span>" +
                         '<span class="napiq-tl-main"><span class="napiq-tl-name">' + escapeHtml(t.name) + "</span>" +
@@ -204,18 +205,18 @@
                 listEl.querySelectorAll(".napiq-tl-item").forEach((el) => {
                     el.addEventListener("click", () => select(Number(el.getAttribute("data-id"))));
                 });
-                // Pre-select the recommended technician (top of the list).
+                // Pre-select the recommended team (top of the list).
                 const rec = techs.find((t) => t.status === "recommended");
                 if (rec) select(rec.id);
                 if (!data.dispatchable) {
-                    showError("This request isn't scheduled yet, so a technician can't be dispatched from here. Use the Dispatch Board.");
+                    showError("This request isn't scheduled yet, so a team can't be dispatched from here. Use the Dispatch Board.");
                     assignBtn.disabled = true;
                     selectedId = null;
                 }
             })
             .catch(() => {
                 listEl.innerHTML = "";
-                showError("Couldn't load the technician list. Please check your connection and try again.");
+                showError("Couldn't load the team list. Please check your connection and try again.");
                 assignBtn.textContent = "Try again";
                 assignBtn.disabled = false;
                 assignBtn.onclick = () => showTechnicianStep();
@@ -230,26 +231,26 @@
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN, Accept: "application/json" },
-                body: JSON.stringify({ technician_id: selectedId }),
+                body: JSON.stringify({ team_id: selectedId }),
             })
                 .then((r) => r.json().catch(() => ({})).then((data) => ({ ok: r.ok, data })))
                 .then(({ ok, data }) => {
                     if (!ok || !data.ok) {
-                        showError((data && data.message) || "Couldn't assign this technician. Please try again.");
+                        showError((data && data.message) || "Couldn't assign this team. Please try again.");
                         assignBtn.disabled = false;
-                        assignBtn.textContent = "Assign Technician";
+                        assignBtn.textContent = "Assign Team";
                         return;
                     }
                     card.classList.remove("napiq-wide");
                     card.innerHTML =
                         '<div class="napiq-toast-icon-wrap"><div class="napiq-toast-circle"><i class="bi bi-check-lg"></i></div></div>' +
-                        '<div class="napiq-toast-text">' + escapeHtml(data.message || "Technician assigned.") + "</div>";
+                        '<div class="napiq-toast-text">' + escapeHtml(data.message || "Team assigned.") + "</div>";
                     setTimeout(() => window.location.reload(), 1100);
                 })
                 .catch(() => {
                     showError("Couldn't reach the server. Please try again.");
                     assignBtn.disabled = false;
-                    assignBtn.textContent = "Assign Technician";
+                    assignBtn.textContent = "Assign Team";
                 });
         });
     }

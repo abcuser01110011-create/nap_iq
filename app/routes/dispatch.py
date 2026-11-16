@@ -82,7 +82,7 @@ from flask import Blueprint, jsonify, render_template, redirect, url_for, flash,
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import TechnicalIssue, ServiceRequest, Technician, Assignment
+from app.models import TechnicalIssue, ServiceRequest, Technician, Assignment, TechnicianTeam
 from app.forms import AssignTechnicianForm
 from app.notifications_utils import notify_issue_status_change
 from app.recommendation import get_recommendations
@@ -573,86 +573,93 @@ def assign_request(request_id):
 @dispatch_bp.route("/requests/<int:request_id>/technician-options")
 @role_required("administrator")
 def request_technician_options(request_id):
-    """JSON list behind the "Assign a technician" popup that opens right
-    after an administrator approves a service request
-    (static/js/service-request-approve.js). Every dispatchable technician
-    (same roster the manual dropdown uses), best pick first, each tagged
-    Recommended / Available / Busy / Offline. Purely a read."""
+    """JSON list behind the "Assign a team" popup that opens right after
+    an administrator approves a service request
+    (static/js/service-request-approve.js). Lists every technician team
+    that has at least one member, least-busy / nearest first, each tagged
+    Recommended / Available / Busy. Purely a read."""
     service_request = ServiceRequest.query.get_or_404(request_id)
     rows = get_recommendations(_service_request_recommendation_source(service_request))
+    by_tech = {row["technician"].id: row for row in rows}
 
-    technicians = []
-    for index, row in enumerate(rows):
-        tech = row["technician"]
-        open_jobs = row["open_assignment_count"]
-        if index == 0:
-            status, label = "recommended", "Recommended"
-        elif row["technician_status"] == "offline":
-            status, label = "offline", "Offline"
-        elif open_jobs > 0 or row["technician_status"] == "busy":
-            status, label = "busy", "Busy"
-        else:
-            status, label = "available", "Available"
-        technicians.append({
-            "id": tech.id,
-            "name": tech.full_name,
-            "phone": getattr(tech, "contact_number", None) or None,
-            "status": status,
-            "status_label": label,
+    teams = []
+    for team in TechnicianTeam.query.order_by(TechnicianTeam.name).all():
+        members = list(team.members)
+        if not members:
+            continue
+        member_ids = [m.id for m in members]
+        open_jobs = Assignment.query.filter(
+            Assignment.technician_id.in_(member_ids),
+            Assignment.status.in_(OPEN_ASSIGNMENT_STATUSES),
+        ).count()
+        distances = [
+            by_tech[m.id]["distance_km"] for m in members
+            if m.id in by_tech and by_tech[m.id]["distance_known"]
+        ]
+        teams.append({
+            "id": team.id,
+            "name": team.name,
+            "leader": team.leader.full_name if team.leader else None,
+            "member_count": len(members),
             "open_jobs": open_jobs,
-            "distance_km": row["distance_km"] if row["distance_known"] else None,
-            "reason": row.get("reason"),
+            "distance_km": min(distances) if distances else None,
         })
+
+    # Best pick first: fewest open jobs, then nearest, then name.
+    teams.sort(key=lambda t: (t["open_jobs"], t["distance_km"] is None, t["distance_km"] or 0, t["name"]))
+    for index, team in enumerate(teams):
+        if index == 0:
+            team["status"], team["status_label"] = "recommended", "Recommended"
+        elif team["open_jobs"] > 0:
+            team["status"], team["status_label"] = "busy", "Busy"
+        else:
+            team["status"], team["status_label"] = "available", "Available"
 
     return jsonify(
         request_id=service_request.id,
         dispatchable=service_request.status in DISPATCHABLE_REQUEST_STATUSES,
         already_assigned=_current_open_assignment_for_request(service_request.id) is not None,
-        technicians=technicians,
+        teams=teams,
     )
 
 
 @dispatch_bp.route("/requests/<int:request_id>/assign-json", methods=["POST"])
 @role_required("administrator")
 def assign_request_json(request_id):
-    """AJAX counterpart of assign_request() for the post-approval popup:
-    same rules (request must be 'scheduled', no open assignment yet) and
-    the same Assignment row, answered with JSON instead of a redirect."""
+    """AJAX counterpart for the post-approval popup: assigns a whole TEAM.
+    One Assignment row is created per team member (so the job shows on
+    every member's dashboard / mobile app). Same rules as
+    assign_request(): request must be 'scheduled' and have no open
+    assignment yet."""
     service_request = ServiceRequest.query.get_or_404(request_id)
 
     if service_request.status not in DISPATCHABLE_REQUEST_STATUSES:
         return jsonify(
             ok=False,
-            message="This request isn't scheduled yet, so a technician can't be dispatched. "
+            message="This request isn't scheduled yet, so a team can't be dispatched. "
                     "Use the Dispatch Board once it is.",
         ), 409
     if _current_open_assignment_for_request(service_request.id) is not None:
-        return jsonify(ok=False, message="A technician is already assigned to this request."), 409
+        return jsonify(ok=False, message="A team is already assigned to this request."), 409
 
     data = request.get_json(silent=True) or {}
     try:
-        technician_id = int(data.get("technician_id"))
+        team_id = int(data.get("team_id"))
     except (TypeError, ValueError):
-        return jsonify(ok=False, message="Please select a technician."), 400
+        return jsonify(ok=False, message="Please select a team."), 400
 
-    technician = Technician.query.filter_by(id=technician_id, personnel_type="technician").first()
-    if technician is None:
-        return jsonify(ok=False, message="That technician isn't available for dispatch."), 404
+    team = TechnicianTeam.query.get(team_id)
+    if team is None or not team.members:
+        return jsonify(ok=False, message="That team isn't available for dispatch."), 404
 
-    score = None
-    for row in get_recommendations(_service_request_recommendation_source(service_request)):
-        if row["technician"].id == technician.id:
-            score = row["total_score"]
-            break
-
-    db.session.add(Assignment(
-        service_request_id=service_request.id,
-        technician_id=technician.id,
-        status="assigned",
-        dispatch_score=score,
-    ))
+    for member in team.members:
+        db.session.add(Assignment(
+            service_request_id=service_request.id,
+            technician_id=member.id,
+            status="assigned",
+        ))
     db.session.commit()
-    return jsonify(ok=True, message=f"Technician {technician.full_name} was assigned.")
+    return jsonify(ok=True, message=f"Team {team.name} was assigned.")
 
 
 @dispatch_bp.route("/requests/<int:request_id>/reassign", methods=["POST"])
