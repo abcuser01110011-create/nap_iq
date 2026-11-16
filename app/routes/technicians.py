@@ -520,12 +520,24 @@ def team_options():
     for team in TechnicianTeam.query.order_by(TechnicianTeam.name.asc()).all():
         if not team.members:
             continue
-        open_count = sum(
-            1 for m in team.members for a in m.assignments if a.status in open_states
-        )
-        completed_count = sum(
-            1 for m in team.members for a in m.assignments if a.status == "completed"
-        )
+        # A ticket dispatched to a team is stored as ONE Assignment PER MEMBER,
+        # so counting assignment rows multiplies every ticket by the number of
+        # members. Count each ticket once (furthest-along status wins), exactly
+        # like the Team Details card does in _team_jobs().
+        rank = {"in_progress": 4, "accepted": 3, "assigned": 2, "completed": 1, "cancelled": 0}
+        best_status = {}
+        for m in team.members:
+            for a in m.assignments:
+                if a.technical_issue_id is not None:
+                    key = ("TN", a.technical_issue_id)
+                elif a.service_request_id is not None:
+                    key = ("SO", a.service_request_id)
+                else:
+                    key = ("JOB", a.id)
+                if key not in best_status or rank.get(a.status, 0) > rank.get(best_status[key], 0):
+                    best_status[key] = a.status
+        open_count = sum(1 for st in best_status.values() if st in open_states)
+        completed_count = sum(1 for st in best_status.values() if st == "completed")
         rows.append({
             "id": team.id,
             "full_name": team.name,
