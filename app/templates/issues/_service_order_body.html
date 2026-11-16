@@ -88,6 +88,7 @@
     <dd class="col-sm-8">{{ service_request.updated_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
 </dl>
 
+{% if not service_request.voided_at %}
 <hr class="my-4">
 
 <div class="disp-dispatch-panel">
@@ -217,6 +218,7 @@
 {% else %}
 <p class="text-muted small mb-0">No technician has ever been assigned to this ticket.</p>
 {% endif %}
+{% endif %}{# /not voided: dispatch + assignment history hidden for a voided ticket #}
 
 {# Navigate lives in the card footer so it also shows in the Tickets list popup. #}
 {% if service_request.latitude is not none and service_request.longitude is not none %}
