@@ -1,0 +1,46 @@
+{# Stacked "all assigned tickets" popup, opened by a[data-assign-url] (View All
+   in the technician details). Included by the Technician list and the full view. #}
+<style>#techAssignModal { z-index: 1065; }</style>
+<div class="modal fade" id="techAssignModal" tabindex="-1" aria-label="Assigned tickets" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 1rem;">
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="position:absolute; top:1rem; right:1rem; z-index:5;"></button>
+            <div class="modal-body px-4 py-4" id="techAssignBody"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var el = document.getElementById('techAssignModal');
+    var body = document.getElementById('techAssignBody');
+    if (!el || !body) return;
+    var modal = bootstrap.Modal.getOrCreateInstance(el);
+    var SPIN = '<div class="text-center text-muted py-5"><div class="spinner-border" role="status"></div></div>';
+    el.addEventListener('keydown', function (e) { if (e.key === 'Escape') e.stopPropagation(); });
+    el.addEventListener('show.bs.modal', function () {
+        setTimeout(function () {
+            var b = document.querySelectorAll('.modal-backdrop');
+            if (b.length) b[b.length - 1].style.zIndex = '1060';
+        }, 0);
+    });
+    el.addEventListener('hidden.bs.modal', function (e) {
+        e.stopPropagation();
+        body.innerHTML = '';
+        if (document.querySelector('.modal.show')) {
+            document.body.classList.add('modal-open');
+            document.body.style.overflow = 'hidden';
+        }
+    });
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest('a[data-assign-url]');
+        if (!a) return;
+        e.preventDefault();
+        body.innerHTML = SPIN;
+        modal.show();
+        fetch(a.getAttribute('data-assign-url'), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { if (!r.ok) throw new Error(); return r.text(); })
+            .then(function (html) { body.innerHTML = html; })
+            .catch(function () { body.innerHTML = '<div class="text-center text-muted py-5">Could not load tickets. Please try again.</div>'; });
+    });
+})();
+</script>

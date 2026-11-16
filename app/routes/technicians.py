@@ -242,6 +242,22 @@ def view_technician(technician_id):
     )
 
 
+@technicians_bp.route("/<int:technician_id>/assignments")
+@role_required("administrator")
+def technician_assignments(technician_id):
+    """Popup body for "View All" on the technician details: every
+    ticket / service order ever assigned to this technician, newest first."""
+    technician = Technician.query.get_or_404(technician_id)
+    assignments = sorted(
+        technician.assignments,
+        key=lambda a: (a.assigned_at is not None, a.assigned_at, a.id),
+        reverse=True,
+    )
+    return render_template(
+        "technicians/_assignments_popup.html", technician=technician, assignments=assignments
+    )
+
+
 @technicians_bp.route("/<int:technician_id>/edit", methods=["GET", "POST"])
 @role_required("administrator")
 def edit_technician(technician_id):

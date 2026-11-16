@@ -117,7 +117,7 @@
                     <i class="bi bi-clipboard-check"></i>Open Assignments
                     <span class="tech-count">({{ open_assignments|length }})</span>
                 </div>
-                <a href="{{ url_for('issues.list_issues') }}" class="tech-viewall">View All <i class="bi bi-chevron-right small"></i></a>
+                <a href="{{ url_for('technicians.technician_assignments', technician_id=technician.id) }}" data-assign-url="{{ url_for('technicians.technician_assignments', technician_id=technician.id) }}" class="tech-viewall">View All <i class="bi bi-chevron-right small"></i></a>
             </div>
 
             {% if open_assignments %}
@@ -157,10 +157,21 @@
         </div>
     </div>
 
+    {% if technician.user %}
+    {% set acct_active = technician.user.status == 'active' %}
+    {% set in_popup = request.args.get('partial') %}
     <div class="tech-foot">
-        <a href="{{ url_for('technicians.edit_technician', technician_id=technician.id) }}"
-           data-edit-url="{{ url_for('technicians.edit_technician', technician_id=technician.id, partial=1) }}" class="tech-edit">
-            <i class="bi bi-pencil"></i>Edit
-        </a>
+        <form method="post" class="tech-acct-form"
+              action="{{ url_for('technicians.deactivate_technician_account' if acct_active else 'technicians.activate_technician_account', technician_id=technician.id, **({'partial': 1} if in_popup else {})) }}"
+              data-confirm="{{ 'Deactivate this account? They will no longer be able to sign in to the mobile app until it is reactivated.' if acct_active else 'Reactivate this account so they can sign in again?' }}"
+              {% if not in_popup %}onsubmit="return confirm(this.dataset.confirm);"{% endif %}>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if acct_active %}
+            <button type="submit" class="btn btn-outline-danger rounded-pill fw-bold px-4"><i class="bi bi-person-x me-1"></i>Deactivate Account</button>
+            {% else %}
+            <button type="submit" class="btn btn-outline-success rounded-pill fw-bold px-4"><i class="bi bi-person-check me-1"></i>Reactivate Account</button>
+            {% endif %}
+        </form>
     </div>
+    {% endif %}
 </div>
