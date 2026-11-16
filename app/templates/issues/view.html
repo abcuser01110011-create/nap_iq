@@ -28,6 +28,8 @@
     </div>
 </div>
 
+{% include "issues/_void_confirm_modal.html" %}
+
 {% if current_user.role == 'administrator' %}
 {% include "partials/ticket_form_modal.html" %}
 {% endif %}
