@@ -128,7 +128,7 @@
         // Carry the page's current light/dark choice into the account (only if one was chosen/remembered).
         try { if (localStorage.getItem("napiq-theme")) body.theme = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "dark" : "light"; } catch (err) {}
         var local = {};
-        if (!body.subscriber_code) local.subscriber_code = "Your account number or full name is required.";
+        if (!body.subscriber_code) local.subscriber_code = "Your account number is required.";
         if (!/^\d{11}$/.test(body.contact_number)) local.contact_number = "Phone number must be exactly 11 digits (numbers only).";
         if (Object.keys(local).length) { showErrors(loginForm, local); return; }
 

@@ -107,7 +107,7 @@ def database_test():
 
 _PHONE_RE = re.compile(r"^\d{11}$")
 _GENERIC_LOGIN_ERROR = (
-    "We couldn't find a subscriber record matching that account number or name "
+    "We couldn't find a subscriber record matching that account number "
     "and phone number. Please double-check both, or contact PG Networks "
     "support for help."
 )
@@ -187,14 +187,14 @@ def public_account_login():
         return jsonify(ok=True, redirect=url_for("auth.home"))
 
     data = _json_body()
-    code = str(data.get("subscriber_code") or "").strip()  # account number OR full name
+    code = str(data.get("subscriber_code") or "").strip()  # account number only
     phone = str(data.get("contact_number") or "").strip()
 
     errors = {}
     if not code:
-        errors["subscriber_code"] = "Your account number or full name is required."
+        errors["subscriber_code"] = "Your account number is required."
     elif len(code) > 150:
-        errors["subscriber_code"] = "Account number or name is too long."
+        errors["subscriber_code"] = "Account number is too long."
     if not phone:
         errors["contact_number"] = "The phone number on your account is required."
     elif not _PHONE_RE.match(phone):
