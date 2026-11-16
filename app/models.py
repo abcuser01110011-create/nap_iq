@@ -233,7 +233,7 @@ class Subscriber(db.Model):
     )
     payments = db.relationship(
         "Payment", back_populates="subscriber",
-        order_by="Payment.payment_date.desc()",
+        order_by="(Payment.payment_date.desc(), Payment.created_at.desc(), Payment.id.desc())",
     )
     # The real-world drop-cable route to this subscriber's linked NAP,
     # if a technician has ever recorded one — see CablePath's

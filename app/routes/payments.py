@@ -385,7 +385,7 @@ def subscriber_history(subscriber_id):
     payments = (
         Payment.query.options(joinedload(Payment.collector))
         .filter(Payment.subscriber_id == sub.id)
-        .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
+        .order_by(Payment.payment_date.desc(), Payment.created_at.desc(), Payment.id.desc())
         .all()
     )
     total = sum(float(p.amount) for p in payments if p.status == "confirmed")

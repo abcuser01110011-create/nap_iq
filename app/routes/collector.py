@@ -227,7 +227,7 @@ def index():
     # subscriber, most recently collected first), like the Collections tab.
     recent_rows = (
         Payment.query.filter_by(collector_id=g.user.id)
-        .order_by(Payment.payment_date.desc(), Payment.created_at.desc())
+        .order_by(Payment.payment_date.desc(), Payment.created_at.desc(), Payment.id.desc())
         .limit(100)
         .all()
     )
