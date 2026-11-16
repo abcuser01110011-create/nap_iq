@@ -12,8 +12,12 @@ app/routes/collector.py's own docstring for why that blueprint is
 intentionally narrow).
 
 Metrics, per collector:
-    Subscribers      — distinct subscribers this collector has ever
-                        recorded a (non-voided) payment for.
+    Subscribers      — total active subscribers inside this collector's
+                        coverage area (barangays), whether or not the
+                        collector has collected from them yet. Same
+                        address-contains-barangay match the collector's own
+                        Collections page uses. 0 until a coverage area is
+                        set.
     Collected Today  — sum of today's *confirmed* payments recorded by
                         this collector.
     Collection Rate  — of all non-voided payments this collector has
@@ -26,18 +30,23 @@ Coverage comes straight from `users.coverage_area` (see
 app/models.py) — set via Manage Users > Edit for that account, blank
 until an administrator fills it in.
 
+Accounts whose login was deactivated are hidden from the main list and
+shown via "View deactivated accounts" (?account=deactivated), same as the
+Technician tab. Deactivate / Reactivate buttons live in the row's popup
+(they post to users.deactivate_user / users.activate_user).
+
 Routes:
     GET /collectors/ -> list_collectors
 """
 
 from datetime import date
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 from sqlalchemy import func
 
 from app.extensions import db
 from app.auth import role_required
-from app.models import User, Payment
+from app.models import User, Payment, Subscriber
 
 collectors_bp = Blueprint("collectors", __name__, url_prefix="/collectors")
 
@@ -51,11 +60,17 @@ ACTIVE_RATE_THRESHOLD = 80
 def list_collectors():
     """Displays every Payment Collector account with its live
     collection metrics for today."""
-    collector_users = (
+    # Deactivated logins are hidden here and shown only via
+    # "View deactivated accounts" (?account=deactivated).
+    show_deactivated = request.args.get("account", "").strip() == "deactivated"
+    all_collectors = (
         User.query.filter_by(role="payment_collector")
         .order_by(User.full_name.asc())
         .all()
     )
+    collector_users = [
+        u for u in all_collectors if (u.status != "active") == show_deactivated
+    ]
 
     today = date.today()
     collector_ids = [c.id for c in collector_users]
@@ -64,12 +79,19 @@ def list_collectors():
     # per metric) so this page doesn't fire N*3 queries for N
     # collectors — same "query once, look up by id in Python"
     # approach the Reports tabs use for their own summary rows.
-    subscriber_counts = dict(
-        db.session.query(Payment.collector_id, func.count(func.distinct(Payment.subscriber_id)))
-        .filter(Payment.collector_id.in_(collector_ids), Payment.status != "voided")
-        .group_by(Payment.collector_id)
-        .all()
-    ) if collector_ids else {}
+    # Subscribers = every active subscriber inside the collector's coverage
+    # (barangays), not just the ones they've collected from. Addresses are
+    # loaded once and matched per collector in Python.
+    active_addresses = (
+        [(a or "").lower() for (a,) in db.session.query(Subscriber.address).filter_by(status="active").all()]
+        if collector_users else []
+    )
+
+    def _coverage_subscriber_count(user):
+        barangays = [b.strip().lower() for b in (user.coverage_area or "").split(",") if b.strip()]
+        if not barangays:
+            return 0
+        return sum(1 for addr in active_addresses if any(b in addr for b in barangays))
 
     collected_today = dict(
         db.session.query(Payment.collector_id, func.coalesce(func.sum(Payment.amount), 0))
@@ -102,7 +124,7 @@ def list_collectors():
 
         collectors.append({
             "user": user,
-            "subscribers": subscriber_counts.get(user.id, 0),
+            "subscribers": _coverage_subscriber_count(user),
             "collected_today": collected_today.get(user.id, 0),
             "rate": rate,
             "status": (
@@ -112,4 +134,6 @@ def list_collectors():
             ),
         })
 
-    return render_template("collectors/list.html", collectors=collectors)
+    return render_template(
+        "collectors/list.html", collectors=collectors, show_deactivated=show_deactivated
+    )

@@ -1,7 +1,7 @@
 {% extends "dashboard_base.html" %}
 {% block title %}Collectors{% endblock %}
 {% block page_title %}Collectors{% endblock %}
-{% block page_subtitle %}<p class="text-muted small mb-0">{{ collectors|length }} collector{{ '' if collectors|length == 1 else 's' }} shown</p>{% endblock %}
+{% block page_subtitle %}<p class="text-muted small mb-0">{{ collectors|length }} {{ 'deactivated ' if show_deactivated else '' }}collector{{ '' if collectors|length == 1 else 's' }} shown</p>{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-end mb-3">
@@ -11,6 +11,15 @@
     </button>
 </div>
 
+{# Plain-text link above the table, right-aligned (same as the Technician tab). #}
+<div class="text-end mb-3">
+    {% if show_deactivated %}
+    <a href="{{ url_for('collectors.list_collectors') }}" class="small text-secondary text-decoration-none">Back to active accounts</a>
+    {% else %}
+    <a href="{{ url_for('collectors.list_collectors', account='deactivated') }}" class="small text-secondary text-decoration-none">View deactivated accounts</a>
+    {% endif %}
+</div>
+
 <div class="disp-table-card">
     <div class="table-responsive">
         <table class="table disp-table align-middle mb-0">
@@ -18,7 +27,7 @@
                 <tr>
                     <th>Collector</th>
                     <th>Coverage</th>
-                    <th class="text-end">Subscribers</th>
+                    <th class="text-end" title="Active subscribers inside this collector's coverage">Subscribers</th>
                     <th class="text-end">Collected Today</th>
                     <th class="text-end">Collection Rate</th>
                     <th>Status</th>
@@ -36,7 +45,8 @@
                     data-collected="₱{{ '{:,.2f}'.format(row.collected_today) }}"
                     data-rate="{% if row.rate is not none %}{{ row.rate }}%{% endif %}"
                     data-status="{{ {'active': 'Active', 'behind': 'Behind', 'no_activity': 'No Activity'}.get(row.status, row.status|capitalize) }}"
-                    data-edit-url="{{ url_for('users.edit_user', user_id=row.user.id, next='collectors') }}">
+                    data-edit-url="{{ url_for('users.edit_user', user_id=row.user.id, next='collectors') }}"
+                    data-acct-url="{{ url_for('users.activate_user' if show_deactivated else 'users.deactivate_user', user_id=row.user.id) }}">
                     <td><span class="disp-primary-link">{{ row.user.full_name }}</span></td>
                     <td class="disp-subtext">{{ row.user.coverage_area or "—" }}</td>
                     <td class="text-end">{{ row.subscribers }}</td>
@@ -64,8 +74,7 @@
                 <tr>
                     <td colspan="6" class="disp-empty">
                         <i class="bi bi-cash-coin display-6 d-block mb-2"></i>
-                        No collector accounts found. Create one from Manage Users with the
-                        "Payment Collector" role.
+                        {% if show_deactivated %}No deactivated accounts.{% else %}No collector accounts found. Create one with Add Collector.{% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -161,6 +170,14 @@
                 </dl>
             </div>
             <div class="modal-footer">
+                <form method="post" id="collectorAcctForm" class="me-auto">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if show_deactivated %}
+                    <button type="submit" class="btn btn-outline-success"><i class="bi bi-person-check me-1"></i>Reactivate Account</button>
+                    {% else %}
+                    <button type="submit" class="btn btn-outline-danger"><i class="bi bi-person-x me-1"></i>Deactivate Account</button>
+                    {% endif %}
+                </form>
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                 <a href="#" id="collectorEditLink" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Edit</a>
             </div>
@@ -179,8 +196,14 @@
             el.textContent = d[el.getAttribute("data-f")] || "\u2014";
         });
         document.getElementById("collectorEditLink").href = d.editUrl;
+        document.getElementById("collectorAcctForm").action = d.acctUrl;
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
+    var acctForm = document.getElementById("collectorAcctForm");
+    if (acctForm) acctForm.addEventListener("submit", function (e) {
+        var msg = {{ ('Reactivate this account so the collector can sign in again?' if show_deactivated else 'Deactivate this account? The collector will no longer be able to sign in until it is reactivated.')|tojson }};
+        if (!confirm(msg)) e.preventDefault();
+    });
     document.querySelectorAll(".collector-row").forEach(function (row) {
         row.addEventListener("click", function () { open(row); });
         row.addEventListener("keydown", function (e) {
