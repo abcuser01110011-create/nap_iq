@@ -64,6 +64,16 @@
        flow -> Assignment.port_number). Only ever set once a
        technician has actually been dispatched, so this falls
        back to "No Port" until then. #}
+    {# "Assigned Team: ..." is stored as the first line of the description;
+       it gets its own row and is left out of the Description box below. #}
+    {% set desc_extras, desc_text = ticket_parts(issue.description) %}
+    {% for label, value in desc_extras %}
+    {% if value %}
+    <dt class="col-sm-4 text-muted fw-normal">{{ 'Assisted By' if label == 'Technician(s) requested' else label }}</dt>
+    <dd class="col-sm-8">{{ value }}</dd>
+    {% endif %}
+    {% endfor %}
+
     <dt class="col-sm-4 text-muted fw-normal">Port Number</dt>
     <dd class="col-sm-8">{{ port_number if port_number is not none else "No Port" }}</dd>
 
@@ -97,7 +107,7 @@
 
 <h6 class="mb-2">Description</h6>
 <div class="p-3 border rounded bg-body-secondary">
-    {{ issue.description or "—" }}
+    {{ desc_text or "—" }}
 </div>
 
 {# Phase 13 (65%, navigation destination panels): only offered

@@ -189,7 +189,35 @@ def _live_team_names():
     return cached
 
 
-def _assigned_team_name(text, assignment):
+_TICKET_EXTRA_LABELS = ("Assigned Team", "Technician(s) requested", "Barangay", "Scheduled")
+_TN_NO_DESCRIPTION_FALLBACK = "Reported via the GeoMap Tickets menu."
+
+
+@issues_bp.app_template_global()
+def ticket_parts(text):
+    """Splits a ticket's free-text notes/description into its leading
+    "Label: value" lines (Assigned Team, Technician(s) requested, Barangay,
+    Scheduled -- written by the GeoMap "+ Tickets" form) and the real
+    free-typed remainder. Returns ([(label, value), ...], remainder) so the
+    ticket popup can show Assigned Team as its own row and the notes alone."""
+    if not text:
+        return [], ""
+    lines = str(text).split("\n")
+    extras = []
+    i = 0
+    while i < len(lines):
+        label = next((l for l in _TICKET_EXTRA_LABELS if lines[i].startswith(l + ": ")), None)
+        if label is None:
+            break
+        extras.append((label, lines[i][len(label) + 2:].strip()))
+        i += 1
+    rest = "\n".join(lines[i:]).strip()
+    if rest == _TN_NO_DESCRIPTION_FALLBACK:
+        rest = ""
+    return extras, rest
+
+
+def _assigned_team_name(text, assignment, trust_named=False):
     """Team name for the tickets list's "Assigned Team" column: the team named
     in the ticket's own "Assigned Team: ..." line when present, otherwise the
     team of the assigned technician (the one they lead, else their first
@@ -200,7 +228,9 @@ def _assigned_team_name(text, assignment):
         # Only trust the stored name while a team with that name still
         # exists (a renamed/deleted team's old text would be stale);
         # otherwise fall through to the technician's current team.
-        if named.lower() in _live_team_names():
+        # A voided ticket is frozen, so its stored team name is kept even if
+        # the team has since been renamed/removed.
+        if trust_named or named.lower() in _live_team_names():
             return named
     tech = assignment.technician if assignment else None
     if tech is None:
@@ -244,7 +274,7 @@ def _ticket_row_from_issue(issue, assignment):
     exists."""
     subscriber_name = issue.subscriber.full_name if issue.subscriber else ""
     subscriber_code = issue.subscriber.subscriber_code if issue.subscriber else ""
-    assigned_name = _assigned_team_name(issue.description, assignment)
+    assigned_name = _assigned_team_name(issue.description, assignment, trust_named=bool(issue.voided_at))
 
     return {
         "kind": "trouble_ticket",
@@ -292,7 +322,7 @@ def _ticket_row_from_service_request(service_request, assignment):
         service_request.subscriber.full_name if service_request.subscriber else (service_request.full_name or "")
     )
     subscriber_code = service_request.subscriber.subscriber_code if service_request.subscriber else ""
-    assigned_name = _assigned_team_name(service_request.notes, assignment)
+    assigned_name = _assigned_team_name(service_request.notes, assignment, trust_named=bool(service_request.voided_at))
 
     return {
         "kind": "service_order",
@@ -412,6 +442,17 @@ def list_issues():
             assignment_by_issue[a.technical_issue_id] = a
         if a.service_request_id and a.service_request_id not in open_request_ids:
             assignment_by_request[a.service_request_id] = a
+
+    # A voided ticket's assignments were all cancelled, so fall back to the
+    # most recent one (any status) to still show which team it was given to.
+    voided_issue_ids = {i.id for i in issues if i.voided_at and i.id not in assignment_by_issue}
+    voided_request_ids = {r.id for r in service_requests if r.voided_at and r.id not in assignment_by_request}
+    if voided_issue_ids or voided_request_ids:
+        for a in Assignment.query.order_by(Assignment.assigned_at.asc(), Assignment.id.asc()).all():
+            if a.technical_issue_id in voided_issue_ids:
+                assignment_by_issue[a.technical_issue_id] = a
+            if a.service_request_id in voided_request_ids:
+                assignment_by_request[a.service_request_id] = a
 
     # A ticket folded into a consolidated parent has no assignment of its
     # own (only the parent's technician is sent), so show the parent's

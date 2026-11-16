@@ -78,8 +78,22 @@
     <dd class="col-sm-8">{{ service_request.port_capacity }}</dd>
     {% endif %}
 
+    {# Notes are stored as "Assigned Team: ..." lines followed by the typed
+       note: show the team (and any other form fields) as their own rows and
+       keep the note alone in a read-only box. #}
+    {% set note_extras, note_text = ticket_parts(service_request.notes) %}
+    {% for label, value in note_extras %}
+    {% if value %}
+    <dt class="col-sm-4 text-muted fw-normal">{{ 'Assisted By' if label == 'Technician(s) requested' else label }}</dt>
+    <dd class="col-sm-8">{{ value }}</dd>
+    {% endif %}
+    {% endfor %}
+
     <dt class="col-sm-4 text-muted fw-normal">Notes</dt>
-    <dd class="col-sm-8">{{ service_request.notes or "—" }}</dd>
+    <dd class="col-sm-8">
+        <textarea class="form-control bg-body-secondary" rows="3" readonly tabindex="-1"
+                  aria-label="Notes (read only)">{{ note_text }}</textarea>
+    </dd>
 
     <dt class="col-sm-4 text-muted fw-normal">Created</dt>
     <dd class="col-sm-8">{{ service_request.created_at.strftime('%B %d, %Y %I:%M %p') }}</dd>
