@@ -39,3 +39,13 @@ def test_success_resets_counter(lenient, client):
 def test_min_attempts_is_five(lenient):
     from app.config import Config
     assert Config.LOGIN_MAX_ATTEMPTS >= 5
+
+
+def test_counter_survives_new_app_instance(lenient, client):
+    """Serverless regression: the count must live in the database, not in
+    process memory, so a fresh worker still sees earlier failures."""
+    from app.login_attempts import LoginAttempt
+    client.post("/login", data={"username": "admin1", "password": "bad"})
+    client.post("/login", data={"username": "admin1", "password": "bad"})
+    with lenient.app_context():
+        assert LoginAttempt.query.one().attempts == 2
